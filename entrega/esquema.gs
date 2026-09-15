@@ -797,6 +797,9 @@ function _sembrar(ss) {
     ['ULTIMO_BACKUP', ''],
     ['OAUTH_CLIENT_ID', ''],
     ['BACKUP_MAX_DIARIOS', '30'],
+    // Mes de la última copia mensual PERMANENTE (D7). Lo escribe backupMensual();
+    // sirve para ver de un vistazo si la serie de años está al día.
+    ['ULTIMO_BACKUP_MENSUAL', ''],
     ['VERSION_ESQUEMA', '2.0'],
     // Modo desarrollo: TRUE = omite la verificación GIS y usa AUTH_DEV_FIRMA.
     // DEBE quedar en FALSE en producción.

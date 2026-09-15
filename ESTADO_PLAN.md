@@ -160,8 +160,8 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | # | Trabajo | Estado |
 |---|---|---|
 | 1 | **G1** · Un solo escapado en la interfaz, con guardia que lo exija | ✅ hecho |
-| 2 | **G2** · Snapshot mensual permanente, con guardia | en curso |
-| 3 | **G4** · Sacar el RUT, por tandas y con guardia primero | pendiente |
+| 2 | **G2** · Snapshot mensual permanente, con guardia | ✅ hecho |
+| 3 | **G4** · Sacar el RUT, por tandas y con guardia primero | en curso |
 | 4 | **G5** · Capa `core/` en la interfaz, pieza por pieza | pendiente |
 | 5 | Estética | pendiente |
 | — | **G3** y **G6** | esperando a Diego / informática |
