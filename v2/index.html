@@ -38,6 +38,13 @@ body{background:var(--bg);color:var(--txt);font-size:15px;overflow-x:hidden;}
 .col input:focus,.col select:focus{border-color:var(--primary);box-shadow:0 0 0 2px #bfdbfe55;}
 .col textarea,.fcard-body textarea{height:auto;min-height:38px;padding:9px 11px;resize:vertical;font-size:.92rem;border:1px solid #dbe2ea;border-radius:9px;background:#fff;outline:none;font-family:inherit;width:100%;box-sizing:border-box;}
 .grow{flex-grow:1;}.ws{width:70px;flex-grow:0;}.wm{width:100px;flex-grow:0;}.wa{flex-grow:0;min-width:min-content;}
+/* Campo angosto con etiqueta larga. «Fijación · cm de arcada dental» son 30
+   caracteres y en los 70 px de .ws envolvía en TRES líneas, estirando la fila
+   entera para que un campo numérico de dos dígitos tuviera título. No se
+   acorta el texto: la unidad decidió que la fijación se mide siempre en
+   arcada dental y eso se dice en pantalla, no solo en el globo de ayuda. Se
+   le da el ancho que el texto necesita para caber en dos. */
+.wf{width:118px;flex-grow:0;}
 .bold{font-weight:700;}.tc{text-align:center;}.mt{margin-top:8px;}.mb{margin-bottom:14px;}
 .check{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:#fff;transition:border-color .15s,background .15s;}
 .check:hover{border-color:#cbd5e1;}
@@ -906,6 +913,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
   .row{gap:6px;}
   .col input,.col select{height:36px;font-size:.9rem;}
   .ws{width:58px;}
+  .wf{width:104px;}
 }
 @media(max-width:560px){
   /* Pestañas: barra deslizable con momentum; compactas para que quepan más */
@@ -1028,7 +1036,16 @@ table.rhb2 .rl{width:128px;text-align:left;}
   #sp .pcontent>form{flex:1;min-width:0;}
 }
 .riel-t{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;padding:2px 8px 6px;}
-.riel-i{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:.76rem;cursor:pointer;color:#334155;font-weight:600;}
+.riel-i{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:7px;font-size:.76rem;cursor:pointer;color:#334155;font-weight:600;line-height:1.25;}
+/* El nombre de la sección se lee entero. Antes iba en una línea con puntos
+   suspensivos y en un riel de 196 px eso dejaba CUATRO de las diez secciones
+   ilegibles: «Sedación y Concie…», «Respiratorio — 💨 …», «IMT / ⚡ EMS —
+   En…», «Procedimientos de…». Un índice que no dice a dónde lleva no es un
+   índice. Ahora envuelve y recién corta a las tres líneas, que es lo que
+   necesita el nombre más largo que hay hoy («IMT / EMS — Entrenamiento
+   muscular», 39 caracteres). El título completo va además en el globo de
+   ayuda, por si alguna vez nace uno más largo. */
+.riel-i .riel-tx{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .riel-i:hover{background:#eef2f7;}
 .riel-st{width:16px;height:16px;border-radius:50%;border:1.5px solid #c7cdd6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.58rem;flex-shrink:0;font-weight:800;}
 .riel-st.ok{background:#16a34a;border-color:#16a34a;}
@@ -3091,7 +3108,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div id="dTOT" class="row hidden" style="margin-bottom:6px;align-items:flex-end;">
                 <div class="col wa"><label>TOT N°</label>
                   <select id="fTOTn" class="bold tc" style="height:34px;"><option value="">--</option><option>6.0</option><option>6.5</option><option>7.0</option><option>7.5</option><option>8.0</option><option>8.5</option></select></div>
-                <div class="col ws"><label>Fijación · cm de <b>arcada dental</b></label><input type="number" id="fTOTcm" class="tc bold" placeholder="22" style="height:34px;" title="Norma de la unidad: la fijación se mide en cm de arcada dental. Se puede ajustar en cualquier turno (reposicionamiento del tubo), sin declarar cambio de tubo."></div>
+                <div class="col wf"><label>Fijación · cm de <b>arcada dental</b></label><input type="number" id="fTOTcm" class="tc bold" placeholder="22" style="height:34px;" title="Norma de la unidad: la fijación se mide en cm de arcada dental. Se puede ajustar en cualquier turno (reposicionamiento del tubo), sin declarar cambio de tubo."></div>
                 <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cCambioTOT" onchange="toggleCambioTOT()"><label for="cCambioTOT" style="font-weight:700;color:#1d4ed8;">🔄 Cambio de tubo</label></div>
                 <div class="col wa hidden" id="dCambioTOTmot"><label>Motivo del cambio</label>
                   <select id="fCambioTOTmot" onchange="if(this.value==='Otro')show('dCambioTOTdet');else{hide('dCambioTOTdet');const e=$('fCambioTOTdet');if(e)e.value='';}" style="min-width:200px;">
@@ -5633,7 +5650,7 @@ function rielRender(){
               (faltas.indexOf('vía aérea')!==-1 && /Ventilatoria/i.test(t));
     return `<div class="riel-i${req?' req':''}" onclick="rielIr(${i})">`+
       `<span class="riel-st${lleno?' ok':''}">${lleno?'✓':''}</span>`+
-      `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t}</span></div>`;
+      `<span class="riel-tx" title="${escapeHtml(t)}">${escapeHtml(t)}</span></div>`;
   }).join('');
 }
 function rielIr(i){
