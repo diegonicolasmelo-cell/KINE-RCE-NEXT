@@ -1,0 +1,20 @@
+{
+  "name": "RCE-KINE NEXT · TEST",
+  "short_name": "RCE NEXT",
+  "description": "Prototipo seguro y sintético de RCE-KINE NEXT",
+  "lang": "es-CL",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f5",
+  "theme_color": "#0b6b58",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
