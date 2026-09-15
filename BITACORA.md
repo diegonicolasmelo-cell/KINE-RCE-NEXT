@@ -1,0 +1,162 @@
+# BITÁCORA — KINE-RCE-NEXT
+
+Qué se cambió en NEXT, por qué, qué se midió y con qué trampa se tropezó.
+
+**Esto NO son las reglas vigentes.** Las reglas viven en `CLAUDE.md`, que se
+lee entero en cada sesión. Lo que falta del plan, medido sobre el código, vive
+en `ESTADO_PLAN.md`. Este archivo se consulta cuando hace falta el porqué.
+
+La bitácora de la aplicación anterior —un año de versiones— se quedó en el
+repositorio de origen (`diegonicolasmelo-cell/RCE-KINE`, `BITACORA.md`). No se
+copió: NEXT arranca su propia memoria desde la base aprobada.
+
+---
+
+## 15-sep-2026 · La base 7.04 entra en NEXT, y las primeras cuatro brechas
+
+El repositorio tenía un solo archivo: un README que decía «importación del
+código fuente pendiente». Este día se hizo la importación y se empezó a cerrar
+lo que el plan maestro pedía y la base no tenía.
+
+### La importación
+
+Desde el commit inmutable aprobado de RCE-KINE (`21498b0`,
+`7.04-aviso-de-error-al-centro`). Entró el fuente entero, la batería, las
+herramientas, las skills, el plan y los 13 PRD de la base. **No** entraron los
+25 MB de cohetes de versiones viejas, las carpetas `legacy/` y `scratchpad/`,
+ni el identificador de la implementación de producción del hospital.
+
+Se verificó uno por uno que ningún RUT de las guardias fuera real: los siete
+que aparecen son inventados (`11111111-1` y parecidos).
+
+**Las cuatro guardias que salieron rojas al importar, ninguna por código roto:**
+
+1. `panel_no_pisa_datos.js` traía la ruta **absoluta** del repositorio viejo.
+   Es la misma trampa que ya se había pagado en `coordinacion_ui.js`.
+2. y 3. `guardado_viajes.js` y `tablero.js` son guardias **A/B**: comparan el
+   código de hoy contra el de un commit anterior, que sacaban del historial con
+   `git worktree` y `git show`. NEXT arranca con historial propio y esos commits
+   no existen acá. Se congelaron los dos árboles de referencia **dentro del
+   repositorio** (`build/checks/base/`, solo los `.gs`: el banco no lee el
+   index) y las guardias leen de ahí.
+4. `paridad_v3.js` comparaba el fuente contra el espejo de la implementación
+   del **hospital**, que no viaja a NEXT. La reemplaza `paridad_entrega.js`,
+   que regenera el paquete completo y lo compara **byte a byte**. Es más
+   estricta que la anterior: aquella, para `infra.gs` y `dominio.gs`, solo
+   exigía que el fuente estuviera **contenido** en el fusionado, así que no
+   habría cazado nada agregado de más en el espejo.
+
+### G1 · Un solo escapado en la interfaz
+
+`escapeHtml` no existía. Había **nueve** funciones locales, siete llamadas
+`esc`, y ninguna igual a otra: una escapaba `& < "` pero no `>` ni la comilla
+simple; otra solo `"`; otra `& < >` pero no `"`; `_aftEsc` y `_escSt` (72 usos)
+cuatro de los cinco; una escapaba metacaracteres de expresión regular y dos
+citaban campos de CSV. Que casi todas se llamaran igual es lo peligroso: mover
+una línea de un bloque a otro parecía seguro.
+
+Ahora: `escapeHtml` (los cinco caracteres), `escapeJs` para el caso doble —un
+valor dentro de una cadena de JavaScript que vive en un atributo, donde
+escapar HTML no basta porque el navegador **decodifica la entidad antes** de
+leer el JavaScript— y `hEsc` como tag de plantilla. Las que sí escapaban HTML
+quedaron como alias; las que no, cambiaron de nombre a `escRe` y `escCsv`.
+
+🪤 El plan llama `h` al tag. Acá no puede llamarse así: `h` ya es variable
+local en más de diez funciones y el global quedaría ensombrecido sin aviso.
+
+**Dos agujeros reales aparecieron al medir**: la grilla de la hoja del día
+escapaba el `title` del `<td>` y metía el mismo dato **crudo** en la celda; y
+el plan del paciente iba a un `<textarea>` escapando la comilla doble —que ahí
+no molesta— y no el `<`, que es el único que importa: un `</textarea>` escrito
+en el plan cerraba el campo.
+
+### El arranque hacía dos GET_BOOT idénticos
+
+`rendimiento.js` se puso roja sin que nadie tocara el arranque: **a las 10:00
+pasaba y a las 19:39, no**. `window.onload` llamaba al aviso de fin de turno
+antes del arranque, y ese aviso armaba su lista con su **propio** GET_BOOT —
+pero solo dispara en los 30 minutos previos al cambio de turno, así que fuera
+de esa ventana el arranque parecía limpio. Dentro, salían dos viajes idénticos
+con 1 ms de diferencia, en la hora de más gente conectada.
+
+Ahora el aviso arranca **después** del boot y reusa lo que el boot acaba de
+traer (ventana de 15 s); pasada esa ventana vuelve a preguntar.
+
+🪤 La trampa de fondo, que es lo que cerró la guardia nueva
+`arranque_un_viaje.js`: **una guardia que lee el reloj real da distinto según
+la hora a la que se corra**. Es la misma familia del `hoyISO` sombreado. Ahora
+el reloj del navegador se congela dentro de la ventana de aviso, así el caso
+peor se prueba siempre. Y comprueba que el aviso **sí** se arme: apagarlo para
+pasar la guardia sería trampa.
+
+### G2 · El respaldo mensual permanente (D7)
+
+Estaba solo la mitad diaria: `_rotarBackups()` mandaba a la papelera todo lo
+que pasara de 30, así que **a los 30 días no quedaba ninguna foto** de la
+planilla. La estadística de la unidad se sostiene sobre años de registros;
+contra eso, 30 días de memoria no es un respaldo, es una ventana.
+
+`backupMensual()` hace una copia al mes en la subcarpeta «mensuales». La llama
+el diario y se salta sola si el mes ya tiene la suya, así que no hace falta
+otro activador. Va en su propio `try` y después de rotar: si Drive falla con la
+mensual, la diaria del día ya está hecha.
+
+La rotación no puede alcanzarla por **dos** razones independientes: vive en
+otra carpeta —`getFilesByType` solo lista hijos directos— y su nombre no lleva
+el prefijo diario. Se dejan las dos a propósito: una sola se rompe sin que
+nadie note nada hasta que ya se borró un año.
+
+### G4 · El RUT no se saca, pero se acota y se vigila
+
+D9 dice «se elimina la columna RUT de todas las hojas». Al medir apareció que
+hoy hace **cuatro trabajos que nadie más hace**: empareja los gases del
+laboratorio con el episodio (el informe trae RUT, no `COD_PACIENTE`: sin él no
+hay ninguna llave), detecta reingresos, es término del buscador y es lo que
+copian los botones de Synapse y del laboratorio. Las hojas impresas lo llevan
+en su casilla.
+
+D9 se cerró en julio; las cuatro funciones llegaron en julio y agosto, pedidas
+por Diego, y el plan nunca se actualizó. **En los hechos D9 quedó superada**,
+pero eso lo tiene que decir él: la pregunta está escrita en `ESTADO_PLAN.md`.
+
+Lo que sí se hizo es la minimización (§10 del plan). `rut_minimo.js` siembra un
+RUT sintético, llama al dispatcher **acción por acción** y exige que no
+aparezca salvo en una lista corta con motivo escrito. Primera corrida: 19
+respuestas limpias y dos que sí lo llevan — `GET_BOOT` y `GET_TODAS_CAMAS`, o
+sea **el censo del arranque reparte el RUT de todos los pacientes a todos los
+navegadores**. Se revisó si era fuga y no lo es: el navegador lo usa en seis
+lugares y la app **nunca pide una cama suelta** (`GET_CAMA` no se llama desde
+el front). Queda anotado como decisión de diseño, y cualquier respuesta nueva
+que empiece a llevarlo pone la batería roja.
+
+### G5 · core/modal.js
+
+De lo que pide §9.1 había: backdrop único, Escape con sus excepciones
+pensadas, y aria-modal en 15 de 20. Faltaba el resto, entero: **ningún modal
+tenía nombre** (el lector de pantalla anunciaba «diálogo» y nada más), cinco
+superficies bloqueantes no tenían rol de diálogo siquiera —entre ellas la
+confirmación propia y el cuadro rojo de «No se guardó»—, **no había ni un
+manejador de Tab** en 18.700 líneas y no se devolvía el foco al cerrar.
+
+Con el panel abierto, tabular salía del formulario hacia los botones de la
+grilla **tapados detrás**: se podía activar un control sin verlo.
+
+Se hizo **sin tocar ninguna función de abrir o cerrar**. Hay una veintena, cada
+una con sus reglas (el egreso pregunta antes de descartar, el aviso de fin de
+turno es bloqueante a propósito, el historial cierra solo con su X).
+Reescribirlas sería el cambio más grande y más arriesgado de la interfaz a
+cambio de nada visible. El módulo **observa la clase `on`** y aplica foco y
+accesibilidad desde afuera.
+
+🪤 El foco inicial no se roba: si al abrirse ya está dentro del modal, no se
+mueve. Pisarlo mandaría al usuario al botón de cerrar en vez de al campo donde
+iba a escribir.
+
+🪤 Escape no se centralizó aunque el plan lo liste: el manejador que existe
+tiene excepciones pensadas, y duplicarlo sería reabrirlas por accidente.
+
+---
+
+Batería al cierre del día: **145 verdes, 0 rojas**. Sin cambio de esquema que
+obligue a correr `crearORepararEstructura()` (la clave nueva de CONFIG se
+agrega sola).

@@ -3,7 +3,11 @@ name: entrega-gas
 description: Pipeline de entrega de archivos al proyecto Apps Script de RCE-KINE. Usar SIEMPRE que haya que enviar al usuario archivos para pegar en el editor de Apps Script — index.html, servicios.gs o cualquier .gs — después de cualquier cambio de código, arreglo de bug o nueva funcionalidad. También cuando el usuario pida "mándame el archivo", "el index", "el zip" o reporte que va a pegar código. El index NUNCA se entrega crudo; viaja en formato cohete (base64).
 ---
 
-# Entrega de archivos a Apps Script (RCE-KINE)
+# Entrega de archivos a Apps Script (NEXT)
+
+🔴 **NEXT no despliega la aplicación del hospital.** Su paquete va a una
+planilla de pruebas con su propio proyecto de Apps Script, separada de la que
+usa el equipo. Nunca se pega en la implementación de producción de RCE-KINE.
 
 Diego (el usuario, no programador) actualiza su proyecto de Apps Script
 pegando a mano el contenido de los archivos que se le envían. Esta skill
@@ -25,17 +29,20 @@ debe acompañar a cada envío. Saltarse pasos ya costó días de depuración
    qué versión lo produjo.
 3. **Nombre de archivo único por versión** (`index_v24_cohete.html`, no
    `index.html`): el usuario acumula descargas y ya pegó una vieja por error.
-4. **Los servicios se entregan fusionados.** El proyecto de producción usa
-   9 archivos .gs; los 11 `svc_*.gs` del repo viajan como un solo
-   `servicios.gs` generado por `build/fusionar_servicios.js` (falla solo si
-   hay funciones duplicadas — no ignorar ese fallo).
-5. **Verificar antes de enviar.** Correr la batería completa (skill `rce-kine`,
-   `references/verificacion.md`; o directo `node build/verificar.js` si ya estás
-   en el repo) o al menos `build/checks/convenciones.js` + `arranque.js` sobre
-   el archivo generado. Nunca enviar un archivo que no arrancó en el simulador.
+4. **El paquete entero se GENERA, no se arma a mano.**
+   `node build/paquete_migracion.js entrega` produce los 13 archivos que el
+   editor necesita: los `svc_*.gs` fusionados en `servicios.gs`, los
+   `infra_*` en `infra.gs`, los `dominio_*` en `dominio.gs`, el resto copiado
+   1:1 y el index en formato cohete. Falla si hay funciones duplicadas — no
+   ignorar ese fallo. La guardia `paridad_entrega.js` compara `entrega/`
+   contra lo que genera el empaquetador **byte a byte**: si cambiaste el
+   fuente y olvidaste regenerar, la batería se pone roja.
+5. **Verificar antes de enviar.** `node build/verificar.js` — la batería
+   entera (skill `verificar`). Nunca enviar un archivo que no arrancó en el
+   simulador.
 6. **Qué archivos pegar SE CALCULA, no se recuerda:** `node build/que_pegar.js
-   origin/main` (o contra la referencia de producción, que puede ir detrás de
-   `main`). Recordarlo ya dejó dos entregas incompletas: faltaron `esquema` —y
+   <referencia-ya-pegada>` (la última que el usuario pegó de verdad, que puede
+   ir detrás de la rama). Recordarlo ya dejó dos entregas incompletas: faltaron `esquema` —y
    sin él las columnas nuevas no existen, así que el formulario manda datos a
    ninguna parte, en silencio— `dominio` y `mantenimiento`.
 7. 🔴 **EL PORTAPAPELES CORROMPE LOS ACENTOS EN ARCHIVOS GRANDES** (19-ago-2026).
@@ -64,15 +71,12 @@ debe acompañar a cada envío. Saltarse pasos ya costó días de depuración
 ## Pipeline
 
 ```bash
-# 1. (si cambió algún svc_*.gs)  →  regenerar la fusión
-node build/fusionar_servicios.js
+# 1. Subir VERSION en build/empaquetar_cohete.js si cambió index.html
+# 2. Regenerar el paquete completo
+node build/paquete_migracion.js entrega
 
-# 2. (si cambió index.html)  →  subir VERSION y generar el cohete
-node build/empaquetar_cohete.js build/index_cohete.html
-
-# 3. Verificación mínima del entregable
-node build/checks/convenciones.js
-node build/checks/arranque.js build/index_cohete.html
+# 3. Batería completa (no solo dos guardias: son ~145 y corren en 2 minutos)
+node build/verificar.js
 
 # 4. Renombrar con la versión y enviar con SendUserFile
 ```

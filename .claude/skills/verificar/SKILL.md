@@ -16,6 +16,10 @@ código (o, si la convención cambió de verdad, se documenta en CLAUDE.md).
 # 0. Dependencia de navegador (una vez por sesión)
 npm install --prefix build --no-save playwright-core
 
+# 1. TODA la batería (es lo normal: ~145 guardias en algo más de 2 minutos)
+node build/verificar.js
+
+# …o suelta, cuando se está iterando sobre una:
 # 1. Guardias estáticas (rápidas, sin navegador)
 node build/checks/convenciones.js
 #    · cero confirm() nativos (la convención es uiConfirm)
