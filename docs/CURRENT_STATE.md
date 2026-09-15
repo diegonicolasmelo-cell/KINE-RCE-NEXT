@@ -10,15 +10,24 @@ de trabajo se revisarán al final.
 
 ## Mediciones por componentes (avance actual)
 
-Último avance local: PIM/PEM (cmH₂O), FEM (L/s), prensión (kg) y presión
+Último avance: PIM/PEM (cmH₂O), FEM (L/s), prensión (kg) y presión
 transtraqueal (cmH₂O) con formato numeric-v1, validación numérica, signo y coma
 decimal. Prensión rechaza negativos según min=0 de legacy. No se añadieron
 umbrales de interpretación clínica. Históricos sin ese formato se conservan.
-33 pruebas aprobadas. Paquete regenerado; este último cambio todavía NO está
-cargado en Google: la implementación publicada sigue en versión 2 con escalas.
-Próxima acción: cargar el paquete, actualizar la misma implementación TEST y
-verificar una medición numérica desde la interfaz; luego continuar GSA y sesiones.
-Automatización existente actualizada a cada 3 minutos por solicitud de Diego.
+GSA ahora registra pH, PaO₂, PaCO₂, HCO₃, EB, lactato, SaO₂ y FiO₂, conservando
+ausencias como null. No se añadió interpretación clínica automática.
+KTR admite técnicas agrupadas en una sola atención. KTM/IMT/EMS conservan
+parámetros por sesión y validan rangos del formulario 7.04. Los parámetros vacíos
+no se rellenan; una actividad no realizada no admite parámetros de ejecución.
+39 pruebas aprobadas. Se corrigió además el reintento después de guardar y fallar
+la lectura posterior, y se propaga la incertidumbre de errores de escritura Sheets.
+Se verificó GSA real sintética con cero, signo y coma; una KTR con dos técnicas
+contó como una atención, y KTM conservó 20 minutos y Borg 0.
+Correcciones de reintentos y campos ausentes incluidas en el paquete final.
+Versión 4 publicada en Google TEST el 15/09/2026 a las 13:51, misma URL y acceso Solo yo.
+El usuario pidió quitar el intervalo: se eliminó la automatización recurrente.
+Continuar directamente en esta tarea. Horarios de turno consultados al usuario,
+todavía sin respuesta; no asumir una nueva regla horaria.
 
 - MRC: 12 componentes, seis movimientos bilaterales; total derivado 0–60.
 - FSS: cinco componentes, NE conservado; hasta dos NE se imputa promedio y se
@@ -55,19 +64,19 @@ Automatización existente actualizada a cada 3 minutos por solicitud de Diego.
 - Modelo puro de episodios, turnos, eventos, series, actividades, pendientes y cultivos.
 - Borradores, firma con texto congelado, adendas y auditoría por operación.
 - Repositorio en memoria con aislamiento de lecturas, idempotencia y revisión optimista.
-- Interfaz operativa para explorar los flujos sintéticos, sin persistencia al recargar.
-- API TEST con diario de operaciones y adaptador Apps Script, probada desde el editor de Google; sin despliegue web.
+- Interfaz local en memoria e interfaz Google con persistencia en Sheets TEST.
+- API TEST con diario de operaciones y adaptador Apps Script, desplegada con acceso Solo yo.
 - Inventario de las 396 columnas de EVOLUCIONES en `docs/FIELD_INVENTORY.md`.
 - Comparación en sombra sintética y prueba acotada del reloj contra legacy 7.04.
-- `npm test`: 24 pruebas aprobadas, además del smoke del shell; incluyen rangos
+- `npm test`: 39 pruebas aprobadas, además del smoke del shell; incluyen rangos
   legacy, GCS con 1T, adaptador GAS y simulación de Sheets.
 - Navegador: borrador pendiente bloquea firma; guardar, firmar y crear adenda conserva texto original.
 
 ## Aún no implementar sin sus condiciones previas
 
-- Conexión a Apps Script / Sheets de producción. La conexión TEST está en alcance,
-  pendiente de verificar identidad/transporte desde la interfaz web.
-- Datos clínicos reales, autenticación definitiva o despliegue.
+- Conexión a Apps Script / Sheets de producción. La conexión TEST funciona;
+  autenticación multiusuario todavía requiere validación.
+- Datos clínicos reales, autenticación definitiva o despliegue productivo.
 - Migración o escritura en RCE-KINE vigente.
 - Parámetros ventilatorios definitivos hasta contrastarlos con la versión real de uso.
 

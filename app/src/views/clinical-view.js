@@ -1,4 +1,4 @@
-import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS, NUMERIC_MEASUREMENTS } from '../model/clinical-record.js';
+import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS, NUMERIC_MEASUREMENTS, GAS_FIELDS, SESSION_FIELDS } from '../model/clinical-record.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const options = values => values.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('');
 const field = (label, name, body = '') => `<label>${label}${body || `<input name="${name}" required>`}</label>`;
@@ -6,12 +6,17 @@ const select = (label, name, values) => field(label, name, `<select name="${name
 const form = (type, title, contents, submit = 'Registrar') => `<form data-command="${type}"><h3>${title}</h3>${contents}<button class="primary" type="submit">${submit}</button></form>`;
 const stamp = value => new Date(value).toLocaleString('es-CL', { timeZone: 'America/Santiago' });
 function measurementFields(kind) {
+  if (kind === 'GSA') return '<p>Deja vacío lo no medido. Cada registro agrega una muestra a la serie.</p>' + GAS_FIELDS.map(({ key, label, unit }) => field(`${label}${unit ? ' (' + unit + ')' : ''}`, `gas_${key}`, `<input name="gas_${key}" inputmode="decimal">`)).join('');
   if (NUMERIC_MEASUREMENTS[kind]) return field(`Resultado (${NUMERIC_MEASUREMENTS[kind].unit})`, 'value', '<input name="value" inputmode="decimal" required>');
   if (SCALE_COMPONENTS[kind]) return '<p>Registrar todos los componentes. El total se calcula al guardar.</p>' + SCALE_COMPONENTS[kind].map(({ key, label }) => select(label, `component_${key}`, ['', ...Array.from({ length: kind === 'FSS' ? 8 : 6 }, (_, i) => String(i)), ...(kind === 'FSS' ? ['NE'] : [])])).join('') + (kind === 'FSS' ? '<p>NE no equivale a cero. Con hasta dos NE se aplica el promedio según legacy 7.04; con más de dos no se calcula total.</p>' : '');
   if (kind === 'GCS') return select('Respuesta ocular', 'ocular', ['', '1', '2', '3', '4']) + select('Respuesta verbal', 'verbal', ['', '1', '2', '3', '4', '5', '1T']) + select('Respuesta motora', 'motor', ['', '1', '2', '3', '4', '5', '6']);
   const range = MEASUREMENT_RANGES[kind];
   if (range) return field(`Resultado ${range[0]}–${range[1]}${kind === 'FSS' ? ' o NE' : ''}`, 'value');
   return field('Resultado de prueba (sin validación clínica)', 'value') + field('Unidad / contexto', 'unit', '<input name="unit">');
+}
+function activityFields(kind) {
+  if (kind === 'KTR') return field('Técnicas de esta atención (una por línea)', 'techniques', '<textarea name="techniques"></textarea>');
+  return (SESSION_FIELDS[kind] || []).map(spec => field(`${spec.label}${spec.unit ? ' (' + spec.unit + ')' : ''}`, `session_${spec.key}`, `<input name="session_${spec.key}"${spec.text ? '' : ' inputmode="decimal"'}>`)).join('');
 }
 export class ClinicalView {
   constructor(document) {
@@ -30,6 +35,7 @@ export class ClinicalView {
     this.document.querySelector('#dialog-body').addEventListener('change', markDirty);
     this.document.querySelector('#dialog-body').addEventListener('change', event => {
       if (event.target.matches('form[data-command="MEASUREMENT"] select[name="kind"]')) this.document.querySelector('#measurement-fields').innerHTML = measurementFields(event.target.value);
+      if (event.target.matches('form[data-command="ACTIVITY"] select[name="kind"]')) this.document.querySelector('#activity-fields').innerHTML = activityFields(event.target.value);
     });
     this.document.querySelector('#bed-board').addEventListener('click', event => {
       const button = event.target.closest('button'); if (!button) return;
@@ -50,6 +56,11 @@ export class ClinicalView {
       if (command.type === 'MEASUREMENT' && data.kind === 'GCS') command.components = { ocular: data.ocular, verbal: data.verbal, motor: data.motor };
       if (command.type === 'MEASUREMENT' && SCALE_COMPONENTS[data.kind]) command.components = Object.fromEntries(SCALE_COMPONENTS[data.kind].map(({ key }) => [key, data[`component_${key}`]]));
       if (command.type === 'MEASUREMENT' && NUMERIC_MEASUREMENTS[data.kind]) command.format = 'numeric-v1';
+      if (command.type === 'MEASUREMENT' && data.kind === 'GSA') { command.format = 'gsa-v1'; command.components = Object.fromEntries(GAS_FIELDS.map(({ key }) => [key, data[`gas_${key}`]])); }
+      if (command.type === 'ACTIVITY') {
+        command.format = 'session-v1'; command.parameters = Object.fromEntries((SESSION_FIELDS[data.kind] || []).map(({ key }) => [key, data[`session_${key}`]]));
+        command.techniques = data.kind === 'KTR' ? (data.techniques || '').split('\n').map(text => text.trim()).filter(Boolean) : [];
+      }
       if (command.type === 'EVENT') command.data = { support: data.support, result: data.result, active: data.active === 'true', detail: data.detail };
       actions.command(command);
     });
@@ -101,9 +112,9 @@ export class ClinicalView {
       body += this.list(e.measurements, item => `${stamp(item.at)} · ${item.kind}: ${item.value} ${item.unit}${item.components && SCALE_COMPONENTS[item.kind] ? ' · ' + SCALE_COMPONENTS[item.kind].map(({key, label}) => `${label}: ${item.components[key]}`).join('; ') : ''}${item.calculation?.notEvaluable ? ` · ${item.calculation.notEvaluable} NE · ${item.calculation.method}` : ''}`);
     }
     if (this.tab === 'actividades') {
-      body = open ? form('ACTIVITY', 'Registrar atención o sesión', select('Tipo', 'kind', ACTIVITIES) + select('Estado', 'status', ['Realizada', 'Contraindicada', 'No realizada']) + field('Técnicas, detalle o motivo', 'detail')) : '<p>Abre un turno para registrar atenciones.</p>';
+      body = open ? form('ACTIVITY', 'Registrar atención o sesión', select('Tipo', 'kind', ACTIVITIES) + select('Estado', 'status', ['Realizada', 'Contraindicada', 'No realizada']) + field('Detalle o motivo', 'detail') + `<div id="activity-fields">${activityFields(ACTIVITIES[0])}</div>`) : '<p>Abre un turno para registrar atenciones.</p>';
       body += `<p>KTR realizadas: ${e.activities.filter(a => a.kind === 'KTR' && a.status === 'Realizada').length} · KTM realizadas: ${e.activities.filter(a => a.kind === 'KTM' && a.status === 'Realizada').length}</p>`;
-      body += this.list(e.activities, item => `${stamp(item.at)} · ${item.kind} · ${item.status}: ${item.detail}`);
+      body += this.list(e.activities, item => `${stamp(item.at)} · ${item.kind} · ${item.status}: ${item.detail}${item.techniques?.length ? ' · Técnicas: ' + item.techniques.join('; ') : ''}${item.parameters ? ' · ' + (SESSION_FIELDS[item.kind] || []).filter(spec => item.parameters[spec.key] != null).map(spec => `${spec.label}: ${item.parameters[spec.key]} ${spec.unit || ''}`).join('; ') : ''}`);
     }
     if (this.tab === 'continuidad') {
       if (open) {

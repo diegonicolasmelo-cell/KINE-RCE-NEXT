@@ -15,4 +15,11 @@ test('Paquete GAS comparte fuente de dominio exacta y compila sin módulos', () 
   assert.equal(typeof context.initializeNextTest, 'function');
   assert.equal(typeof context.runNextTestSmoke, 'function');
   assert.equal(typeof context.doPost, 'function');
+  const ui = readFileSync(new URL('../api/generated/interface.gs', import.meta.url), 'utf8');
+  vm.runInContext(ui, context);
+  const html = context.nextTestInterface_();
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  new vm.Script(script);
+  assert.match(script, /google\.script\.run/);
+  assert.doesNotMatch(script, /serviceWorker\.register/);
 });

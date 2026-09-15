@@ -9,8 +9,8 @@ plan maestro ni una versión clínicamente validada.
 | 1 | Camas, estado, traslado, egreso e historia por episodio | UX clínica y ficha de persona/ingreso completa |
 | 2 | Borrador, firma congelada, adenda, revisión e idempotencia | Horarios clínicos día/noche, autor autenticado en Google, concurrencia real |
 | 3 | Secuencia vía aérea/VM, PVE independiente, AET/UPOT/aislamiento | Dispositivos, parámetros, cambios retroactivos y correcciones estructuradas |
-| 4 | Series; GCS con 1T; MRC/FSS/CPAx por componentes con total derivado y NE trazable | Validación clínica de componentes, unidades y resto de mediciones |
-| 5 | Atenciones KTR y sesiones KTM separadas; programas IMT/EMS | Detalle estructurado de cada sesión y validaciones terapéuticas |
+| 4 | Series; GCS con 1T; MRC/FSS/CPAx; numéricas con unidades; gases por resultados | Validación clínica, CAM-ICU, ecografía, deglución, BDT y neurología completa |
+| 5 | KTR con técnicas; sesiones KTM/IMT/EMS con parámetros separados; programas persistentes | Validaciones terapéuticas completas, detalles de válvula e inhaloterapia |
 | 6 | Gateway, diario y smoke Google; interfaz HtmlService conectada con acceso Solo yo | Autenticación multiusuario, concurrencia real y PWA externa |
 | 7 | Texto por turno, adendas, entrega y pendientes | Presentación clínica, impresión, indicadores REM y conciliación completa |
 | 8 | Comparador sintético sin escritura; prueba limitada de reloj legacy | Matriz aprobada, migración en sombra real autorizada, piloto, corte y retorno |
@@ -29,7 +29,9 @@ plan maestro ni una versión clínicamente validada.
 - SAS e IMS validan rangos existentes en legacy. GCS conserva 1T.
   MRC/FSS/CPAx conservan componentes y total derivado; FSS reproduce sumFSS de
   legacy 7.04 con promedio y redondeo para hasta dos NE. Esta equivalencia de código
-  no constituye aprobación clínica. El resto sigue en texto libre y no está validado.
+  no constituye aprobación clínica. PIM/PEM/FEM/prensión/presión transtraqueal tienen
+  formato numérico con unidades de legacy. GSA conserva resultados y ausencias;
+  no interpreta automáticamente el gas. CAM-ICU/ecografía/deglución/BDT siguen pendientes.
 - No se recuperó el DOCX maestro original. Markdown consolida mensajes leídos,
   por lo que debe contrastarse con ese archivo si contiene reglas adicionales.
 

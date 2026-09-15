@@ -21,12 +21,45 @@ export const NUMERIC_MEASUREMENTS = Object.freeze({
   PIM: { unit: 'cmH₂O' }, PEM: { unit: 'cmH₂O' }, FEM: { unit: 'L/s' },
   Prensión: { unit: 'kg', min: 0 }, 'Presión transtraqueal': { unit: 'cmH₂O' }
 });
+export const GAS_FIELDS = Object.freeze([
+  { key: 'ph', label: 'pH', unit: '' }, { key: 'pao2', label: 'PaO₂', unit: 'mmHg' },
+  { key: 'paco2', label: 'PaCO₂', unit: 'mmHg' }, { key: 'hco3', label: 'HCO₃⁻', unit: 'mEq/L' },
+  { key: 'eb', label: 'EB', unit: '' }, { key: 'lactate', label: 'Lactato', unit: 'mmol/L' },
+  { key: 'sao2', label: 'SaO₂', unit: '%', min: 0, max: 100 }, { key: 'fio2', label: 'FiO₂ al momento', unit: '%', min: 0, max: 100 }
+]);
+function decimal(value, label) {
+  const text = String(value ?? '').trim().replace(',', '.');
+  requireValue(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text) && Number.isFinite(Number(text)), `Ingresa un valor numérico válido: ${label}`);
+  return Number(text);
+}
+function structuredValues(input, fields) {
+  requireValue(input && typeof input === 'object' && !Array.isArray(input), 'Campos estructurados inválidos');
+  requireValue(Object.keys(input).every(key => fields.some(field => field.key === key)), 'Campo desconocido');
+  return Object.fromEntries(fields.map(field => {
+    const raw = input[field.key];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return [field.key, null];
+    if (field.text) return [field.key, String(raw).trim()];
+    const value = decimal(raw, field.label);
+    requireValue((field.min === undefined || value >= field.min) && (field.max === undefined || value <= field.max), `${field.label}: valor fuera de rango`);
+    requireValue(!field.integer || Number.isInteger(value), `${field.label}: requiere entero`);
+    return [field.key, value];
+  }));
+}
+function describeValues(values, fields) {
+  return fields.filter(field => values[field.key] !== null && values[field.key] !== undefined).map(field => `${field.label}: ${values[field.key]}${field.unit ? ' ' + field.unit : ''}`).join('; ');
+}
 export const SCALE_COMPONENTS = Object.freeze({
   MRC: ['Abducción de hombro', 'Flexión de codo', 'Extensión de muñeca', 'Flexión de cadera', 'Extensión de rodilla', 'Dorsiflexión de tobillo'].flatMap((label, i) => [{ key: `D${i + 1}`, label: `${label} derecho` }, { key: `I${i + 1}`, label: `${label} izquierdo` }]),
   FSS: ['Giro', 'Supino a sedente', 'Sedente borde cama', 'Sedente a bípedo', 'Marcha'].map((label, i) => ({ key: `item${i + 1}`, label })),
   CPAx: ['Función respiratoria', 'Tos', 'Movilidad en cama (girar)', 'Supino a sedente', 'Equilibrio sedente dinámico', 'Equilibrio bípedo', 'Sedente a bípedo', 'Transferencia cama a sillón', 'Marcha en el lugar', 'Prensión (% del predicho)'].map((label, i) => ({ key: `item${i + 1}`, label }))
 });
 export function measurementValue(command) {
+  if (command.format === 'gsa-v1') {
+    requireValue(command.kind === 'GSA', 'Formato GSA incompatible');
+    const components = structuredValues(command.components, GAS_FIELDS);
+    requireValue(Object.values(components).some(value => value !== null), 'Registra al menos un resultado de gases');
+    return { value: describeValues(components, GAS_FIELDS), unit: '', components, format: 'gsa-v1' };
+  }
   if (command.format === 'numeric-v1') {
     const spec = NUMERIC_MEASUREMENTS[command.kind];
     requireValue(spec, 'Medición numérica no permitida');
@@ -70,6 +103,23 @@ export function measurementValue(command) {
   return { value, unit: String(command.unit || '').trim(), components: null };
 }
 export const ACTIVITIES = Object.freeze(['KTR', 'KTM', 'Válvula de fonación', 'IMT', 'EMS', 'Educación', 'Inhaloterapia', 'Procedimiento']);
+export const SESSION_FIELDS = Object.freeze({
+  KTM: [{ key: 'level', label: 'Nivel realizado', text: true }, { key: 'assistance', label: 'Asistencia', text: true }, { key: 'minutes', label: 'Tiempo', unit: 'min', min: 1, max: 120, integer: true }, { key: 'borg', label: 'Borg', min: 0, max: 10 }],
+  IMT: [{ key: 'sets', label: 'Frecuencia', unit: 'series', min: 1, max: 20, integer: true }, { key: 'intensity', label: 'Intensidad', unit: '% PiMáx', min: 1, max: 100 }, { key: 'minutes', label: 'Tiempo', unit: 'min', min: 1, max: 60, integer: true }, { key: 'rest', label: 'Descanso entre series', unit: 'seg', min: 1, max: 300, integer: true }],
+  EMS: [{ key: 'frequency', label: 'Frecuencia', unit: 'Hz', min: 1, max: 200 }, { key: 'intensity', label: 'Intensidad', unit: 'mA', min: 1, max: 150 }, { key: 'pulse', label: 'Ancho de pulso', unit: 'µs', min: 50, max: 1000 }, { key: 'minutes', label: 'Tiempo', unit: 'min', min: 1, max: 120, integer: true }, { key: 'muscles', label: 'Grupo muscular', text: true }]
+});
+export function sessionDetails(command) {
+  if (!command.format) return {};
+  requireValue(command.format === 'session-v1', 'Formato de sesión inválido');
+  const fields = SESSION_FIELDS[command.kind] || [];
+  const parameters = structuredValues(command.parameters || {}, fields);
+  requireValue(command.status === 'Realizada' || Object.values(parameters).every(value => value === null), 'Una sesión no realizada no admite parámetros de ejecución');
+  const techniques = command.techniques || [];
+  requireValue(Array.isArray(techniques) && techniques.length <= 30 && techniques.every(nonempty), 'Técnicas inválidas');
+  requireValue(command.kind === 'KTR' || techniques.length === 0, 'Técnicas agrupadas solo en atención KTR');
+  requireValue(command.status === 'Realizada' || techniques.length === 0, 'Una atención no realizada no admite técnicas ejecutadas');
+  return { format: 'session-v1', parameters, techniques: techniques.map(text => text.trim()) };
+}
 const SUPPORTS = ['VM', 'VNI', 'CNAF', 'Oxigenoterapia', 'Ambiente'];
 function compatible(state) {
   requireValue(['Natural', 'TOT', 'TQT'].includes(state.airway), 'Vía aérea no válida');
@@ -180,7 +230,7 @@ export function applyCommand(original, command, context) {
       editable(); requireValue(ACTIVITIES.includes(command.kind), 'Actividad no permitida');
       requireValue(nonempty(command.detail), 'Describe la atención o sesión');
       requireValue(['Realizada', 'Contraindicada', 'No realizada'].includes(command.status), 'Estado de actividad requerido');
-      episode.activities.push({ ...entry, turnId: command.turnId, kind: command.kind, status: command.status, detail: command.detail.trim() }); break;
+      episode.activities.push({ ...entry, turnId: command.turnId, kind: command.kind, status: command.status, detail: command.detail.trim(), ...sessionDetails(command) }); break;
     case 'PENDING':
       editable(); requireValue(nonempty(command.text), 'Describe el pendiente');
       episode.pending.push({ ...entry, turnId: command.turnId, text: command.text.trim(), status: 'Abierto', changes: [] }); break;
@@ -224,7 +274,11 @@ export function narrative(episode, turnId) {
     if (item.components && SCALE_COMPONENTS[item.kind]) lines.push(SCALE_COMPONENTS[item.kind].map(({ key, label }) => `${label}: ${item.components[key]}`).join('; ') + '.');
     if (item.calculation?.notEvaluable) lines.push(`Ítems NE: ${item.calculation.notEvaluable}. ${item.calculation.method === 'no-calculable' ? 'Total no calculable.' : 'Total con imputación por promedio y redondeo según legacy 7.04.'}`);
   }
-  for (const item of episode.activities.filter(e => e.turnId === turnId)) lines.push(`${item.at}: ${item.kind} — ${item.status}: ${item.detail}.`);
+  for (const item of episode.activities.filter(e => e.turnId === turnId)) {
+    lines.push(`${item.at}: ${item.kind} — ${item.status}: ${item.detail}.`);
+    if (item.techniques?.length) lines.push(`Técnicas de la misma atención: ${item.techniques.join('; ')}.`);
+    if (item.parameters) { const details = describeValues(item.parameters, SESSION_FIELDS[item.kind] || []); if (details) lines.push(details + '.'); }
+  }
   for (const item of episode.pending.filter(e => e.turnId === turnId)) lines.push(`${item.at}: Pendiente creado: ${item.text}.`);
   for (const item of episode.cultures) {
     if (item.turnId === turnId) lines.push(`${item.at}: Toma de cultivo: ${item.sample}.`);

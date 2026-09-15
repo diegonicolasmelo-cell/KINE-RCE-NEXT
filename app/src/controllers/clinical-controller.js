@@ -20,8 +20,9 @@ export class ClinicalController {
       this.pending = pending;
       try { await this.service.execute(this.activeId, command, pending.options); }
       catch (error) { if (!error.uncertain) this.pending = null; throw error; }
-      this.pending = null;
-      await this.refresh(); this.view.message(this.service.persistent ? 'Guardado en Sheets TEST.' : 'Cambio registrado en la simulación. Se perderá al recargar.');
+      // Keep the receipt until rereading succeeds: a failed read must not turn
+      // a retry of an already persisted command into a second operation.
+      await this.refresh(); this.pending = null; this.view.message(this.service.persistent ? 'Guardado en Sheets TEST.' : 'Cambio registrado en la simulación. Se perderá al recargar.');
     });
   }
   admit(bed) {
@@ -32,8 +33,8 @@ export class ClinicalController {
       let episode;
       try { episode = await this.service.admit(pending.input, pending.requestId); }
       catch (error) { if (!error.uncertain) this.pendingAdmission = null; throw error; }
-      this.pendingAdmission = null; this.activeId = episode.id;
-      await this.refresh(); this.view.show();
+      this.activeId = episode.id;
+      await this.refresh(); this.pendingAdmission = null; this.view.show();
     });
   }
 }

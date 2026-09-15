@@ -39,7 +39,10 @@ function nextTestDispatch_(request) {
         if (count > 20000) throw new Error('Límite del diario TEST excedido');
         return count ? sheet.getRange(2, 1, count, 1).getValues().map(function(row) { return JSON.parse(row[0]); }) : [];
       },
-      append: function(row) { sheet.getRange(sheet.getLastRow() + 1, 1).setValue(JSON.stringify(row)); SpreadsheetApp.flush(); }
+      append: function(row) {
+        try { sheet.getRange(sheet.getLastRow() + 1, 1).setValue(JSON.stringify(row)); SpreadsheetApp.flush(); }
+        catch (error) { error.uncertain = true; throw error; }
+      }
     }
   });
 }
@@ -48,7 +51,7 @@ function doGet() {
 }
 function nextTestRequest(request) {
   try { return { ok: true, data: nextTestDispatch_(request) }; }
-  catch (error) { return { ok: false, error: String(error.message || 'Operación rechazada') }; }
+  catch (error) { return { ok: false, error: String(error.message || 'Operación rechazada'), uncertain: !!error.uncertain }; }
 }
 function doPost(event) {
   var response;
@@ -57,7 +60,7 @@ function doPost(event) {
     if (!content || content.length > 30000) throw new Error('Solicitud inválida');
     response = { ok: true, data: nextTestDispatch_(JSON.parse(content)) };
   } catch (error) {
-    response = { ok: false, error: String(error.message || 'Operación rechazada') };
+    response = { ok: false, error: String(error.message || 'Operación rechazada'), uncertain: !!error.uncertain };
   }
   return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON);
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GoogleClinicalService } from '../app/src/api/google-service.js';
+import { GoogleClinicalService, googleTransport } from '../app/src/api/google-service.js';
 import { dispatchTest } from '../api/gateway.js';
 import { ClinicalController } from '../app/src/controllers/clinical-controller.js';
 test('Interfaz asíncrona persiste, reabre y conserva autor del servidor', async () => {
@@ -24,4 +24,19 @@ test('Controlador conserva solicitud al perder respuesta y evita doble clic', as
   assert.equal(requests.length, 1); release(); await first;
   await controller.execute({ type: 'OPEN_TURN' });
   assert.equal(requests[0].requestId, requests[1].requestId);
+});
+test('Guardar seguido de lectura fallida reintenta el mismo recibo', async () => {
+  const requests = []; let reads = 0;
+  const service = { execute: async (_id, _command, options) => requests.push(options), list: () => { if (++reads === 1) throw new Error('Lectura fallida'); return []; }, get: () => ({}) };
+  const view = { revision: 0, setBusy() {}, message() {}, board() {}, record() {} };
+  const controller = new ClinicalController(service, view); controller.activeId = 'e';
+  await controller.execute({ type: 'OPEN_TURN' });
+  await controller.execute({ type: 'OPEN_TURN' });
+  assert.equal(requests[0].requestId, requests[1].requestId);
+  assert.equal(controller.pending, null);
+});
+test('Transporte conserva incertidumbre de un fallo de Sheets posterior a escritura', async () => {
+  let success;
+  const runner = { withSuccessHandler(fn) { success = fn; return this; }, withFailureHandler() { return this; }, nextTestRequest() { success({ ok: false, error: 'Flush falló', uncertain: true }); } };
+  await assert.rejects(googleTransport(runner)({}), error => error.uncertain === true);
 });

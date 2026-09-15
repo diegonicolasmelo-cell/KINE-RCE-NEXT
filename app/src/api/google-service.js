@@ -4,7 +4,7 @@ export function googleTransport(runner) {
   return request => new Promise((resolve, reject) => {
     runner.withSuccessHandler(response => {
       if (response?.ok) resolve(response.data);
-      else reject(new Error(response?.error || 'Operación rechazada'));
+      else reject(Object.assign(new Error(response?.error || 'Operación rechazada'), { uncertain: !!response?.uncertain }));
     }).withFailureHandler(error => reject(Object.assign(new Error(error.message || 'Sin respuesta de Google'), { uncertain: true }))).nextTestRequest(JSON.parse(JSON.stringify(request)));
   });
 }
