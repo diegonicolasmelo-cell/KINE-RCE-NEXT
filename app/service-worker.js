@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rce-kine-next-shell-v4';
+const CACHE_NAME = 'rce-kine-next-shell-v5';
 const SHELL = [
   './',
   './index.html',

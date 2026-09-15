@@ -51,6 +51,13 @@ export class ClinicalView {
     });
   }
   canLeave() { if (this.dirty) { this.message('Hay cambios sin registrar. Guarda el formulario o pulsa «Descartar formulario».', true); return false; } return true; }
+  setBusy(busy) {
+    this.document.querySelectorAll('button, input, select, textarea').forEach(element => {
+      if (busy) { element.dataset.wasDisabled = String(element.disabled); element.disabled = true; }
+      else if ('wasDisabled' in element.dataset) { element.disabled = element.dataset.wasDisabled === 'true'; delete element.dataset.wasDisabled; }
+    });
+    this.document.querySelector('main').setAttribute('aria-busy', String(busy));
+  }
   message(text, error = false) {
     this.notice.textContent = text; this.notice.classList.toggle('error', error);
     const local = this.document.querySelector('#record-feedback'); if (local) { local.textContent = text; local.classList.toggle('error', error); }

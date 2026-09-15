@@ -56,7 +56,15 @@ posterior, adenda sin alterar el original y egreso con historia conservada.
 La evidencia corresponde a ejecución desde el editor, no a una conexión de la PWA.
 Instrucciones concretas en `api/README.md`.
 
-Siguiente integración: verificar transporte y autor desde la interfaz TEST.
+La interfaz se conectó mediante HtmlService y google.script.run el 15/09/2026.
+Implementación web versión 1 con acceso Solo yo, ejecutada por el propietario.
+Se verificó lectura del episodio previo, ingreso, apertura de turno y guardado de
+borrador desde la pantalla; tras recargar, la cama sigue ocupada con turno abierto.
+26 pruebas automáticas aprobadas, incluyendo servicio remoto y reintento con el
+mismo identificador después de respuesta incierta. La versión local permanece en
+memoria. Falta validar acceso multiusuario y alojamiento PWA externo.
+
+Siguiente integración: ampliar las pruebas de concurrencia multiusuario TEST.
 También falta cerrar unidades y componentes de mediciones,
 campos de sesiones, horarios de turno y matriz clínica; no declarar completos esos
 hitos mientras existan los pendientes de `docs/VALIDATION_GAPS.md`.

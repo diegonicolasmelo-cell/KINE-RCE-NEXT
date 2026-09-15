@@ -11,7 +11,7 @@ plan maestro ni una versión clínicamente validada.
 | 3 | Secuencia vía aérea/VM, PVE independiente, AET/UPOT/aislamiento | Dispositivos, parámetros, cambios retroactivos y correcciones estructuradas |
 | 4 | Series; rangos legacy SAS/IMS/MRC/FSS/CPAx; GCS por componentes con 1T | Componentes FSS/MRC/CPAx, unidades y validación del resto de mediciones |
 | 5 | Atenciones KTR y sesiones KTM separadas; programas IMT/EMS | Detalle estructurado de cada sesión y validaciones terapéuticas |
-| 6 | Gateway y adaptador GAS, diario, fallos simulados; inicialización y smoke aprobados en Google TEST | Resolver autenticación/transporte y conectar PWA; concurrencia real |
+| 6 | Gateway, diario y smoke Google; interfaz HtmlService conectada con acceso Solo yo | Autenticación multiusuario, concurrencia real y PWA externa |
 | 7 | Texto por turno, adendas, entrega y pendientes | Presentación clínica, impresión, indicadores REM y conciliación completa |
 | 8 | Comparador sintético sin escritura; prueba limitada de reloj legacy | Matriz aprobada, migración en sombra real autorizada, piloto, corte y retorno |
 
@@ -33,7 +33,7 @@ plan maestro ni una versión clínicamente validada.
 
 ## Datos y entorno
 
-La simulación del navegador pierde sus cambios al recargar. La API aún no está
-conectada. La prueba ejecutada desde el editor de Google el 15 de septiembre de
+La simulación local pierde sus cambios al recargar. La interfaz HtmlService sí
+se conecta al backend TEST. La prueba ejecutada desde el editor de Google el 15 de septiembre de
 2026 sí verifica persistencia real en la planilla TEST. No demuestra identidad
 institucional, transporte desde la PWA ni aptitud para producción.

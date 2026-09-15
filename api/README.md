@@ -1,7 +1,8 @@
 # API de NEXT exclusivamente TEST
 
 Estado: pruebas locales y prueba real desde el editor de Apps Script aprobadas.
-**No desplegada como aplicación web y no conectada a la PWA.**
+La misma interfaz se sirve mediante HtmlService y se conecta con
+`google.script.run`. La ejecución local sigue siendo una simulación en memoria.
 
 El 15 de septiembre de 2026 se inicializó el proyecto vacío RCE-KINE-NEXT-TEST,
 creando una planilla nueva. `runNextTestSmoke` devolvió `passed: true`: persistencia,
@@ -36,17 +37,28 @@ las propiedades del proyecto. Nunca recibe ni acepta un ID de producción para
 inicializarse. Si el archivo no conserva la marca TEST exacta, las operaciones se
 rechazan. Un nombre TEST por sí solo nunca se usa como comprobación.
 
-## Transporte y autenticación pendientes
+## Transporte de la interfaz TEST
 
 El adaptador exige usuario identificado mediante `Session.getActiveUser()` y lista
 de usuarios autorizados del servidor. No toma el autor de un campo del navegador.
 No poner secretos en el frontend ni habilitar acceso anónimo para resolver un
 problema de conexión.
 
-Primero validar desde el editor la función `nextTestDispatch_` y los escenarios del
-diario. El modo de despliegue, la disponibilidad de identidad de usuario y el
-transporte entre la PWA y Apps Script todavía requieren prueba real. No se ha
-demostrado CORS/autenticación entre dominios. La PWA sigue utilizando memoria.
+`npm run package:test` incorpora CSS, vista, controlador y servicio remoto en
+`api/generated/interface.gs`. Cargar este archivo además del dominio y adaptador,
+o usar el paquete combinado. `doGet` sirve solo el shell; `nextTestRequest`
+comprueba la identidad y marca de la planilla en cada operación.
+
+La implementación TEST se configura como **Solo yo**, ejecutada por el propietario.
+No habilitar acceso anónimo. La identidad multiusuario sigue pendiente de validación.
+No existe transporte CORS desde una PWA alojada en otro dominio; esta entrega usa
+la interfaz dentro de HtmlService y no registra un service worker allí.
+
+El controlador espera confirmación del servidor, evita envíos simultáneos y
+conserva el requestId al reintentar una respuesta incierta sin cambiar el contenido.
+El servidor nunca usa el autor enviado por el cliente.
+
+Referencia: [Comunicación con el servidor](https://developers.google.com/apps-script/guides/html/communication).
 
 ## Contrato
 

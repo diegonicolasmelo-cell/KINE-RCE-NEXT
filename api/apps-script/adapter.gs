@@ -44,7 +44,11 @@ function nextTestDispatch_(request) {
   });
 }
 function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ environment: 'TEST', schemaVersion: 1, status: 'Sin datos clínicos por GET' })).setMimeType(ContentService.MimeType.JSON);
+  return HtmlService.createHtmlOutput(nextTestInterface_()).setTitle('RCE-KINE NEXT · TEST').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+function nextTestRequest(request) {
+  try { return { ok: true, data: nextTestDispatch_(request) }; }
+  catch (error) { return { ok: false, error: String(error.message || 'Operación rechazada') }; }
 }
 function doPost(event) {
   var response;
