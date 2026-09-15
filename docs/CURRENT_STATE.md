@@ -5,6 +5,26 @@
 Simulación transversal de hitos 1–7 y preparación del Hito 8.
 El plan maestro permanece en curso; ver `docs/VALIDATION_GAPS.md`.
 
+Prioridad indicada por Diego: completar funcionalidad primero; estética y flujo
+de trabajo se revisarán al final.
+
+## Mediciones por componentes (avance actual)
+
+- MRC: 12 componentes, seis movimientos bilaterales; total derivado 0–60.
+- FSS: cinco componentes, NE conservado; hasta dos NE se imputa promedio y se
+  redondea como en sumFSS de legacy 7.04. Más de dos NE: total no calculable.
+- CPAx: diez componentes 0–5 y total derivado 0–50.
+- Se rechazan componentes faltantes, vacíos o fuera de rango. Se conserva el
+  detalle en cada medición y en el texto firmado, incluido método de cálculo FSS.
+- Totales sin componentes anteriores siguen legibles para reconstruir el diario;
+  los formularios nuevos usan componentes. No se migraron registros existentes.
+- 30 pruebas automáticas aprobadas. FSS se comparó directamente con sumFSS de
+  legacy en las 59.049 combinaciones completas de puntajes y NE, sin diferencias.
+  Validación clínica institucional pendiente.
+- Aplicación TEST actualizada a versión 2, conservando la misma URL y acceso Solo yo.
+- Prueba real desde interfaz: FSS [1, 2, 4, NE, NE] guardado como 12 puntos,
+  conservando cinco componentes y método de promedio en el registro.
+
 ## Terminado
 
 - Repositorio NEXT enlazado y rama `codex/reestructuracion-hito-0` publicada con PR #1 en borrador.

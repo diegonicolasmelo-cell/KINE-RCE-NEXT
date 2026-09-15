@@ -17,7 +17,29 @@ export const EVENT_LABELS = Object.freeze({
 export const MEASUREMENTS = Object.freeze(['SAS', 'GCS', 'CAM-ICU', 'GSA', 'PIC', 'PPC', 'IMS', 'MRC', 'Prensión', 'FSS', 'CPAx', 'PIM', 'PEM', 'FEM', 'Ecografía', 'Deglución', 'BDT', 'Presión transtraqueal']);
 // Ranges ported from the 7.04 form and EVAL_SERIE, not new clinical cutoffs.
 export const MEASUREMENT_RANGES = Object.freeze({ SAS: [1, 7], IMS: [0, 10], MRC: [0, 60], FSS: [0, 35], CPAx: [0, 50] });
+export const SCALE_COMPONENTS = Object.freeze({
+  MRC: ['Abducción de hombro', 'Flexión de codo', 'Extensión de muñeca', 'Flexión de cadera', 'Extensión de rodilla', 'Dorsiflexión de tobillo'].flatMap((label, i) => [{ key: `D${i + 1}`, label: `${label} derecho` }, { key: `I${i + 1}`, label: `${label} izquierdo` }]),
+  FSS: ['Giro', 'Supino a sedente', 'Sedente borde cama', 'Sedente a bípedo', 'Marcha'].map((label, i) => ({ key: `item${i + 1}`, label })),
+  CPAx: ['Función respiratoria', 'Tos', 'Movilidad en cama (girar)', 'Supino a sedente', 'Equilibrio sedente dinámico', 'Equilibrio bípedo', 'Sedente a bípedo', 'Transferencia cama a sillón', 'Marcha en el lugar', 'Prensión (% del predicho)'].map((label, i) => ({ key: `item${i + 1}`, label }))
+});
 export function measurementValue(command) {
+  if (SCALE_COMPONENTS[command.kind] && command.components) {
+    const spec = SCALE_COMPONENTS[command.kind];
+    const components = {};
+    const max = command.kind === 'FSS' ? 7 : 5;
+    requireValue(Object.keys(command.components).length === spec.length, 'Componentes incompletos o desconocidos');
+    for (const { key } of spec) {
+      const value = String(command.components[key] ?? '');
+      requireValue((command.kind === 'FSS' && value === 'NE') || (/^[0-7]$/.test(value) && Number(value) <= max), `Completa ${command.kind}: ${key}`);
+      components[key] = value;
+    }
+    const values = Object.values(components);
+    const ne = values.filter(value => value === 'NE').length;
+    const sum = values.filter(value => value !== 'NE').reduce((total, value) => total + Number(value), 0);
+    const total = ne > 2 ? null : Math.round(sum + (ne ? ne * sum / (values.length - ne) : 0));
+    return { value: total === null ? 'NE' : String(total), unit: total === null ? '' : 'puntos', components,
+      calculation: { method: ne > 2 ? 'no-calculable' : ne ? 'promedio-imputado-legacy-7.04' : 'suma', notEvaluable: ne, rawSum: sum } };
+  }
   if (command.kind === 'GCS') {
     const components = command.components || {};
     const valid = (value, max) => /^(?:[1-9])$/.test(String(value)) && Number(value) <= max;
@@ -185,7 +207,11 @@ export function narrative(episode, turnId) {
     if (['AET', 'UPOT', 'ISOLATION', 'IMT', 'EMS', 'VALVE'].includes(item.type)) fields.push(`${item.data.active ? 'Activo' : 'Suspendido'}${item.data.detail ? ': ' + item.data.detail : ''}`);
     lines.push(`${item.at}: ${EVENT_LABELS[item.type]}. ${item.reason}. ${fields.join('. ')}`);
   }
-  for (const item of episode.measurements.filter(e => e.turnId === turnId)) lines.push(`${item.at}: ${item.kind}: ${item.value} ${item.unit}.`);
+  for (const item of episode.measurements.filter(e => e.turnId === turnId)) {
+    lines.push(`${item.at}: ${item.kind}: ${item.value} ${item.unit}.`);
+    if (item.components && SCALE_COMPONENTS[item.kind]) lines.push(SCALE_COMPONENTS[item.kind].map(({ key, label }) => `${label}: ${item.components[key]}`).join('; ') + '.');
+    if (item.calculation?.notEvaluable) lines.push(`Ítems NE: ${item.calculation.notEvaluable}. ${item.calculation.method === 'no-calculable' ? 'Total no calculable.' : 'Total con imputación por promedio y redondeo según legacy 7.04.'}`);
+  }
   for (const item of episode.activities.filter(e => e.turnId === turnId)) lines.push(`${item.at}: ${item.kind} — ${item.status}: ${item.detail}.`);
   for (const item of episode.pending.filter(e => e.turnId === turnId)) lines.push(`${item.at}: Pendiente creado: ${item.text}.`);
   for (const item of episode.cultures) {
