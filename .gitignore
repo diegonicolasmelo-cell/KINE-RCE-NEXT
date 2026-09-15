@@ -1,0 +1,13 @@
+# Dependencias y artefactos generados: nunca se versionan.
+build/node_modules/
+build/servicios.gs
+build/index_cohete.html
+build/package-lock.json
+build/package.json
+build/sim/sim_compilado.html
+build/entrega_*/
+*.zip
+
+# Notas de trabajo que no son del proyecto.
+scratchpad/
+HANDOFF.md

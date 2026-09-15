@@ -1,0 +1,1111 @@
+{
+  "turnos": [
+    {
+      "pac": "P1",
+      "cama": 1,
+      "tk": "2026-07-01-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nFase clínica: Reanimación inicial.\nPaciente ingresa a UCI con diagnóstico de Shock séptico foco pulmonar.\nSin sedación. GCS 6T (O:1, V:1T, M:4).\nHDN inestable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 22 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 420 ml (6.2 ml/kg PI), FR 18 rpm, VM 7.6 L/min.\nPmax 24 cmH2O, PEEP 10 cmH2O.\nFiO2 60%, SpO2 94%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[\"Reanimación inicial\"]",
+        "F_VA": "2026-07-01",
+        "F_SOP": "2026-07-01",
+        "APACHE2": 24
+      }
+    },
+    {
+      "pac": "P1",
+      "cama": 1,
+      "tk": "2026-07-01-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 13 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nFase clínica: Reanimación inicial.\nPaciente en día 0 de estadía en UCI (ingreso) en contexto de Shock séptico foco pulmonar.\nSin sedación. GCS 6T (O:1, V:1T, M:4).\nHDN inestable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 22 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 420 ml (6.2 ml/kg PI), FR 18 rpm, VM 7.6 L/min.\nPmax 24 cmH2O, PEEP 10 cmH2O.\nFiO2 60%, SpO2 94%.\nKTM no realizada.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[\"Reanimación inicial\"]",
+        "F_VA": "2026-07-01",
+        "F_SOP": "2026-07-01",
+        "APACHE2": 24
+      }
+    },
+    {
+      "pac": "P1",
+      "cama": 1,
+      "tk": "2026-07-03-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 3 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nFase clínica: Reanimación inicial + Weaning.\nPaciente en 2do día de estadía en UCI en contexto de Shock séptico foco pulmonar.\nSin sedación. GCS 6T (O:1, V:1T, M:4), No cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 22 cm a nivel de comisura labial (día 2).\nVentila espontáneo en modo CPAP/PS (día 2 de VM).\nParámetros: PS 10 cmH2O.\nPEEP 6 cmH2O.\nFiO2 40%, SpO2 96%.\nSe realiza KTM.\nSe realiza PVE según protocolo con resultado fallido por FR > 35 rpm. Paciente continúa con soporte ventilatorio.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "CPAP/PS",
+        "FASE": "[\"Reanimación inicial\",\"Weaning\"]",
+        "F_VA": "2026-07-01",
+        "F_SOP": "2026-07-01",
+        "APACHE2": 24
+      }
+    },
+    {
+      "pac": "P1",
+      "cama": 1,
+      "tk": "2026-07-05-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 6 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nFase clínica: Reanimación inicial + Weaning.\nPaciente en 4to día de estadía en UCI en contexto de Shock séptico foco pulmonar.\nSin sedación. GCS 6T (O:1, V:1T, M:4), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 22 cm a nivel de comisura labial (día 4).\nVentila espontáneo en modo CPAP/PS (día 4 de VM).\nParámetros: PS 8 cmH2O.\nPEEP 5 cmH2O.\nFiO2 30%, SpO2 97%.\nSe realiza KTM.\nSe realiza PVE con resultado superado, progresando a extubación a las 11:30 hrs.\nPaciente queda con CNAF.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "CNAF",
+        "FASE": "[\"Reanimación inicial\",\"Weaning\"]",
+        "F_VA": "",
+        "F_SOP": "2026-07-01",
+        "APACHE2": 24
+      }
+    },
+    {
+      "pac": "P1",
+      "cama": 1,
+      "tk": "2026-07-06-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 8 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nFase clínica: Reanimación inicial + Weaning + Rehabilitación.\nPaciente en 5to día de estadía en UCI en contexto de Shock séptico foco pulmonar.\nSin sedación. GCS 10/15 (O:1, V:5, M:4), No cooperador.\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo con apoyo de CNAF.\nParámetros: FiO2 30%, SpO2 96%.\nSe realiza KTM.\nEvaluaciones funcionales: MRC-ss 52/60 (Sin DAUCI); FSS-ICU 28/35 (Independencia funcional); IMS 7/10.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "CNAF",
+        "FASE": "[\"Reanimación inicial\",\"Weaning\",\"Rehabilitación\"]",
+        "F_VA": "",
+        "F_SOP": "2026-07-01",
+        "APACHE2": 24
+      }
+    },
+    {
+      "pac": "P2",
+      "cama": 2,
+      "tk": "2026-07-02-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "🫁 Intubación marcada — arriba queda el estado PREVIO; completa abajo cómo quedó el paciente.",
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nPaciente ingresa a UCI con diagnóstico de Insuficiencia respiratoria aguda por NAC.\nSin sedación. GCS 15/15 (O:4, V:5, M:6).\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo con FiO2 adicional.\nPrevio en naricera-NRC, paciente requiere intubación orotraqueal a las 13:40 hrs en contexto de hipoxemia refractaria.\nQueda con TOT N° 7.5 fijado a 21 cm, conectado a VM en modo ACVC. Vt 380 ml (7.5 ml/kg), FR 18 rpm, VM 6.8 L/m, Ppl 22 cmH2O, DP 14 cmH2O, PEEP 8 cmH2O, FiO2 50%, SpO2 95%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[]",
+        "F_VA": "2026-07-02",
+        "F_SOP": "2026-07-02",
+        "APACHE2": 19
+      }
+    },
+    {
+      "pac": "P2",
+      "cama": 2,
+      "tk": "2026-07-04-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 6 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nPaciente en 2do día de estadía en UCI en contexto de Insuficiencia respiratoria aguda por NAC.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 2).\nVentila espontáneo en modo CPAP/PS (día 2 de VM).\nParámetros: PS 12 cmH2O.\nPEEP 6 cmH2O.\nFiO2 40%, SpO2 95%.\nKTM no realizada.\nPaciente se autoextuba a las 03:20 hrs.\nEvolucionando con falla respiratoria post extubación por lo que se reintuba a las 03:50 hrs con TOT N° 8.0 a 22 cm, quedando en modo ACVC (Vt 400 ml (7.9 ml/kg), FR 20 rpm, VM 8.0 L/m, PEEP 8 cmH2O, FiO2 60%).\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "CPAP/PS",
+        "FASE": "[]",
+        "F_VA": "2026-07-02",
+        "F_SOP": "2026-07-02",
+        "APACHE2": 19
+      }
+    },
+    {
+      "pac": "P2",
+      "cama": 2,
+      "tk": "2026-07-10-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 7 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 8vo día de estadía en UCI en contexto de Insuficiencia respiratoria aguda por NAC.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 8).\nTras 8 días de VM, se realiza traqueostomía percutánea a las 10:30 hrs, con cánula N° 8.0 con balón.\nQueda conectado a VM en modo CPAP/PS. PS 10 cmH2O, PEEP 6 cmH2O, FiO2 35%, SpO2 96%.\nSe realiza KTM.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TQT",
+        "SOP": "VM",
+        "MODO": "CPAP/PS",
+        "FASE": "[]",
+        "F_VA": "2026-07-10",
+        "F_SOP": "2026-07-02",
+        "APACHE2": 19
+      }
+    },
+    {
+      "pac": "P2",
+      "cama": 2,
+      "tk": "2026-07-12-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Venía en VM y quedó en Oxigenoterapia/OAF, sin desvinculación registrada (agrégala en Procedimientos).\nQuedan 6 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 10mo día de estadía en UCI en contexto de Insuficiencia respiratoria aguda por NAC.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TQT N° 8.0 (día 2).\nVentila espontáneo con FiO2 adicional por Tubo T.\nOxigenoterapia: FiO2 28%, SpO2 96%.\nSe realiza KTM.\nEvaluaciones funcionales: MRC-ss 44/60 (DAUCI); Pmant VA 8 cmH2O.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TQT",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "Tubo T",
+        "FASE": "[]",
+        "F_VA": "2026-07-10",
+        "F_SOP": "2026-07-02",
+        "APACHE2": 19
+      }
+    },
+    {
+      "pac": "P3",
+      "cama": 3,
+      "tk": "2026-07-03-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nPaciente ingresa a UCI con diagnóstico de EPOC exacerbado, acidosis respiratoria.\nSin sedación. GCS 15/15 (O:4, V:5, M:6).\nHDN estable, sin requerimientos de DVA.\nEn VNI, modo S/T.\nParámetros: IPAP 16 cmH2O, EPAP 6 cmH2O, PS 10 cmH2O, FiO2 40%, SpO2 90%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Full Face",
+        "SOP": "VNI",
+        "MODO": "S/T",
+        "FASE": "[]",
+        "F_VA": "2026-07-03",
+        "F_SOP": "2026-07-03",
+        "APACHE2": ""
+      }
+    },
+    {
+      "pac": "P3",
+      "cama": 3,
+      "tk": "2026-07-04-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "🫁 Intubación marcada — arriba queda el estado PREVIO; completa abajo cómo quedó el paciente.",
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 11 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nPaciente en 1er día de estadía en UCI en contexto de EPOC exacerbado, acidosis respiratoria.\nSin sedación. GCS 15/15 (O:4, V:5, M:6).\nHDN estable, sin requerimientos de DVA.\nEn VNI, modo S/T.\nParámetros: IPAP 16 cmH2O, EPAP 6 cmH2O, PS 10 cmH2O, FiO2 40%, SpO2 90%.\nPrevio en VNI, paciente requiere intubación orotraqueal a las 02:10 hrs en contexto de acidosis respiratoria refractaria a VNI.\nQueda con TOT N° 8.0 fijado a 22 cm, conectado a VM en modo ACVC. Vt 400 ml (6.5 ml/kg), FR 20 rpm, VM 8.0 L/m, Ppl 26 cmH2O, DP 18 cmH2O, PEEP 8 cmH2O, FiO2 60%, SpO2 91%.\nKTM no realizada.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[]",
+        "F_VA": "2026-07-04",
+        "F_SOP": "2026-07-04",
+        "APACHE2": ""
+      }
+    },
+    {
+      "pac": "P3",
+      "cama": 3,
+      "tk": "2026-07-06-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 4 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 3er día de estadía en UCI en contexto de EPOC exacerbado, acidosis respiratoria.\nSedado+BNM para meta SAS 1. GCS 3T (O:1, V:1T, M:1).\nHDN inestable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 22 cm a nivel de comisura labial (día 2).\nEn VMI, modo ACVC (día 2 de VM), con adecuada interacción P-VM.\nParámetros: Vti 400 ml (6.5 ml/kg PI).\nPEEP 12 cmH2O.\nFiO2 80%, SpO2 86%.\nPosicionamiento: Prono desde las 10:00 hrs.\nKTM contraindicada por BNM.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[]",
+        "F_VA": "2026-07-04",
+        "F_SOP": "2026-07-04",
+        "APACHE2": ""
+      }
+    },
+    {
+      "pac": "P4",
+      "cama": 4,
+      "tk": "2026-07-05-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nPaciente ingresa a UCI con diagnóstico de Polineuropatía del paciente crítico, TQT prolongada.\nSin sedación. GCS 11T (O:4, V:1T, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TQT N° 7.5 (día 0).\nVentila espontáneo en modo CPAP/PS (día 0 de VM).\nParámetros: PS 8 cmH2O.\nPEEP 5 cmH2O.\nFiO2 30%, SpO2 97%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TQT",
+        "SOP": "VM",
+        "MODO": "CPAP/PS",
+        "FASE": "[]",
+        "F_VA": "2026-07-05",
+        "F_SOP": "2026-07-05",
+        "APACHE2": 12
+      }
+    },
+    {
+      "pac": "P4",
+      "cama": 4,
+      "tk": "2026-07-06-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 7 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 1er día de estadía en UCI en contexto de Polineuropatía del paciente crítico, TQT prolongada.\nSin sedación. GCS 11T (O:4, V:1T, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TQT N° 7.5 (día 1).\nVentila espontáneo en modo CPAP/PS (día 1 de VM).\nParámetros: PS 8 cmH2O.\nPEEP 5 cmH2O.\nFiO2 28%, SpO2 97%, PaFiO2 329.\nSe desvincula de ventilación mecánica a las 09:00 hrs, quedando con Tubo T (entrenamiento de weaning programado).\nSe reconecta a VM a las 15:30 hrs, completando 6,5 h de desvinculación.\nBuena tolerancia, sin taquipnea.\nGSA de las 14:00 hrs: pH 7,41, PaO2 92 mmHg, PaCO2 42 mmHg, HCO3 25 mEq/L. pH normal · PaFiO2 329.\nSe realiza KTM.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TQT",
+        "SOP": "VM",
+        "MODO": "CPAP/PS",
+        "FASE": "[]",
+        "F_VA": "2026-07-05",
+        "F_SOP": "2026-07-05",
+        "APACHE2": 12
+      }
+    },
+    {
+      "pac": "P4",
+      "cama": 4,
+      "tk": "2026-07-07-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Venía en VM y quedó en Oxigenoterapia/OAF, sin desvinculación registrada (agrégala en Procedimientos).\nQuedan 7 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 2do día de estadía en UCI en contexto de Polineuropatía del paciente crítico, TQT prolongada.\nSin sedación. GCS 11T (O:4, V:1T, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TQT N° 7.5 (día 2).\nVentila espontáneo con válvula de fonación y O2 adicional.\nOxigenoterapia: FiO2 26%, SpO2 96%.\nSe instala válvula de fonación por 45 minutos, con tolerancia buena. Fonación audible, sin desaturación.\nSe realiza KTM nivel 3.\nSe realiza IMT.\nEvaluaciones funcionales: MRC-ss 40/60 (DAUCI); FSS-ICU 22/35 (Asistencia mínima); Pmant VA 12 cmH2O.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TQT",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "Válvula de fonación",
+        "FASE": "[]",
+        "F_VA": "2026-07-05",
+        "F_SOP": "2026-07-05",
+        "APACHE2": 12
+      }
+    },
+    {
+      "pac": "P4",
+      "cama": 4,
+      "tk": "2026-07-09-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 8 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 4to día de estadía en UCI en contexto de Polineuropatía del paciente crítico, TQT prolongada.\nSin sedación. GCS 11T (O:4, V:1T, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVAA mediante TQT N° 7.5 (día 4).\nVentila espontáneo con válvula de fonación y O2 adicional.\nOxigenoterapia: FiO2 26%, FR 20 rpm, SpO2 97%.\nCumple ~24 h con válvula de fonación, por lo que se realiza decanulación a las 11:00 hrs.\nSe realiza KTM nivel 3.\nSe realiza IMT.\nEvaluaciones funcionales: Pmant VA 9 cmH2O.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "Válvula de fonación",
+        "FASE": "[]",
+        "F_VA": "",
+        "F_SOP": "2026-07-05",
+        "APACHE2": 12
+      }
+    },
+    {
+      "pac": "P5",
+      "cama": 5,
+      "tk": "2026-07-08-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "SIM⚠ no existe #r_litros",
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nPaciente ingresa a UCI con diagnóstico de Contusión pulmonar por accidente de tránsito.\nSin sedación. GCS 15/15 (O:4, V:5, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo con FiO2 adicional.\nOxigenoterapia: SpO2 95%.\nKTR + SOF + asistencia de tos.\nKTM no realizada por ingreso reciente.\nEvaluaciones funcionales: IMS 8/10.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "",
+        "FASE": "[]",
+        "F_VA": "",
+        "F_SOP": "",
+        "APACHE2": 8
+      }
+    },
+    {
+      "pac": "P5",
+      "cama": 5,
+      "tk": "2026-07-08-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 8 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nPaciente en día 0 de estadía en UCI (ingreso) en contexto de Contusión pulmonar por accidente de tránsito.\nSin sedación. GCS 15/15 (O:4, V:5, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo con FiO2 adicional por NRC.\nOxigenoterapia: SpO2 95%.\nKTM no realizada.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "NRC",
+        "FASE": "[]",
+        "F_VA": "",
+        "F_SOP": "",
+        "APACHE2": 8
+      }
+    },
+    {
+      "pac": "P5",
+      "cama": 5,
+      "tk": "2026-07-09-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 7 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nPaciente en 1er día de estadía en UCI en contexto de Contusión pulmonar por accidente de tránsito.\nSin sedación. GCS 15/15 (O:4, V:5, M:6), Cooperador.\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo sin O2 adicional, SpO2 96%.\nSe realiza KTM nivel 5.\nEvaluaciones funcionales: MRC-ss 58/60 (Sin DAUCI); IMS 10/10.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Ambiente",
+        "MODO": "Sin soporte",
+        "FASE": "[]",
+        "F_VA": "",
+        "F_SOP": "",
+        "APACHE2": 8
+      }
+    },
+    {
+      "pac": "P6",
+      "cama": 6,
+      "tk": "2026-07-10-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nFase clínica: Postoperatorio inmediato.\nPaciente ingresa a UCI con diagnóstico de Postoperatorio laparotomía electiva.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 400 ml (7.4 ml/kg PI), FR 18 rpm, VM 7.2 L/min.\nPmax 24 cmH2O, PEEP 5 cmH2O.\nFiO2 40%, SpO2 98%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[\"Postoperatorio inmediato\"]",
+        "F_VA": "2026-07-10",
+        "F_SOP": "2026-07-10",
+        "APACHE2": 10
+      }
+    },
+    {
+      "pac": "P6",
+      "cama": 6,
+      "tk": "2026-07-10-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 13 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nFase clínica: Postoperatorio inmediato.\nPaciente en día 0 de estadía en UCI (ingreso) en contexto de Postoperatorio laparotomía electiva.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 400 ml (7.4 ml/kg PI), FR 18 rpm, VM 7.2 L/min.\nPmax 24 cmH2O, PEEP 5 cmH2O.\nFiO2 40%, SpO2 98%.\nKTM no realizada.\nSe realiza extubación sin protocolo PVE a las 22:30 hrs.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Ambiente",
+        "MODO": "ACVC",
+        "FASE": "[\"Postoperatorio inmediato\"]",
+        "F_VA": "",
+        "F_SOP": "2026-07-10",
+        "APACHE2": 10
+      }
+    },
+    {
+      "pac": "P7",
+      "cama": 7,
+      "tk": "2026-07-12-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nFase clínica: Neuroprotección.\nPaciente ingresa a UCI con diagnóstico de ACV isquémico extenso.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 360 ml (7.5 ml/kg PI), FR 18 rpm, VM 6.5 L/min.\nPmax 24 cmH2O, PEEP 8 cmH2O.\nFiO2 45%, SpO2 96%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[\"Neuroprotección\"]",
+        "F_VA": "2026-07-12",
+        "F_SOP": "2026-07-12",
+        "APACHE2": 22
+      }
+    },
+    {
+      "pac": "P7",
+      "cama": 12,
+      "tk": "2026-07-13-Dia",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 12 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO DÍA\nFase clínica: Neuroprotección.\nPaciente en 1er día de estadía en UCI en contexto de ACV isquémico extenso.\nSin sedación. GCS 11T (O:4, V:1T, M:6).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 7.5 fijado a 21 cm a nivel de comisura labial (día 1).\nEn VMI, modo ACVC (día 1 de VM), con adecuada interacción P-VM.\nParámetros: Vti 360 ml (7.5 ml/kg PI), FR 18 rpm, VM 6.5 L/min.\nPmax 24 cmH2O, PEEP 8 cmH2O.\nFiO2 45%, SpO2 96%.\nSe realiza KTM.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[\"Neuroprotección\"]",
+        "F_VA": "2026-07-12",
+        "F_SOP": "2026-07-12",
+        "APACHE2": 22
+      }
+    },
+    {
+      "pac": "P7b",
+      "cama": 7,
+      "tk": "2026-07-17-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nCorresponde a reingreso a UCI.\nPaciente ingresa a UCI con diagnóstico de Reingreso: neumonía aspirativa.\nSin sedación. GCS 15/15 (O:4, V:5, M:6).\nHDN estable, sin requerimientos de DVA.\nVentila espontáneo con apoyo de CNAF.\nParámetros: Flujo 40 L/min, FiO2 45%, SpO2 93%.\nKTM no realizada por ingreso reciente.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "Natural",
+        "SOP": "Oxigenoterapia/OAF",
+        "MODO": "CNAF",
+        "FASE": "[]",
+        "F_VA": "",
+        "F_SOP": "",
+        "APACHE2": 22
+      }
+    },
+    {
+      "pac": "P8",
+      "cama": 8,
+      "tk": "2026-07-15-Dia",
+      "ingreso": true,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "",
+      "texto": "KINESIOLOGÍA TURNO DÍA — INGRESO\nPaciente en aislamiento de contacto por Influenza A.\nPaciente ingresa a UCI con diagnóstico de SDRA por influenza.\nSedado+BNM para meta SAS 1. GCS 3T (O:1, V:1T, M:1).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 23 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM.\nParámetros: Vti 440 ml (5.9 ml/kg PI), FR 18 rpm, VM 7.9 L/min.\nPmax 24 cmH2O, PEEP 12 cmH2O.\nFiO2 70%, SpO2 90%.\nSecreciones fluidas mucopurulentas.\nKTM contraindicada por BNM.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[]",
+        "F_VA": "2026-07-15",
+        "F_SOP": "2026-07-15",
+        "APACHE2": 28
+      }
+    },
+    {
+      "pac": "P8",
+      "cama": 8,
+      "tk": "2026-07-15-Noche",
+      "ingreso": false,
+      "guardo": true,
+      "toasts": [
+        "💾 Guardando en servidor...",
+        "✅ Evolución guardada correctamente"
+      ],
+      "avisos": "Quedan 16 valores heredados del turno anterior sin revisar (en ámbar). Corrígelos si cambiaron, tócalos para confirmarlos, o usa «✓ Sin cambios» en cada módulo.",
+      "texto": "KINESIOLOGÍA TURNO NOCHE\nPaciente en día 0 de estadía en UCI (ingreso) en contexto de SDRA por influenza.\nSedado+BNM para meta SAS 1. GCS 3T (O:1, V:1T, M:1).\nHDN estable, sin requerimientos de DVA.\nVAA mediante TOT N° 8.0 fijado a 23 cm a nivel de comisura labial (día 0).\nEn VMI, modo ACVC (día 0 de VM), con adecuada interacción P-VM, sin realización de PVE en este turno por sedación profunda / BNM.\nParámetros: Vti 440 ml (5.9 ml/kg PI), FR 18 rpm, VM 7.9 L/min.\nPmax 24 cmH2O, PEEP 12 cmH2O.\nFiO2 70%, SpO2 90%.\nSecreciones fluidas mucopurulentas.\nKTM no realizada.\nKlgo. Diego Melo Villagrán",
+      "camaSnap": {
+        "VA": "TOT",
+        "SOP": "VM",
+        "MODO": "ACVC",
+        "FASE": "[]",
+        "F_VA": "2026-07-15",
+        "F_SOP": "2026-07-15",
+        "APACHE2": 28
+      }
+    }
+  ],
+  "egresos": [
+    {
+      "pac": "P1",
+      "cama": 1,
+      "fecha": "2026-07-07",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Medicina",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "Medicina",
+        "DIAS": 6,
+        "DIAS_VM": 3,
+        "DIAS_VA": 3,
+        "APACHE2": 24,
+        "EXTUB_OK": true,
+        "REINTUB": false,
+        "MRC": "52",
+        "DAUCI": false,
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P2",
+      "cama": 2,
+      "fecha": "2026-07-13",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: UTI",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "UTI",
+        "DIAS": 11,
+        "DIAS_VM": 3,
+        "DIAS_VA": 4,
+        "APACHE2": 19,
+        "EXTUB_OK": false,
+        "REINTUB": true,
+        "MRC": "44",
+        "DAUCI": true,
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P3",
+      "cama": 3,
+      "fecha": "2026-07-06",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Anatomía patológica",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": true,
+        "informa": false
+      },
+      "archivo": {
+        "MOTIVO": "Fallecimiento",
+        "DESTINO": "Anatomía patológica",
+        "DIAS": 3,
+        "DIAS_VM": 2,
+        "DIAS_VA": 2,
+        "APACHE2": 31,
+        "EXTUB_OK": false,
+        "REINTUB": false,
+        "MRC": "",
+        "DAUCI": "",
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P4",
+      "cama": 4,
+      "fecha": "2026-07-11",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Domicilio",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Alta a domicilio",
+        "DESTINO": "Domicilio",
+        "DIAS": 6,
+        "DIAS_VM": 2,
+        "DIAS_VA": 4,
+        "APACHE2": 12,
+        "EXTUB_OK": false,
+        "REINTUB": false,
+        "MRC": "40",
+        "DAUCI": true,
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P5",
+      "cama": 5,
+      "fecha": "2026-07-09",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Traumatología",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "Traumatología",
+        "DIAS": 1,
+        "DIAS_VM": 0,
+        "DIAS_VA": 0,
+        "APACHE2": 8,
+        "EXTUB_OK": false,
+        "REINTUB": false,
+        "MRC": "58",
+        "DAUCI": false,
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P6",
+      "cama": 6,
+      "fecha": "2026-07-11",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Cirugía",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "Cirugía",
+        "DIAS": 1,
+        "DIAS_VM": 1,
+        "DIAS_VA": 1,
+        "APACHE2": 10,
+        "EXTUB_OK": true,
+        "REINTUB": false,
+        "MRC": "",
+        "DAUCI": "",
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P7",
+      "cama": 12,
+      "fecha": "2026-07-14",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: UTI",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "UTI",
+        "DIAS": 2,
+        "DIAS_VM": 2,
+        "DIAS_VA": 2,
+        "APACHE2": 22,
+        "EXTUB_OK": false,
+        "REINTUB": false,
+        "MRC": "",
+        "DAUCI": "",
+        "FASE_FINAL": ""
+      }
+    },
+    {
+      "pac": "P7b",
+      "cama": 7,
+      "fecha": "2026-07-19",
+      "ok": true,
+      "toasts": [
+        "✅ Egreso registrado. Destino: Medicina",
+        "✅ Datos actualizados"
+      ],
+      "apacheUI": {
+        "pide": false,
+        "informa": true
+      },
+      "archivo": {
+        "MOTIVO": "Traslado a sala",
+        "DESTINO": "Medicina",
+        "DIAS": 7,
+        "DIAS_VM": 0,
+        "DIAS_VA": 0,
+        "APACHE2": 22,
+        "EXTUB_OK": false,
+        "REINTUB": false,
+        "MRC": "",
+        "DAUCI": "",
+        "FASE_FINAL": ""
+      }
+    }
+  ],
+  "eventos": [
+    {
+      "pac": "P7",
+      "accion": "MOVER_A_CAMA_VACIA",
+      "ok": true,
+      "err": "",
+      "data": {
+        "accion": "mover_cama_vacia",
+        "origen": "7",
+        "destino": "12",
+        "patientId": "uuid-7"
+      }
+    },
+    {
+      "pac": "P7",
+      "accion": "GET_RUT_PREVIO",
+      "ok": true,
+      "err": "",
+      "data": {
+        "episodios": [
+          {
+            "tipo": "egresado",
+            "idCama": "12",
+            "fechaIngreso": "2026-07-12",
+            "fechaEgreso": "2026-07-14",
+            "motivo": "Traslado a sala",
+            "nombre": "Ana Prado Soto"
+          }
+        ]
+      }
+    },
+    {
+      "pac": "P8",
+      "accion": "MOVER_VENTILADOR",
+      "ok": true,
+      "err": "",
+      "data": {
+        "id": "vm1",
+        "accion": "mover",
+        "entidad": "VENTILADORES",
+        "resumen": "Bodega → Cama 8"
+      }
+    },
+    {
+      "pac": "P8",
+      "accion": "ANEXAR_EVENTO",
+      "ok": true,
+      "err": "",
+      "data": {
+        "entidad": "TIMELINE",
+        "idCama": "8",
+        "patientId": "uuid-9",
+        "accion": "evento rápido: 🔧 FIBROBRONCOSCOPÍA 16:30 hrs (anexo)",
+        "texto": "🔧 FIBROBRONCOSCOPÍA 16:30 hrs (anexo)",
+        "dispositivos": [
+          {
+            "k": "hme",
+            "nombre": "HME",
+            "icono": "🌫️",
+            "fecha": "2026-07-15",
+            "frec": 2,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "hepa",
+            "nombre": "HEPA",
+            "icono": "🛡️",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "sonda",
+            "nombre": "Sonda de aspiración",
+            "icono": "➿",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          }
+        ]
+      }
+    },
+    {
+      "pac": "P8",
+      "accion": "ANEXAR_EVENTO",
+      "ok": true,
+      "err": "",
+      "data": {
+        "entidad": "TIMELINE",
+        "idCama": "8",
+        "patientId": "uuid-9",
+        "accion": "evento rápido: 🌫️ Cambio de HME 17:00 hrs",
+        "texto": "🌫️ Cambio de HME 17:00 hrs",
+        "dispositivos": [
+          {
+            "k": "hme",
+            "nombre": "HME",
+            "icono": "🌫️",
+            "fecha": "2026-07-15",
+            "frec": 2,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "hepa",
+            "nombre": "HEPA",
+            "icono": "🛡️",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "sonda",
+            "nombre": "Sonda de aspiración",
+            "icono": "➿",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          }
+        ]
+      }
+    },
+    {
+      "pac": "P8",
+      "accion": "ANEXAR_EVENTO",
+      "ok": true,
+      "err": "",
+      "data": {
+        "entidad": "TIMELINE",
+        "idCama": "8",
+        "patientId": "uuid-9",
+        "accion": "evento rápido: 🧫 Cultivo Aspirado traqueal 18:00 hrs: Influenza A (+)",
+        "texto": "🧫 Cultivo Aspirado traqueal 18:00 hrs: Influenza A (+)",
+        "dispositivos": [
+          {
+            "k": "hme",
+            "nombre": "HME",
+            "icono": "🌫️",
+            "fecha": "2026-07-15",
+            "frec": 2,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "hepa",
+            "nombre": "HEPA",
+            "icono": "🛡️",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          },
+          {
+            "k": "sonda",
+            "nombre": "Sonda de aspiración",
+            "icono": "➿",
+            "fecha": "2026-07-15",
+            "frec": 3,
+            "dias": 0,
+            "aplica": true,
+            "vence": false,
+            "venceManana": false
+          }
+        ]
+      }
+    },
+    {
+      "pac": "P8",
+      "accion": "REGISTRAR_FALLA_VM",
+      "ok": true,
+      "err": "",
+      "data": {
+        "entidad": "FALLAS_VM",
+        "id": "FALLA_1785762044679_0OHQM",
+        "idVm": "vm1",
+        "fotoUrl": "",
+        "accion": "falla registrada: AVEA-01"
+      }
+    }
+  ],
+  "errores": [],
+  "notas": [],
+  "cierre": {
+    "indicadores": {
+      "desde": "2026-07-01",
+      "hasta": "2026-07-20",
+      "diasRango": 20,
+      "pacienteDias": 22,
+      "diasVM": 12,
+      "extubaciones": 2,
+      "fracaso": 0,
+      "fracasoPrecoz": 0,
+      "fracasoTardio": 0,
+      "fracasoPct": 0,
+      "autoextubaciones": 1,
+      "autoextPor100VM": 8.33,
+      "fueraProtocolo": 1,
+      "fueraPct": 50,
+      "motivosFuera": {
+        "≤ 24 h de VM": {
+          "total": 1,
+          "noche": 1
+        }
+      },
+      "pve": 2,
+      "pvePor100PacDia": 9.09,
+      "tqt": 1,
+      "medianaVMpreTQT": 3,
+      "ventilados": 7,
+      "vmProlongada": 0,
+      "vmProlongadaPct": 0,
+      "atenciones": 29,
+      "desvinculaciones": 1,
+      "desvincPacientes": 1,
+      "desvincReconexiones": 1,
+      "desvincHorasTotal": 6.5,
+      "desvincMedianaHoras": 6.5,
+      "vfonTurnos": 1,
+      "vfonMinutos": 45,
+      "cuffTurnos": 15,
+      "cuffVerificados": 15,
+      "cuffAjustes": 1,
+      "cuffAdherenciaPct": 100,
+      "atencionesPorPacDia": 1.32,
+      "ocupacionProm": 1.1,
+      "personasConRut": 8,
+      "reingresos": 1,
+      "egresos": 8,
+      "fallecidos": 1,
+      "mortalidadPct": 12.5,
+      "tendencia": [
+        {
+          "mes": "2026-07",
+          "fuente": "rce",
+          "fracasoPct": 0
+        }
+      ]
+    },
+    "stats": {
+      "rem28": "sin rem28",
+      "keys": [
+        "desde",
+        "hasta",
+        "evos",
+        "pacientes",
+        "vm",
+        "eventos",
+        "ktm",
+        "procs",
+        "rem",
+        "catResp",
+        "catMotor",
+        "dauciActual",
+        "egresos"
+      ]
+    },
+    "auditoria": {
+      "generado": "2026-07-20 23:00:00",
+      "fecha": "2026-07-20",
+      "camasRevisadas": 1,
+      "camasConHallazgos": 1,
+      "cortes": {
+        "evalDias": 5,
+        "pveTurnos": 2
+      },
+      "resumen": {
+        "huecos": 1,
+        "transicion": 0,
+        "evaluacion": 0,
+        "pve": 0,
+        "clones": 0,
+        "texto": 0
+      },
+      "filas": [
+        {
+          "cama": "8",
+          "nombre": "Iván Leiva Cruz",
+          "cod": "150726Ileivac44",
+          "hallazgos": [
+            {
+              "tipo": "huecos",
+              "sev": "rojo",
+              "texto": "Última evolución hace 5 día(s) (2026-07-15)"
+            }
+          ]
+        }
+      ]
+    },
+    "pivotFilas": 26,
+    "pivotSinIdentidad": true,
+    "archivados": 8,
+    "clienteArchivados": 8
+  }
+}

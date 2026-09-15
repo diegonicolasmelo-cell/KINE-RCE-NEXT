@@ -1,0 +1,298 @@
+/**
+ * dominio_validacion.gs — Validación de payloads PURA (sin Sheets).
+ * Devuelve array de mensajes de error (vacío = OK). Se corre ANTES del lock.
+ * Acepta tanto claves de esquema (PAC_EDAD…) como alias del cliente (idCama…).
+ */
+
+function validarPayloadEvolucion(d) {
+  const errs = [];
+  if (!d) return ['Payload vacío'];
+
+  if (!d.ID_CAMA && !d.idCama) errs.push('Falta ID_CAMA');
+  if (!d.TURNO_KEY && !d.turnoKey) errs.push('Falta TURNO_KEY');
+  if (!d.PLAN_FIRMA_KINE || String(d.PLAN_FIRMA_KINE).trim() === '') errs.push('Falta firma del kinesiólogo');
+
+  // En INGRESO (crea el episodio) el nombre es obligatorio
+  const esIngreso = d.ES_INGRESO === true || String(d.ES_INGRESO) === 'true';
+  if (esIngreso && (!d.PAC_NOMBRE || String(d.PAC_NOMBRE).trim() === '')) {
+    errs.push('Falta nombre del paciente (ingreso)');
+  }
+
+  _rango(errs, d.PAC_EDAD, 'Edad', 15, 110, true);
+  _rango(errs, d.PAC_TALLA, 'Talla (cm)', 100, 230, false);
+  _rango(errs, d.VENT_FIO2, 'FiO₂ (%)', 21, 100, false);
+  _rango(errs, d.VENT_SPO2, 'SpO₂ (%)', 0, 100, false);
+  _rango(errs, d.VENT_VT, 'VT (ml)', 50, 1500, false);
+  _rango(errs, d.VENT_FR, 'FR (rpm)', 4, 60, false);
+  _rango(errs, d.PAC_BARTHEL, 'Barthel', 0, 100, true);
+
+  if (d.VENT_PEEP) {
+    const p = parseFloat(d.VENT_PEEP);
+    if (!isNaN(p) && p > 30) errs.push('PEEP > 30 cmH₂O — verificar: ' + d.VENT_PEEP);
+  }
+  validarKTM(d).forEach(function (m) { errs.push(m); });
+  validarPVE(d).forEach(function (m) { errs.push(m); });
+  return errs;
+}
+
+/**
+ * validarKTM — las reglas del trío de KTM, EN EL SERVIDOR (20-ago-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. Estas reglas vivían SOLO en el navegador (`guardar()`, con
+ * un toast y un `return`). Cualquier ruta que no pase por ese formulario se las
+ * salta — y el botón ➕ del Registro Diario, que es por donde va a entrar la
+ * corrección retroactiva, no pasa por ahí. Una regla clínica que solo vive en la
+ * pantalla no es una regla: es una sugerencia.
+ *
+ * 🪤 LO QUE DELIBERADAMENTE **NO** SE VALIDA AQUÍ, y por qué. Cada una de estas
+ * se probó y rompía el camino de todos los días:
+ *
+ *  · «REALIZADA exige nivel»: el formulario arranca en estado `'r'` con el nivel
+ *    vacío, y `aplicarGatesEval` BORRA el nivel cuando SAS = 1. Exigirlo aquí
+ *    bloquearía el guardado normal. El nivel se exige en la ruta de corrección
+ *    del ➕, que es donde alguien está declarando una KTM a conciencia.
+ *  · «nivel o razón sin ningún estado»: de noche la KTM no aplica, el estado se
+ *    apaga y el nivel se HEREDA de la cama sin que nadie lo limpie, con la
+ *    tarjeta oculta. Rechazar eso bloquearía **toda evolución nocturna** de un
+ *    paciente con KTM de día, y sin forma de destrabarlo desde la pantalla. El
+ *    nivel huérfano se NORMALIZA al guardar, no se rechaza.
+ *  · «'' distinto de false»: ningún lector del sistema los distingue
+ *    (`esVerdadero` trata igual los dos). Perder la evolución entera por esa
+ *    diferencia sería cobrar carísimo algo que nadie honra.
+ *
+ * Y lo que SÍ se valida además del trío (28-ago-2026): la razón «Otro» de la
+ * KTM no realizada exige su fundamento. Se puede exigir sin romper nada porque,
+ * a diferencia del nivel, «Otro» no se hereda ni lo escribe ningún automatismo:
+ * lo elige una persona en el turno, en la misma pantalla donde está el campo.
+ *
+ * Devuelve un array de mensajes (vacío = OK).
+ */
+/**
+ * Razones de «KTM no realizada» que exigen fundamento escrito: SOLO «Otro».
+ * «Indicación médica» se evaluó y quedó fuera (decisión de Manuel, 28-ago-2026):
+ * es legítima y frecuente, y obligar ahí le cobra un trámite al turno en un caso
+ * que se entiende. Tampoco entra al subregistro — se pide el porqué exactamente
+ * donde se va a leer, así que esta lista y `_KTM_RAZON_SUBREGISTRO` (svc_stats.gs)
+ * dicen hoy lo mismo.
+ * Espejo exacto de `KTM_RAZONES_CON_FUNDAMENTO` en index.html: si las dos se
+ * separan, el turno ve un campo opcional que el servidor va a rechazar y no hay
+ * forma de destrabarlo desde la pantalla. La guardia vigila la paridad.
+ */
+var _KTM_RAZON_EXIGE_FUNDAMENTO = ['Otro'];
+
+function validarKTM(d) {
+  const errs = [];
+  if (!d) return errs;
+  const vv = function (x) { return x === true || String(x) === 'true'; };
+  const r = vv(d.KTM_REALIZADA), s = vv(d.KTM_SUSPENDIDA), n = vv(d.KTM_NO_REALIZADA);
+  if (!r && !s && !n) return errs;   // nada declarado: no hay nada que validar
+
+  // Exclusividad. Imposible desde la pantalla (`setKTMstate` es excluyente),
+  // alcanzable por API.
+  if ((r && s) || (r && n) || (s && n)) {
+    errs.push('KTM: solo puede estar en UNO de los tres estados (realizada, suspendida o no realizada).');
+  }
+
+  // De noche la KTM no aplica: la estadística manual nunca tuvo casilla
+  // nocturna, y el REM cuenta sesiones sin filtrar turno. Confirmado con la
+  // planilla real (20-ago-2026): las 36 KTM realizadas son TODAS de día.
+  const turno = String(d.TURNO || d.turno || '');
+  if (turno === 'Noche') {
+    errs.push('KTM: en turno noche la kinesiterapia motora no aplica; no se declara estado.');
+  }
+
+  if (n && !String(d.KTM_NO_RAZON || '').trim()) {
+    errs.push('KTM: indica la razón por la que NO se realizó.');
+  }
+  // Las razones que no se explican solas exigen el porqué: sin él la KTM queda
+  // declarada con un motivo hueco y así entra al subregistro mensual. Va en el
+  // SERVIDOR y no solo en la pantalla porque el ➕ del Registro Diario
+  // (corrección retroactiva) no pasa por `guardar()`. (28-ago-2026, Manuel.)
+  //   · «Otro» no dice nada por definición, y es la única que obliga.
+  // Las otras seis se explican solas y no se les cobra un campo más — incluida
+  // «Indicación médica», que absorbió a «Decisión médica» (eran la misma razón
+  // escrita de dos formas) pero NO exige fundamento.
+  if (n && _KTM_RAZON_EXIGE_FUNDAMENTO.indexOf(String(d.KTM_NO_RAZON || '').trim()) !== -1
+        && !String(d.KTM_NO_COMENTARIO || '').trim()) {
+    errs.push('KTM: «' + String(d.KTM_NO_RAZON).trim() + '» necesita que escribas el fundamento.');
+  }
+  if (s && !String(d.KTM_CONTRA_RAZON || '').trim() && !String(d.KTM_CONTRA_MANUAL || '').trim()) {
+    errs.push('KTM: indica la razón de la contraindicación.');
+  }
+  return errs;
+}
+
+/**
+ * validarPVE — la razón de una PVE NO realizada, EN EL SERVIDOR
+ * (28-ago-2026, pedido de Manuel).
+ *
+ * 🔴 POR QUÉ EXISTE. `PVE_SC_RAZON` no se validaba en NINGUNA parte: ni en la
+ * pantalla ni aquí. El HTML declaraba «No se realizó PVE: SIEMPRE con razón» en
+ * un comentario y el campo de al lado decía «Detalle (opcional)». Resultado: se
+ * podía cerrar el turno con la PVE marcada en «No» y sin decir por qué, y ese
+ * porqué —el dato del weaning de ese turno— ya no se recuperaba. Igual que con
+ * la KTM, la regla va en el servidor porque el ➕ del Registro Diario
+ * (corrección retroactiva) no pasa por `guardar()`.
+ *
+ * 🪤 LO QUE DELIBERADAMENTE **NO** SE VALIDA, y por qué:
+ *
+ *  · **Nada cuando `PVE_VAL` no viene en el payload.** `_podarEventosPayload`
+ *    borra el grupo PVE completo cuando la rama no está activa en el formulario,
+ *    y entonces el servidor PRESERVA lo ya guardado. Exigir sobre una clave
+ *    ausente rechazaría el re-guardado de cualquier turno viejo —los que se
+ *    guardaron antes de esta regla, sin razón— y no habría forma de destrabarlo
+ *    desde la pantalla, porque la rama PVE no se repuebla al reabrir el turno.
+ *    Las filas históricas sin razón se corrigen abriendo esa evolución, no
+ *    bloqueando la siguiente.
+ *  · **Nada cuando hubo extubación sin PVE.** Ahí el formulario manda razón y
+ *    detalle VACÍOS a propósito (el evento es la extubación, con su tipo), así
+ *    que exigirlos trabaría un turno por un campo que el propio cliente
+ *    descarta.
+ *
+ * Devuelve un array de mensajes (vacío = OK).
+ */
+/**
+ * Razones de «PVE no realizada» que exigen escribir cuál: SOLO «Otra», la única
+ * del catálogo que por definición no dice nada. Las otras ocho se explican solas
+ * y conservan el detalle opcional — misma decisión que con «Indicación médica»
+ * en la KTM: no cobrarle un trámite al turno en un caso que ya se entiende.
+ * Espejo exacto de `PVE_RAZONES_CON_MOTIVO` en index.html y de
+ * `_PVE_RAZON_SUBREGISTRO` en svc_stats.gs: si se separan, el turno ve un campo
+ * opcional que el servidor va a rechazar y no hay forma de destrabarlo desde la
+ * pantalla. La guardia vigila que las tres digan lo mismo.
+ */
+var _PVE_RAZON_EXIGE_MOTIVO = ['Otra'];
+
+function validarPVE(d) {
+  const errs = [];
+  if (!d) return errs;
+  const vv = function (x) { return x === true || String(x) === 'true' || String(x) === 'TRUE'; };
+  // PVE superada SIN extubar (tanda 2a): la razón es obligatoria y la
+  // extubación no puede venir marcada a la vez (el candado del PRD, en el
+  // servidor: por aquí pasa también el ➕ del Registro Diario).
+  if (String(d.PVE_VAL || '') === 'si' && vv(d.PVE_SUP_SIN_EXT)) {
+    if (String(d.PVE_RESULTADO || '') !== 'superada') errs.push('PVE: «no se extubó» solo aplica a una PVE superada.');
+    if (!String(d.PVE_SUP_SIN_EXT_RAZ || '').trim()) errs.push('PVE superada sin extubar: indica por qué no se extubó.');
+    if (/^Otra$/i.test(String(d.PVE_SUP_SIN_EXT_RAZ || '').trim())) errs.push('PVE superada sin extubar: «Otra» necesita que describas el motivo.');
+    if (vv(d.EXT_OCURRIO)) errs.push('PVE superada sin extubar: no puede venir marcada una extubación en el mismo turno.');
+    return errs;
+  }
+  if (String(d.PVE_VAL || '') !== 'no') return errs;   // ausente o 'si'/'nc': nada que validar
+  // Extubación sin PVE: el evento del turno es otro y el formulario manda los
+  // PVE_SC_* vacíos a propósito.
+  // 🪤 Salvo `sin_condiciones`, que NO es una extubación (decisión clínica
+  // jul-2026): significa justamente que no hubo PVE, así que ahí la razón sí se
+  // exige. La condición es CARÁCTER POR CARÁCTER la de `_pveMotivo`
+  // (svc_stats.gs): si se separan, la estadística mostraría la razón de una fila
+  // que la validación nunca obligó a escribir. La guardia vigila las dos.
+  if (vv(d.EXT_OCURRIO) && String(d.EXT_TIPO || '') !== 'sin_condiciones') return errs;
+
+  const raz = String(d.PVE_SC_RAZON || '').trim();
+  if (!raz) {
+    errs.push('PVE: indica por qué NO se realizó la prueba de ventilación espontánea.');
+    return errs;                                       // sin razón, el motivo no tiene de qué colgar
+  }
+  if (_PVE_RAZON_EXIGE_MOTIVO.indexOf(raz) !== -1 && !String(d.PVE_SC_DET || '').trim()) {
+    errs.push('PVE: «' + raz + '» necesita que describas el motivo.');
+  }
+  return errs;
+}
+
+/**
+ * _ktmCantidad — la cantidad de sesiones, acotada a 1..9.
+ *
+ * Existe para que la fórmula deje de estar copiada. Estaba escrita a mano en el
+ * front (`index.html`, al armar el payload) y repetida en el REM; el servidor no
+ * la acotaba en ninguna parte, así que por API entraba cualquier número.
+ */
+function _ktmCantidad(v) {
+  const n = parseInt(v, 10);
+  return String(Math.min(9, Math.max(1, isNaN(n) ? 1 : n)));
+}
+
+function validarPayloadIngreso(d) {
+  const errs = [];
+  if (!d) return ['Payload vacío'];
+  if (!d.idCama && !d.ID_CAMA) errs.push('Falta idCama');
+  const nombre = d.nombre || d.NOMBRE || d.PAC_NOMBRE;
+  if (!nombre || String(nombre).trim() === '') errs.push('Falta nombre del paciente');
+  const firma = d.firmaKine || d.PLAN_FIRMA_KINE || d.FIRMA_KINE;
+  if (!firma || String(firma).trim() === '') errs.push('Falta firma del kinesiólogo');
+  _rango(errs, d.edad || d.EDAD, 'Edad', 15, 110, true);
+  _rango(errs, d.talla || d.TALLA_CM, 'Talla (cm)', 100, 230, false);
+  return errs;
+}
+
+/** Valida rango si el valor viene (no vacío). entero=true fuerza int. */
+function _rango(errs, val, etiqueta, min, max, entero) {
+  if (val === undefined || val === null || val === '') return;
+  const num = entero ? parseInt(val) : parseFloat(val);
+  if (isNaN(num) || num < min || num > max) {
+    errs.push(etiqueta + ' fuera de rango (' + min + '-' + max + '): ' + val);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  🗂️ Rama episodio/turno (11-sep-2026) — dos reglas que viven en el
+//  SERVIDOR además del cliente. Puras: reciben lo que necesitan y no leen la
+//  planilla, para poder probarlas en Node como el resto de este archivo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * validarSBC — «PARA REGISTRAR SBC DEBE TENER NECESARIAMENTE FSS-ICU» (Diego,
+ * 9-sep), afinado el 11-sep: «del episodio, al menos 1; eso quiere decir: lo
+ * evalué, después lo traté». SBC es el nivel 3 de KTM (sedente al borde de la
+ * cama) y el ítem 3 del FSS-ICU es esa misma actividad: si el paciente se
+ * sentó al borde de la cama, la escala tiene que existir.
+ * @param d        payload del turno
+ * @param tieneFSS true si el episodio YA tiene al menos un FSS (serie o ULT_FSS)
+ */
+function validarSBC(d, tieneFSS) {
+  const errs = [];
+  if (!d) return errs;
+  const vv = function (x) { return x === true || String(x) === 'true'; };
+  if (!vv(d.KTM_REALIZADA)) return errs;
+  if (String(d.KTM_NIVEL_KTR || '') !== '3') return errs;
+  const fssHoy = d.EVAL_T_FSS !== '' && d.EVAL_T_FSS != null;
+  if (fssHoy || tieneFSS) return errs;
+  errs.push('SBC (KTM nivel 3) exige al menos un FSS-ICU en el episodio: mídelo en Evaluaciones y vuelve a guardar.');
+  return errs;
+}
+
+/**
+ * validarTransicionVA — la vía aérea NO cambia sin un evento declarado
+ * (línea fina: parámetros = turno; vía aérea y soporte = episodio). Es el
+ * espejo en el servidor de `_avisosTransicion()` del cliente, que hasta aquí
+ * avisaba y dejaba pasar con «Guardar igual» — así se perdió la extubación de
+ * la cama 13. La salida sigue existiendo, pero cuesta una razón escrita
+ * (TRANS_MOTIVO), que viaja al hito y no a EVOLUCIONES.
+ * @param d      payload del turno
+ * @param cama   fila de CAMAS_ESTADO tal como estaba ANTES de este guardado
+ */
+function validarTransicionVA(d, cama) {
+  const errs = [];
+  if (!d || !cama) return errs;
+  const vv = function (x) { return x === true || String(x) === 'true'; };
+  if (vv(d.ES_INGRESO)) return errs;                    // al ingresar no hay transición
+  const ini = String(cama.VIA_AEREA || '').trim();
+  if (!ini || !cama.PATIENT_ID) return errs;            // cama sin episodio: no hay «venía con»
+  const va = String(d.VENT_VIA_AEREA_FINAL || d.VENT_VIA_AEREA || '').trim();
+  if (!va || va === ini) return errs;
+  // Con CUALQUIER evento de vía aérea declarado, el cambio tiene explicación:
+  // la regla es «no cambia sin evento», no «el evento tiene que ser exactamente
+  // este». Si el colega declaró decanulación donde correspondía extubación, el
+  // cliente lo avisa; el servidor no rechaza un turno que sí declaró.
+  if (vv(d.EXT_OCURRIO) || vv(d.INTUB_OCURRIO) || vv(d.EXT_REINTUB) || vv(d.TQT_OCURRIO) || vv(d.DECAN_OCURRIO)) return errs;
+  const inv = function (x) { return x === 'TOT' || x === 'TQT'; };
+  const motivo = String(d.TRANS_MOTIVO || '').trim();
+  const falta = function (msg) { if (motivo.length >= 5) return; errs.push(msg); };
+  if (ini === 'TOT' && va === 'TQT' && !vv(d.TQT_OCURRIO))
+    falta('Venía con TOT y queda con TQT, pero no hay traqueostomía registrada. Decláralo en «¿Qué pasó hoy con la vía aérea?» o escribe por qué.');
+  if (ini === 'TOT' && !inv(va) && !vv(d.EXT_OCURRIO))
+    falta('Venía con TOT y queda con ' + va + ', pero no hay extubación registrada. Decláralo en «¿Qué pasó hoy con la vía aérea?» o escribe por qué.');
+  if (ini === 'TQT' && !inv(va) && !vv(d.DECAN_OCURRIO))
+    falta('Venía con TQT y queda con ' + va + ', pero no hay decanulación registrada. Decláralo en «¿Qué pasó hoy con la vía aérea?» o escribe por qué.');
+  if (!inv(ini) && inv(va) && !vv(d.INTUB_OCURRIO) && !vv(d.EXT_REINTUB) && !vv(d.TQT_OCURRIO))
+    falta('Venía con ' + ini + ' y queda con ' + va + ', pero no hay intubación ni reintubación registrada. Decláralo en «¿Qué pasó hoy con la vía aérea?» o escribe por qué.');
+  return errs;
+}
