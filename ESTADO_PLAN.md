@@ -220,8 +220,25 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | 2 | **G2** · Snapshot mensual permanente, con guardia | ✅ hecho |
 | 3 | **G4** · Minimización medida y con guardia | ✅ hecho · sacarlo entero espera a Diego |
 | 4 | **G5** · Capa `core/` en la interfaz | ✅ escape, puente y modales · queda `core/estado.js` |
-| 5 | Estética | pendiente |
+| 5 | Estética · textos cortados | ✅ hecho |
+| 6 | Estética · las cuatro decisiones de Diego | esperando su respuesta |
 | — | **G3** y **G6** | esperando a Diego / informática |
+
+### Estética
+
+Lo medido y lo propuesto está en una página aparte, con las maquetas armadas
+con el CSS real de la aplicación:
+**https://claude.ai/artifact/5Revb8L5egpjUTaw1y5yob**
+
+Cuatro decisiones, ninguna tomada: qué se ve primero en la tarjeta de cama
+(hoy son cuatro etiquetas de «pendiente» las que van arriba del diagnóstico),
+si las camas vacías pesan menos, si la cabecera del teléfono se comprime
+(hoy ocupa el 24% de la pantalla y entran 1,9 tarjetas) y si se uniforman las
+mayúsculas de las etiquetas.
+
+Lo que **no** necesitaba decisión ya está hecho: ver la bitácora del 15-sep.
+
+---
 
 Lo que necesita **decisión de Diego** se le pregunta nombrando qué hace, no se
 decide por él: si el RUT se saca igual sabiendo que hoy pesca los gases del

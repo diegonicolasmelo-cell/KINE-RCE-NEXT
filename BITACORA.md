@@ -155,8 +155,42 @@ iba a escribir.
 🪤 Escape no se centralizó aunque el plan lo liste: el manejador que existe
 tiene excepciones pensadas, y duplicarlo sería reabrirlas por accidente.
 
+### Estética · primera tanda
+
+Se hizo **mirando la aplicación corriendo**, no leyendo el código:
+`build/pantallazos.js` levanta el cliente real contra el servidor real con una
+unidad sembrada y guarda una imagen por vista, en escritorio y en teléfono.
+
+🪤 La primera corrida salió con la franja roja de «el reloj de este equipo
+difiere del servidor en ~99.914 minutos» y con todos los pacientes en «Día 76»:
+el reloj del servidor simulado estaba fijo en julio. Una foto con una alarma
+que no existe es peor que no tener foto.
+
+Dos defectos se arreglaron sin preguntar, porque no son cuestión de gusto sino
+texto que no se puede leer, y ninguno cambia una palabra de lo que dice la
+pantalla:
+
+- El **riel de secciones** del panel (196 px) dejaba **cuatro de las diez**
+  ilegibles. Ahora envuelve hasta tres líneas.
+- **«Fijación · cm de arcada dental»** envolvía en tres líneas dentro de una
+  columna de 70 px. Se le dio el ancho que el texto necesita. No se acortó el
+  texto: la unidad decidió que la fijación se mide siempre en arcada dental y
+  eso se dice en pantalla, no solo en el globo de ayuda.
+
+Guardia `legibilidad.js`: siembra nombres y diagnósticos largos, abre el panel
+en un navegador real y mide `scrollWidth`/`scrollHeight` contra el tamaño de la
+caja. No cuenta caracteres — con otra fuente habría dado verde.
+
+**Lo que sí es cuestión de gusto quedó en una página de decisiones** para
+Diego, con las maquetas armadas con el CSS real de la aplicación:
+`https://claude.ai/artifact/5Revb8L5egpjUTaw1y5yob`. Son cuatro: qué se ve
+primero en la tarjeta de cama, si las camas vacías pesan menos, si se comprime
+la cabecera del teléfono y si se uniforman las mayúsculas. Ninguna está tomada:
+la regla del proyecto es que los cambios de diseño se le proponen antes de
+tocar código.
+
 ---
 
-Batería al cierre del día: **145 verdes, 0 rojas**. Sin cambio de esquema que
+Batería al cierre del día: **146 verdes, 0 rojas**. Sin cambio de esquema que
 obligue a correr `crearORepararEstructura()` (la clave nueva de CONFIG se
 agrega sola).
