@@ -233,7 +233,7 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | 3 | **G4** · Minimización medida y con guardia | ✅ hecho · sacarlo entero espera a Diego |
 | 4 | **G5** · Capa `core/` en la interfaz | ✅ escape, puente y modales · queda `core/estado.js` |
 | 5 | Estética · textos cortados | ✅ hecho |
-| 6 | Estética · las cuatro decisiones de Diego | esperando su respuesta |
+| 6 | Estética · las cinco decisiones de Diego | esperando su respuesta |
 | — | **G3** y **G6** | esperando a Diego / informática |
 
 ### Estética

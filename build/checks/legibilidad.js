@@ -122,7 +122,9 @@ const si = (l, cond, detalle) => {
     panel.etiquetas.map(e => e.txt + ' (' + e.lineas + ' líneas)').join(' · '));
 
   /* ── Registro y entrega: si un texto se recorta, tiene que poder leerse ── */
-  for (const [vista, js] of [['el registro diario', "setTab('P')"], ['la entrega de turno', "setTab('E')"]]) {
+  for (const [vista, js] of [['el registro diario', "setTab('P')"], ['la entrega de turno', "setTab('E')"],
+                             ['las estadísticas', "setTab('D')"], ['los ventiladores', "setTab('V')"],
+                             ['los archivados', "setTab('A')"]]) {
     await pagina.evaluate(js);
     await pagina.waitForTimeout(900);
     const r = await pagina.evaluate(() => {
@@ -207,6 +209,30 @@ const si = (l, cond, detalle) => {
         'se puede desplazar pero nada lo dice, y con un mouse nadie lo descubre');
     }
   }
+  await pagina.setViewportSize({ width: 1400, height: 950 });
+
+  /* ── En el teléfono, donde más aprieta ────────────────────────────────── */
+  await pagina.setViewportSize({ width: 390, height: 844 });
+  await pagina.evaluate(() => setTab('G'));
+  await pagina.waitForTimeout(700);
+  const tel = await pagina.evaluate(() => {
+    const desbordaLaPagina = document.documentElement.scrollWidth > window.innerWidth + 1;
+    const cortados = [];
+    document.querySelectorAll('#bedGrid .bcard *').forEach(n => {
+      if (n.children.length || !n.textContent.trim()) return;
+      const cs = getComputedStyle(n);
+      if (cs.overflow === 'visible' && cs.overflowX === 'visible') return;
+      if (n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1) {
+        cortados.push(n.textContent.trim().slice(0, 34));
+      }
+    });
+    return { desbordaLaPagina, cortados: [...new Set(cortados)],
+             ancho: document.documentElement.scrollWidth };
+  });
+  si('a 390 px la página no se desplaza de lado', !tel.desbordaLaPagina,
+    'el documento mide ' + tel.ancho + ' px y la pantalla 390');
+  si('a 390 px ningún texto de las tarjetas queda cortado', tel.cortados.length === 0,
+    tel.cortados.slice(0, 5).join(' · '));
   await pagina.setViewportSize({ width: 1400, height: 950 });
 
   si('sin errores de JavaScript', errores.length === 0, errores.join(' | '));

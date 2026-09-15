@@ -270,7 +270,8 @@ caja. No cuenta caracteres — con otra fuente habría dado verde.
 
 **Lo que sí es cuestión de gusto quedó en una página de decisiones** para
 Diego, con las maquetas armadas con el CSS real de la aplicación:
-`https://claude.ai/artifact/5Revb8L5egpjUTaw1y5yob`. Son cuatro: qué se ve
+`https://claude.ai/artifact/5Revb8L5egpjUTaw1y5yob`. Son cinco, y la primera no es gusto sino funcionalidad perdida: los
+botones que no se ven en el notebook del hospital. Las otras: qué se ve
 primero en la tarjeta de cama, si las camas vacías pesan menos, si se comprime
 la cabecera del teléfono y si se uniforman las mayúsculas. Ninguna está tomada:
 la regla del proyecto es que los cambios de diseño se le proponen antes de
