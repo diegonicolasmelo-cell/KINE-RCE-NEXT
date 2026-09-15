@@ -202,6 +202,46 @@ Queda anotado, sin arreglar: la tabla del registro deja **175 píxeles fuera de
 la vista** a la derecha (mide 1.529 y el contenedor 1.354). Se puede
 desplazar, pero lo único que avisa es la palabra «TURN…» cortada a la mitad.
 
+### Estética · segunda tanda, mirando las vistas que faltaban
+
+Había sacado diez pantallazos y mirado tres. Al revisar el resto apareció lo
+más serio del día.
+
+**🔴 La cabecera se come los botones de la derecha.** Va en una sola franja con
+`overflow-x:auto`, y el envolver solo se activa bajo 900 px. Entre 901 y ~1500
+queda una barra desplazable **sin ninguna señal**: con un mouse nadie descubre
+que se corre, así que lo que sobra no existe. Medido a cada ancho: a 1440 se
+pierden «Actualizar datos» y la mascota; **a 1366 —el notebook del hospital con
+Windows 10— además el BUZÓN de notificaciones**; a 1280, también la CAMPANA de
+alertas y el candado de Coordinación.
+
+🪤 El arreglo evidente —subir el umbral del envolver a 1500 px— se probó,
+funciona y deja los siete anchos limpios… y puso ROJA a `piel.js`, que protege
+una decisión ya tomada: «el encabezado es UNA sola franja compacta (≤ 74 px)».
+Las dos cosas no caben. Elegir entre ellas no es de quien acomoda la caja: se
+revirtió y quedó planteado para Diego. Lo que sí se hizo, porque no contradice
+nada, es que la barra **avise que continúa**.
+
+**La tabla del registro** también escondía 175 px a la derecha, justo la mitad
+del turno noche, y lo único que lo avisaba era la palabra «TURN…» cortada.
+Ahora lleva la misma sombra.
+🪤 El primer intento QUITÓ el `background:#fff` del contenedor al reemplazarlo
+por los degradados, y la marca de agua del hospital empezó a transparentarse a
+través de las filas. Se vio en el pantallazo, no en el código. El blanco va
+como última capa, debajo de todo.
+
+**Los nombres del selector de camas de la entrega** se cortaban en seco, sin
+puntos suspensivos: «Rosa Elena Contrer» parecía un nombre completo. La causa:
+`text-overflow:ellipsis` **no funciona en un elemento en línea**, y ese span lo
+era. El CSS estaba escrito y no hacía nada; el recorte lo terminaba haciendo el
+contenedor. Con `display:block` el ellipsis sí se aplica, y el nombre entero
+quedó en el globo de ayuda.
+
+La guardia `legibilidad.js` creció con las tres cosas: que todo texto recortado
+se pueda leer al posar el cursor, que lo que se esconde a los lados lo avise
+algo, y una **línea base por ancho** de la cabecera — hoy se caen 3 controles a
+1366 px; si mañana se cae uno más, rojo.
+
 ### Estética · primera tanda
 
 Se hizo **mirando la aplicación corriendo**, no leyendo el código:
@@ -238,6 +278,6 @@ tocar código.
 
 ---
 
-Batería al cierre del día: **147 verdes, 0 rojas**. Sin cambio de esquema que
+Batería al cierre del día: **147 verdes, 0 rojas**, en 147 guardias. Sin cambio de esquema que
 obligue a correr `crearORepararEstructura()` (la clave nueva de CONFIG se
 agrega sola).

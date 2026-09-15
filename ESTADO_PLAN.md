@@ -242,7 +242,26 @@ Lo medido y lo propuesto está en una página aparte, con las maquetas armadas
 con el CSS real de la aplicación:
 **https://claude.ai/artifact/5Revb8L5egpjUTaw1y5yob**
 
-Cuatro decisiones, ninguna tomada: qué se ve primero en la tarjeta de cama
+🔴 **La más importante apareció después y es funcionalidad perdida, no gusto.**
+La cabecera va en una sola franja con desplazamiento horizontal y sin ninguna
+señal. Medido a cada ancho, esto es lo que **no se ve**:
+
+| Ancho | Se pierde |
+|---|---|
+| 1600 px | nada |
+| 1440 px | «Actualizar datos» y la mascota |
+| **1366 px** | **además el BUZÓN de notificaciones** ← el notebook del hospital |
+| 1280 px | además la CAMPANA de alertas y el candado de Coordinación |
+
+El arreglo evidente —dejar que la cabecera envuelva en dos líneas— se probó y
+funciona, pero **choca con una decisión ya tomada** que `checks/piel.js`
+protege: «el encabezado es UNA sola franja compacta (≤ 74 px)». Las dos cosas
+no caben. Mientras Diego decide, se hizo lo único que no contradice nada: que
+la barra **diga que continúa**, con la misma sombra que la tabla del registro.
+Y la guardia `legibilidad.js` fija la línea base: si mañana se cae un control
+más, se pone roja.
+
+Las otras cuatro decisiones, ninguna tomada: qué se ve primero en la tarjeta de cama
 (hoy son cuatro etiquetas de «pendiente» las que van arriba del diagnóstico),
 si las camas vacías pesan menos, si la cabecera del teléfono se comprime
 (hoy ocupa el 24% de la pantalla y entran 1,9 tarjetas) y si se uniforman las

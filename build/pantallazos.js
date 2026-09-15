@@ -129,6 +129,16 @@ const VISTAS = [
   } catch (e) { errores.push('panel: ' + e.message); }
   await esc.close();
 
+  /* ── Notebook del hospital (1366×768, Windows 10) ─────────────────────── */
+  console.log('NOTEBOOK 1366×768');
+  const note = await sesion('notebook', { width: 1366, height: 768 });
+  for (const v of VISTAS.slice(0, 2)) {
+    try { await note.evaluate(v.js); } catch (e) { errores.push('1366 ' + v.id + ': ' + e.message); }
+    await note.waitForTimeout(700);
+    await foto(note, 'notebook-' + v.id + '.png', v.titulo);
+  }
+  await note.close();
+
   /* ── Teléfono ─────────────────────────────────────────────────────────── */
   console.log('TELÉFONO 390×844');
   const mov = await sesion('movil', { width: 390, height: 844 });

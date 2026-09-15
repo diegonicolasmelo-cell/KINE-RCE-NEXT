@@ -121,6 +121,94 @@ const si = (l, cond, detalle) => {
   si('ninguna etiqueta del formulario envuelve en tres líneas o más', panel.etiquetas.length === 0,
     panel.etiquetas.map(e => e.txt + ' (' + e.lineas + ' líneas)').join(' · '));
 
+  /* ── Registro y entrega: si un texto se recorta, tiene que poder leerse ── */
+  for (const [vista, js] of [['el registro diario', "setTab('P')"], ['la entrega de turno', "setTab('E')"]]) {
+    await pagina.evaluate(js);
+    await pagina.waitForTimeout(900);
+    const r = await pagina.evaluate(() => {
+      const conTitulo = n => {
+        if (n.getAttribute('title')) return true;
+        if (n.querySelector && n.querySelector('[title]')) return true;
+        let a = n.parentElement;
+        while (a && a !== document.body) { if (a.getAttribute('title')) return true; a = a.parentElement; }
+        return false;
+      };
+      const mudos = [];
+      document.querySelectorAll('td *, .ent-bed *, .ent-ficha *').forEach(n => {
+        if (!n.textContent.trim()) return;
+        if (n.scrollWidth <= n.clientWidth + 1) return;
+        if (!conTitulo(n)) mudos.push(n.textContent.trim().slice(0, 36));
+      });
+      // ¿Algún contenedor esconde contenido a los lados sin ninguna señal?
+      const sinSenal = [];
+      document.querySelectorAll('*').forEach(n => {
+        const cs = getComputedStyle(n);
+        if (cs.overflowX !== 'auto' && cs.overflowX !== 'scroll') return;
+        if (n.scrollWidth <= n.clientWidth + 8) return;
+        if (cs.backgroundImage === 'none' && cs.boxShadow === 'none') {
+          sinSenal.push((n.className || n.tagName) + ' oculta ' + Math.round(n.scrollWidth - n.clientWidth) + ' px');
+        }
+      });
+      return { mudos: [...new Set(mudos)], sinSenal: [...new Set(sinSenal)] };
+    });
+    si('en ' + vista + ', todo texto recortado se puede leer al posar el cursor',
+      r.mudos.length === 0, r.mudos.slice(0, 5).join(' · '));
+    si('en ' + vista + ', lo que se esconde a los lados lo avisa algo',
+      r.sinSenal.length === 0,
+      r.sinSenal.join(' · ') + ' — se puede desplazar, pero nada lo dice');
+  }
+
+  /* ── La cabecera: qué se pierde a cada ancho ──────────────────────────
+     🔴 Medido el 15-sep-2026: la barra va `nowrap` con desplazamiento y, entre
+     901 y ~1500 px, los botones de la derecha quedan fuera de la vista. En el
+     notebook del hospital (1366×768, Windows 10) se pierde el BUZÓN de
+     notificaciones; a 1280, también la CAMPANA y el candado de Coordinación.
+
+     🪤 Esta guardia NO exige que todos se vean, aunque sería lo deseable: el
+     arreglo obvio es dejar que la cabecera envuelva en dos líneas, y eso
+     choca de frente con una decisión ya tomada que `checks/piel.js` protege
+     («el encabezado es UNA sola franja compacta»). Elegir entre las dos es de
+     Diego, no de quien acomoda la caja, y está planteado en ESTADO_PLAN.md.
+
+     Lo que sí exige es que la lista NO CREZCA. Esta es la línea base medida:
+     si mañana un control más se cae de la cabecera, esto se pone rojo y hay
+     que decidirlo a conciencia en vez de perderlo en silencio. */
+  const LINEA_BASE = {
+    1920: 0, 1600: 0, 1440: 2, 1366: 3, 1280: 5, 1100: 6, 960: 7,
+  };
+  for (const ancho of Object.keys(LINEA_BASE).map(Number).sort((a, b) => b - a)) {
+    await pagina.setViewportSize({ width: ancho, height: 800 });
+    await pagina.waitForTimeout(260);
+    const r = await pagina.evaluate(() => {
+      const h = document.querySelector('.hbar');
+      if (!h) return { falta: true };
+      const caja = h.getBoundingClientRect();
+      const fuera = [...h.querySelectorAll('button,a,select,input')]
+        .filter(n => {
+          const c = n.getBoundingClientRect();
+          if (!c.width && !c.height) return false;          // oculto a propósito
+          return c.left >= caja.right - 1 || c.right > caja.right + 1;
+        })
+        .map(n => (n.title || n.textContent.trim() || n.id || n.className).slice(0, 24));
+      const cs = getComputedStyle(h);
+      return {
+        oculto: Math.round(h.scrollWidth - h.clientWidth),
+        fuera: [...new Set(fuera)],
+        avisa: cs.backgroundImage !== 'none' || cs.boxShadow !== 'none',
+      };
+    });
+    if (r.falta) { si('se encontró la cabecera a ' + ancho + ' px', false); continue; }
+    const esperado = LINEA_BASE[ancho];
+    si('a ' + ancho + ' px no se cae de la cabecera nada nuevo (' + r.fuera.length + ' de ' + esperado + ')',
+      r.fuera.length <= esperado,
+      'ahora quedan fuera ' + r.fuera.length + ': ' + r.fuera.join(' · '));
+    if (r.oculto > 0) {
+      si('a ' + ancho + ' px, la cabecera avisa que continúa', r.avisa,
+        'se puede desplazar pero nada lo dice, y con un mouse nadie lo descubre');
+    }
+  }
+  await pagina.setViewportSize({ width: 1400, height: 950 });
+
   si('sin errores de JavaScript', errores.length === 0, errores.join(' | '));
 
   await navegador.close();

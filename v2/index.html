@@ -72,8 +72,36 @@ body{background:var(--bg);color:var(--txt);font-size:15px;overflow-x:hidden;}
 /* HEADER */
 .hdr{background:#0e3a5f;color:#fff;padding:6px 16px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:nowrap;box-shadow:0 1px 0 rgba(255,255,255,.07);min-height:58px;}
 .hdr .htitle{flex-shrink:0;}
-.hdr .hbar{flex:1;min-width:0;overflow-x:auto;flex-wrap:nowrap;}
-@media (max-width:900px){ .hdr{flex-wrap:wrap;min-height:0;} .hdr .hbar{overflow-x:visible;flex-wrap:wrap;} }
+/* 🔴 LA CABECERA SE COMÍA LOS BOTONES DE LA DERECHA (medido el 15-sep-2026).
+   La barra va `nowrap` con `overflow-x:auto`, y el envolver se activa solo
+   bajo 900 px. Entre 901 y ~1500 queda una barra desplazable SIN NINGUNA
+   SEÑAL: con un mouse nadie descubre que se corre, así que lo que sobra
+   simplemente no existe. Medido a cada ancho, esto es lo que se pierde:
+     · 1440 px → «Actualizar datos» y la mascota  (63 px ocultos)
+     · 1366 px → además el BUZÓN de notificaciones (137 px)  ← el notebook
+                 típico del hospital, Windows 10
+     · 1280 px → además la CAMPANA de alertas y el candado de Coordinación
+                 (223 px)
+   🪤 El arreglo evidente —subir el umbral del envolver a 1500 px— se probó y
+   FUNCIONA, pero deja la cabecera en dos líneas y eso choca de frente con una
+   decisión ya tomada que `checks/piel.js` protege: «el encabezado es una sola
+   franja compacta (<= 74 px)». Las dos cosas no caben, y elegir entre ellas no
+   es de quien acomoda la caja: queda planteado para Diego en ESTADO_PLAN.md.
+   Lo que sí se puede hacer sin contradecir nada es que la barra DIGA que
+   continúa, igual que la tabla del registro: la sombra aparece solo cuando
+   queda algo oculto y se apaga al llegar al final. Descubrir el buzón
+   corriendo la barra es peor que verlo, pero infinitamente mejor que no saber
+   que existe. */
+.hdr .hbar{
+  flex:1;min-width:0;overflow-x:auto;flex-wrap:nowrap;
+  background:
+    linear-gradient(to left, var(--hdr-bg,#04345E) 30%, rgba(4,52,94,0)) right center / 26px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.42), rgba(0,0,0,0)) right center / 11px 100% no-repeat;
+  background-attachment: local, scroll;
+  scrollbar-width:none;
+}
+.hdr .hbar::-webkit-scrollbar{height:0;}
+@media (max-width:900px){ .hdr{flex-wrap:wrap;min-height:0;} .hdr .hbar{overflow-x:visible;flex-wrap:wrap;background:none;} }
 .hnav{display:flex;gap:9px;align-items:center;}
 /* ── ENCABEZADO MÓVIL (opción C elegida por Diego, ago-2026): barra mínima en
    3 filas parejas — 1) logo chico EN LÍNEA + marca + reloj + contadores;
@@ -145,7 +173,25 @@ body{background:var(--bg);color:var(--txt);font-size:15px;overflow-x:hidden;}
 .tbl-wrap{padding:16px 22px;}
 .tbl-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 .tbl-title{font-size:.95rem;font-weight:800;color:#0f172a;}
-.tbl-scroll{overflow-x:auto;background:#fff;border:1px solid var(--border);border-radius:10px;}
+/* 🔴 LA TABLA CONTINÚA A LA DERECHA Y NADA LO DECÍA (15-sep-2026).
+   Mide 1.529 px dentro de 1.354: quedan 175 px fuera de la vista, justo la
+   mitad del TURNO NOCHE. Se podía desplazar —ya era `overflow-x:auto`— pero lo
+   único que lo avisaba era la palabra «TURN…» cortada a la mitad, que se lee
+   como un título feo, no como «hay más». La sombra del borde aparece solo
+   cuando queda algo oculto y se apaga sola al llegar al final.
+   🪤 El primer intento QUITÓ el `background:#fff` al reemplazarlo por los
+   degradados, y la marca de agua del hospital empezó a transparentarse a
+   través de las filas. El blanco va como última capa, debajo de todo. */
+.tbl-scroll{
+  overflow-x:auto;border:1px solid var(--border);border-radius:10px;
+  background:
+    linear-gradient(to right, #fff 35%, rgba(255,255,255,0)) left center / 30px 100% no-repeat,
+    linear-gradient(to left,  #fff 35%, rgba(255,255,255,0)) right center / 30px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%,   rgba(4,52,94,.14), rgba(4,52,94,0)) left center / 11px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(4,52,94,.14), rgba(4,52,94,0)) right center / 11px 100% no-repeat,
+    #fff;
+  background-attachment: local, local, scroll, scroll, local;
+}
 table.nt{border-collapse:collapse;width:max-content;min-width:100%;font-size:.77rem;}
 table.nt th:first-child,table.nt td:first-child{position:sticky;left:0;z-index:10;background:#fff;box-shadow:2px 0 5px rgba(0,0,0,.06);}
 table.nt thead tr:first-child th:first-child{background:#1e293b;z-index:20;position:static;box-shadow:none;}
@@ -335,7 +381,13 @@ tr.r-tot td.tv{color:#fde68a!important;font-family:'Courier New',monospace;font-
 .ent-bed.on .ent-bed-chk{background:var(--primary);border-color:var(--primary);}
 .ent-bed-id{font-weight:800;font-size:.82rem;color:var(--pdark);}
 .ent-bed.on .ent-bed-id{color:#003a8c;}
-.ent-bed-nm{font-size:.66rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* 🪤 `text-overflow:ellipsis` NO funciona en un elemento en línea, y este lo
+   era: el CSS estaba escrito y no hacía nada. El recorte lo terminaba haciendo
+   el contenedor, que corta en seco — «Rosa Elena Contrer» parecía un nombre
+   completo. Con `display:block` el ellipsis sí se aplica y se ve que falta
+   texto; el nombre entero queda en el globo de ayuda. */
+.ent-bed-nm{display:block;font-size:.66rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ent-bed-txt{display:flex;flex-direction:column;min-width:0;overflow:hidden;}
 
 /* Documento */
 .ent-doc-wrap{display:flex;justify-content:center;}
@@ -17415,7 +17467,7 @@ function entRenderBeds(){
     const id=String(c.ID_CAMA), on=ENT_SEL.has(id);
     return `<button class="ent-bed ${on?'on':''}" onclick="entToggleBed('${id}')">
       <span class="ent-bed-chk">${on?'✓':''}</span>
-      <span style="overflow:hidden;"><span class="ent-bed-id">Cama ${escapeHtml(id)}</span> <span class="ent-bed-nm">${escapeHtml(c.NOMBRE||'—')}</span></span>
+      <span class="ent-bed-txt"><span class="ent-bed-id">Cama ${escapeHtml(id)}</span><span class="ent-bed-nm" title="${escapeHtml(c.NOMBRE||'')}">${escapeHtml(c.NOMBRE||'—')}</span></span>
     </button>`;
   }).join('');
 }
