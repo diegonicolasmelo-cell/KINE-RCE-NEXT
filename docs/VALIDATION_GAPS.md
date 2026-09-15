@@ -7,7 +7,7 @@ plan maestro ni una versión clínicamente validada.
 |---|---|---|
 | 0 | Shell, caché acotada, banner TEST | Instalación PWA en los dispositivos reales; iconos PNG |
 | 1 | Camas, estado, traslado, egreso e historia por episodio | UX clínica y ficha de persona/ingreso completa |
-| 2 | Borrador, firma congelada, adenda, revisión e idempotencia | Horarios clínicos día/noche, autor autenticado en Google, concurrencia real |
+| 2 | Apertura/cierre manual confirmados por Diego; firma congelada, adenda, autor Google e idempotencia | Concurrencia multiusuario real y validación clínica |
 | 3 | Secuencia vía aérea/VM, PVE independiente, AET/UPOT/aislamiento | Dispositivos, parámetros, cambios retroactivos y correcciones estructuradas |
 | 4 | Series; GCS con 1T; MRC/FSS/CPAx; numéricas con unidades; gases por resultados | Validación clínica, CAM-ICU, ecografía, deglución, BDT y neurología completa |
 | 5 | KTR con técnicas; sesiones KTM/IMT/EMS con parámetros separados; programas persistentes | Validaciones terapéuticas completas, detalles de válvula e inhaloterapia |

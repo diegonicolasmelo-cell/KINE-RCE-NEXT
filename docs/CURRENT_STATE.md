@@ -26,8 +26,8 @@ contó como una atención, y KTM conservó 20 minutos y Borg 0.
 Correcciones de reintentos y campos ausentes incluidas en el paquete final.
 Versión 4 publicada en Google TEST el 15/09/2026 a las 13:51, misma URL y acceso Solo yo.
 El usuario pidió quitar el intervalo: se eliminó la automatización recurrente.
-Continuar directamente en esta tarea. Horarios de turno consultados al usuario,
-todavía sin respuesta; no asumir una nueva regla horaria.
+Continuar directamente en esta tarea. Diego confirmó apertura y cierre manual de
+turnos por ahora; no aplicar horarios automáticos día/noche.
 
 - MRC: 12 componentes, seis movimientos bilaterales; total derivado 0–60.
 - FSS: cinco componentes, NE conservado; hasta dos NE se imputa promedio y se

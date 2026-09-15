@@ -47,6 +47,8 @@ crea una adenda auditable.
 ## Decisiones específicas
 
 - VM significa ventilación mecánica invasiva; VNI se cuenta por separado.
+- Turnos: apertura y cierre manual por ahora, confirmado por Diego el 15/09/2026.
+  No aplicar cortes automáticos día/noche ni asignar horarios inferidos desde legacy.
 - Los días VM suman intervalos efectivos y no se reinician por cambios visuales.
 - Una PVE superada no implica necesariamente extubación.
 - GCS tiene una sola fuente bajo conciencia/neurología.
@@ -96,4 +98,3 @@ modelo clínico.
 - Autenticación institucional definitiva.
 - Diseño definitivo de parámetros ventilatorios basado en una 7.05 no disponible.
 - Reemplazo inmediato de Sheets por otra base de datos.
-
