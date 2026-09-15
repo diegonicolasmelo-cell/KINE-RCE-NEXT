@@ -12,3 +12,7 @@ build/entrega_*/
 scratchpad/
 HANDOFF.md
 build/pantallazos/
+# Sondas de un rato: se escriben dentro de build/ porque ahí vive
+# playwright-core, y no son del proyecto.
+build/_*
+build/*_tmp.js
