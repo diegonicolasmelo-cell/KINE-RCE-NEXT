@@ -1,13 +1,17 @@
 # Plan de pruebas
 
-## Hito 0
+## Hito 0: simulación local
 
 - La aplicación muestra el banner TEST / NO PRODUCCIÓN.
 - El manifiesto y los recursos del shell existen.
 - Se muestran 18 camas sintéticas.
-- No existe URL de Apps Script, ID de Sheets ni credencial.
-- El cliente API rechaza cualquier llamada.
+- El shell local no contiene URL de Apps Script, ID de Sheets ni credencial.
+- El cliente API de la simulación local rechaza cualquier llamada.
 - El service worker no almacena respuestas clínicas.
+
+La interfaz HtmlService sí realiza operaciones contra Apps Script TEST.
+Ver [el acta de cierre](BLOCK_CLOSEOUT_2026-09-15.md) para distinguir las pruebas
+automáticas de los recorridos ejecutados en Google y sus límites.
 
 ## Escenarios clínicos obligatorios
 
@@ -26,4 +30,3 @@
 13. Firma, intento de edición directa rechazado y adenda auditable.
 14. Acción rápida y formulario producen el mismo evento estructurado.
 15. Cálculos NEXT comparados con la línea base y diferencias explicadas.
-

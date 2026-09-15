@@ -20,11 +20,15 @@ PWA / Vista
 - **Apps Script:** autentica, autoriza, valida nuevamente y persiste.
 - **Repositorio:** traduce entidades a almacenamiento sin definir su significado.
 
-## Hito 0
+## Simulación local y conexión TEST
 
-La PWA funciona solo con un repositorio sintético en memoria. El cliente de API
+La PWA local funciona con un repositorio sintético en memoria. Su cliente de API
 está bloqueado deliberadamente y no contiene URL, ID de planilla ni credenciales.
 El service worker almacena solo el shell estático, nunca datos clínicos.
+
+La interfaz Google TEST usa HtmlService y google.script.run para acceder al
+adaptador y al diario Sheets. Comparte el modelo y persiste los cambios. No registra
+service worker. Acceso actual: Solo yo; identidad multiusuario y PWA externa pendientes.
 
 ## Seguridad de desarrollo
 
@@ -32,5 +36,4 @@ El service worker almacena solo el shell estático, nunca datos clínicos.
 - Pacientes ficticios y claramente rotulados.
 - Ningún dato clínico en localStorage, IndexedDB o caché del service worker.
 - Configuración de producción fuera del repositorio.
-- Escrituras futuras con idempotencia, auditoría y control de concurrencia.
-
+- Escrituras TEST con idempotencia, auditoría, revisión optimista y bloqueo del script.

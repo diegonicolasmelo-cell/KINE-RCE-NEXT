@@ -18,18 +18,25 @@ conservar datos y referencias al sistema vigente.
 
 Preparación de archivos:
 
-1. Ejecutar `npm run build:api`.
+1. Ejecutar `npm run package:test`.
 2. En el proyecto nuevo, cargar `api/generated/domain.gs` como `domain.gs`.
 3. Cargar `api/apps-script/adapter.gs` como `adapter.gs`.
 4. Cargar `api/apps-script/smoke.gs` como `smoke.gs`.
-5. Usar el manifiesto `api/apps-script/appsscript.json`.
-6. Ejecutar `initializeNextTest` con la cuenta responsable del entorno TEST.
-7. Ejecutar `runNextTestSmoke` y comprobar `passed: true` en el registro.
+5. Cargar `api/generated/interface.gs` como `interface.gs`.
+6. Usar el manifiesto `api/apps-script/appsscript.json`.
+7. Solo en un proyecto nuevo sin inicializar, ejecutar `initializeNextTest` con la cuenta responsable del entorno TEST.
+8. Ejecutar `runNextTestSmoke` y comprobar `passed: true` en el registro.
 
 Alternativa de un solo archivo: `npm run package:test` genera
-`deliverables/next-test/NEXT_TEST.gs` con dominio, adaptador y prueba juntos,
+`deliverables/next-test/NEXT_TEST.gs` con dominio, interfaz, adaptador y prueba juntos,
 además del manifiesto y una guía breve. Usar esa alternativa o los archivos
 separados, nunca ambas: compartirían nombres de funciones.
+
+El proyecto RCE-KINE-NEXT-TEST existente ya está inicializado. Para actualizarlo,
+conservar las propiedades del proyecto, cargar el paquete probado y actualizar
+la implementación existente con una nueva versión y acceso Solo yo.
+No ejecutar otra vez `initializeNextTest`. El cierre documental del 15/09/2026
+mantiene la versión 4: no requiere publicar código.
 
 La función crea una planilla vacía nueva y la marca con un identificador aleatorio.
 Guarda el identificador de planilla, la marca y el usuario autorizado solamente en
