@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rce-kine-next-shell-v1';
+const CACHE_NAME = 'rce-kine-next-shell-v4';
 const SHELL = [
   './',
   './index.html',
@@ -11,6 +11,10 @@ const SHELL = [
   './src/model/bed.js',
   './src/repositories/synthetic-bed-repository.js',
   './src/views/bed-board-view.js'
+  ,'./src/controllers/clinical-controller.js'
+  ,'./src/repositories/clinical-repository.js'
+  ,'./src/model/clinical-record.js'
+  ,'./src/views/clinical-view.js'
 ];
 
 self.addEventListener('install', event => {
@@ -20,13 +24,13 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      keys.filter(key => key.startsWith('rce-kine-next-shell-') && key !== CACHE_NAME).map(key => caches.delete(key))
     ))
   );
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  const allowed = new Set(SHELL.map(path => new URL(path, self.registration.scope).href));
+  if (event.request.method !== 'GET' || !allowed.has(event.request.url)) return;
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });
-

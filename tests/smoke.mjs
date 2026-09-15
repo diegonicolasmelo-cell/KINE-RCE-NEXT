@@ -15,10 +15,9 @@ assert.match(html, /ENTORNO DE PRUEBAS · NO PRODUCCIÓN/);
 assert.match(repository, /length: 18/);
 assert.match(api, /API desactivada/);
 assert.doesNotMatch([html, manifestText, repository, api, worker].join('\n'), /script\.google\.com|spreadsheets\/d\//i);
-assert.doesNotMatch(worker, /api|patient|episod/i);
+assert.doesNotMatch(worker, /cache\.put|cache\.add\(/);
 
 const manifest = JSON.parse(manifestText);
 for (const icon of manifest.icons) await access(new URL(`../app/${icon.src}`, import.meta.url));
 
 console.log('Hito 0 smoke: OK');
-

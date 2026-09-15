@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/smoke.mjs"
+    "test": "node tests/smoke.mjs && node --test tests/*.test.mjs",
+    "build:api": "node scripts/build-api.mjs",
+    "inventory": "node scripts/inventory-fields.mjs",
+    "package:test": "npm run build:api && node scripts/package-test.mjs"
   }
 }
-

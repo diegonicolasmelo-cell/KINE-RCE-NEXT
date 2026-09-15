@@ -4,9 +4,12 @@ Nueva generación del Registro Clínico Electrónico de Kinesiología UCI.
 
 ## Estado
 
-Hito 0 implementado en la rama `reestructuracion-hito-0`: PWA instalable, tablero
-de 18 camas sintéticas, arquitectura inicial por capas y conexiones externas
-bloqueadas.
+Simulación funcional en `codex/reestructuracion-hito-0`: tablero de 18 camas,
+episodios, turnos, firma, adendas, eventos, mediciones, atenciones y continuidad.
+Los cambios viven solo en memoria y se pierden al recargar.
+
+El plan está en desarrollo. Consultar `docs/VALIDATION_GAPS.md` para conocer el
+alcance probado y lo que todavía requiere implementación o validación.
 
 ## Ejecutar localmente
 
@@ -30,6 +33,8 @@ npm test
 - `docs/ARCHITECTURE.md`: responsabilidades técnicas.
 - `docs/CURRENT_STATE.md`: continuidad entre sesiones.
 - `docs/MIGRATION_PLAN.md` y `docs/TEST_PLAN.md`: transición y validación.
+- `docs/FIELD_INVENTORY.md`: 396 columnas legacy inventariadas, pendientes de aprobación.
+- `api/README.md`: preparación del backend exclusivamente TEST, aún no conectado.
 
 ## Base aprobada
 
