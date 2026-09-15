@@ -48,7 +48,19 @@ No hay nada que hacer aquí. Se deja escrito para que nadie lo "reconstruya".
 
 ## 2 · Lo que FALTA — medido, no supuesto
 
-### 🔴 G1 · No hay UN escapado en la interfaz (§2.3, §9.1, §10)
+### ✅ G1 · Un solo escapado, y que además se use (§2.3, §9.1, §10)
+
+> **Corrección del 15-sep, medida después de darlo por cerrado.** Unificar los
+> escapadores **no** era el trabajo completo: probaba que existiera uno solo,
+> no que se usara. Un barrido encontró **804 interpolaciones** dentro de
+> plantillas HTML que no pasaban por ningún escapador, y una guardia que
+> siembra un paciente llamado `Ana <b>Mar"ía</b> Pérez & Soto` demostró que
+> ese marcado **se interpretaba de verdad** en la grilla, el registro y la
+> entrega. Se escaparon 16 puntos y la guardia
+> `build/checks/dato_no_es_marcado.js` lo mide por efecto, no por forma.
+> Lo que sigue es el diagnóstico original.
+
+### 🔴 El diagnóstico original (§2.3, §9.1, §10)
 
 El plan lo pone entre los principios **no negociables**: «todo valor de
 paciente se inserta con `escapeHtml()`… cero `innerHTML` crudo con datos de

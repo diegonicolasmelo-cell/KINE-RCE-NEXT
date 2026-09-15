@@ -155,6 +155,53 @@ iba a escribir.
 🪤 Escape no se centralizó aunque el plan lo liste: el manejador que existe
 tiene excepciones pensadas, y duplicarlo sería reabrirlas por accidente.
 
+### G1, segunda parte · unificar los escapadores no bastaba
+
+Al revisar las vistas que faltaban por mirar apareció que **G1 estaba a medias
+y yo lo había dado por cerrado**. Unificar los nueve escapadores en uno solo
+prueba que exista uno solo; no prueba que se use.
+
+Un barrido del archivo encontró **804 interpolaciones `${…}` dentro de
+plantillas HTML que no pasaban por ningún escapador**, 41 de ellas con pinta
+de dato de paciente. Pero contar interpolaciones no sirve: la mayoría son
+clases, números y ternarios entre literales, y revisarlas a mano es un trabajo
+que se hace mal y hay que rehacer con cada línea nueva.
+
+Lo que sí sirve es **medir el efecto**. La guardia nueva
+`dato_no_es_marcado.js` siembra un paciente llamado
+`Ana <b>Mar"ía</b> Pérez & Soto` con diagnóstico
+`PaFi <100 con <i>derrame</i> "tabicado" & fiebre`, pinta las vistas y exige
+que ese marcado siga siendo texto. **La primera corrida salió con diez
+fallos**: el `<b>` nacía como elemento real en la grilla, el registro y la
+entrega, y la comilla doble partía atributos —quedaban atributos basura
+llamados `ía<`—.
+
+El caso real no es un ataque: es «PaFi <100» escrito a mano en un diagnóstico.
+Cuando ese `<` se interpreta, se come el resto de la línea y el dato
+desaparece de la pantalla sin que nadie se entere.
+
+Se escaparon **16 puntos**: el nombre y el diagnóstico de la tarjeta, del
+registro diario, de la entrega y del selector de camas de la entrega; el
+título emergente del diagnóstico en la tabla; la hoja impresa del día; y los
+mensajes de confirmación de egreso, de mover cama, de dar de baja un
+ventilador y de «ventilando a».
+
+🪤 Uno de los puntos tenía su propio escapador escrito a mano en la misma
+línea —`String(c.DIAGNOSTICO).replace(/"/g,'&quot;')`—, que la guardia
+`escapado_unico.js` no cazaba porque solo mira las funciones declaradas, no
+las escritas al vuelo dentro de una plantilla.
+
+🪤 Una alarma que resultó falsa, y que conviene dejar escrita: los nombres del
+registro diario se ven cortados con puntos suspensivos y mi primera medición
+dijo que **ninguno** tenía título emergente. Era un error de la sonda: el
+título está en un span INTERIOR y yo subía por los ancestros. El nombre
+completo sí se puede leer pasando el cursor. Medir mal y alarmar cuesta más
+que no medir.
+
+Queda anotado, sin arreglar: la tabla del registro deja **175 píxeles fuera de
+la vista** a la derecha (mide 1.529 y el contenedor 1.354). Se puede
+desplazar, pero lo único que avisa es la palabra «TURN…» cortada a la mitad.
+
 ### Estética · primera tanda
 
 Se hizo **mirando la aplicación corriendo**, no leyendo el código:
@@ -191,6 +238,6 @@ tocar código.
 
 ---
 
-Batería al cierre del día: **146 verdes, 0 rojas**. Sin cambio de esquema que
+Batería al cierre del día: **147 verdes, 0 rojas**. Sin cambio de esquema que
 obligue a correr `crearORepararEstructura()` (la clave nueva de CONFIG se
 agrega sola).

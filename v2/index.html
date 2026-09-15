@@ -5525,7 +5525,7 @@ function renderGrid() {
                 corregir un nombre mal escrito, un RUT o el diagnóstico: la
                 tarjeta de Identificación se esconde fuera del ingreso. En la
                 vista retrospectiva no va — ahí no se edita nada. */''}
-          <div class="pname" title="${c.NOMBRE||''}"><span>${c.NOMBRE||'-'}</span>${c._RETRO?'':
+          <div class="pname" title="${escapeHtml(c.NOMBRE||'')}"><span>${escapeHtml(c.NOMBRE||'-')}</span>${c._RETRO?'':
             `<button type="button" class="pname-lap" title="Editar la ficha del paciente (nombre, RUT, diagnóstico, evaluaciones de ingreso)" onclick="event.stopPropagation();abrirPanel('${c.ID_CAMA}',false,true)">✏️</button>`}${_synBotonHTML(c)}${_lisBotonHTML(c)}</div>${_escalasEpisodioHTML(c)}
           <div style="font-size:.78rem;color:var(--muted);">${c.EDAD||'?'}a · ${c.SEXO||''}</div>
           ${/* El DIAGNÓSTICO reemplaza al COD_PACIENTE en la tarjeta (Diego,
@@ -5534,7 +5534,7 @@ function renderGrid() {
                 egreso y archivados, que es donde cumple su función.
                 Se recorta porque los diagnósticos largos desarman la tarjeta;
                 el completo queda al pasar el cursor. */''}
-          ${c.DIAGNOSTICO?`<div class="bdx" title="${String(c.DIAGNOSTICO).replace(/"/g,'&quot;')}">${String(c.DIAGNOSTICO).length>46?String(c.DIAGNOSTICO).slice(0,46)+'…':c.DIAGNOSTICO}</div>`:''}
+          ${c.DIAGNOSTICO?`<div class="bdx" title="${escapeHtml(c.DIAGNOSTICO)}">${escapeHtml(String(c.DIAGNOSTICO).length>46?String(c.DIAGNOSTICO).slice(0,46)+'…':c.DIAGNOSTICO)}</div>`:''}
           <div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap;">
             <span class="pill pill-d">Día ${d}</span>
             <span class="pill">${c.VIA_AEREA||'-'}</span>
@@ -8193,7 +8193,7 @@ function confirmarEgreso() {
   const c = DB.find(x => String(x.ID_CAMA) === String(EG_IDCAMA));
   uiConfirm({
     icono:'🏠', titulo:'Confirmar egreso',
-    mensaje:`<b>${c?.NOMBRE || 'Paciente'}</b> egresa a <b>${destino}</b>.`,
+    mensaje:`<b>${escapeHtml(c?.NOMBRE || 'Paciente')}</b> egresa a <b>${escapeHtml(destino)}</b>.`,
     detalle:`Motivo: ${motivo} · Se liberará la cama ${EG_IDCAMA} y el episodio pasará a Archivados.`,
     confirmar:'🏠 Confirmar egreso',
   }).then(ok => { if (ok) _ejecutarEgreso(destino, motivo); });
@@ -8295,8 +8295,8 @@ function mover(id) {
     uiConfirm({
       icono:'🛏️', titulo: destinoOcupada?'Intercambiar camas':'Traslado a cama vacía',
       mensaje: destinoOcupada
-        ? `<b>${origen?.NOMBRE||('Cama '+MOVECAMA)}</b> (cama ${MOVECAMA}) ⇄ <b>${destino?.NOMBRE||('Cama '+id)}</b> (cama ${id})`
-        : `<b>${origen?.NOMBRE||('Cama '+MOVECAMA)}</b> pasa de la cama ${MOVECAMA} a la cama ${id} (vacía).`,
+        ? `<b>${escapeHtml(origen?.NOMBRE||('Cama '+MOVECAMA))}</b> (cama ${MOVECAMA}) ⇄ <b>${escapeHtml(destino?.NOMBRE||('Cama '+id))}</b> (cama ${id})`
+        : `<b>${escapeHtml(origen?.NOMBRE||('Cama '+MOVECAMA))}</b> pasa de la cama ${MOVECAMA} a la cama ${id} (vacía).`,
       detalle:'El episodio completo (evoluciones, hitos e historial) viaja con cada paciente y queda el hito de traslado.'+_eqHtml,
       confirmar: destinoOcupada?'⇄ Intercambiar':'🛏️ Trasladar',
     }).then(okC=>{
@@ -11909,7 +11909,7 @@ function chkNombreDB(val){
     return (c.NOMBRE||'').toLowerCase().includes(q);
   });
   if(match.length){
-    const info=match.map(c=>`Cama ${c.ID_CAMA||'?'} (${c.NOMBRE||''})`).join(', ');
+    const info=match.map(c=>`Cama ${escapeHtml(c.ID_CAMA||'?')} (${escapeHtml(c.NOMBRE||'')})`).join(', ');
     $('lblNombreMatch').textContent=`Coincide con: ${info}`;
     show('dNombreAlert');
   } else { hide('dNombreAlert'); }
@@ -15112,10 +15112,10 @@ function renderTabla(){
       /* «Disponible» AFIRMA que la cama estaba vacía. En una fecha pasada sin
          evolución eso no se sabe, y decirlo sería inventar: se distingue la
          cama libre de hoy del día que nadie registró. */
-      const nomHtml=nombre?`<span title="${nombre}">${String(nombre).slice(0,28)}</span>`
+      const nomHtml=nombre?`<span title="${escapeHtml(nombre)}">${escapeHtml(String(nombre).slice(0,28))}</span>`
                    :(_tblRetro?'<span style="color:#cbd5e1;font-style:italic;" title="Ese día no quedó ninguna evolución registrada en esta cama">Sin registro ese día</span>'
                               :'<span style="color:#cbd5e1;font-style:italic;">Disponible</span>');
-      const dx=((diag||'').slice(0,24)+((diag||'').length>24?'…':''))||'-';
+      const dx=escapeHtml(((diag||'').slice(0,24)+((diag||'').length>24?'…':''))||'-');
       const ktrCell=n=>n>0?`<span class="ktr-${Math.min(n,5)}">${n}</span>`:dash;
       const ktmHtml=!evoD?dash
         :(esT(evoD.KTM_SUSPENDIDA)?'<span class="bk bk-s">KTMC</span>'
@@ -15159,7 +15159,7 @@ function renderTabla(){
         const sg=md==='Mascarilla'?'MR':md;
         const oxi=x==='Oxigenoterapia/OAF'&&sg;
         const txt=oxi?`O2 · ${sg}`:x;
-        const tip=oxi?` title="${x} — ${_MODO_LARGO[md]||sg}"`:'';
+        const tip=oxi?` title="${escapeHtml(x)} — ${escapeHtml(_MODO_LARGO[md]||sg)}"`:'';
         return `<span class="bs ${map[x]||'bs-def'}"${tip}>${txt}</span>`; })(sop,modo);
 
       tr.innerHTML=`
@@ -15173,7 +15173,7 @@ function renderTabla(){
         <td class="tc-num" style="color:${parseInt(dEst)>7?'var(--danger)':'inherit'};font-weight:${parseInt(dEst)>7?800:600};">${dEst!==''?dEst:'-'}</td>
         <td class="tc-num" style="color:var(--resp);">${dvmTxt}</td>
         <td class="tc-num" style="color:var(--fisico);">${dvniTxt}</td>
-        <td class="tc-dx" title="${diag||''}">${dx}</td>
+        <td class="tc-dx" title="${escapeHtml(diag||'')}">${dx}</td>
         <td class="tc-sop">${nombre?sopHtml:'-'}</td>
         <td class="tc-ktr">${ktrCell(ktrD)}</td>
         <td class="tc-ktm">${ktmHtml}</td>
@@ -15999,7 +15999,7 @@ function _vmCard(x){
   let pac='';
   if(x.ubicTipo==='CAMA'){
     const c=(DB||[]).find(k=>String(k.ID_CAMA)===String(x.ubicDetalle));
-    if(c&&(c.OCUPADA===true||c.OCUPADA==='TRUE')&&c.SOPORTE==='VM') pac=`<div style="font-size:.72rem;color:#0369a1;">🫁 Ventilando a ${c.NOMBRE||'paciente'}</div>`;
+    if(c&&(c.OCUPADA===true||c.OCUPADA==='TRUE')&&c.SOPORTE==='VM') pac=`<div style="font-size:.72rem;color:#0369a1;">🫁 Ventilando a ${escapeHtml(c.NOMBRE||'paciente')}</div>`;
     else pac='<div style="font-size:.72rem;color:#94a3b8;">Sala sin paciente en VM</div>';
   }
   return `<div data-vm="${x.id}" style="background:#fff;border:1px ${x.id==='TUT_DEMO'?'dashed #b45309':'solid var(--border)'};border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:4px;">
@@ -16427,7 +16427,7 @@ function vmBaja(id){
   if(id==='TUT_DEMO'){ VM_ALL=(VM_ALL||[]).filter(k=>k.id!=='TUT_DEMO'); window._TUT_EQ=false; vmRender(); toast('🎓 Equipo de práctica retirado'); return; }
   const x=(VM_ALL||[]).find(k=>k.id===id); if(!x) return;
   uiConfirm({ icono:'⛔', titulo:'Dar de baja del inventario',
-    mensaje:`<b>${x.nombre}</b> ${x.marca?`(${x.marca} ${x.modelo||''})`:''} saldrá del inventario activo.`,
+    mensaje:`<b>${escapeHtml(x.nombre)}</b> ${x.marca?`(${escapeHtml(x.marca)} ${escapeHtml(x.modelo||'')})`:''} saldrá del inventario activo.`,
     detalle:'No se borra: queda en "Dados de baja" con todo su historial de movimientos.',
     confirmar:'⛔ Dar de baja', tono:'rojo',
   }).then(okC=>{
@@ -17415,7 +17415,7 @@ function entRenderBeds(){
     const id=String(c.ID_CAMA), on=ENT_SEL.has(id);
     return `<button class="ent-bed ${on?'on':''}" onclick="entToggleBed('${id}')">
       <span class="ent-bed-chk">${on?'✓':''}</span>
-      <span style="overflow:hidden;"><span class="ent-bed-id">Cama ${id}</span> <span class="ent-bed-nm">${c.NOMBRE||'—'}</span></span>
+      <span style="overflow:hidden;"><span class="ent-bed-id">Cama ${escapeHtml(id)}</span> <span class="ent-bed-nm">${escapeHtml(c.NOMBRE||'—')}</span></span>
     </button>`;
   }).join('');
 }
@@ -17510,7 +17510,7 @@ function renderEntrega(d){
     // Último cultivo (fecha + estudio + RESULTADO), usado en el piso 1. El
     // resultado no viajaba a la entrega (reporte de Álvaro, ago-2026): solo
     // salía nombre y fecha; el micro queda de respaldo si no hay resultado.
-    const cult=f.ultimoCultivo?`${f.ultimoCultivo.nombre||'Cultivo'} ${f.ultimoCultivo.fecha}${f.ultimoCultivo.resultado?` → <b>${f.ultimoCultivo.resultado}</b>`:(f.ultimoCultivo.micro?` → <b>${f.ultimoCultivo.micro}</b>`:'')}`:'';
+    const cult=f.ultimoCultivo?`${escapeHtml(f.ultimoCultivo.nombre||'Cultivo')} ${escapeHtml(f.ultimoCultivo.fecha)}${f.ultimoCultivo.resultado?` → <b>${escapeHtml(f.ultimoCultivo.resultado)}</b>`:(f.ultimoCultivo.micro?` → <b>${escapeHtml(f.ultimoCultivo.micro)}</b>`:'')}`:'';
     const planVal=escapeHtml(f.plan||'');
     // ── FICHA ANCHA EN DOS PISOS (opción C, elegida por Diego) ──
     // Piso 1: cómo está el paciente AHORA. Piso 2: qué pasó y qué sigue.
@@ -17572,10 +17572,10 @@ function renderEntrega(d){
       ${sinEvoF?`<div class="ent-heredado">⚠️ SIN EVOLUCIÓN DE ESTE TURNO${_her?` — se muestran los datos del turno anterior (${_her})`:' — pendiente de registro'}</div>`:''}
       <div class="ent-fh">
         <span class="ent-ficha-cama">${f.idCama}</span>
-        <span class="ent-ficha-nm" style="flex-grow:0;">${f.nombre||'—'}</span>
+        <span class="ent-ficha-nm" style="flex-grow:0;">${escapeHtml(f.nombre||'—')}</span>
         <span class="ent-ficha-meta">${meta}</span>
         ${chips?`<span class="ent-fh-chips">${chips}</span>`:''}
-        ${f.diagnostico?`<span class="ent-fh-dx">${f.diagnostico}</span>`:''}
+        ${f.diagnostico?`<span class="ent-fh-dx">${escapeHtml(f.diagnostico)}</span>`:''}
         ${f.fechaIngreso?`<span class="ent-fh-ing">ing. ${String(f.fechaIngreso).slice(8,10)}-${String(f.fechaIngreso).slice(5,7)}</span>`:''}
       </div>
       <div class="ent-p1">
@@ -18099,7 +18099,7 @@ function listaDelDiaHTML(camas, fechaISO, horaTxt){
         <td class="ld-c" style="width:40px;text-align:center;"><b>DÍAS</b><br><span class="ld-big">${dias||'&nbsp;'}</span></td>
         <td class="ld-c" style="width:80px;text-align:center;background:#f2f2f2;"><b>FECHA</b><br><span class="ld-big">${f}</span></td>
       </tr></table>
-      <div class="ld-dx"><b>DIAGNÓSTICO:</b> ${c.DIAGNOSTICO||'—'}${esc?`<span class="ld-escs">${esc}</span>`:''}</div>
+      <div class="ld-dx"><b>DIAGNÓSTICO:</b> ${escapeHtml(c.DIAGNOSTICO||'—')}${esc?`<span class="ld-escs">${esc}</span>`:''}</div>
     </div>`;
   }).join('')}`;
 }
