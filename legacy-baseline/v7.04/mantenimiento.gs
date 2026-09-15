@@ -1,0 +1,1674 @@
+/**
+ * mantenimiento.gs — Reparaciones puntuales de la estructura.
+ *
+ * cuadrarEncabezados(): repara hojas cuyas FILAS DE ENCABEZADO fueron
+ * borradas a mano (parecen "filas vacías" pero son parte del diseño:
+ * fila 1 = título de la hoja, fila 2 = nombres de columna, y en las hojas
+ * de 3 encabezados la fila 3 va vacía). Si faltan, los DATOS quedan
+ * corridos hacia arriba y la app deja de verlos (las lecturas parten en
+ * FILA_DATOS).
+ *
+ * Qué hace, hoja por hoja:
+ *   1. Localiza la fila de nombres de columna (busca el primer nombre del
+ *      esquema, ej. 'ID_CAMA', en las primeras filas).
+ *   2. Inserta arriba las filas que falten para que los nombres queden en
+ *      su fila de diseño (fila 2 en hojas de 2-3 encabezados, fila 1 en
+ *      las de 1).
+ *   3. En hojas de 3 encabezados, si un dato quedó pegado bajo los nombres
+ *      (fila 3), inserta la fila vacía de diseño para devolver los datos a
+ *      la fila 4.
+ *   4. Elimina filas vacías espurias entre el encabezado y el primer dato.
+ *   5. Al final corre crearORepararEstructura() (reescribe títulos y
+ *      nombres, ensancha columnas al esquema vigente y siembra faltantes)
+ *      y testEsquema().
+ *
+ * Es idempotente: si una hoja ya está bien, no la toca.
+ * Ejecutar desde el editor de Apps Script: seleccionar cuadrarEncabezados
+ * y presionar ▶. Revisar el resultado en el registro de ejecución.
+ */
+function cuadrarEncabezados() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const informe = [];
+
+  Object.keys(ESQUEMA).forEach(function (hoja) {
+    const def = ESQUEMA[hoja];
+    const h = ss.getSheetByName(hoja);
+    if (!h) { informe.push(hoja + ': no existe (la creará crearORepararEstructura)'); return; }
+
+    const primerNombre = def.cols[0][0];              // ej. 'ID_CAMA'
+    const filaNombresDiseno = def.headerRows >= 2 ? 2 : 1;
+
+    // 1. ¿Dónde está la fila de nombres ahora?
+    let filaNombres = -1;
+    const tope = Math.min(h.getLastRow(), def.headerRows + 3) || 1;
+    const colA = h.getRange(1, 1, Math.max(tope, 1), 1).getValues();
+    for (let r = 0; r < colA.length; r++) {
+      if (String(colA[r][0]).trim() === primerNombre) { filaNombres = r + 1; break; }
+    }
+    if (filaNombres === -1) {
+      informe.push('⚠️ ' + hoja + ': no se encontró la fila de nombres (' + primerNombre + '). NO se tocó — revisar a mano.');
+      return;
+    }
+
+    let acciones = [];
+
+    // 2. Reponer filas de encabezado faltantes ARRIBA de los nombres.
+    if (filaNombres < filaNombresDiseno) {
+      const faltan = filaNombresDiseno - filaNombres;
+      h.insertRowsBefore(1, faltan);
+      acciones.push('insertadas ' + faltan + ' fila(s) de encabezado arriba');
+    }
+
+    // 3. Hojas de 3 encabezados: la fila 3 debe ir vacía; si hay un dato ahí,
+    //    insertar la fila de diseño para que los datos vuelvan a la fila 4.
+    if (def.headerRows >= 3) {
+      const a3 = String(h.getRange(3, 1).getValue()).trim();
+      if (a3 !== '') {
+        h.insertRowsBefore(3, 1);
+        acciones.push('repuesta la fila 3 vacía del encabezado (los datos vuelven a la fila 4)');
+      }
+    }
+
+    // 4. Quitar filas vacías espurias entre el encabezado y el primer dato
+    //    (p. ej. filas fantasma de versiones anteriores).
+    const fi = FILA_DATOS[hoja];
+    let borradas = 0;
+    while (h.getLastRow() > fi && String(h.getRange(fi, 1).getValue()).trim() === '') {
+      // ¿hay algún dato más abajo? si no, no hay nada que compactar
+      const resto = h.getRange(fi + 1, 1, h.getLastRow() - fi, 1).getValues()
+        .some(function (r) { return String(r[0]).trim() !== ''; });
+      if (!resto) break;
+      h.deleteRow(fi);
+      borradas++;
+    }
+    if (borradas) acciones.push('eliminadas ' + borradas + ' fila(s) vacía(s) entre encabezado y datos');
+
+    informe.push((acciones.length ? '🔧 ' : '✓ ') + hoja + ': ' + (acciones.length ? acciones.join('; ') : 'ya estaba cuadrada'));
+  });
+
+  // 5. Reescribir títulos/nombres, ensanchar al esquema vigente y sembrar.
+  const rep = crearORepararEstructura();
+  informe.push('crearORepararEstructura: ' + rep.mensaje);
+
+  const test = testEsquema();
+  informe.push('testEsquema: ' + JSON.stringify(test));
+
+  informe.forEach(function (l) { console.log(l); });
+  return informe;
+}
+
+// ── Firmas contaminadas (bug jul-2026: texto de evolución colado en la firma) ──
+
+/** Muestra en el registro qué filas tienen PLAN_FIRMA_KINE inválida (texto
+ *  largo en vez de iniciales), sin modificar nada. Correr ANTES de reparar. */
+function diagnosticarFirmas() {
+  ['EVOLUCIONES', 'EVOLUCIONES_ARCHIVO'].forEach(hoja => {
+    const malas = repoLeerTodos(hoja).filter(e =>
+      String(e.PLAN_FIRMA_KINE || '').length > 15 || /\n/.test(String(e.PLAN_FIRMA_KINE || '')));
+    console.log(hoja + ': ' + malas.length + ' fila(s) con firma inválida');
+    malas.slice(0, 10).forEach(e => console.log('  · ' + e.ID_EVOLUCION + ' → "' +
+      String(e.PLAN_FIRMA_KINE).slice(0, 60) + '…" (' + String(e.PLAN_FIRMA_KINE).length + ' caracteres)'));
+  });
+  console.log('Si hay filas listadas, correr repararFirmas() para limpiarlas.');
+}
+
+/** Limpia las firmas inválidas (las deja vacías; el texto de la evolución no
+ *  se toca). Idempotente: correrla dos veces no cambia nada más. */
+function repararFirmas() {
+  let total = 0;
+  ['EVOLUCIONES', 'EVOLUCIONES_ARCHIVO'].forEach(hoja => {
+    const n = repoActualizarDonde(hoja,
+      e => String(e.PLAN_FIRMA_KINE || '').length > 15 || /\n/.test(String(e.PLAN_FIRMA_KINE || '')),
+      e => ({ PLAN_FIRMA_KINE: '' }));
+    console.log(hoja + ': ' + n + ' firma(s) limpiada(s)');
+    total += n;
+  });
+  console.log(total ? ('✅ ' + total + ' fila(s) reparada(s). Recarga la app.') : '✅ No había firmas inválidas.');
+  return total;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+ * RESETEO PARA EL INICIO REAL
+ *
+ * Deja la base en cero para empezar a registrar de verdad: borra TODO lo
+ * que se cargó durante la marcha blanca (pacientes, evoluciones, historial,
+ * archivados, entregas, ventiladores y sus fallas, auditoría) y conserva la
+ * CONFIGURACIÓN de la unidad (parámetros clínicos, catálogos, matrices,
+ * roster de kinesiólogos y la serie histórica de indicadores).
+ *
+ * CÓMO SE USA — dos pasos, a propósito:
+ *   1. Ejecutar `resetearBaseDeDatos`  → NO borra nada. Muestra en el
+ *      registro cuántas filas tiene cada hoja y qué pasaría con ella.
+ *   2. Si el resumen es el esperado, ejecutar
+ *      `resetearBaseDeDatosCONFIRMAR` → borra de verdad.
+ *
+ * Antes de borrar SIEMPRE se genera un respaldo completo de la planilla en
+ * Drive; si el respaldo falla, el borrado se cancela (todo o nada).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+// Hojas que quedan VACÍAS (datos de la marcha blanca).
+const _RESET_VACIAR = [
+  'EVOLUCIONES', 'EVOLUCIONES_ARCHIVO', 'PROCEDIMIENTOS', 'TIMELINE',
+  'ENTREGAS_TURNO', 'ARCHIVO_PACIENTES', 'REINTUBACIONES',
+  'VENTILADORES', 'MOVIMIENTOS_VM', 'FALLAS_VM',
+  'STOCK_EQUIPOS', 'MOVIMIENTOS_STOCK',
+  'ESTADISTICAS_REM', 'TURNOS', 'AUDIT_LOG', 'IMPORTAR', 'SUGERENCIAS',
+  // El buzón referencia notas clínicas de la marcha que se resetea; su regla
+  // de «solo agregar» aplica al código de la app, no a esta rutina explícita.
+  'NOTIFICACIONES',
+  'GSA_IMPORTADAS',   // gases importados de la marcha que se resetea
+  'EVALUACIONES',     // 🗂️ la serie fechada del episodio: dato clínico, se va con el reseteo
+];
+// Hojas que NO se tocan (configuración de la unidad).
+const _RESET_CONSERVAR = ['CONFIG', 'CATALOGOS', 'CAT_MATRICES', 'KINESIOLOGOS', 'INDICADORES_HISTORICO', 'PLANTILLAS_EVOLUCION'];
+
+/** Paso 1 — SIMULACRO: informa qué se borraría. No modifica nada. */
+function resetearBaseDeDatos() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  console.log('🔎 SIMULACRO — no se ha borrado nada.\n');
+  let total = 0;
+  console.log('SE VACIARÍAN:');
+  _RESET_VACIAR.forEach(function (n) {
+    const f = _resetFilasDatos(ss, n);
+    total += f;
+    console.log('   · ' + n + ': ' + f + ' fila(s)');
+  });
+  const camas = _resetFilasDatos(ss, 'CAMAS_ESTADO');
+  console.log('   · CAMAS_ESTADO: ' + camas + ' cama(s) quedarían libres (las camas se conservan, vacías)');
+  console.log('\nSE CONSERVARÍAN (configuración de la unidad):');
+  _RESET_CONSERVAR.forEach(function (n) {
+    console.log('   · ' + n + ': ' + _resetFilasDatos(ss, n) + ' fila(s) intactas');
+  });
+  console.log('\n📦 Total de filas de datos a borrar: ' + total);
+  console.log('\n➡️  Si es lo que esperas, ejecuta ahora la función:');
+  console.log('    resetearBaseDeDatosCONFIRMAR');
+  console.log('    (antes de borrar hace un respaldo completo en Drive)');
+  return { ok: true, simulacro: true, filas: total };
+}
+
+/** Paso 2 — BORRADO REAL. Respalda primero; si el respaldo falla, cancela. */
+function resetearBaseDeDatosCONFIRMAR() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  console.log('💾 Generando respaldo previo...');
+  let respaldo;
+  try {
+    respaldo = backupDiario();
+  } catch (e) {
+    respaldo = { ok: false, error: e.message };
+  }
+  if (!respaldo || !respaldo.ok) {
+    const motivo = (respaldo && respaldo.error) || 'motivo desconocido';
+    console.error('❌ CANCELADO: no se pudo respaldar (' + motivo + '). No se borró nada.');
+    return { ok: false, error: 'Respaldo previo fallido: ' + motivo };
+  }
+  console.log('✅ Respaldo listo: ' + respaldo.data.url);
+
+  const borradas = {};
+  let total = 0;
+  _RESET_VACIAR.forEach(function (n) {
+    const f = _resetVaciarHoja(ss, n);
+    if (f) { borradas[n] = f; total += f; }
+  });
+
+  // CAMAS_ESTADO: se borran las filas y se vuelven a sembrar camas libres.
+  const camas = _resetVaciarHoja(ss, 'CAMAS_ESTADO');
+  _sembrar(ss);
+  SpreadsheetApp.flush();
+
+  // El caché del servidor puede tener listas ya calculadas (documentos, etc.)
+  try { CacheService.getScriptCache().removeAll(['DOCS_LISTA']); } catch (e) {}
+
+  // Queda constancia del reseteo como primer registro de la etapa real.
+  auditar({
+    email: '', firma: 'Mantenimiento', accion: 'RESETEO_INICIAL',
+    entidad: 'PLANILLA', resumen: total + ' filas borradas · respaldo ' + respaldo.data.nombre,
+  });
+
+  console.log('\n🧹 RESETEO COMPLETO');
+  Object.keys(borradas).forEach(function (n) { console.log('   · ' + n + ': ' + borradas[n] + ' fila(s) borradas'); });
+  console.log('   · CAMAS_ESTADO: ' + camas + ' cama(s) reiniciadas (libres)');
+  console.log('\nSe conservó: ' + _RESET_CONSERVAR.join(', '));
+  console.log('Respaldo por si acaso: ' + respaldo.data.url);
+  console.log('\n➡️  Recarga la app en el navegador (Ctrl+Shift+R).');
+  console.log('➡️  Carga los ventiladores reales en la pestaña 🔧 VENTILADORES.');
+  return { ok: true, borradas: borradas, camas: camas, respaldo: respaldo.data.url };
+}
+
+/** Cuántas filas de DATOS tiene una hoja (sin contar encabezados). */
+function _resetFilasDatos(ss, nombre) {
+  const h = ss.getSheetByName(nombre);
+  if (!h) return 0;
+  const desde = FILA_DATOS[nombre] || 2;
+  return Math.max(0, h.getLastRow() - desde + 1);
+}
+
+/** Borra las filas de datos de una hoja (respeta los encabezados). */
+function _resetVaciarHoja(ss, nombre) {
+  const h = ss.getSheetByName(nombre);
+  if (!h) return 0;
+  const desde = FILA_DATOS[nombre] || 2;
+  const n = h.getLastRow() - desde + 1;
+  if (n <= 0) return 0;
+  h.deleteRows(desde, n);
+  return n;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CARGA INICIAL DEL INVENTARIO REAL (ago-2026)
+//  Traspaso del libro de VM en papel (entrega de turno del 31-07-2026):
+//  ventiladores mecánicos por cama + bodega, V60, Airvo2 (los «CNAF Nº» del
+//  papel), Carina y base calefactora MR850. Correr UNA VEZ desde el editor:
+//  es idempotente (si un nombre ya existe, lo salta) y cada alta queda
+//  trazada en MOVIMIENTOS_VM. Los datos pendientes (N° de serie, inventario,
+//  año) se completan después con ✏️ Editar en la pestaña Ventiladores.
+// ═══════════════════════════════════════════════════════════════════════════
+function cargarInventarioInicial() {
+  const F = '2026-07-31';   // estado del papel traspasado
+  const INVENTARIO = [
+    // ── Ventiladores mecánicos en cama (libro del 31-07) ──
+    { nombre: 'Avea 1',   marca: 'Vyaire',          modelo: 'Avea',    ubicTipo: 'CAMA', ubicDetalle: '1' },
+    { nombre: 'Vela 9',   marca: 'Vyaire',          modelo: 'Vela',    ubicTipo: 'CAMA', ubicDetalle: '2' },
+    { nombre: 'PB 1',     marca: 'Puritan Bennett', modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '3' },
+    { nombre: 'Mek 12',   marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '4' },
+    { nombre: 'Avea 3',   marca: 'Vyaire',          modelo: 'Avea',    ubicTipo: 'CAMA', ubicDetalle: '5' },
+    { nombre: 'Mek 10',   marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '6' },
+    { nombre: 'Savina 2', marca: 'Dräger',          modelo: 'Savina',  ubicTipo: 'CAMA', ubicDetalle: '7' },
+    { nombre: 'Savina 4', marca: 'Dräger',          modelo: 'Savina',  ubicTipo: 'CAMA', ubicDetalle: '8' },
+    { nombre: 'Savina 1', marca: 'Dräger',          modelo: 'Savina',  ubicTipo: 'CAMA', ubicDetalle: '9' },
+    { nombre: 'Mek 15',   marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '10' },
+    { nombre: 'Servo U',  marca: 'Maquet',          modelo: 'Servo-u', ubicTipo: 'CAMA', ubicDetalle: '11' },
+    { nombre: 'PB 2',     marca: 'Puritan Bennett', modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '12' },
+    { nombre: 'Mek 4',    marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '13' },
+    { nombre: 'Mek 16',   marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '14' },
+    { nombre: 'Mek 6',    marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '15' },
+    { nombre: 'Mek 9',    marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '16' },
+    { nombre: 'Mek 5',    marca: 'Mekics',          modelo: '',        ubicTipo: 'CAMA', ubicDetalle: '17' },
+    { nombre: 'PB 980',   marca: 'Puritan Bennett', modelo: '980',     ubicTipo: 'CAMA', ubicDetalle: '18' },
+    // ── Bodega (nombres PROVISORIOS: corregir con el número real del equipo) ──
+    { nombre: 'Vela (bodega A)',   marca: 'Vyaire', modelo: 'Vela',   ubicTipo: 'BODEGA', obs: 'Nombre provisorio: completar número real, serie e inventario' },
+    { nombre: 'Vela (bodega B)',   marca: 'Vyaire', modelo: 'Vela',   ubicTipo: 'BODEGA', obs: 'Nombre provisorio: completar número real, serie e inventario' },
+    { nombre: 'Savina (bodega)',   marca: 'Dräger', modelo: 'Savina', ubicTipo: 'BODEGA', obs: 'Nombre provisorio: completar número real, serie e inventario' },
+    { nombre: 'Avea (bodega)',     marca: 'Vyaire', modelo: 'Avea',   ubicTipo: 'BODEGA', obs: 'Nombre provisorio: completar número real, serie e inventario' },
+    { nombre: 'Mekics (bodega)',   marca: 'Mekics', modelo: '',       ubicTipo: 'BODEGA', obs: 'Nombre provisorio: completar número real, serie e inventario' },
+    // ── VNI ──
+    { nombre: 'V60 Nº1', marca: 'Philips', modelo: 'V60', ubicTipo: 'CAMA', ubicDetalle: '3',  obs: 'VNI' },
+    { nombre: 'V60 Nº3', marca: 'Philips', modelo: 'V60', ubicTipo: 'CAMA', ubicDetalle: '8',  obs: 'VNI' },
+    { nombre: 'V60 Nº2', marca: 'Philips', modelo: 'V60', ubicTipo: 'BODEGA', obs: 'VNI · número por confirmar (el papel indica 2 V60 en bodega)' },
+    { nombre: 'V60 Nº4', marca: 'Philips', modelo: 'V60', ubicTipo: 'BODEGA', obs: 'VNI · número por confirmar (el papel indica 2 V60 en bodega)' },
+    { nombre: 'Carina',  marca: 'Dräger',  modelo: 'Carina', ubicTipo: 'BODEGA', obs: 'VNI' },
+    // ── CNAF (Airvo 2): 4 en total, 3 en la unidad y 1 en la UTI ──
+    { nombre: 'Airvo2 Nº2', marca: 'Fisher & Paykel', modelo: 'Airvo 2', ubicTipo: 'CAMA', ubicDetalle: '10', obs: 'CNAF' },
+    { nombre: 'Airvo2 Nº3', marca: 'Fisher & Paykel', modelo: 'Airvo 2', ubicTipo: 'CAMA', ubicDetalle: '3',  obs: 'CNAF' },
+    { nombre: 'Airvo2 Nº4', marca: 'Fisher & Paykel', modelo: 'Airvo 2', ubicTipo: 'CAMA', ubicDetalle: '5',  obs: 'CNAF' },
+    { nombre: 'Airvo2 Nº1', marca: 'Fisher & Paykel', modelo: 'Airvo 2', ubicTipo: 'PRESTAMO', ubicDetalle: 'UTI', obs: 'CNAF · número en UTI por confirmar' },
+    // ── Bases calefactoras ──
+    { nombre: 'MR850 (cama 12)', marca: 'Fisher & Paykel', modelo: 'MR850', ubicTipo: 'CAMA', ubicDetalle: '12', obs: 'Base calefactora · nombre provisorio' },
+  ];
+  const existentes = {};
+  repoLeerTodos('VENTILADORES').forEach(function (x) { existentes[String(x.NOMBRE).trim().toLowerCase()] = true; });
+  const ctx = { firma: 'Carga inicial', email: '' };
+  let altas = 0, saltados = 0;
+  INVENTARIO.forEach(function (eq) {
+    if (existentes[eq.nombre.trim().toLowerCase()]) { saltados++; return; }
+    const r = guardarVentilador({
+      nombre: eq.nombre, marca: eq.marca, modelo: eq.modelo || '',
+      ubicTipo: eq.ubicTipo, ubicDetalle: eq.ubicDetalle || '',
+      fecha: F, estado: 'Operativo', obs: eq.obs || '',
+      motivo: 'Carga inicial del inventario (libro de VM del 31-07-2026)',
+    }, ctx);
+    if (r && r.ok) altas++; else console.log('FALLÓ ' + eq.nombre + ': ' + (r && r.error));
+  });
+  // ── Equipos SIN número: se llevan por cantidad (Diego, ago-2026) ──
+  const STOCK = [
+    { nombre: 'Aerogen Pro-X', marca: 'Aerogen', modelo: 'Pro-X', categoria: 'Nebulización',
+      cantidad: 10, estado: 'Operativo', obs: 'Nebulizador de malla · sin numerar' },
+    { nombre: 'Capnógrafo Nihon Kohden', marca: 'Nihon Kohden', modelo: '', categoria: 'Capnografía',
+      cantidad: 5, estado: 'Operativo', obs: 'En uso en la unidad' },
+    { nombre: 'Capnógrafo Dräger', marca: 'Dräger', modelo: '', categoria: 'Capnografía',
+      cantidad: 4, estado: 'De baja', obs: 'No se ocupan (decisión de la unidad)' },
+  ];
+  const existeStock = {};
+  repoLeerTodos('STOCK_EQUIPOS').forEach(function (x) { existeStock[String(x.NOMBRE).trim().toLowerCase()] = true; });
+  let stockAltas = 0;
+  STOCK.forEach(function (eq) {
+    if (existeStock[eq.nombre.trim().toLowerCase()]) return;
+    const r = guardarStockEquipo({
+      nombre: eq.nombre, marca: eq.marca, modelo: eq.modelo, categoria: eq.categoria,
+      cantidad: eq.cantidad, estado: eq.estado, obs: eq.obs, fecha: F,
+      motivo: 'Carga inicial del inventario (libro del 31-07-2026)',
+    }, ctx);
+    if (r && r.ok) stockAltas++; else console.log('FALLÓ ' + eq.nombre + ': ' + (r && r.error));
+  });
+
+  console.log('Inventario inicial: ' + altas + ' equipos dados de alta, ' + saltados + ' ya existían (no se tocaron).');
+  console.log('Stock sin numerar: ' + stockAltas + ' tipos cargados (Aerogen y capnógrafos).');
+  console.log('Pendientes de completar con ✏️ Editar: números reales de los equipos de bodega, series, inventarios y años.');
+  return { altas: altas, saltados: saltados, stock: stockAltas };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CIERRE DE AÑO — TRASLADO DEL HISTÓRICO (ago-2026)
+//  Google Sheets admite 10 millones de celdas por planilla y EVOLUCIONES
+//  tiene 379 columnas: con la unidad llena, un año de registro ocupa ~5
+//  millones. Una vez al año se mueven las evoluciones de los pacientes YA
+//  EGRESADOS a una planilla aparte («RCE-KINE — Histórico AAAA»), dejando la
+//  de trabajo liviana.
+//
+//  REGLA DE ORO (pedido de Diego): los pacientes que siguen hospitalizados
+//  NO se tocan. El traslado va por EPISODIO EGRESADO — se mueve la historia
+//  COMPLETA de cada paciente dado de alta ese año, aunque haya ingresado en
+//  diciembre del año anterior. Un paciente que cruza el año de fin a inicio
+//  conserva todo su historial en la planilla de trabajo hasta que egrese, y
+//  se archiva en el cierre del año en que se fue.
+//
+//  Uso desde el editor:
+//    1) archivarAnioHistorico(2026)            → SIMULACRO: informa, no toca
+//    2) archivarAnioHistoricoCONFIRMAR(2026)   → traslado real
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Episodios EGRESADOS en el año + sus evoluciones archivadas. */
+function _cierreDatosAnio(anio) {
+  const a = String(anio);
+  const egresados = repoLeerTodos('ARCHIVO_PACIENTES').filter(function (x) {
+    return String(_statISO(x.FECHA_EGRESO)).slice(0, 4) === a;
+  });
+  const pids = {};
+  egresados.forEach(function (x) { if (x.PATIENT_ID) pids[String(x.PATIENT_ID)] = true; });
+  const evos = repoLeerTodos('EVOLUCIONES_ARCHIVO').filter(function (e) {
+    return pids[String(e.PATIENT_ID)];
+  });
+  // Pacientes que siguen en la unidad: JAMÁS se tocan (control explícito)
+  const enUnidad = repoLeerTodos('CAMAS_ESTADO').filter(function (c) { return esVerdadero(c.OCUPADA); });
+  return { anio: a, egresados: egresados, evos: evos, enUnidad: enUnidad };
+}
+
+/** Paso 1 — SIMULACRO: informa qué se movería. No modifica nada. */
+function archivarAnioHistorico(anio) {
+  anio = anio || (new Date().getFullYear() - 1);
+  const d = _cierreDatosAnio(anio);
+  const celdas = d.evos.length * TOTAL_COLS.EVOLUCIONES;
+  console.log('🔎 SIMULACRO de cierre ' + d.anio + ' — no se ha movido nada.\n');
+  console.log('  Pacientes egresados en ' + d.anio + ': ' + d.egresados.length);
+  console.log('  Evoluciones que se trasladarían: ' + d.evos.length +
+    ' (~' + Math.round(celdas / 1000) + ' mil celdas liberadas)');
+  console.log('  Quedan intactos en la planilla de trabajo:');
+  console.log('    · ' + d.enUnidad.length + ' paciente(s) HOSPITALIZADO(S) — su historial completo se queda');
+  console.log('    · el resumen de cada egreso en ARCHIVO_PACIENTES (indicadores, REM y reingresos siguen funcionando)');
+  console.log('\n  Para ejecutarlo de verdad: archivarAnioHistoricoCONFIRMAR(' + d.anio + ')');
+  return { anio: d.anio, egresados: d.egresados.length, evoluciones: d.evos.length, hospitalizados: d.enUnidad.length };
+}
+
+/** Paso 2 — TRASLADO REAL: copia a la planilla histórica y recién ahí borra. */
+function archivarAnioHistoricoCONFIRMAR(anio) {
+  anio = anio || (new Date().getFullYear() - 1);
+  const d = _cierreDatosAnio(anio);
+  if (!d.evos.length) {
+    console.log('No hay evoluciones archivadas de ' + d.anio + ' para trasladar.');
+    return { anio: d.anio, movidas: 0 };
+  }
+  // 1) Respaldo primero: si falla, no se mueve nada (todo o nada).
+  console.log('1/4 · Respaldando antes de mover…');
+  const rb = backupDiario();
+  if (!rb || !rb.ok) {
+    console.log('❌ El respaldo falló: NO se movió nada. ' + ((rb && rb.error) || ''));
+    return { anio: d.anio, movidas: 0, error: 'respaldo' };
+  }
+  // 2) Planilla histórica del año (se reutiliza si ya existe)
+  console.log('2/4 · Preparando la planilla histórica…');
+  const claveCfg = 'HISTORICO_' + d.anio;
+  let ss = null;
+  const idPrevio = leerConfig(claveCfg, '');
+  if (idPrevio) { try { ss = SpreadsheetApp.openById(idPrevio); } catch (e) { ss = null; } }
+  if (!ss) {
+    ss = SpreadsheetApp.create('RCE-KINE — Histórico ' + d.anio);
+    escribirConfig(claveCfg, ss.getId());
+    try {
+      const carpeta = _obtenerCarpetaBackup();
+      DriveApp.getFileById(ss.getId()).moveTo(carpeta);
+    } catch (e) { console.log('  (la planilla quedó en la raíz de Drive: ' + e.message + ')'); }
+  }
+  // 3) Copiar encabezados + filas
+  console.log('3/4 · Copiando ' + d.evos.length + ' evoluciones…');
+  const cols = ESQUEMA.EVOLUCIONES_ARCHIVO.cols.map(function (c) { return c[0]; });
+  let hoja = ss.getSheetByName('EVOLUCIONES_ARCHIVO');
+  if (!hoja) {
+    hoja = ss.getSheets()[0].setName('EVOLUCIONES_ARCHIVO');
+    hoja.getRange(1, 1, 1, cols.length).setValues([cols]);
+  }
+  const filas = d.evos.map(function (e) {
+    return cols.map(function (c) { return e[c] === undefined || e[c] === null ? '' : e[c]; });
+  });
+  const desde = Math.max(2, hoja.getLastRow() + 1);
+  hoja.getRange(desde, 1, filas.length, cols.length).setValues(filas);
+  SpreadsheetApp.flush();
+  // Verificación: solo se borra si la copia quedó completa
+  const copiadas = hoja.getLastRow() - desde + 1;
+  if (copiadas !== filas.length) {
+    console.log('❌ La copia quedó incompleta (' + copiadas + ' de ' + filas.length + '): NO se borró nada.');
+    return { anio: d.anio, movidas: 0, error: 'copia incompleta' };
+  }
+  // 4) Recién ahora se vacían de la planilla de trabajo
+  console.log('4/4 · Liberando espacio en la planilla de trabajo…');
+  const pids = {};
+  d.egresados.forEach(function (x) { if (x.PATIENT_ID) pids[String(x.PATIENT_ID)] = true; });
+  repoEliminarDonde('EVOLUCIONES_ARCHIVO', function (e) { return pids[String(e.PATIENT_ID)]; });
+  escribirConfig('CIERRE_' + d.anio, ahoraTS());
+  try {
+    auditar({ email: '', firma: 'MANTENIMIENTO', accion: 'CIERRE_ANIO', entidad: 'EVOLUCIONES_ARCHIVO',
+      idEntidad: d.anio, resumen: d.evos.length + ' evoluciones de ' + d.egresados.length + ' egresos → ' + ss.getName() });
+  } catch (e) {}
+  console.log('\n✅ Cierre ' + d.anio + ' listo.');
+  console.log('   Planilla histórica: ' + ss.getUrl());
+  console.log('   Trasladadas: ' + d.evos.length + ' evoluciones de ' + d.egresados.length + ' pacientes egresados.');
+  console.log('   Intactos: ' + d.enUnidad.length + ' paciente(s) hospitalizado(s) y el resumen de todos los egresos.');
+  return { anio: d.anio, movidas: d.evos.length, url: ss.getUrl() };
+}
+
+/**
+ * Aviso de cierre para la app (lo consume GET_BOOT). Aparece desde el 26 de
+ * diciembre y durante enero-febrero mientras queden evoluciones del año
+ * anterior sin trasladar. Es solo un recordatorio: no mueve nada.
+ */
+function avisoCierreAnio() {
+  try {
+    const hoy = hoyISO();
+    const anioAct = parseInt(hoy.slice(0, 4), 10);
+    const mes = parseInt(hoy.slice(5, 7), 10);
+    const dia = parseInt(hoy.slice(8, 10), 10);
+    const enVentana = (mes === 12 && dia >= 26) || mes <= 2;
+    if (!enVentana) return null;
+    const anio = (mes === 12) ? anioAct : anioAct - 1;
+    if (leerConfig('CIERRE_' + anio, '')) return null;   // ya se hizo
+    const d = _cierreDatosAnio(anio);
+    if (!d.evos.length) return null;
+    return {
+      anio: anio, evoluciones: d.evos.length, egresados: d.egresados.length,
+      hospitalizados: d.enUnidad.length,
+    };
+  } catch (e) { return null; }
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CORRECCIÓN · PRONACIONES REPETIDAS (ago-2026)
+//  Hasta la v5.31 la casilla «Prono» del posicionamiento servía para DOS cosas:
+//  decir cómo estaba el paciente y registrar la pronación. Quien describía la
+//  posición en el turno siguiente sumaba una pronación que nunca ocurrió
+//  (reportado por Diego con la paciente de la cama 4). Desde la v5.32 el
+//  procedimiento lo declara una casilla aparte; estas dos funciones limpian lo
+//  que quedó registrado con la regla vieja.
+//
+//  Criterio (conservador — solo saca lo que es claramente arrastre):
+//    · la evolución trae un procedimiento PRONO/SUPINACIÓN, y
+//    · el turno ANTERIOR del mismo episodio ya estaba en esa misma posición, y
+//    · el procedimiento de esta evolución viene SIN hora
+//      (el que pronó de verdad anota la hora; el que solo describía, no).
+//  El texto clínico, la posición y todo lo demás quedan INTACTOS: se saca el
+//  procedimiento sobrante de PROC_JSON/PROC_RESUMEN/PROC_CANTIDAD, su fila en
+//  PROCEDIMIENTOS y su hito en TIMELINE.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Paso 1 — SIMULACRO: lista qué se corregiría. No modifica nada. */
+function corregirPronosRepetidos() { return _pronoCorregir(false); }
+
+/** Paso 2 — CORRECCIÓN REAL. Respalda primero; si el respaldo falla, cancela. */
+function corregirPronosRepetidosCONFIRMAR() { return _pronoCorregir(true); }
+
+function _pronoCorregir(aplicar) {
+  var HOJAS = ['EVOLUCIONES', 'EVOLUCIONES_ARCHIVO'];
+  var casos = [];
+
+  HOJAS.forEach(function (hoja) {
+    var filas = repoLeerTodos(hoja) || [];
+    // Agrupar por episodio y ordenar cronológicamente por TURNO_KEY
+    // ('2026-08-02-Dia' ordena bien como texto salvo el turno: Dia < Noche ✓).
+    var porEpisodio = {};
+    filas.forEach(function (f) {
+      var pid = String(f.PATIENT_ID || f.ID_CAMA || '');
+      (porEpisodio[pid] = porEpisodio[pid] || []).push(f);
+    });
+    Object.keys(porEpisodio).forEach(function (pid) {
+      var evs = porEpisodio[pid].sort(function (a, b) {
+        return String(a.TURNO_KEY) < String(b.TURNO_KEY) ? -1 : 1;
+      });
+      for (var i = 1; i < evs.length; i++) {
+        [['PRONO', 'RESP_POS_PRONO'], ['SUPINACIÓN', 'RESP_POS_SUPINO']].forEach(function (par) {
+          var etq = par[0], colPos = par[1];
+          if (!esVerdadero(evs[i][colPos]) || !esVerdadero(evs[i - 1][colPos])) return;
+          var procs = _pronoProcs(evs[i]);
+          // solo el registro SIN hora: el que pronó de verdad la anotó
+          var sobra = procs.filter(function (p) { return String(p).trim().toUpperCase() === etq; });
+          if (!sobra.length) return;
+          casos.push({
+            hoja: hoja, id: evs[i].ID_EVOLUCION, cama: evs[i].ID_CAMA,
+            turno: evs[i].TURNO_KEY, firma: evs[i].PLAN_FIRMA_KINE,
+            quita: etq, turnoPrevio: evs[i - 1].TURNO_KEY,
+          });
+        });
+      }
+    });
+  });
+
+  var detalle = casos.map(function (c) {
+    return '  · ' + c.hoja + ' · cama ' + c.cama + ' · ' + c.turno + ' (' + (c.firma || 's/firma') +
+      ') — quita «' + c.quita + '» (ya estaba en esa posición desde ' + c.turnoPrevio + ')';
+  }).join('\n');
+
+  if (!aplicar) {
+    var msg = casos.length
+      ? 'SIMULACRO — se corregirían ' + casos.length + ' registro(s):\n' + detalle +
+        '\n\nNada se ha modificado. Para aplicarlo corre corregirPronosRepetidosCONFIRMAR().'
+      : 'SIMULACRO — no hay pronaciones repetidas que corregir.';
+    Logger.log(msg);
+    return ok({ simulacro: true, casos: casos.length, detalle: casos, mensaje: msg });
+  }
+
+  if (!casos.length) { Logger.log('Nada que corregir.'); return ok({ casos: 0 }); }
+
+  var resp = backupDiario();
+  if (!resp || !resp.ok) {
+    var e = 'CANCELADO: el respaldo falló, no se modificó nada. ' + ((resp && resp.error) || '');
+    Logger.log(e); return err(e);
+  }
+
+  casos.forEach(function (c) {
+    var fila = repoBuscarPorId(c.hoja, 'ID_EVOLUCION', c.id);
+    if (!fila) return;
+    var procs = _pronoProcs(fila).filter(function (p) {
+      return String(p).trim().toUpperCase() !== c.quita;
+    });
+    repoActualizar(c.hoja, 'ID_EVOLUCION', c.id, {
+      PROC_JSON: JSON.stringify(procs),
+      PROC_RESUMEN: procs.join(', '),
+      PROC_CANTIDAD: procs.length,
+    });
+    // la fila del procedimiento y su hito en el historial
+    repoEliminarDonde('PROCEDIMIENTOS', function (p) {
+      return String(p.ID_EVOLUCION) === String(c.id) &&
+             String(p.PROCEDIMIENTO || '').trim().toUpperCase() === c.quita;
+    });
+    var etiqueta = (PROC_TO_HITO[c.quita === 'SUPINACIÓN' ? 'SUPINO' : c.quita] || {}).label;
+    if (etiqueta) {
+      var partes = String(c.turno).split('-');
+      var turno = partes.pop(), fecha = partes.join('-');
+      repoEliminarDonde('TIMELINE', function (h) {
+        return String(h.ID_CAMA) === String(c.cama) && String(h.FECHA) === fecha &&
+               h.TURNO === turno && String(h.TEXTO) === etiqueta;
+      });
+    }
+  });
+
+  auditar({ accion: 'CORRECCION_PRONO', entidad: 'EVOLUCIONES', detalle: casos.length + ' registro(s)' });
+  var fin = 'Listo: ' + casos.length + ' pronación(es)/supinación(es) repetida(s) corregida(s).\n' + detalle;
+  Logger.log(fin);
+  return ok({ casos: casos.length, detalle: casos, mensaje: fin });
+}
+
+/** Procedimientos de una evolución (PROC_JSON, tolerante a filas antiguas). */
+function _pronoProcs(fila) {
+  try { return JSON.parse(fila.PROC_JSON || '[]') || []; } catch (e) { return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EVOLUCIONES AJENAS EN LA HOJA VIVA (ago-2026)
+//  Desde que el alta y limpiarCama archivan POR CAMA, una cama que se cierra
+//  ya no deja nada atrás. Esto repara lo que quedó de ANTES de esa regla:
+//  camas cuya hoja viva mezcla filas de DOS pacientes (el ocupante actual y
+//  uno anterior que salió por limpiarCamasManual o por un alta sin
+//  PATIENT_ID). Esas filas ajenas alimentan la pronación heredada y la
+//  evolución previa del que está hoy en la cama.
+//
+//  QUÉ TOCA Y QUÉ NO (las reglas salen de la reversión del 6-ago):
+//  · Cama OCUPADA con PATIENT_ID: se archivan SOLO las filas con un
+//    PATIENT_ID distinto y no vacío — esas son de otra persona con certeza.
+//  · Las filas SIN PATIENT_ID no se tocan NUNCA, solo se informan: pueden
+//    ser del propio ocupante (el pid se regenera al re-ingresar tras una
+//    reparación de cama) y archivarlas escondería su historia real.
+//  · Cama OCUPADA sin PATIENT_ID: no hay contra qué comparar — solo informa.
+//  · Cama LIBRE con filas vivas: se archiva TODO (nadie las reclama y son
+//    exactamente lo que heredaría el próximo ocupante).
+//  Mismo alcance que _archivarEvolucionesDeCama: solo EVOLUCIONES. TIMELINE y
+//  PROCEDIMIENTOS quedan como historia del episodio, igual que en el alta.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Paso 1 — SIMULACRO: informa qué se archivaría. No modifica nada. */
+function repararEvolucionesAjenasSIMULACRO() { return _mtoRepararAjenas(false); }
+
+/** Paso 2 — REAL. Respalda primero; si el respaldo falla, cancela. */
+function repararEvolucionesAjenasCONFIRMAR() { return _mtoRepararAjenas(true); }
+
+function _mtoRepararAjenas(escribir) {
+  var camas = {};
+  (repoLeerTodos('CAMAS_ESTADO') || []).forEach(function (c) {
+    camas[String(c.ID_CAMA)] = {
+      ocupada: esVerdadero(c.OCUPADA),
+      pid: String(c.PATIENT_ID || ''),
+      nombre: String(c.NOMBRE || ''),
+    };
+  });
+
+  var archivar = [];   // filas que se van a EVOLUCIONES_ARCHIVO
+  var anonimas = [];   // filas no verificables en cama ocupada: SOLO se informan
+  (repoLeerTodos('EVOLUCIONES') || []).forEach(function (e) {
+    var cama = String(e.ID_CAMA || '');
+    var pidFila = String(e.PATIENT_ID || '');
+    var c = camas[cama];
+    if (!c || !c.ocupada) { archivar.push({ fila: e, motivo: 'cama libre' }); return; }
+    if (!c.pid) {
+      // El censo perdió el pid del ocupante: no hay contra qué comparar nada.
+      anonimas.push({ fila: e, motivo: 'la cama ocupada no tiene PATIENT_ID' });
+      return;
+    }
+    if (!pidFila) {
+      // Sin pid en la fila no se puede saber de quién es: jamás se archiva
+      // (el pid se regenera al re-ingresar; puede ser del propio ocupante).
+      anonimas.push({ fila: e, motivo: 'fila sin PATIENT_ID' });
+      return;
+    }
+    if (pidFila !== c.pid) {
+      archivar.push({ fila: e, motivo: 'de otro paciente (ocupa ' + (c.nombre || c.pid) + ')' });
+    }
+  });
+
+  var linea = function (x) {
+    var e = x.fila || x;
+    return '  · cama ' + e.ID_CAMA + ' · ' + e.TURNO_KEY + ' (' + (e.PLAN_FIRMA_KINE || 's/firma') + ')' +
+      (x.motivo ? ' — ' + x.motivo : '');
+  };
+  var detalle = archivar.map(linea).join('\n');
+  var detalleAnon = anonimas.map(linea).join('\n');
+  var aviso = anonimas.length
+    ? '\n\n⚠️ ' + anonimas.length + ' fila(s) no verificables en camas ocupadas NO se tocan ' +
+      '(pueden ser del propio ocupante). Revisarlas a mano:\n' + detalleAnon
+    : '';
+
+  if (!escribir) {
+    var msg = (archivar.length
+      ? 'SIMULACRO — se archivarían ' + archivar.length + ' evolución(es) ajena(s):\n' + detalle +
+        '\n\nNada se ha modificado. Para aplicarlo corre repararEvolucionesAjenasCONFIRMAR().'
+      : 'SIMULACRO — la hoja viva no tiene evoluciones ajenas.') + aviso;
+    Logger.log(msg);
+    return ok({ simulacro: true, archivar: archivar.length, anonimas: anonimas.length, mensaje: msg });
+  }
+
+  if (!archivar.length) {
+    Logger.log('Nada que archivar.' + aviso);
+    return ok({ archivadas: 0, anonimas: anonimas.length });
+  }
+
+  var resp = backupDiario();
+  if (!resp || !resp.ok) {
+    var eMsg = 'CANCELADO: el respaldo falló, no se modificó nada. ' + ((resp && resp.error) || '');
+    Logger.log(eMsg); return err(eMsg);
+  }
+
+  // Copiar ANTES de borrar, igual que el alta: nada se elimina sin archivar.
+  var ids = {};
+  archivar.forEach(function (x) {
+    repoInsertar('EVOLUCIONES_ARCHIVO', x.fila);
+    ids[String(x.fila.ID_EVOLUCION)] = true;
+  });
+  repoEliminarDonde('EVOLUCIONES', function (e) { return ids[String(e.ID_EVOLUCION)] === true; });
+
+  auditar({
+    accion: 'REPARAR_EVOS_AJENAS', entidad: 'EVOLUCIONES_ARCHIVO',
+    resumen: archivar.length + ' evolución(es) de ocupantes anteriores archivadas' +
+      (anonimas.length ? ' (' + anonimas.length + ' sin PATIENT_ID quedaron informadas)' : ''),
+  });
+  var fin = 'Listo: ' + archivar.length + ' evolución(es) ajena(s) archivada(s).\n' + detalle + aviso;
+  Logger.log(fin);
+  return ok({ archivadas: archivar.length, anonimas: anonimas.length, mensaje: fin });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AUDITORÍA DE INTEGRIDAD — SOLO LECTURA (v5.99, sep-2026)
+//
+//  Nace de la auditoría del guardado del 5-sep-2026 (hallazgo R1: una cama
+//  que rota sin alta pisaba la evolución del paciente anterior) y del pedido
+//  de Diego: «eso puede haber alterado los datos de la marcha blanca». Esta
+//  rutina NO escribe nada: busca las huellas que deja ese fallo y las
+//  informa, para que la estadística de fin de mes se haga sabiendo qué hay.
+//
+//  Qué mira, en orden:
+//   A. Claves ID_EVOLUCION repetidas en la hoja viva (dos filas, una clave).
+//   B. Camas ocupadas con filas de OTRO paciente en la hoja viva (la cama
+//      rotó sin alta y las evoluciones del anterior siguen ahí; las archiva
+//      repararEvolucionesAjenasCONFIRMAR, con simulacro primero).
+//   C. En AUDIT_LOG: episodios cuyo PRIMER guardado en una cama fue
+//      «actualizar» — o sea cayó sobre una fila que ya existía. Antes de la
+//      v5.99 eso es la firma de una sobreescritura (o de una fila legacy sin
+//      pid adoptada). Desde la v5.99 la rotación deja «crear (fila aparte…)».
+//   D. Cama + turno con dos episodios distintos (viva + archivo): informativo
+//      —pasa cada vez que un paciente egresa y otro ingresa el mismo turno—.
+//   E. Episodios del ARCHIVO_PACIENTES sin ninguna evolución archivada.
+// ═══════════════════════════════════════════════════════════════════════
+/**
+ * revisarRelojesCama — SOLO LECTURA. Para cuando los días de VM o de vía aérea
+ * de una cama no cuadran (reporte de Diego, 7-sep-2026: «el texto lo relata
+ * como día 0 pero días en la unidad aparecen 10»).
+ *
+ * Imprime en el registro las tres cosas que hacen falta para entender y
+ * reparar: el estado vigente de la cama con sus dos anclas, los días que salen
+ * de cada ancla, y el recorrido de los últimos turnos con la vía aérea y el
+ * soporte que quedaron guardados en cada uno. El turno donde el ancla saltó a
+ * la fecha del propio turno es el que rompió la cuenta.
+ *
+ * No escribe nada. La reparación se hace desde 🔐 COORDINACIÓN → corregir
+ * ficha, que además deja la fecha protegida contra el guardado del turno.
+ *
+ * 🪤 El botón ▶ del editor NO sabe pasar argumentos (7-sep-2026, preguntado
+ * por Diego). Por eso SIN argumento la función revisa TODAS las camas
+ * ocupadas y marca las sospechosas: se elige en la lista, se aprieta ▶ y
+ * listo. Con argumento —`revisarRelojesCama(17)` desde otra función— da el
+ * detalle de una sola cama.
+ */
+function revisarRelojesCama(idCama) {
+  const id = String(idCama == null ? '' : idCama).trim();
+  if (!id) return _relojesDeLaUnidad();
+  const c = repoLeerTodos('CAMAS_ESTADO', 'ID_CAMA', id)[0];
+  if (!c) { Logger.log('No existe la cama ' + id + '.'); return null; }
+  const hoy = hoyISO();
+  const L = ['🛏️ CAMA ' + id + (c.NOMBRE ? ' · ' + c.NOMBRE : '') + '   (hoy: ' + hoy + ')',
+    '   ocupada: ' + esVerdadero(c.OCUPADA) + ' · episodio: ' + (c.PATIENT_ID || '—'),
+    '   vía aérea: ' + (c.VIA_AEREA || '—') + ' · soporte: ' + (c.SOPORTE || '—'),
+    '',
+    '   ⏱️ ANCLAS (de aquí salen los días; se corrigen en 🔐 COORDINACIÓN)',
+    '     ingreso a la unidad : ' + (c.FECHA_INGRESO || '—') + '   → ' + diasEntre(c.FECHA_INGRESO, hoy) + ' días',
+    '     inicio de vía aérea : ' + (c.FECHA_INICIO_VA || '—') + '   → ' + (c.FECHA_INICIO_VA ? diasEntre(c.FECHA_INICIO_VA, hoy) : '—') + ' días',
+    '     inicio de ventilación: ' + (c.TS_INICIO_SOPORTE || c.FECHA_INICIO_SOPORTE || '—') + '   → ' +
+      (c.FECHA_INICIO_SOPORTE ? diasVMReloj(c.TS_INICIO_SOPORTE, c.FECHA_INICIO_SOPORTE, _tsAhora(), hoy) : '—') + ' días' +
+      (vmPorHoras() ? ' (bloques de 24 h; por calendario: ' + (c.FECHA_INICIO_SOPORTE ? diasEntre(c.FECHA_INICIO_SOPORTE, hoy) : '—') + ')' : '')];
+  const corr = String(c.CORRECCIONES_JSON || '').trim();
+  L.push('     correcciones de coordinación: ' + (corr && corr !== '[]' ? corr : 'ninguna'));
+  if (c.FECHA_INGRESO && c.FECHA_INICIO_VA && String(c.FECHA_INICIO_VA) > String(c.FECHA_INGRESO)) {
+    L.push('     ⚠️ la vía aérea arranca DESPUÉS del ingreso: revisa si es real (TQT, reintubación) o si se reinició sola.');
+  }
+  L.push('', '   📋 ÚLTIMOS TURNOS GUARDADOS (el que cambió la vía aérea es el que movió el reloj)');
+  const pid = String(c.PATIENT_ID || '');
+  const evos = repoLeerTodos('EVOLUCIONES', 'ID_CAMA', id)
+    .filter(function (e) { return !pid || !e.PATIENT_ID || String(e.PATIENT_ID) === pid; })
+    .sort(function (a, b) { return String(a.TURNO_KEY).localeCompare(String(b.TURNO_KEY)); })
+    .slice(-10);
+  if (!evos.length) L.push('     (sin evoluciones guardadas)');
+  evos.forEach(function (e) {
+    const fin = String(e.VENT_VIA_AEREA_FINAL || '');
+    const va = String(e.VENT_VIA_AEREA || '—');
+    L.push('     ' + String(e.TURNO_KEY || '') +
+      ' · VA ' + va + (fin && fin !== va ? ' → ' + fin : '') +
+      ' · soporte ' + String(e.VENT_SOPORTE || '—') + (e.VENT_SOPORTE_FINAL && e.VENT_SOPORTE_FINAL !== e.VENT_SOPORTE ? ' → ' + e.VENT_SOPORTE_FINAL : '') +
+      ' · PVE ' + (e.PVE_VAL || '—') + (e.PVE_RESULTADO ? '/' + e.PVE_RESULTADO : '') +
+      (esVerdadero(e.EXT_OCURRIO) ? ' · ✂️ EXTUBACIÓN' : '') +
+      (esVerdadero(e.INTUB_OCURRIO) ? ' · 🫁 intubación' : '') +
+      (esVerdadero(e.TQT_OCURRIO) ? ' · 🔪 TQT' : '') +
+      ' · ' + String(e.PLAN_FIRMA_KINE || ''));
+  });
+  L.push('', '   👉 Para repararlo: deja la cama en su vía aérea y soporte reales, y después',
+             '      corrige las dos fechas en 🔐 COORDINACIÓN → corregir ficha. Una fecha',
+             '      corregida ahí queda protegida: el guardado del turno ya no la pisa.');
+  const txt = L.join('\n');
+  Logger.log(txt);
+  return txt;
+}
+
+/**
+ * Los relojes de TODAS las camas ocupadas, en una tabla, con las sospechosas
+ * marcadas. Es lo que sale al correr `revisarRelojesCama` sin argumento.
+ * Sospechosa = tiene vía aérea o ventilación puesta y su ancla arrancó
+ * DESPUÉS del ingreso sin que ningún turno declarara el evento que lo
+ * justifique (intubación, TQT, reintubación). Es exactamente la huella que
+ * dejó el error de la cama 17: el reloj saltó solo.
+ */
+/**
+ * tablaRelojes — LAS DOS FECHAS DE CADA CAMA, para cotejar con el otro
+ * programa (Diego, 11-sep-2026: «si calculas fecha de ingreso y actual para
+ * cada paciente, ¿podrías darme las 2 fechas?»). Solo lectura. Por cama:
+ * ingreso (fecha y hora), el momento de hoy, la estadía contada por
+ * CALENDARIO (como BUDA) y por bloques de 24 h, y lo mismo para la VM desde
+ * su reloj (hora de ingreso si llegó ventilado, hora de intubación si no).
+ * 🔒 Sin nombres ni RUT: la salida se puede copiar tal cual.
+ * Ejecutar desde el editor y leer el registro.
+ */
+function tablaRelojes() {
+  const hoy = hoyISO(), ahora = _tsAhora();
+  const camas = repoLeerTodos('CAMAS_ESTADO')
+    .filter(function (c) { return esVerdadero(c.OCUPADA); })
+    .sort(function (a, b) { return (parseInt(a.ID_CAMA, 10) || 0) - (parseInt(b.ID_CAMA, 10) || 0); });
+  const pad = function (x, n) { x = String(x == null ? '' : x); while (x.length < n) x += ' '; return x; };
+  const bloques = function (ts) { const h = _horasEntreTS(ts, ahora); return h === '' ? '—' : Math.floor(h / 24); };
+  const L = ['📅 TABLA DE RELOJES · hoy ' + ahora + '   (' + camas.length + ' camas ocupadas; sin nombres ni RUT)', '',
+    pad('cama', 5) + pad('VA', 10) + pad('soporte', 16) + pad('INGRESO (fecha hora)', 22) + pad('estadía cal.', 14) + pad('estadía 24h', 13) +
+    pad('INICIO VM (fecha hora)', 24) + pad('VM cal.', 9) + 'VM 24h'];
+  camas.forEach(function (c) {
+    const ing = String(c.TS_INGRESO || c.FECHA_INGRESO || '—');
+    const esVM = String(c.SOPORTE) === 'VM';
+    const vmIni = esVM ? String(c.TS_INICIO_SOPORTE || c.FECHA_INICIO_SOPORTE || '—') : '—';
+    L.push(pad(c.ID_CAMA, 5) + pad(c.VIA_AEREA || '—', 10) + pad(c.SOPORTE || '—', 16) + pad(ing, 22) +
+      pad(c.FECHA_INGRESO ? diasEntre(c.FECHA_INGRESO, hoy) : '—', 14) + pad(c.TS_INGRESO ? bloques(c.TS_INGRESO) : '—', 13) +
+      pad(vmIni, 24) + pad(esVM && c.FECHA_INICIO_SOPORTE ? diasEntre(c.FECHA_INICIO_SOPORTE, hoy) : '—', 9) +
+      (esVM && c.TS_INICIO_SOPORTE ? bloques(c.TS_INICIO_SOPORTE) : '—'));
+  });
+  L.push('', 'cal. = días de calendario (ingreso = día 0, como BUDA) · 24h = bloques completos de 24 horas desde la hora registrada.');
+  const txt = L.join('\n');
+  Logger.log(txt);
+  return txt;
+}
+
+function _relojesDeLaUnidad() {
+  const hoy = hoyISO();
+  const camas = repoLeerTodos('CAMAS_ESTADO')
+    .filter(function (c) { return esVerdadero(c.OCUPADA); })
+    .sort(function (a, b) { return (parseInt(a.ID_CAMA, 10) || 0) - (parseInt(b.ID_CAMA, 10) || 0); });
+  if (!camas.length) { Logger.log('No hay camas ocupadas.'); return 'No hay camas ocupadas.'; }
+  // ¿Qué episodios declararon un evento de vía aérea? Una sola pasada.
+  const conEvento = {};
+  repoLeerTodos('EVOLUCIONES').forEach(function (e) {
+    if (esVerdadero(e.INTUB_OCURRIO) || esVerdadero(e.TQT_OCURRIO) || esVerdadero(e.EXT_REINTUB)) {
+      conEvento[String(e.PATIENT_ID || '') + '|' + String(e.ID_CAMA || '')] = true;
+    }
+  });
+  // El encabezado dice CUÁNTAS se revisaron: sin ese número, ver una sola cama
+  // marcada se confunde con «revisó una sola cama» (le pasó a Diego, 7-sep).
+  const L = ['⏱️ RELOJES DE LA UNIDAD   (hoy: ' + hoy + ')',
+    '   ' + camas.length + ' camas ocupadas revisadas', ''];
+  const sospechosas = [];
+  camas.forEach(function (c) {
+    const id = String(c.ID_CAMA);
+    const dIng = c.FECHA_INGRESO ? diasEntre(c.FECHA_INGRESO, hoy) : '—';
+    const dVA = c.FECHA_INICIO_VA ? diasEntre(c.FECHA_INICIO_VA, hoy) : '—';
+    const dVM = (String(c.SOPORTE) === 'VM' && c.FECHA_INICIO_SOPORTE) ? diasVMReloj(c.TS_INICIO_SOPORTE, c.FECHA_INICIO_SOPORTE, _tsAhora(), hoy) : '—';
+    const tieneVA = c.VIA_AEREA && String(c.VIA_AEREA) !== 'Natural';
+    const saltoVA = tieneVA && c.FECHA_INGRESO && c.FECHA_INICIO_VA &&
+      String(c.FECHA_INICIO_VA) > String(c.FECHA_INGRESO) &&
+      !conEvento[String(c.PATIENT_ID || '') + '|' + id];
+    if (saltoVA) sospechosas.push(id);
+    L.push((saltoVA ? '  ⚠️ ' : '     ') + 'cama ' + (id.length < 2 ? ' ' + id : id) +
+      ' · ' + (String(c.VIA_AEREA || '—') + '        ').slice(0, 8) +
+      ' · ' + (String(c.SOPORTE || '—') + '                  ').slice(0, 18) +
+      ' · estadía ' + dIng + ' d · vía aérea ' + dVA + ' d · VM ' + dVM + ' d');
+  });
+  L.push('');
+  if (!sospechosas.length) {
+    L.push('  ✅ Ninguna cama tiene el reloj de vía aérea arrancado sin su evento.');
+  } else {
+    L.push('  ⚠️ El reloj de vía aérea de estas camas arrancó DESPUÉS del ingreso sin que');
+    L.push('     ningún turno declarara el evento que lo explique: ' + sospechosas.join(', '));
+    // El detalle sale aquí mismo: el botón ▶ del editor no pasa argumentos, así
+    // que pedirle a alguien que llame a la función con la cama no sirve de nada.
+    sospechosas.forEach(function (n) { L.push('', '  ────────────────────────────────────────', revisarRelojesCama(n)); });
+  }
+  L.push('', '  Revisadas ' + camas.length + ' camas · con el reloj sospechoso: ' + sospechosas.length + '.');
+  L.push('  👉 Para corregir una fecha: 🔐 COORDINACIÓN → corregir ficha. Ahí queda protegida.');
+  const txt = L.join('\n');
+  Logger.log(txt);
+  return txt;
+}
+
+/**
+ * auditoriaDeUso — SOLO LECTURA. Qué funciones de la app se usan de verdad y
+ * cuáles no ha tocado nadie (Diego, 7-sep-2026: «siento que tenemos muchas
+ * funciones que no están siendo exploradas, podríamos centralizar y acotar»).
+ *
+ * Cuenta las acciones registradas en AUDIT_LOG, en total y en los últimos 30
+ * días, y lista las que NUNCA se han usado. Con eso se decide qué se depura,
+ * qué se centraliza y qué queda solo para coordinación — con datos y no con
+ * impresiones.
+ *
+ * 🔴 QUÉ NO MIDE, para no sacar conclusiones de más: el registro guarda lo que
+ * se ESCRIBE, no lo que se MIRA. Las 19 acciones de lectura (GET_*) no dejan
+ * huella a propósito —nadie quiere un registro de quién abrió qué pantalla—,
+ * así que esto NO dice qué pestañas se visitan. Para eso mandan el criterio
+ * clínico y lo que el equipo cuente.
+ *
+ * 🔒 No sale ningún dato de paciente: solo nombres de acción y cuentas. Los
+ * correos y las firmas del registro NO se leen: la pregunta es qué se usa, no
+ * quién lo usa.
+ * Uso desde el editor:  auditoriaDeUso()
+ */
+function auditoriaDeUso() {
+  const hoy = hoyISO();
+  const desde30 = _restarDias(hoy, 30);
+  const filas = repoLeerTodos('AUDIT_LOG');
+  if (!filas.length) { Logger.log('El registro de auditoría está vacío.'); return 'vacío'; }
+  const tot = {}, ult = {};
+  let primera = '', ultima = '';
+  filas.forEach(function (f) {
+    const a = String(f.ACCION || '').trim(); if (!a) return;
+    const ts = String(f.TIMESTAMP || '').slice(0, 10);
+    tot[a] = (tot[a] || 0) + 1;
+    if (ts && ts >= desde30) ult[a] = (ult[a] || 0) + 1;
+    if (ts) { if (!primera || ts < primera) primera = ts; if (!ultima || ts > ultima) ultima = ts; }
+  });
+  const usadas = Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; });
+  const L = ['📊 USO DE LA APP   (registro del ' + primera + ' al ' + ultima + ')',
+    '   ' + filas.length + ' acciones registradas · ' + usadas.length + ' funciones distintas',
+    '',
+    '   ACCIÓN                          TOTAL   ÚLT. 30 DÍAS'];
+  usadas.forEach(function (a) {
+    L.push('   ' + (a + '                              ').slice(0, 30) +
+      ('      ' + tot[a]).slice(-6) + '   ' + ('      ' + (ult[a] || 0)).slice(-6) +
+      ((ult[a] || 0) === 0 ? '   ← sin uso este mes' : ''));
+  });
+  // Lo que NUNCA se usó: se compara contra el catálogo de acciones auditadas.
+  const nunca = AUDIT_ACCIONES.filter(function (a) { return !tot[a]; });
+  L.push('', nunca.length
+    ? '   🕸️ NUNCA se han usado (' + nunca.length + '):\n      ' + nunca.join(', ')
+    : '   ✅ Todas las funciones que dejan huella se han usado alguna vez.');
+  L.push('', '   🔎 Ojo: esto mide lo que se ESCRIBE. Abrir una pestaña no deja huella,',
+             '      así que no dice qué vistas se visitan — eso lo sabe el equipo.');
+  const txt = L.join('\n');
+  Logger.log(txt);
+  return txt;
+}
+
+/** Catálogo de acciones que dejan huella, para saber cuáles NUNCA se usaron. */
+var AUDIT_ACCIONES = ['AGREGAR_FASE', 'AGREGAR_HITO', 'AJUSTAR_STOCK', 'ANEXAR_EVENTO',
+  'ANULAR_ANEXO', 'ANULAR_EVENTO', 'ASIGNAR_STOCK', 'BAJA_VENTILADOR', 'CONFIRMAR_DISPOSITIVOS',
+  'DAR_ALTA', 'GENERAR_REM', 'GSA_ASIGNAR', 'GSA_DESCARTAR', 'GSA_IMPORTAR',
+  'GUARDAR_ENTREGA_TURNO', 'GUARDAR_EVOLUCION', 'GUARDAR_STOCK', 'GUARDAR_SUGERENCIA',
+  'GUARDAR_VENTILADOR', 'INGRESAR_PACIENTE', 'INTERCAMBIAR_CAMAS', 'LIMPIAR_CAMA',
+  'MOVER_A_CAMA_VACIA', 'MOVER_VENTILADOR', 'MOVER_VENTILADORES_LOTE', 'PLANTILLA_GUARDAR',
+  'PLANTILLA_RETIRAR', 'REGISTRAR_FALLA_VM', 'SET_ASIGNACION_TURNO', 'SET_BANNER',
+  'SET_SUGERENCIA_ESTADO', 'COORD_CORRIGE_FICHA', 'COORD_ENTRADA'];
+
+function auditoriaIntegridad() {
+  try {
+    const out = { A_clavesRepetidas: [], B_camasConAjenas: [], C_primerGuardadoSobreFila: [],
+      C_filasAparteDesdeV599: 0, D_turnosConDosEpisodios: 0, E_episodiosSinEvoluciones: [],
+      F_viaAereaSinEvento: [] };
+    const lineas = [];
+
+    // A + B + D — hoja viva y archivo, solo las columnas que hacen falta.
+    // Solo las columnas de identidad (las 5 primeras de la hoja): nunca la fila entera.
+    const _cols = function (hoja) {
+      return repoLeerColumnasConFila(hoja, ['ID_EVOLUCION', 'ID_CAMA', 'PATIENT_ID', 'TURNO_KEY']).map(function (f) { return f.obj; });
+    };
+    const vivas = _cols('EVOLUCIONES');
+    const archiv = _cols('EVOLUCIONES_ARCHIVO');
+    const porClave = {};
+    vivas.forEach(function (e) { const k = String(e.ID_EVOLUCION || ''); (porClave[k] = porClave[k] || []).push(e); });
+    Object.keys(porClave).forEach(function (k) {
+      if (porClave[k].length > 1) out.A_clavesRepetidas.push({ clave: k, filas: porClave[k].length,
+        pids: porClave[k].map(function (e) { return String(e.PATIENT_ID || '').slice(0, 8); }) });
+    });
+
+    const camas = {};
+    repoLeerTodos('CAMAS_ESTADO').forEach(function (c) {
+      camas[String(c.ID_CAMA)] = { ocupada: esVerdadero(c.OCUPADA), pid: String(c.PATIENT_ID || ''), nombre: String(c.NOMBRE || '') };
+    });
+    const ajenasPorCama = {};
+    vivas.forEach(function (e) {
+      const c = camas[String(e.ID_CAMA)]; const pe = String(e.PATIENT_ID || '');
+      if (!c || !c.ocupada || !c.pid || !pe || pe === c.pid) return;
+      (ajenasPorCama[String(e.ID_CAMA)] = ajenasPorCama[String(e.ID_CAMA)] || []).push(String(e.TURNO_KEY));
+    });
+    Object.keys(ajenasPorCama).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).forEach(function (cama) {
+      out.B_camasConAjenas.push({ cama: cama, filas: ajenasPorCama[cama].length,
+        turnos: ajenasPorCama[cama].sort().slice(0, 6) });
+    });
+
+    const pidsPorTurno = {};
+    vivas.concat(archiv).forEach(function (e) {
+      const k = String(e.ID_CAMA) + '|' + String(e.TURNO_KEY); const pe = String(e.PATIENT_ID || '');
+      if (!pe) return;
+      (pidsPorTurno[k] = pidsPorTurno[k] || {})[pe] = true;
+    });
+    Object.keys(pidsPorTurno).forEach(function (k) { if (Object.keys(pidsPorTurno[k]).length > 1) out.D_turnosConDosEpisodios++; });
+
+    // C — AUDIT_LOG: el primer guardado de cada (cama, episodio).
+    try {
+      const log = repoLeerTodos('AUDIT_LOG').filter(function (a) { return String(a.ACCION) === 'GUARDAR_EVOLUCION'; })
+        .sort(function (a, b) { return String(a.TIMESTAMP).localeCompare(String(b.TIMESTAMP)); });
+      const visto = {};
+      log.forEach(function (a) {
+        const k = String(a.ID_ENTIDAD) + '|' + String(a.PATIENT_ID || '');
+        const res = String(a.RESUMEN || '');
+        if (/fila aparte/.test(res)) out.C_filasAparteDesdeV599++;
+        if (visto[k] || !a.PATIENT_ID) return;
+        visto[k] = true;
+        if (/^actualizar/.test(res)) {
+          out.C_primerGuardadoSobreFila.push({ cama: String(a.ID_ENTIDAD), pid: String(a.PATIENT_ID).slice(0, 8),
+            cuando: String(a.TIMESTAMP).slice(0, 16), firma: String(a.FIRMA || '') });
+        }
+      });
+    } catch (e) { lineas.push('  (AUDIT_LOG no se pudo leer: ' + e.message + ')'); }
+
+    // E — episodios archivados sin evoluciones.
+    const conEvo = {};
+    archiv.forEach(function (e) { if (e.PATIENT_ID) conEvo[String(e.PATIENT_ID)] = true; });
+    vivas.forEach(function (e) { if (e.PATIENT_ID) conEvo[String(e.PATIENT_ID)] = true; });
+    repoLeerTodos('ARCHIVO_PACIENTES').forEach(function (a) {
+      const pid = String(a.PATIENT_ID || '');
+      if (pid && !conEvo[pid]) out.E_episodiosSinEvoluciones.push({ pid: pid.slice(0, 8), cama: String(a.CAMA_ORIGEN || ''),
+        ingreso: String(a.FECHA_INGRESO || '').slice(0, 10), egreso: String(a.FECHA_EGRESO || '').slice(0, 10) });
+    });
+
+    // F — 🗂️ VÍA AÉREA CAMBIADA SIN EVENTO (rama episodio/turno, 11-sep-2026;
+    // la cama 13 de Diego). Un turno cuya vía aérea de salida es distinta de
+    // la que traía y que no declaró intubación, extubación, reintubación, TQT
+    // ni decanulación. Para las cifras esa extubación nunca ocurrió y el reloj
+    // de VM siguió corriendo. Vivos Y archivados, porque el daño ya puede
+    // estar en ARCHIVO_PACIENTES (EXTUBACION_OK falso, DIAS_VM_TOTAL inflado).
+    try {
+      const colsF = ['ID_EVOLUCION', 'ID_CAMA', 'PATIENT_ID', 'TURNO_KEY', 'ES_INGRESO',
+        'VENT_VIA_AEREA', 'VENT_VIA_AEREA_FINAL', 'EXT_OCURRIO', 'INTUB_OCURRIO', 'EXT_REINTUB', 'TQT_OCURRIO', 'DECAN_OCURRIO'];
+      const filasF = repoLeerColumnasConFila('EVOLUCIONES', colsF).map(function (f) { return f.obj; })
+        .concat(repoLeerColumnasConFila('EVOLUCIONES_ARCHIVO', colsF).map(function (f) { return f.obj; }));
+      const porEp = {};
+      filasF.forEach(function (e) {
+        const k = String(e.PATIENT_ID || ('cama:' + e.ID_CAMA));
+        (porEp[k] = porEp[k] || []).push(e);
+      });
+      const inv = function (x) { return x === 'TOT' || x === 'TQT'; };
+      Object.keys(porEp).forEach(function (k) {
+        const evs = porEp[k].sort(function (a, b) { return String(a.TURNO_KEY).localeCompare(String(b.TURNO_KEY)); });
+        for (let i = 1; i < evs.length; i++) {
+          const prev = evs[i - 1], cur = evs[i];
+          if (esVerdadero(cur.ES_INGRESO)) continue;
+          const de = String(prev.VENT_VIA_AEREA_FINAL || prev.VENT_VIA_AEREA || '').trim();
+          const a = String(cur.VENT_VIA_AEREA_FINAL || cur.VENT_VIA_AEREA || '').trim();
+          if (!de || !a || de === a) continue;
+          const evento = esVerdadero(cur.EXT_OCURRIO) || esVerdadero(cur.INTUB_OCURRIO) || esVerdadero(cur.EXT_REINTUB) ||
+                         esVerdadero(cur.TQT_OCURRIO) || esVerdadero(cur.DECAN_OCURRIO);
+          if (evento) continue;
+          let que = 'cambio sin evento';
+          if (inv(de) && !inv(a)) que = de === 'TQT' ? 'decanulación sin declarar' : 'extubación sin declarar (invisible para el REM; reloj de VM abierto)';
+          else if (!inv(de) && inv(a)) que = 'intubación/reintubación sin declarar';
+          else if (de === 'TOT' && a === 'TQT') que = 'TQT sin declarar';
+          out.F_viaAereaSinEvento.push({ cama: String(cur.ID_CAMA), turno: String(cur.TURNO_KEY), de: de, a: a,
+            pid: String(cur.PATIENT_ID || '').slice(0, 8), que: que });
+        }
+      });
+    } catch (e) { lineas.push('  (huella F no se pudo calcular: ' + e.message + ')'); }
+
+    // Informe legible (sin nombres ni RUT: solo camas, turnos y 8 letras del pid).
+    lineas.unshift('AUDITORÍA DE INTEGRIDAD — solo lectura, nada se modificó');
+    lineas.push('A · Claves repetidas en la hoja viva: ' + out.A_clavesRepetidas.length +
+      (out.A_clavesRepetidas.length ? '\n' + out.A_clavesRepetidas.map(function (x) { return '   · ' + x.clave + ' ×' + x.filas + ' (pids ' + x.pids.join(', ') + ')'; }).join('\n') : ''));
+    lineas.push('B · Camas ocupadas con evoluciones de OTRO paciente: ' + out.B_camasConAjenas.length +
+      (out.B_camasConAjenas.length ? '\n' + out.B_camasConAjenas.map(function (x) { return '   · cama ' + x.cama + ': ' + x.filas + ' fila(s) — ' + x.turnos.join(', ') + (x.filas > 6 ? '…' : ''); }).join('\n') +
+        '\n   → repararEvolucionesAjenasSIMULACRO() y después CONFIRMAR.' : ''));
+    lineas.push('C · Episodios cuyo primer guardado cayó sobre una fila existente (sospecha de sobreescritura pre-v5.99): ' +
+      out.C_primerGuardadoSobreFila.length +
+      (out.C_primerGuardadoSobreFila.length ? '\n' + out.C_primerGuardadoSobreFila.map(function (x) { return '   · cama ' + x.cama + ' · ' + x.cuando + ' · ' + x.firma + ' · pid ' + x.pid; }).join('\n') : '') +
+      '\n   Filas abiertas aparte por rotación sin alta desde la v5.99: ' + out.C_filasAparteDesdeV599);
+    lineas.push('D · Cama+turno con dos episodios (egreso e ingreso el mismo turno, informativo): ' + out.D_turnosConDosEpisodios);
+    lineas.push('E · Episodios archivados sin ninguna evolución: ' + out.E_episodiosSinEvoluciones.length +
+      (out.E_episodiosSinEvoluciones.length ? '\n' + out.E_episodiosSinEvoluciones.map(function (x) { return '   · cama ' + x.cama + ' · ' + x.ingreso + ' → ' + x.egreso + ' · pid ' + x.pid; }).join('\n') : ''));
+    lineas.push('F · Vía aérea cambiada SIN evento declarado (vivos + archivo): ' + out.F_viaAereaSinEvento.length +
+      (out.F_viaAereaSinEvento.length ? '\n' + out.F_viaAereaSinEvento.map(function (x) { return '   · cama ' + x.cama + ' · ' + x.turno + ' · ' + x.de + ' → ' + x.a + ' · ' + x.que + ' · pid ' + x.pid; }).join('\n') +
+        '\n   → abrir esa evolución, declarar el evento en «¿Qué pasó hoy con la vía aérea?» y volver a guardar.' : ''));
+    const msg = lineas.join('\n');
+    Logger.log(msg);
+    out.mensaje = msg;
+    return ok(out);
+  } catch (e) { return err('auditoriaIntegridad: ' + e.message, ERR.INTERNO, e); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TIEMPO EXTUBADO — RECÁLCULO CON EL RELOJ REAL (ago-2026)
+//
+//  `TIEMPO_EXTUBADO` (hoja REINTUBACIONES) son las horas entre la extubación
+//  previa y la reintubación. Es el número con el que después se distingue una
+//  reintubación de una intubación nueva —«no es reintubación sino intubación,
+//  por los días» (Diego)— y hasta ago-2026 se calculaba con la FECHA DEL
+//  TURNO: el turno Noche pertenece al día anterior hasta las 09:00, así que
+//  una reintubación de las 03:00 quedaba **24 h corta**. `_tiempoExtubado` ya
+//  se arregló; esto repara lo que quedó escrito antes.
+//
+//  Regla que dio Diego: MANDA EL RELOJ, no el turno. Y lo que no se pueda
+//  calcular —sin hora de reintubación, o sin extubación registrada en el
+//  episodio— NO se toca y se informa al final: jamás se rellena con un
+//  número inventado.
+//
+//  Idempotente: correrlo dos veces no cambia nada la segunda.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Paso 1 — SIMULACRO. Informa qué cambiaría y no toca nada. */
+function corregirTiempoExtubadoSIMULACRO() { return _mtoTiempoExtubado(false); }
+
+/** Paso 2 — REAL. Respalda primero; si el respaldo falla, cancela. */
+function corregirTiempoExtubadoCONFIRMAR() { return _mtoTiempoExtubado(true); }
+
+function _mtoTiempoExtubado(escribir) {
+  // Las evoluciones del episodio pueden estar VIVAS o ARCHIVADAS (al egresar
+  // se particionan): hay que mirar las dos hojas o los episodios cerrados
+  // quedarían sin corregir.
+  var porPid = {};
+  ['EVOLUCIONES', 'EVOLUCIONES_ARCHIVO'].forEach(function (hoja) {
+    (repoLeerTodos(hoja) || []).forEach(function (e) {
+      var pid = String(e.PATIENT_ID || '');
+      (porPid[pid] = porPid[pid] || []).push(e);
+    });
+  });
+  var porIdEvo = {};
+  Object.keys(porPid).forEach(function (pid) {
+    porPid[pid].forEach(function (e) { porIdEvo[String(e.ID_EVOLUCION)] = e; });
+  });
+
+  var cambios = [];      // { id, antes, ahora, cama, turnoKey }
+  var sinDato = [];      // { id, motivo }
+  (repoLeerTodos('REINTUBACIONES') || []).forEach(function (r) {
+    var idEvo = String(r.ID_EVOLUCION || '');
+    var evo = porIdEvo[idEvo];
+    if (!evo) { sinDato.push({ id: idEvo, motivo: 'no se encuentra su evolución' }); return; }
+
+    var fecha = _statISO(evo.FECHA) || _statISO(r.FECHA);
+    var turno = String(evo.TURNO || r.TURNO || 'Dia');
+    var pid = String(evo.PATIENT_ID || '');
+    var lector = function () { return porPid[pid] || []; };
+
+    var ahora = _tiempoExtubado(evo, evo.ID_CAMA, fecha, turno, lector);
+    var antes = String(r.TIEMPO_EXTUBADO || '');
+    if (!ahora) {
+      sinDato.push({
+        id: idEvo,
+        motivo: !(evo.REINTUB_HORA || evo.EXT_HORA)
+          ? 'sin hora de reintubación anotada'
+          : 'sin extubación previa registrada en el episodio',
+      });
+      return;
+    }
+    if (ahora !== antes) {
+      cambios.push({ id: String(r.ID_REINTUB), antes: antes || '(vacío)', ahora: ahora,
+                     cama: String(r.ID_CAMA || ''), turnoKey: fecha + '-' + turno });
+    }
+  });
+
+  var detalle = cambios.map(function (c) {
+    return '  · cama ' + c.cama + ' · ' + c.turnoKey + ': ' + c.antes + ' → ' + c.ahora;
+  }).join('\n');
+  var aviso = sinDato.length
+    ? '\n\n⚠️ ' + sinDato.length + ' reintubación(es) sin dato suficiente NO se tocan:\n' +
+      sinDato.map(function (s) { return '  · ' + s.id + ' — ' + s.motivo; }).join('\n')
+    : '';
+
+  if (!escribir) {
+    var msg = (cambios.length
+      ? 'SIMULACRO — se corregirían ' + cambios.length + ' tiempo(s) extubado:\n' + detalle +
+        '\n\nNada se ha modificado. Para aplicarlo corre corregirTiempoExtubadoCONFIRMAR().'
+      : 'SIMULACRO — todos los tiempos extubados ya están bien calculados.') + aviso;
+    Logger.log(msg);
+    return ok({ simulacro: true, cambios: cambios.length, sinDato: sinDato.length, mensaje: msg });
+  }
+
+  if (!cambios.length) {
+    Logger.log('Nada que corregir.' + aviso);
+    return ok({ corregidas: 0, sinDato: sinDato.length });
+  }
+
+  var resp = backupDiario();
+  if (!resp || !resp.ok) {
+    var eMsg = 'CANCELADO: el respaldo falló, no se modificó nada. ' + ((resp && resp.error) || '');
+    Logger.log(eMsg); return err(eMsg);
+  }
+
+  cambios.forEach(function (c) {
+    repoActualizar('REINTUBACIONES', 'ID_REINTUB', c.id, { TIEMPO_EXTUBADO: c.ahora });
+  });
+
+  auditar({
+    accion: 'CORREGIR_TIEMPO_EXTUBADO', entidad: 'REINTUBACIONES',
+    resumen: cambios.length + ' tiempo(s) extubado recalculados con el reloj real' +
+      (sinDato.length ? ' (' + sinDato.length + ' sin dato suficiente quedaron informados)' : ''),
+  });
+  var fin = 'Listo: ' + cambios.length + ' tiempo(s) extubado corregido(s).\n' + detalle + aviso;
+  Logger.log(fin);
+  return ok({ corregidas: cambios.length, sinDato: sinDato.length, mensaje: fin });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CAMAS DE PRUEBA (ago-2026)
+//  Pedido de Diego: quiere probar una versión nueva con la unidad llena de
+//  pacientes REALES, sin tocarles la evolución. Se agregan camas al final
+//  del censo para ensayar ahí.
+//
+//  OJO — la siembra de crearORepararEstructura() solo corre con la hoja
+//  VACÍA (`if (hCam.getLastRow() < filaDatos)`), así que subir NUM_CAMAS a
+//  mano NO agrega nada cuando ya hay pacientes. Por eso existe esto.
+//
+//  Las camas de prueba NO son inocuas para la estadística: los indicadores
+//  y el REM cuentan pacientes-día desde EVOLUCIONES, así que todo lo que se
+//  evolucione en ellas SUMA. Por eso el retiro borra también su historia.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Cuántas camas de prueba se agregan. */
+const _PRUEBA_N = 2;
+
+/** ¿Es una cama de prueba? Lo son las que pasan del NUM_CAMAS declarado. */
+function _esCamaPrueba(idCama) {
+  const real = parseInt(leerConfig('NUM_CAMAS', '18'), 10) || 18;
+  return (parseInt(idCama, 10) || 0) > real;
+}
+
+/**
+ * Agrega _PRUEBA_N camas vacías al final del censo, para ensayar sin tocar
+ * a los pacientes reales. Idempotente: si ya existen, no las duplica.
+ * NO cambia NUM_CAMAS a propósito — así `_esCamaPrueba` puede distinguirlas
+ * y el retiro sabe cuáles son.
+ */
+function agregarCamasPrueba() {
+  const log = [];
+  const p = m => { log.push(m); Logger.log(m); };
+  const camas = repoLeerTodos('CAMAS_ESTADO');
+  const ids = {};
+  let maxId = 0;
+  camas.forEach(c => {
+    const n = parseInt(c.ID_CAMA, 10) || 0;
+    ids[String(n)] = true;
+    if (n > maxId) maxId = n;
+  });
+  const real = parseInt(leerConfig('NUM_CAMAS', '18'), 10) || 18;
+  p('=== CAMAS DE PRUEBA ===');
+  p('camas reales declaradas (NUM_CAMAS): ' + real);
+  p('cama más alta que existe hoy: ' + maxId);
+
+  let creadas = 0;
+  for (let i = 1; i <= _PRUEBA_N; i++) {
+    const id = String(real + i);
+    if (ids[id]) { p('  cama ' + id + ': YA EXISTE - se salta'); continue; }
+    repoInsertar('CAMAS_ESTADO', {
+      ID_CAMA: id, OCUPADA: false, STATUS_CAMA: 'Libre',
+      VIA_AEREA: 'Natural', SOPORTE: 'Ambiente', MODO: 'Sin soporte',
+    });
+    p('  cama ' + id + ': CREADA (vacía)');
+    creadas++;
+  }
+  SpreadsheetApp.flush();
+  try { CacheService.getScriptCache().removeAll(['camas', 'boot']); } catch (e) {}
+  p('');
+  p(creadas ? ('✅ ' + creadas + ' cama(s) de prueba agregadas. Recarga la app con Ctrl+Shift+R.')
+            : 'Nada que hacer: ya estaban.');
+  p('Cuando termines de probar: quitarCamasPruebaSIMULACRO().');
+  return log.join('\n');
+}
+
+/** Paso 1 — SIMULACRO: informa qué se borraría al retirar las camas de prueba. */
+function quitarCamasPruebaSIMULACRO() { return _mtoQuitarPrueba(false); }
+/** Paso 2 — REAL: retira las camas de prueba y TODA su historia. */
+function quitarCamasPruebaCONFIRMAR() { return _mtoQuitarPrueba(true); }
+
+function _mtoQuitarPrueba(escribir) {
+  const log = [];
+  const p = m => { log.push(m); Logger.log(m); };
+  p(escribir ? '=== RETIRO REAL DE CAMAS DE PRUEBA ===' : '=== SIMULACRO (no se borra nada) ===');
+
+  const camas = repoLeerTodos('CAMAS_ESTADO').filter(c => _esCamaPrueba(c.ID_CAMA));
+  if (!camas.length) { p('No hay camas de prueba. Nada que hacer.'); return log.join('\n'); }
+
+  // Los PATIENT_ID que nacieron en esas camas: su historia se va con ellas.
+  const pids = {};
+  camas.forEach(c => { if (c.PATIENT_ID) pids[String(c.PATIENT_ID)] = true; });
+  const idsCama = {};
+  camas.forEach(c => { idsCama[String(c.ID_CAMA)] = true; });
+  repoLeerTodos('EVOLUCIONES').forEach(e => {
+    if (idsCama[String(e.ID_CAMA)] && e.PATIENT_ID) pids[String(e.PATIENT_ID)] = true;
+  });
+
+  p('camas de prueba: ' + camas.map(c => c.ID_CAMA).join(', '));
+  p('episodios de prueba: ' + (Object.keys(pids).length || 'ninguno'));
+  p('');
+
+  // Tablas que cuelgan de la cama o del episodio. Se limpian TODAS para que
+  // las pruebas no queden sumando en indicadores, REM ni historial.
+  // OJO: repoEliminarDonde SIEMPRE borra (no tiene modo simulacro), así que
+  // en el simulacro se CUENTA con repoLeerTodos y no se le llama jamás.
+  const PORCAMA = ['EVOLUCIONES', 'EVOLUCIONES_ARCHIVO', 'PROCEDIMIENTOS', 'TIMELINE', 'REINTUBACIONES'];
+  const dePrueba = function (f) {
+    return !!(idsCama[String(f.ID_CAMA)] || pids[String(f.PATIENT_ID)]);
+  };
+  let total = 0;
+  PORCAMA.forEach(hoja => {
+    let n = 0;
+    try {
+      n = escribir ? repoEliminarDonde(hoja, dePrueba)
+                   : repoLeerTodos(hoja).filter(dePrueba).length;
+    } catch (e) { p('  ' + hoja + ': no existe o no se pudo leer (' + e.message + ')'); return; }
+    p('  ' + hoja + ': ' + n + (escribir ? ' fila(s) borradas' : ' fila(s) se borrarían'));
+    total += n;
+  });
+  try {
+    const esEp = f => !!pids[String(f.PATIENT_ID)];
+    const n = escribir ? repoEliminarDonde('ARCHIVO_PACIENTES', esEp)
+                       : repoLeerTodos('ARCHIVO_PACIENTES').filter(esEp).length;
+    p('  ARCHIVO_PACIENTES: ' + n + (escribir ? ' fila(s) borradas' : ' fila(s) se borrarían'));
+    total += n;
+  } catch (e) {}
+
+  if (escribir) {
+    const n = repoEliminarDonde('CAMAS_ESTADO', f => _esCamaPrueba(f.ID_CAMA));
+    p('  CAMAS_ESTADO: ' + n + ' cama(s) retiradas');
+    SpreadsheetApp.flush();
+    try { CacheService.getScriptCache().removeAll(['camas', 'boot']); } catch (e) {}
+    p('');
+    p('✅ Listo. ' + total + ' fila(s) de prueba borradas. Recarga con Ctrl+Shift+R.');
+  } else {
+    p('');
+    p('Total: ' + total + ' fila(s) de historia + ' + camas.length + ' cama(s).');
+    p('Si cuadra, correr quitarCamasPruebaCONFIRMAR().');
+  }
+  return log.join('\n');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  MEDICIÓN DEL ARRANQUE (ago-2026)
+//
+//  Regla aprendida en otro sistema del mismo tipo (la agenda de Colitas): la
+//  causa de la lentitud NUNCA fue la que parecía, y optimizar «lo que se ve
+//  pesado» perdió días sin arreglar nada. Antes de tocar hay que cronometrar
+//  por capas, y después hay que demostrar que acelerar no cambió ni un dato.
+//
+//  Esta función hace las dos cosas en una sola corrida desde el editor:
+//    · cronometra cada parte de GET_BOOT por separado;
+//    · corre el arranque completo CON y SIN el memo de configuración;
+//    · compara las dos respuestas y avisa si difieren en algo.
+//
+//  Orden deliberado: primero CON memo y después SIN memo. Las lecturas de una
+//  hoja quedan tibias del lado de Google, así que el segundo en correr tiene
+//  ventaja — dársela al comportamiento ANTIGUO hace que la comparación sea
+//  conservadora: si el memo igual gana, la ganancia es real.
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cronometra el arranque y compara con/sin memo. Correr desde el editor y leer
+ * el registro de ejecución. No escribe nada.
+ * @return {string} el mismo informe que deja en el log.
+ */
+function medirArranque() {
+  const fecha = hoyISO();
+  const key = fecha + '-Dia';
+  const out = [];
+  const p = function (s) { out.push(s); };
+
+  const cron = function (etiqueta, fn) {
+    const t0 = Date.now();
+    let r = null, e = '';
+    try { r = fn(); } catch (ex) { e = ex.message; }
+    const ms = Date.now() - t0;
+    p('   ' + etiqueta + ': ' + ms + ' ms' + (e ? '   ⚠ ' + e : ''));
+    return { ms: ms, r: r };
+  };
+
+  const limpiar = function () { _CFG_MEMO = null; _TZ_MEMO = null; _CAT_MEMO = {}; };
+
+  // Calentamiento: la primera lectura de la planilla en una ejecución paga el
+  // arranque en frío de Apps Script. Se descarta para no atribuírselo a nadie.
+  _MEMO_OFF = false; limpiar();
+  const cal = Date.now();
+  try { obtenerTodasLasCamas(); } catch (e) {}
+  p('Calentamiento (arranque en frío + abrir la planilla): ' + (Date.now() - cal) + ' ms');
+  p('');
+
+  // ── 1) CON memo ───────────────────────────────────────────────────────────
+  p('CON memo (esta versión):');
+  _MEMO_OFF = false; limpiar();
+  const cfg2 = cron('config de interfaz', function () { return _configUI(); });
+  const fas2 = cron('catálogo de fases', function () { return catalogo('FASE_CLINICA'); });
+  const mat2 = cron('matrices de categorización', function () { return catMatrices(); });
+  const cam2 = cron('camas', function () { return obtenerTodasLasCamas(); });
+  const evo2 = cron('evoluciones del día', function () { return obtenerEvosDelDia(fecha); });
+  limpiar();
+  const boot2 = cron('GET_BOOT completo', function () { return api('GET_BOOT', { fecha: fecha, key: key }, null); });
+
+  p('');
+
+  // ── 2) SIN memo (como estaba antes) ───────────────────────────────────────
+  p('SIN memo (comportamiento anterior):');
+  _MEMO_OFF = true; limpiar();
+  const cfg1 = cron('config de interfaz', function () { return _configUI(); });
+  const fas1 = cron('catálogo de fases', function () { return catalogo('FASE_CLINICA'); });
+  const mat1 = cron('matrices de categorización', function () { return catMatrices(); });
+  const cam1 = cron('camas', function () { return obtenerTodasLasCamas(); });
+  const evo1 = cron('evoluciones del día', function () { return obtenerEvosDelDia(fecha); });
+  limpiar();
+  const boot1 = cron('GET_BOOT completo', function () { return api('GET_BOOT', { fecha: fecha, key: key }, null); });
+  _MEMO_OFF = false; limpiar();   // dejar el servidor como estaba
+
+  // ── 3) ¿Cambió algún valor? ───────────────────────────────────────────────
+  // `ahora` es el reloj del servidor y cambia entre corridas: se excluye.
+  const norm = function (b) {
+    try {
+      const d = JSON.parse(JSON.stringify((b && b.data) || {}));
+      delete d.ahora;
+      return JSON.stringify(d);
+    } catch (e) { return 'ERROR:' + e.message; }
+  };
+  const iguales = norm(boot1.r) === norm(boot2.r);
+
+  p('');
+  p('─────────────────────────────────────────────');
+  p('GET_BOOT   sin memo: ' + boot1.ms + ' ms');
+  p('GET_BOOT   con memo: ' + boot2.ms + ' ms');
+  const dif = boot1.ms - boot2.ms;
+  p('Diferencia: ' + dif + ' ms' + (boot1.ms ? '  (' + Math.round(dif * 100 / boot1.ms) + '%)' : ''));
+  p('Solo la config: ' + cfg1.ms + ' ms → ' + cfg2.ms + ' ms');
+  p('Respuesta idéntica con y sin memo: ' + (iguales ? 'SÍ ✓' : 'NO ✗  ← REVISAR ANTES DE PUBLICAR'));
+  p('');
+  p('Referencia: camas ' + cam1.ms + '/' + cam2.ms + ' ms · evoluciones ' +
+    evo1.ms + '/' + evo2.ms + ' ms · fases ' + fas1.ms + '/' + fas2.ms +
+    ' ms · matrices ' + mat1.ms + '/' + mat2.ms + ' ms  (sin/con memo)');
+
+  const informe = out.join('\n');
+  Logger.log(informe);
+  console.log(informe);
+  return informe;
+}
+
+/**
+ * ✅ **LA FUNCIÓN A CORRER ANTES DE DEJAR PUESTA LA LECTURA POR COLUMNAS.**
+ * Comprueba, **con los datos reales de esta planilla**, que el tablero da
+ * exactamente lo mismo leyendo 21 columnas que leyendo las 386, y que ningún
+ * indicador se fue a 0 en el camino. No escribe nada.
+ *
+ * Tres comprobaciones, en este orden:
+ *  1. **Número por número.** Compara los dos tableros campo a campo y lista las
+ *     diferencias con nombre propio. Un indicador que pasa a 0 aparece aquí.
+ *  2. **Los ceros se miran uno por uno.** Un 0 puede ser verdad (no hubo
+ *     autoextubaciones este mes) o ser el síntoma. La única forma de saberlo es
+ *     que valga 0 en los DOS caminos: eso es lo que se verifica.
+ *  3. **Auditoría de campos.** Con `_COLS_AUDIT` encendido, cualquier campo que
+ *     el cálculo toque sin haberlo declarado queda registrado — incluso si hoy
+ *     llega con valor por caer dentro del bloque de un vecino. Ese es el que se
+ *     rompería mañana en silencio.
+ *
+ * @return {string} el mismo informe que deja en el log.
+ */
+function verificarTablero() {
+  const hoy = hoyISO();
+  const out = [];
+  const p = function (s) { out.push(s); };
+  let problemas = 0;
+
+  // Un mes con datos y el año completo: si el rango va vacío, la comparación
+  // sale «idéntica» sin haber probado nada.
+  const rangos = [
+    ['mes en curso', hoy.slice(0, 8) + '01', hoy],
+    ['año completo', hoy.slice(0, 4) + '-01-01', hoy],
+  ];
+
+  rangos.forEach(function (r) {
+    const etiqueta = r[0], desde = r[1], hasta = r[2];
+    p('══ ' + etiqueta + ' (' + desde + ' a ' + hasta + ') ══');
+
+    _COLS_OFF = true;
+    const entero = calcularIndicadores(desde, hasta);
+    _COLS_OFF = false;
+    _COLS_AUDIT = true; _COLS_AUDIT_HITS = {};
+    const porCol = calcularIndicadores(desde, hasta);
+    _COLS_AUDIT = false;
+
+    if (!entero.ok || !porCol.ok) {
+      problemas++;
+      p('🔴 El cálculo falló: ' + (entero.error || porCol.error));
+      return;
+    }
+    const A = entero.data, B = porCol.data;
+
+    // 1 · Número por número.
+    const claves = Object.keys(A);
+    const dif = [];
+    claves.forEach(function (k) {
+      const a = JSON.stringify(A[k]), b = JSON.stringify(B[k]);
+      if (a !== b) dif.push('   ✗ ' + k + ': entero=' + a + '  porColumnas=' + b);
+    });
+    if (dif.length) {
+      problemas += dif.length;
+      p('🔴 ' + dif.length + ' de ' + claves.length + ' indicadores NO coinciden:');
+      dif.forEach(p);
+    } else {
+      p('✓ los ' + claves.length + ' indicadores coinciden exactamente');
+    }
+
+    // 2 · Los ceros, uno por uno.
+    const ceros = claves.filter(function (k) {
+      return (B[k] === 0 || B[k] === null) && typeof A[k] !== 'object';
+    });
+    const cerosMalos = ceros.filter(function (k) { return A[k] !== B[k]; });
+    if (cerosMalos.length) {
+      problemas += cerosMalos.length;
+      p('🔴 indicadores que se fueron a 0 SOLO al leer por columnas: ' + cerosMalos.join(', '));
+    } else if (ceros.length) {
+      p('✓ ' + ceros.length + ' indicadores valen 0 o nulo, y valen lo mismo leyendo entero');
+      p('   (' + ceros.join(', ') + ')');
+    }
+
+    // 3 · Campos tocados sin declarar.
+    const sueltos = Object.keys(_COLS_AUDIT_HITS);
+    if (sueltos.length) {
+      problemas += sueltos.length;
+      p('🔴 el cálculo tocó campos que nadie declaró en _CAMPOS_INDICADORES:');
+      sueltos.slice(0, 25).forEach(function (k) { p('   ✗ ' + k + ' (' + _COLS_AUDIT_HITS[k] + ' accesos)'); });
+      if (sueltos.length > 25) p('   … y ' + (sueltos.length - 25) + ' más');
+      p('   Hoy pueden estar llegando con valor por caer al lado de otra columna,');
+      p('   pero el día que eso cambie el indicador se va a 0 sin avisar. Agrégalos.');
+      if (sueltos.length > 50) {
+        p('   ⚠ Con tantos campos de golpe, lo más probable es que alguien esté');
+        p('     recorriendo la fila entera (un JSON.stringify o un Object.keys),');
+        p('     no usando cada campo. Mirar QUIÉN serializa antes de agregar 300.');
+      }
+    } else {
+      p('✓ ningún campo tocado fuera de los declarados');
+    }
+    p('');
+  });
+
+  p('─────────────────────────────────────────────');
+  p(problemas === 0
+    ? '✅ SE PUEDE DEJAR PUESTA: mismos números, mismos ceros, ningún campo suelto.'
+    : '🔴 NO DEJARLA PUESTA (' + problemas + ' hallazgos). Mientras se arregla: _COLS_OFF = true en repo.gs.');
+
+  const informe = out.join('\n');
+  Logger.log(informe);
+  console.log(informe);
+  return informe;
+}
+
+/**
+ * Cronometra el tablero de indicadores con y sin lectura por columnas, y prueba
+ * varios techos de viajes por hoja (Ola 3, ago-2026). Correr desde el editor y
+ * leer el registro de ejecución. No escribe nada.
+ *
+ * Mide velocidad; quien dice si los números están bien es `verificarTablero()`.
+ *
+ * Por qué existe: leer 21 columnas en vez de 386 baja muchísimas celdas, pero
+ * cuesta varios `getRange` en vez de uno, y **cuál de las dos cosas pesa más
+ * no se sabe sin medirlo en esta planilla**. Aquí se mide y se elige. Si el
+ * mejor resultado es «entero», dejar `_COLS_MAX_TRAMOS` como está no sirve de
+ * nada: lo correcto es poner `_COLS_OFF = true` en repo.gs y decirlo.
+ *
+ * @return {string} el mismo informe que deja en el log.
+ */
+function medirTablero() {
+  const hoy = hoyISO();
+  const desde = hoy.slice(0, 8) + '01';
+  const hasta = hoy;
+  const out = [];
+  const p = function (s) { out.push(s); };
+
+  const filasDe = function (hoja) {
+    try {
+      const h = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(hoja);
+      return h ? Math.max(0, h.getLastRow() - FILA_DATOS[hoja] + 1) : 0;
+    } catch (e) { return -1; }
+  };
+  const fEvo = filasDe('EVOLUCIONES'), fArc = filasDe('EVOLUCIONES_ARCHIVO');
+  const celdas = (fEvo + fArc) * TOTAL_COLS.EVOLUCIONES;
+  p('Rango medido: ' + desde + ' a ' + hasta);
+  p('Tamaño: EVOLUCIONES ' + fEvo + ' filas · EVOLUCIONES_ARCHIVO ' + fArc +
+    ' filas · ' + celdas.toLocaleString('es-CL') + ' celdas leídas hoy por tablero');
+  if ((fEvo * TOTAL_COLS.EVOLUCIONES) <= 40000) {
+    p('⚠ EVOLUCIONES todavía cabe bajo el umbral: la lectura por columnas NO se');
+    p('  activa para esa hoja y los tiempos de abajo saldrán casi iguales.');
+  }
+  p('');
+
+  const cron = function (etiqueta, fn) {
+    const t0 = Date.now();
+    let r = null, e = '';
+    try { r = fn(); } catch (ex) { e = ex.message; }
+    const ms = Date.now() - t0;
+    p('   ' + etiqueta + ': ' + ms + ' ms' + (e ? '   ⚠ ' + e : ''));
+    return { ms: ms, r: r };
+  };
+  const norm = function (b) {
+    try { return JSON.stringify((b && b.data) || {}); } catch (e) { return 'ERROR:' + e.message; }
+  };
+
+  // Calentamiento: la primera lectura paga el arranque en frío de Apps Script.
+  const cal = Date.now();
+  try { calcularIndicadores(desde, hasta); } catch (e) {}
+  p('Calentamiento: ' + (Date.now() - cal) + ' ms');
+  p('');
+
+  p('Leyendo la hoja ENTERA (comportamiento anterior):');
+  _COLS_OFF = true;
+  const entero = cron('GET_INDICADORES', function () { return calcularIndicadores(desde, hasta); });
+  _COLS_OFF = false;
+
+  const resultados = [];
+  const techoOriginal = _COLS_MAX_TRAMOS;
+  [1, 3, 6, 10].forEach(function (techo) {
+    _COLS_MAX_TRAMOS = techo;
+    p('');
+    p('Por columnas, hasta ' + techo + ' lectura(s) por hoja:');
+    const r = cron('GET_INDICADORES', function () { return calcularIndicadores(desde, hasta); });
+    resultados.push({ techo: techo, ms: r.ms, igual: norm(r.r) === norm(entero.r) });
+  });
+  _COLS_MAX_TRAMOS = techoOriginal;   // dejar el servidor como estaba
+
+  const distintos = resultados.filter(function (x) { return !x.igual; });
+  let mejor = { techo: 0, ms: entero.ms };
+  resultados.forEach(function (x) { if (x.igual && x.ms < mejor.ms) mejor = x; });
+
+  p('');
+  p('─────────────────────────────────────────────');
+  p('Hoja entera: ' + entero.ms + ' ms');
+  resultados.forEach(function (x) {
+    const dif = entero.ms - x.ms;
+    p('Hasta ' + String(x.techo).padStart(2) + ' lecturas: ' + x.ms + ' ms   (' +
+      (dif >= 0 ? '−' : '+') + Math.abs(dif) + ' ms' +
+      (entero.ms ? ', ' + Math.round(Math.abs(dif) * 100 / entero.ms) + '%' : '') + ')' +
+      (x.igual ? '' : '   ✗ RESULTADO DISTINTO'));
+  });
+  p('');
+  if (distintos.length) {
+    p('🔴 ALGÚN TECHO DEVOLVIÓ NÚMEROS DISTINTOS. No publicar: eso significa que');
+    p('   _CAMPOS_INDICADORES no cubre todo lo que el cálculo usa.');
+  } else if (mejor.techo === 0) {
+    p('⚠ Ningún techo le ganó a leer la hoja entera EN ESTA PLANILLA.');
+    p('  Lo correcto es dejar _COLS_OFF = true en repo.gs y anotar la medición,');
+    p('  no dejar el código puesto «por si acaso».');
+  } else {
+    p('✔ Mejor medición: hasta ' + mejor.techo + ' lecturas por hoja (' + mejor.ms + ' ms).');
+    p('  Dejar _COLS_MAX_TRAMOS = ' + mejor.techo + ' en repo.gs.');
+  }
+  p('  (Todos los techos devolvieron los mismos números que leer la hoja entera' +
+    (distintos.length ? ' EXCEPTO los marcados' : '') + '.)');
+
+  const informe = out.join('\n');
+  Logger.log(informe);
+  console.log(informe);
+  return informe;
+}

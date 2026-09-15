@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b6b58">
+    <meta name="description" content="Prototipo seguro de RCE-KINE NEXT">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+    <title>RCE-KINE NEXT · TEST</title>
+  </head>
+  <body>
+    <div class="test-banner" role="status">
+      RCE-KINE NEXT · ENTORNO DE PRUEBAS · NO PRODUCCIÓN
+    </div>
+
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">UCI Adultos · datos sintéticos</p>
+        <h1>Tablero de camas</h1>
+      </div>
+      <div class="connection" aria-label="Estado de conexión">
+        <span class="connection__dot" aria-hidden="true"></span>
+        API desactivada
+      </div>
+    </header>
+
+    <main>
+      <section class="summary" aria-label="Resumen del tablero">
+        <article><strong id="occupied-count">0</strong><span>ocupadas</span></article>
+        <article><strong id="available-count">0</strong><span>disponibles</span></article>
+        <article><strong id="pending-count">0</strong><span>pendientes abiertos</span></article>
+      </section>
+
+      <section aria-labelledby="beds-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Simulación funcional</p>
+            <h2 id="beds-title">18 camas sintéticas</h2>
+          </div>
+          <p>Datos solo en memoria. Se pierden al recargar. Selecciona una cama para comenzar.</p>
+        </div>
+        <div id="bed-board" class="bed-grid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <dialog id="patient-dialog" aria-labelledby="dialog-title">
+      <div class="dialog-topline"></div>
+      <div class="dialog-content">
+        <button class="close-button" type="button" aria-label="Cerrar">×</button>
+        <p class="eyebrow">Vista provisional de episodio</p>
+        <h2 id="dialog-title"></h2>
+        <div id="dialog-body"></div>
+        <p class="dialog-note">Este prototipo no guarda información.</p>
+      </div>
+    </dialog>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
