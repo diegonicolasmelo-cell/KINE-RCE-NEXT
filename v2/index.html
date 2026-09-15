@@ -4915,6 +4915,42 @@ let TL_TURNO = 'all';       // 'all' | 'Dia' | 'Noche'
 let TL_VARS_SEL = new Set(); // variables seleccionadas para el gráfico (multi)
 let TL_NOMBRE= '';
 
+/* ══ ESCAPADO — UNA sola función para toda la interfaz ═══════════════════════
+   Principio NO negociable del plan maestro (§2.3): «todo valor de paciente se
+   inserta con escapeHtml() o vía nodos DOM. Cero innerHTML crudo con datos de
+   usuario». La capa `core/escape.js` del plan (§9.1) empieza acá.
+
+   🪤 DE DÓNDE SALE (medido el 15-sep-2026 al importar la base en NEXT). No
+   había ningún escapeHtml: había SEIS funciones locales llamadas `esc`, cada
+   una en su ámbito y NINGUNA igual a otra —una escapaba & < " pero no > ni ';
+   otra solo "; otra & < > pero no "; otra escapaba metacaracteres de expresión
+   regular; dos citaban campos de CSV—. Que todas se llamen igual es lo
+   peligroso: quien mueve una línea de un bloque a otro cree que está escapando
+   y puede estar citando un CSV. Las que no escapan HTML pasaron a llamarse
+   `escRe` y `escCsv`; las que sí, son alias de ésta.
+
+   Escapa los CINCO caracteres, no tres: así el mismo valor sirve en texto y en
+   un atributo, con comillas dobles o simples. Escapar de menos «casi siempre
+   funciona» y falla justo en el caso raro.
+
+   ⚠️ `escapeJs` es para el caso doble: un valor que cae dentro de una cadena
+   de JavaScript que a su vez vive en un atributo (onclick="fn('...')"). Ahí
+   escapar HTML NO basta: el navegador decodifica la entidad ANTES de leer el
+   JavaScript, así que un &#39; vuelve a ser una comilla y corta la cadena.
+   Primero se escapa para JavaScript y ese resultado se escapa para HTML.
+
+   🪤 El plan llama `h` al tag de plantilla. Acá se llama `hEsc`: `h` ya está
+   tomado como variable local en más de diez funciones (la hora del turno, un
+   acumulador de HTML) y un global con ese nombre quedaría ensombrecido sin
+   aviso — el escapado desaparecería en silencio, que es exactamente lo que
+   esta sección existe para impedir. */
+const _ESC_HTML = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => _ESC_HTML[c]);
+const escapeJs   = s => escapeHtml(String(s ?? '').replace(/[\\'"]/g, c => '\\' + c)
+                                                 .replace(/\n/g, '\\n').replace(/\r/g, '\\r'));
+/** Tag de plantilla: hEsc`<b>${nombre}</b>` escapa cada valor interpolado. */
+const hEsc = (trozos, ...vals) => trozos.reduce((acc, t, i) => acc + escapeHtml(vals[i - 1]) + t);
+
 //  HELPERS
 const $  = id => document.getElementById(id);
 const v  = id => { const e=$(id); return e ? e.value : ''; };
@@ -5961,7 +5997,7 @@ function _aftMinutosParaSalida(now, turno, cfg){
 function _aftAvisado(slot){ try{ return sessionStorage.getItem('avisoFinTurno:'+slot)==='1'; }catch(e){ return false; } }
 function _aftMarcar(slot){ try{ sessionStorage.setItem('avisoFinTurno:'+slot,'1'); }catch(e){} }
 
-const _aftEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const _aftEsc=escapeHtml;
 
 /** El panel abierto con cambios sin guardar, si lo hay. */
 function _aftPanelSucio(){
@@ -6010,8 +6046,23 @@ function _aftAltas(fecha, tk, evos, cb){
   }).catch(()=>cb([], true));
 }
 
+/* Ventana en la que los datos del arranque siguen siendo «recién traídos del
+   servidor». No es caché para decidir: es el MISMO GET_BOOT que acaba de
+   responder, así que pedir otro sería repetir el viaje. Pasada la ventana (el
+   tick de cada minuto) se vuelve a preguntar. */
+let _bootFresco = { ts:0, key:'' };
+const BOOT_FRESCO_MS = 15000;
+
 /** Una llamada fresca al servidor (GET_BOOT: camas + evoluciones del día). */
 function _aftLista(fecha, tk, cb){
+  if(_bootFresco.key===tk && (Date.now()-_bootFresco.ts)<BOOT_FRESCO_MS){
+    const base=_aftPendientesDe(DB||[], EVOS_DIA||[], tk);
+    _aftAltas(fecha, tk, EVOS_DIA||[], (altas, falloAltas)=>{
+      const vistas=new Set(base.map(x=>x.cama));
+      cb(base.concat(altas.filter(a=>!vistas.has(a.cama))), false, falloAltas);
+    });
+    return;
+  }
   api('GET_BOOT',{fecha:fecha, key:tk}).then(b=>{
     const base=_aftPendientesDe((b&&b.camas)||[], (b&&b.evos)||[], tk);
     _aftAltas(fecha, tk, (b&&b.evos)||[], (altas, falloAltas)=>{
@@ -13822,15 +13873,15 @@ function plantPopAbrir(){
     return;
   }
   const c=_plantCatalogo(), act=_plantActiva(), gana=_plantGanadora(), caso=_plantCaso();
-  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const it=(p,quien)=>`<div class="pm-it${act&&act.id===p.id?' sel':''}" onclick="plantElegir('${esc(p.id)}')">${_plantIcono(p.caso)} ${esc(p.nombre)}<span class="pm-q">${(gana&&gana.id===p.id&&!_plantConf)?'se aplicó sola':esc(quien||p.dueno)}</span></div>`;
+  const esc=escapeHtml;
+  const it=(p,quien)=>`<div class="pm-it${act&&act.id===p.id?' sel':''}" onclick="plantElegir('${escapeJs(p.id)}')">${_plantIcono(p.caso)} ${esc(p.nombre)}<span class="pm-q">${(gana&&gana.id===p.id&&!_plantConf)?'se aplicó sola':esc(quien||p.dueno)}</span></div>`;
   const grupo=(tit,l,quien)=>l.length?`<div class="pm-g">${tit}</div>`+l.map(p=>it(p,quien)).join(''):'';
   m.innerHTML = `<div class="pm-g">Situación del turno: ${esc(PLANT_CASOS[caso]||caso)}</div>`
     + grupo(`Mías (${esc(c.firma||'sin firma')})`, c.mias, 'mía')
     + grupo('De la unidad', c.unidad, 'coordinación')
     + grupo('De otros colegas', c.otros)
     + `<div class="pm-it${!act?' sel':''}" onclick="plantElegir('')">📄 Motor libre<span class="pm-q">sin plantilla</span></div>`
-    + (act?`<div class="pm-it" onclick="plantPopCerrar();plantEditar('${esc(act.id)}')">✏️ Editar la que está en uso</div>`:'')
+    + (act?`<div class="pm-it" onclick="plantPopCerrar();plantEditar('${escapeJs(act.id)}')">✏️ Editar la que está en uso</div>`:'')
     + `<div class="pm-it" onclick="plantPopCerrar();plantEditar('')">➕ Nueva plantilla<span class="pm-q">o selecciona texto y aprieta el +</span></div>`
     + `<div class="pm-it" onclick="plantPopCerrar();plantMisAbrir()">⚙️ Mis plantillas…</div>`;
   m.classList.add('on');
@@ -13866,7 +13917,7 @@ function _plantDesrellenar(lineas, modo){
   const motor=genTexto().split('\n'), tags=(window._TXB_ULT||[]).slice();
   const bloqueDe={}; Object.keys(PLANT_ALIAS).forEach(a=>PLANT_ALIAS[a].forEach(t=>{ bloqueDe[t]=a; }));
   const usados=new Set(); const fijas=[];
-  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');   // metacaracteres de RegExp, NO HTML
   const salida=lineas.map(l=>{
     const i=motor.findIndex(m=>m.trim()===l);
     const alias=i>=0?bloqueDe[tags[i]]:'';
@@ -13883,7 +13934,7 @@ function _plantDesrellenar(lineas, modo){
       .filter(x=>x.val).sort((a,b)=>b.val.length-a.val.length);
     claves.forEach(x=>{
       const pre=x.d.pre||'', post=x.d.post||'';
-      const re=new RegExp('('+(pre||'(?:^|[^\\wáéíóú])')+')'+esc(x.val)+'(?='+(post||'(?:$|[^\\wáéíóú])')+')','i');
+      const re=new RegExp('('+(pre||'(?:^|[^\\wáéíóú])')+')'+escRe(x.val)+'(?='+(post||'(?:$|[^\\wáéíóú])')+')','i');
       if(re.test(t)){ t=t.replace(re,(m,p)=>(p||'')+'{'+x.k+'}'); tocada=true; }
     });
     if(!tocada){ if(alias){ usados.add(alias); return '{'+alias+'}'; } fijas.push(l); }
@@ -13949,7 +14000,7 @@ function plantPreview(){
   const cuerpo=$('plantCuerpo').value||'';
   const malos=[]; cuerpo.replace(/\{([^{}]*)\}/g,(m,k)=>{ if(PLANT_COMODINES.indexOf(String(k).trim().toLowerCase())===-1) malos.push('{'+k+'}'); return m; });
   const fijas=cuerpo.split('\n').map(l=>l.trim()).filter(l=>l && !/\{[a-z0-9_]+\}/i.test(l) && !/^Plan:\s*$/i.test(l));
-  const av=$('plantFijas'); if(av){ av.classList.toggle('hidden', !fijas.length); av.innerHTML=fijas.length?('⚠️ Frases fijas — saldrán IGUAL en todos tus pacientes: '+fijas.map(f=>'«'+String(f).replace(/</g,'&lt;')+'»').join(' · ')+'. Si es lo que quieres, está bien; si no, cambia una palabra por un comodín del menú.'):''; }
+  const av=$('plantFijas'); if(av){ av.classList.toggle('hidden', !fijas.length); av.innerHTML=fijas.length?('⚠️ Frases fijas — saldrán IGUAL en todos tus pacientes: '+fijas.map(f=>'«'+escapeHtml(f)+'»').join(' · ')+'. Si es lo que quieres, está bien; si no, cambia una palabra por un comodín del menú.'):''; }
   if(malos.length){ pv.innerHTML=`<span style="color:var(--danger);font-weight:700;">Comodín desconocido: ${malos.map(x=>x.replace(/</g,'&lt;')).join(', ')} — elígelo del menú.</span>`; return; }
   let txt=''; try{ txt=v('cBed')?_plantRellenar(cuerpo,_plantDatos()):''; }catch(e){ txt=''; }
   pv.textContent = txt || (v('cBed') ? '(con los datos de este turno no queda ninguna frase: revisa los comodines)' : 'Abre una cama para ver la vista previa con un paciente.');
@@ -13995,8 +14046,8 @@ function plantModRetirar(){
 /* «Mis plantillas»: todo el catálogo por estante, con ✏️. */
 function plantMisAbrir(){
   const c=_plantCatalogo();
-  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const fila=p=>`<div class="pm-it" style="cursor:default;"><span>${_plantIcono(p.caso)} <b>${esc(p.nombre)}</b> <span style="color:var(--muted);font-size:.7rem;">· ${esc(PLANT_CASOS[p.caso]||p.caso)}${p.por?' · '+esc(p.por):''}</span></span><button type="button" class="fase-chip" style="margin-left:auto;" onclick="plantEditar('${esc(p.id)}')">✏️</button></div>`;
+  const esc=escapeHtml;
+  const fila=p=>`<div class="pm-it" style="cursor:default;"><span>${_plantIcono(p.caso)} <b>${esc(p.nombre)}</b> <span style="color:var(--muted);font-size:.7rem;">· ${esc(PLANT_CASOS[p.caso]||p.caso)}${p.por?' · '+esc(p.por):''}</span></span><button type="button" class="fase-chip" style="margin-left:auto;" onclick="plantEditar('${escapeJs(p.id)}')">✏️</button></div>`;
   const grupo=(t,l)=>`<div class="pm-g">${t}</div>`+(l.length?l.map(fila).join(''):'<div class="pm-it" style="color:var(--muted);cursor:default;">— ninguna todavía</div>');
   $('plantListBody').innerHTML = grupo(`Mías (${esc(c.firma||'sin firma')})`, c.mias) + grupo('De la unidad', c.unidad) + grupo('De otros colegas', c.otros)
     + `<div style="padding:10px 12px;"><button type="button" class="btn btn-p" style="width:auto;padding:8px 16px;" onclick="plantEditar('')">➕ Nueva plantilla</button></div>`;
@@ -14985,7 +15036,7 @@ function renderTabla(){
 function regCSV(){
   const fecha=v('gDate')||hoy();
   const esT=x=>x===true||x==='TRUE';
-  const esc=x=>{ const s=String(x??''); return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const escCsv=x=>{ const s=String(x??''); return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };   // comillas de CSV, NO HTML
   let csv='\ufeff'+['CAMA','PACIENTE','SEXO','EDAD','DIAS_ESTADIA','DIAS_VM','SOPORTE','DIAGNOSTICO',
     'KTR_DIA','KTM_DIA','PROCS_DIA','KINE_DIA','KTR_NOCHE','PROCS_NOCHE','KINE_NOCHE'].join(';')+'\n';
   DB.slice().sort((a,b)=>(parseInt(a.ID_CAMA)||0)-(parseInt(b.ID_CAMA)||0)).forEach(c=>{
@@ -14996,12 +15047,12 @@ function regCSV(){
     const ocu=c.OCUPADA===true||c.OCUPADA==='TRUE';
     if(!ocu&&!evoRef){ csv+=`${id};DISPONIBLE\n`; return; }
     const ktm=evoD?(esT(evoD.KTM_SUSPENDIDA)?'C':(esT(evoD.KTM_REALIZADA)?(evoD.KTM_NIVEL_KTR||''):'')):'';
-    csv+=[id,esc((evoRef&&evoRef.PAC_NOMBRE)||c.NOMBRE),((evoRef&&evoRef.PAC_SEXO)||c.SEXO)||'',((evoRef&&evoRef.PAC_EDAD)||c.EDAD)||'',
+    csv+=[id,escCsv((evoRef&&evoRef.PAC_NOMBRE)||c.NOMBRE),((evoRef&&evoRef.PAC_SEXO)||c.SEXO)||'',((evoRef&&evoRef.PAC_EDAD)||c.EDAD)||'',
       evoRef?(evoRef.DIA_ESTADIA??''):dias(c.FECHA_INGRESO,fecha),
       evoRef?((parseInt(evoRef.DIAS_VM_PREVIOS)||0)+(parseInt(evoRef.DIAS_VM)||0)):'',
-      ((evoRef&&evoRef.VENT_SOPORTE)||c.SOPORTE)||'',esc((evoRef&&evoRef.PAC_DIAGNOSTICO)||c.DIAGNOSTICO),
-      evoD?(parseInt(evoD.RESP_KTR_CANT)||0):'',ktm,esc(evoD?evoD.PROC_RESUMEN:''),evoD?(evoD.PLAN_FIRMA_KINE||''):'',
-      evoN?(parseInt(evoN.RESP_KTR_CANT)||0):'',esc(evoN?evoN.PROC_RESUMEN:''),evoN?(evoN.PLAN_FIRMA_KINE||''):''].join(';')+'\n';
+      ((evoRef&&evoRef.VENT_SOPORTE)||c.SOPORTE)||'',escCsv((evoRef&&evoRef.PAC_DIAGNOSTICO)||c.DIAGNOSTICO),
+      evoD?(parseInt(evoD.RESP_KTR_CANT)||0):'',ktm,escCsv(evoD?evoD.PROC_RESUMEN:''),evoD?(evoD.PLAN_FIRMA_KINE||''):'',
+      evoN?(parseInt(evoN.RESP_KTR_CANT)||0):'',escCsv(evoN?evoN.PROC_RESUMEN:''),evoN?(evoN.PLAN_FIRMA_KINE||''):''].join(';')+'\n';
   });
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
@@ -15127,9 +15178,9 @@ function arcCSV(){
     ['Motivo','motivo'],['Destino','destino'],['KTR totales','ktr'],['Turnos VM','turnosVM'],['Turnos KTM','turnosKTM'],
     ['Barthel ingreso','barthelIn'],['Barthel egreso','barthelEg'],['MRC egreso','mrc'],['FSS egreso','fss'],
     ['Dinamometría egreso','dinamo'],['CPAx egreso','cpax'],['DAUCI','dauci'],['Kine','firma'],['Observaciones','obs']];
-  const esc=x=>{ const s=String(x??''); return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const escCsv=x=>{ const s=String(x??''); return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };   // comillas de CSV, NO HTML
   const csv='\ufeff'+cols.map(c=>c[0]).join(';')+'\n'+
-    ARC_VIEW.map(a=>cols.map(c=>esc(a[c[1]])).join(';')).join('\n');
+    ARC_VIEW.map(a=>cols.map(c=>escCsv(a[c[1]])).join(';')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const aEl=document.createElement('a');
   aEl.href=URL.createObjectURL(blob);
@@ -16244,7 +16295,7 @@ function loadStats(){
   gs('GET_STATS',{desde,hasta}, d=>{ window._statsLoaded=true; renderStats(d||{}); },
     ()=>{ $('dashBody').innerHTML='<div class="pivot-empty">No se pudo cargar la estadística.</div>'; });
 }
-const _escSt=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const _escSt=escapeHtml;
 
 // ── Control de calidad del registro (auditoría de episodios activos) ──
 function loadAuditoria(){
@@ -17287,7 +17338,7 @@ function renderEntrega(d){
     // resultado no viajaba a la entrega (reporte de Álvaro, ago-2026): solo
     // salía nombre y fecha; el micro queda de respaldo si no hay resultado.
     const cult=f.ultimoCultivo?`${f.ultimoCultivo.nombre||'Cultivo'} ${f.ultimoCultivo.fecha}${f.ultimoCultivo.resultado?` → <b>${f.ultimoCultivo.resultado}</b>`:(f.ultimoCultivo.micro?` → <b>${f.ultimoCultivo.micro}</b>`:'')}`:'';
-    const planVal=(f.plan||'').replace(/"/g,'&quot;');
+    const planVal=escapeHtml(f.plan||'');
     // ── FICHA ANCHA EN DOS PISOS (opción C, elegida por Diego) ──
     // Piso 1: cómo está el paciente AHORA. Piso 2: qué pasó y qué sigue.
     /* La celda vacía se marca (ago-2026): en pantalla sigue mostrando su «—»
@@ -18191,7 +18242,7 @@ function imprimirHojaRHB(){
   const sum=(f,n)=>{const d=new Date(f+'T00:00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
   const ddmm=f=>f?f.slice(8,10)+'-'+f.slice(5,7):'';
   const esT=x=>x===true||x==='TRUE';
-  const esc=x=>String(x??'').replace(/"/g,'&quot;');
+  const esc=escapeHtml;
   const evoDia=f=>evos.find(e=>String(e.TURNO_KEY)===f+'-Dia')||null;
   const s5q=x=>x==='lt3'?'<3':(x==='gte3'?'≥3':(x||''));
   const dvaF=x=>{x=String(x||'');if(!x||/sin requerimientos/i.test(x))return '—';return x.replace(/^DVA\s*(dosis\s*)?/i,'');};
@@ -18244,7 +18295,7 @@ function imprimirHojaRHB(){
         const dia=d0+i;
         let val='';
         if(dia<nDias){ const e=evoDia(sum(fIng,dia)); if(e) val=fn(e); }
-        grid+=`<td title="${esc(val)}">${val??''}</td>`;
+        grid+=`<td title="${esc(val)}">${escapeHtml(val)}</td>`;
       }
       grid+='</tr>';
     });
@@ -18457,7 +18508,7 @@ const REM_CONCIL_SECS=[
 function remConciliacion(det){
   const cont=$('remConcil'); if(!cont) return;
   if(!det||!Object.keys(det).length){ hide('remConcil'); return; }
-  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc=escapeHtml;
   const _dm=f=>{ const s=String(f||'').slice(0,10); return /^\d{4}-\d{2}-\d{2}$/.test(s)?s.slice(8,10)+'-'+s.slice(5,7):(s||'—'); };
   const bloques=REM_CONCIL_SECS.map(([k,titulo,regla])=>{
     const b=det[k]; if(!b||!b.n) return '';
@@ -18578,7 +18629,13 @@ function _bootPintarCache(fecha, turno){
 window.onload = function() {
   initControls();
   initClock();
-  _aftIniciar();            // aviso de fin de turno (O4): un tick por minuto
+  // 🪤 `_aftIniciar()` ESTABA AQUÍ y hacía su propio GET_BOOT para armar la
+  // lista de camas sin evolucionar. Resultado: al abrir la app dentro de la
+  // ventana de aviso (los minutos previos al cambio de turno) salían DOS
+  // GET_BOOT idénticos con 1 ms de diferencia — el mismo viaje dos veces.
+  // Lo cazó `checks/rendimiento.js`, y solo a ciertas horas del día: a las
+  // 10:00 la guardia pasaba y a las 19:39 no. Ahora arranca DESPUÉS del boot,
+  // que ya trajo camas y evoluciones, y reusa esos datos (ver `_aftLista`).
   // El candado sigue 🔓 tras un F5 si la sesión del servidor vive (bolsillo
   // de la pestaña). Corre en paralelo al GET_BOOT: no depende de las camas.
   _coordReanudar();
@@ -18608,8 +18665,10 @@ window.onload = function() {
     _evosCache[_f0]={ts:Date.now(), evos:EVOS_DIA};
     EVO_SET=new Set(EVOS_DIA.filter(e=>String(e.TURNO_KEY)===`${_f0}-${SHIFT}`).map(e=>String(e.ID_CAMA)));
     if(window.Turnos) Turnos.init(b.asignacion);
+    _bootFresco={ ts:Date.now(), key:`${_f0}-${SHIFT}` };
     renderGrid(); loading(false); tutHolaMostrar(); serviInit();
-  }).catch(()=>{ _bootLegacy(); });
+    _aftIniciar();          // aviso de fin de turno (O4): un tick por minuto
+  }).catch(()=>{ _bootLegacy(); _aftIniciar(); });
 };
 
 //  Ruta clásica de arranque (4 viajes). Queda como red de seguridad: si el
