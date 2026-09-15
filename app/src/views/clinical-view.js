@@ -1,4 +1,4 @@
-import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS } from '../model/clinical-record.js';
+import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS, NUMERIC_MEASUREMENTS } from '../model/clinical-record.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const options = values => values.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('');
 const field = (label, name, body = '') => `<label>${label}${body || `<input name="${name}" required>`}</label>`;
@@ -6,6 +6,7 @@ const select = (label, name, values) => field(label, name, `<select name="${name
 const form = (type, title, contents, submit = 'Registrar') => `<form data-command="${type}"><h3>${title}</h3>${contents}<button class="primary" type="submit">${submit}</button></form>`;
 const stamp = value => new Date(value).toLocaleString('es-CL', { timeZone: 'America/Santiago' });
 function measurementFields(kind) {
+  if (NUMERIC_MEASUREMENTS[kind]) return field(`Resultado (${NUMERIC_MEASUREMENTS[kind].unit})`, 'value', '<input name="value" inputmode="decimal" required>');
   if (SCALE_COMPONENTS[kind]) return '<p>Registrar todos los componentes. El total se calcula al guardar.</p>' + SCALE_COMPONENTS[kind].map(({ key, label }) => select(label, `component_${key}`, ['', ...Array.from({ length: kind === 'FSS' ? 8 : 6 }, (_, i) => String(i)), ...(kind === 'FSS' ? ['NE'] : [])])).join('') + (kind === 'FSS' ? '<p>NE no equivale a cero. Con hasta dos NE se aplica el promedio según legacy 7.04; con más de dos no se calcula total.</p>' : '');
   if (kind === 'GCS') return select('Respuesta ocular', 'ocular', ['', '1', '2', '3', '4']) + select('Respuesta verbal', 'verbal', ['', '1', '2', '3', '4', '5', '1T']) + select('Respuesta motora', 'motor', ['', '1', '2', '3', '4', '5', '6']);
   const range = MEASUREMENT_RANGES[kind];
@@ -48,6 +49,7 @@ export class ClinicalView {
       if (data.bed) command.bed = Number(data.bed);
       if (command.type === 'MEASUREMENT' && data.kind === 'GCS') command.components = { ocular: data.ocular, verbal: data.verbal, motor: data.motor };
       if (command.type === 'MEASUREMENT' && SCALE_COMPONENTS[data.kind]) command.components = Object.fromEntries(SCALE_COMPONENTS[data.kind].map(({ key }) => [key, data[`component_${key}`]]));
+      if (command.type === 'MEASUREMENT' && NUMERIC_MEASUREMENTS[data.kind]) command.format = 'numeric-v1';
       if (command.type === 'EVENT') command.data = { support: data.support, result: data.result, active: data.active === 'true', detail: data.detail };
       actions.command(command);
     });

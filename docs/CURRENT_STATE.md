@@ -10,6 +10,16 @@ de trabajo se revisarán al final.
 
 ## Mediciones por componentes (avance actual)
 
+Último avance local: PIM/PEM (cmH₂O), FEM (L/s), prensión (kg) y presión
+transtraqueal (cmH₂O) con formato numeric-v1, validación numérica, signo y coma
+decimal. Prensión rechaza negativos según min=0 de legacy. No se añadieron
+umbrales de interpretación clínica. Históricos sin ese formato se conservan.
+33 pruebas aprobadas. Paquete regenerado; este último cambio todavía NO está
+cargado en Google: la implementación publicada sigue en versión 2 con escalas.
+Próxima acción: cargar el paquete, actualizar la misma implementación TEST y
+verificar una medición numérica desde la interfaz; luego continuar GSA y sesiones.
+Automatización existente actualizada a cada 3 minutos por solicitud de Diego.
+
 - MRC: 12 componentes, seis movimientos bilaterales; total derivado 0–60.
 - FSS: cinco componentes, NE conservado; hasta dos NE se imputa promedio y se
   redondea como en sumFSS de legacy 7.04. Más de dos NE: total no calculable.

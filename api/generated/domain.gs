@@ -18,12 +18,24 @@ const EVENT_LABELS = Object.freeze({
 const MEASUREMENTS = Object.freeze(['SAS', 'GCS', 'CAM-ICU', 'GSA', 'PIC', 'PPC', 'IMS', 'MRC', 'Prensión', 'FSS', 'CPAx', 'PIM', 'PEM', 'FEM', 'Ecografía', 'Deglución', 'BDT', 'Presión transtraqueal']);
 // Ranges ported from the 7.04 form and EVAL_SERIE, not new clinical cutoffs.
 const MEASUREMENT_RANGES = Object.freeze({ SAS: [1, 7], IMS: [0, 10], MRC: [0, 60], FSS: [0, 35], CPAx: [0, 50] });
+const NUMERIC_MEASUREMENTS = Object.freeze({
+  PIM: { unit: 'cmH₂O' }, PEM: { unit: 'cmH₂O' }, FEM: { unit: 'L/s' },
+  Prensión: { unit: 'kg', min: 0 }, 'Presión transtraqueal': { unit: 'cmH₂O' }
+});
 const SCALE_COMPONENTS = Object.freeze({
   MRC: ['Abducción de hombro', 'Flexión de codo', 'Extensión de muñeca', 'Flexión de cadera', 'Extensión de rodilla', 'Dorsiflexión de tobillo'].flatMap((label, i) => [{ key: `D${i + 1}`, label: `${label} derecho` }, { key: `I${i + 1}`, label: `${label} izquierdo` }]),
   FSS: ['Giro', 'Supino a sedente', 'Sedente borde cama', 'Sedente a bípedo', 'Marcha'].map((label, i) => ({ key: `item${i + 1}`, label })),
   CPAx: ['Función respiratoria', 'Tos', 'Movilidad en cama (girar)', 'Supino a sedente', 'Equilibrio sedente dinámico', 'Equilibrio bípedo', 'Sedente a bípedo', 'Transferencia cama a sillón', 'Marcha en el lugar', 'Prensión (% del predicho)'].map((label, i) => ({ key: `item${i + 1}`, label }))
 });
 function measurementValue(command) {
+  if (command.format === 'numeric-v1') {
+    const spec = NUMERIC_MEASUREMENTS[command.kind];
+    requireValue(spec, 'Medición numérica no permitida');
+    const text = String(command.value ?? '').trim().replace(',', '.');
+    requireValue(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text) && Number.isFinite(Number(text)), 'Ingresa un valor numérico válido');
+    requireValue(spec.min === undefined || Number(text) >= spec.min, `El valor mínimo es ${spec.min}`);
+    return { value: String(Number(text)), unit: spec.unit, components: null, format: 'numeric-v1' };
+  }
   if (SCALE_COMPONENTS[command.kind] && command.components) {
     const spec = SCALE_COMPONENTS[command.kind];
     const components = {};
