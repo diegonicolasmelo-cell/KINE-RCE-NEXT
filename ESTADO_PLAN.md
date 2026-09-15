@@ -110,23 +110,51 @@ institucional que sigue trabada. El spike del plan (F1) ya existe:
 
 ---
 
-### 🟡 G4 · El RUT sigue en el esquema (D9, §5)
+### 🔴 G4 · El RUT: D9 chocó con cuatro cosas que llegaron después
 
-D9 está cerrada y es explícita: «**se elimina la columna RUT** de todas las
-hojas». `COD_PACIENTE` ya existe y convive con él, así que la mitad está
-hecha; lo que falta es sacar el RUT.
+D9 está cerrada en el plan y es explícita: «**se elimina la columna RUT** de
+todas las hojas». `COD_PACIENTE` ya existe y convive con él, así que esa mitad
+está hecha.
 
-Medido: 4 menciones en `v2/esquema.gs` y **67 en `v2/index.html`**, más
-`api.gs`, `svc_camas.gs`, `svc_coordinacion.gs`, `svc_evoluciones.gs`,
-`svc_gsa.gs`, `svc_indicadores.gs`, `svc_notificaciones.gs`, `svc_rem.gs`,
-`svc_stats.gs`.
+**Pero el plan se escribió antes que las funciones que hoy usan el RUT.** Se
+midió el 15-sep-2026 y hace cuatro trabajos que hoy **nadie más hace**:
 
-⚠️ **No es un buscar-y-reemplazar.** Al menos un consumidor usa el RUT como
-llave clínica: la detección de **reingreso** del tablero (lo dice la semilla
-de `build/checks/tablero.js`). Sacarlo exige decidir con qué se reconoce que
-un paciente ya estuvo antes. Se hace por tandas, con guardia primero.
+| # | Para qué | Dónde | Qué pasa si se saca |
+|---|---|---|---|
+| 1 | Emparejar los **gases del laboratorio** con el episodio | `v2/svc_gsa.gs` | El informe del laboratorio trae RUT, no `COD_PACIENTE`. Sin él **no hay ninguna llave** y la importación de gases deja de funcionar entera. |
+| 2 | Detectar **reingresos** | `episodiosPorRut` en `svc_camas.gs`, reingresos en `svc_indicadores.gs` | El aviso al ingresar y el indicador de reingreso se quedan sin criterio. |
+| 3 | **Buscador** por RUT | `svc_camas.gs:612` | Se pierde una búsqueda que Diego pidió en ago-2026: «al que solo tenía el RUT a mano no le servía de nada». |
+| 4 | Botón que lo **copia para abrir el laboratorio** y Synapse | `v2/index.html:16658,16915` | Vuelve el tecleo a mano del RUT en cada consulta. |
 
----
+Y hay una quinta pieza: **las hojas impresas** (hoja del día, PVE, APK) llevan
+el RUT en su casilla por convención del papel.
+
+> **Esto no se decide desde acá.** D9 se cerró en julio; las cuatro funciones
+> llegaron en julio y agosto, pedidas por Diego, y el documento del plan nunca
+> se actualizó. En los hechos **D9 quedó superada**, pero eso lo tiene que
+> decir él. La pregunta concreta, en sus términos: *«hoy el RUT sirve para
+> pescar los gases del laboratorio, avisar que un paciente ya estuvo antes,
+> buscarlo y abrir el laboratorio sin teclear. ¿Lo sacamos igual —y entonces
+> hay que decidir con qué se reemplaza cada una— o lo dejamos y escribimos que
+> D9 cambió?»*
+
+**Lo que SÍ se hizo, porque no depende de esa decisión** (§10 del plan,
+minimización): que el RUT no salga en ninguna respuesta que no lo necesite.
+Se cuidaba caso por caso —25 guardias lo mencionan— pero nadie lo miraba de
+forma sistemática. La guardia nueva `build/checks/rut_minimo.js` siembra un
+RUT sintético, llama al dispatcher **acción por acción** y exige que no
+aparezca salvo en una lista corta y justificada. Resultado de la primera
+corrida: **19 respuestas limpias** y dos que sí lo llevan.
+
+Las dos son `GET_BOOT` y `GET_TODAS_CAMAS`: **el censo del arranque reparte el
+RUT de todos los pacientes a todos los navegadores**, en cada carga. Se
+revisó si era una fuga y **no lo es**: el navegador lo usa en seis lugares
+(el formulario de la ficha, los dos botones de laboratorio y las tres hojas
+impresas), y la app **nunca pide una cama suelta** — `GET_CAMA` no se llama
+desde el front, todo sale del censo. Sacarlo de ahí obliga a inventar un
+viaje por paciente en una aplicación que pasó un año quitando viajes. Queda
+anotado como decisión de diseño, no como descuido, y cualquier respuesta
+NUEVA que empiece a llevar RUT pone la batería roja.
 
 ### 🟡 G5 · La interfaz sigue siendo un solo archivo (§9)
 
@@ -161,11 +189,12 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 |---|---|---|
 | 1 | **G1** · Un solo escapado en la interfaz, con guardia que lo exija | ✅ hecho |
 | 2 | **G2** · Snapshot mensual permanente, con guardia | ✅ hecho |
-| 3 | **G4** · Sacar el RUT, por tandas y con guardia primero | en curso |
+| 3 | **G4** · Minimización medida y con guardia | ✅ hecho · sacarlo entero espera a Diego |
 | 4 | **G5** · Capa `core/` en la interfaz, pieza por pieza | pendiente |
 | 5 | Estética | pendiente |
 | — | **G3** y **G6** | esperando a Diego / informática |
 
 Lo que necesita **decisión de Diego** se le pregunta nombrando qué hace, no se
-decide por él: con qué se reconoce un reingreso sin RUT (G4), y cuándo se
-enciende el login (G3).
+decide por él: si el RUT se saca igual sabiendo que hoy pesca los gases del
+laboratorio, avisa los reingresos, sirve de búsqueda y abre el laboratorio sin
+teclear (G4); y cuándo se enciende el login (G3).
