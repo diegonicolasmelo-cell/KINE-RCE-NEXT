@@ -156,21 +156,50 @@ viaje por paciente en una aplicación que pasó un año quitando viajes. Queda
 anotado como decisión de diseño, no como descuido, y cualquier respuesta
 NUEVA que empiece a llevar RUT pone la batería roja.
 
-### 🟡 G5 · La interfaz sigue siendo un solo archivo (§9)
+### 🟡 G5 · La capa `core/` de la interfaz
 
-El plan pide `core/auth.js`, `core/bridge.js`, `core/escape.js`,
-`core/modal.js`, `core/estado.js`, y cada modal como módulo con su propio
-estado.
+El plan pide cinco piezas (§9.1). Medidas una por una:
 
-Medido: `v2/index.html` son **18.719 líneas en 3 bloques `<script>`**. No hay
-capa `core/`.
+| Pieza del plan | Estado |
+|---|---|
+| `core/bridge.js` — llamadas al servidor que devuelven Promise | ✅ **ya existía**: `api()` devuelve Promise y `gs()` la envuelve con el manejo de sesión caída |
+| `core/escape.js` — un solo escapado | ✅ hecho en G1 |
+| `core/modal.js` — foco, teclado y nombre de los diálogos | ✅ hecho, ver abajo |
+| `core/auth.js` — login GIS | construido pero apagado; es G3, depende de Diego |
+| `core/estado.js` — estado encapsulado por modal | pendiente |
 
-Dicho sin adorno: partirlo entero es el trabajo más grande y más riesgoso de
-todo el plan, y la base tiene 140 guardias que lo protegen **como está**. Se
-gana de verdad sacando primero las piezas que resuelven un problema medido
-—el escapado (G1) es la primera— y no moviendo código por moverlo.
+**`core/modal.js` · qué se midió y qué se hizo.** El plan pedía «backdrop
+único, cierre por Escape, aria-modal, focus trap, retorno de foco». De eso
+había: backdrop único ✅, Escape ✅ (con sus excepciones pensadas), aria-modal
+✅ en 15 de 20. Faltaba lo demás, y faltaba entero:
 
----
+- **Ningún modal tenía nombre.** El lector de pantalla anunciaba «diálogo» y
+  nada más: quien no ve la pantalla no sabía cuál se había abierto. Los 20
+  tienen nombre ahora.
+- **Cinco superficies bloqueantes no tenían rol de diálogo**, y son justo las
+  que hay que anunciar: la confirmación propia, el cuadro rojo de «No se
+  guardó», el aviso de fin de turno, el login y el panel de evolución.
+- **Cero trampa de foco** — ni un manejador de Tab en 18.700 líneas. Con el
+  panel abierto, tabular salía del formulario hacia los botones de la grilla
+  **tapados detrás**: se podía activar un control sin verlo.
+- **Cero retorno de foco.** Al cerrar, el foco volvía al principio del
+  documento y había que tabular la página entera para seguir.
+
+Se hizo **sin tocar ninguna función de abrir o cerrar**. Hay una veintena
+repartidas por el archivo, cada una con sus reglas (el egreso pregunta antes
+de descartar, el aviso de fin de turno es bloqueante a propósito, el historial
+cierra solo con su X). Reescribirlas sería el cambio más grande y más
+arriesgado de la interfaz a cambio de nada visible. El módulo **observa la
+clase `on`** —que todas usan, sin excepción— y aplica foco y accesibilidad
+desde afuera. Guardia `build/checks/modal_foco.js`, en navegador real: 40
+tabulaciones seguidas sin salir del modal, ida y vuelta, y el foco de regreso
+al botón que lo abrió.
+
+**Lo que queda de §9 es `core/estado.js`** y partir los modales en módulos con
+estado propio. Dicho sin adorno: es el trabajo más grande del plan, la base
+tiene 145 guardias que la protegen **como está**, y mover código por moverlo
+no arregla nada que hoy esté roto. Conviene hacerlo cuando haya un motivo
+medido —un bug que nazca de ese acoplamiento— y no antes.
 
 ### ⚪ G6 · `clasp` (§2.8, §13)
 
@@ -190,7 +219,7 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | 1 | **G1** · Un solo escapado en la interfaz, con guardia que lo exija | ✅ hecho |
 | 2 | **G2** · Snapshot mensual permanente, con guardia | ✅ hecho |
 | 3 | **G4** · Minimización medida y con guardia | ✅ hecho · sacarlo entero espera a Diego |
-| 4 | **G5** · Capa `core/` en la interfaz, pieza por pieza | pendiente |
+| 4 | **G5** · Capa `core/` en la interfaz | ✅ escape, puente y modales · queda `core/estado.js` |
 | 5 | Estética | pendiente |
 | — | **G3** y **G6** | esperando a Diego / informática |
 

@@ -4953,6 +4953,162 @@ const hEsc = (trozos, ...vals) => trozos.reduce((acc, t, i) => acc + escapeHtml(
 
 //  HELPERS
 const $  = id => document.getElementById(id);
+
+/* ══ core/modal.js — FOCO, TECLADO Y NOMBRE DE LOS MODALES ═══════════════════
+   La capa que pide el plan maestro (§9.1): «backdrop único, cierre por Escape,
+   aria-modal, focus trap, retorno de foco. TODOS los modales lo usan». Y §15:
+   «5 patrones distintos, sin escape ni foco → core/modal.js unificado,
+   accesible».
+
+   QUÉ SE MIDIÓ ANTES DE ESCRIBIRLO (15-sep-2026, sobre la base 7.04):
+     · 15 modales ya traían role="dialog" y aria-modal="true" — bien.
+     · NINGUNO tenía nombre: el lector de pantalla anuncia «diálogo» y nada
+       más, así que quien no ve la pantalla no sabe cuál se abrió.
+     · Cinco superficies bloqueantes no tenían rol de diálogo siquiera, y son
+       justo las que hay que anunciar: la confirmación propia (`ucOvl`, la que
+       reemplazó a la del navegador), el cuadro rojo de «No se
+       guardó», el aviso de fin de turno, el login y el panel de evolución.
+     · Trampa de foco: CERO (ni un manejador de Tab en 18.700 líneas). Con el
+       panel abierto, tabular sale del formulario hacia la barra del navegador
+       y hacia los botones de la grilla que están detrás — se puede activar un
+       control de la pantalla tapada sin verlo.
+     · Retorno de foco: no había. Al cerrar, el foco volvía al principio del
+       documento y había que tabular la página entera para seguir.
+
+   CÓMO SE HIZO, Y POR QUÉ ASÍ. No se tocó ni una función de abrir/cerrar: hay
+   una veintena repartidas por el archivo, cada una con sus reglas (el egreso
+   pregunta antes de descartar, el aviso de fin de turno es bloqueante a
+   propósito, el historial cierra solo con su X). Reescribirlas para pasar por
+   un `abrirModal()` sería el cambio más grande y más arriesgado de la interfaz
+   a cambio de nada visible. En vez de eso, este módulo OBSERVA la clase `on`
+   —que es lo que todas usan, sin excepción— y aplica foco y accesibilidad
+   desde afuera. Las reglas de cierre siguen donde están.
+
+   🪤 El foco inicial NO se roba. Varios modales ya llevan el cursor a su
+   primer campo. Si al abrirse el foco ya está dentro, este módulo no lo mueve:
+   pisarlo mandaría al usuario al botón de cerrar en vez de al campo donde iba
+   a escribir. Solo si el foco quedó fuera se entra al modal.
+
+   🪤 Escape no se centraliza. Ya existe un manejador con sus excepciones
+   pensadas (el aviso de fin de turno y el cuadro de «No se guardó» NO se
+   cierran de un manotazo: cerrarlos así es justo lo que hace perder la
+   evolución). Duplicarlo acá sería reabrir esa decisión por accidente. */
+const Modal = (function () {
+  /* id → nombre que anuncia el lector de pantalla. Un modal que no está en
+     esta lista no se vigila: agregarlo es una línea, y así la lista dice
+     exactamente qué superficies son diálogos y cuáles no. */
+  const REGISTRO = {
+    sp:           'Evolución del turno',
+    egMod:        'Egreso del paciente',
+    tlp:          'Historial del paciente',
+    arcMod:       'Ficha archivada',
+    ayudaMod:     'Ayuda',
+    bnMod:        'Banner de la unidad',
+    buzMod:       'Buzón de sugerencias',
+    campMod:      'Avisos de la unidad',
+    cnMod:        'Cambios de la noche',
+    docsMod:      'Documentos',
+    gsaMod:       'Gases sin emparejar',
+    plantMod:     'Editor de plantillas',
+    plantListMod: 'Mis plantillas',
+    stkMod:       'Stock de insumos',
+    vmMod:        'Ventilador',
+    vmMove:       'Mover ventilador',
+    ucOvl:        'Confirmación',
+    avErrOvl:     'Aviso de error',
+    aftOvl:       'Fin de turno: camas sin evolucionar',
+    loginOvl:     'Iniciar sesión',
+  };
+
+  const FOCUSABLES = [
+    'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])',
+  ].join(',');
+
+  const pila = [];              // ids abiertos; el último es el que manda
+  const focoPrevio = new Map(); // id → elemento que tenía el foco al abrirse
+
+  const abierto = el => !!el && (el.classList.contains('on') ||
+    (el.style && el.style.display && el.style.display !== 'none'));
+
+  function focosDe(el) {
+    return Array.prototype.filter.call(el.querySelectorAll(FOCUSABLES), function (n) {
+      // offsetParent null = oculto (display:none o un padre oculto). Un modal
+      // suele traer secciones escondidas; tabular hacia ellas es un agujero.
+      return n.offsetParent !== null || n === document.activeElement;
+    });
+  }
+
+  function alAbrir(id) {
+    const el = $(id); if (!el) return;
+    if (pila[pila.length - 1] === id) return;
+    focoPrevio.set(id, document.activeElement);
+    pila.push(id);
+    // Si el modal ya llevó el foco a su campo, no se le pisa (ver trampa arriba).
+    setTimeout(function () {
+      if (!abierto(el)) return;
+      if (el.contains(document.activeElement)) return;
+      const f = focosDe(el);
+      if (f.length) { try { f[0].focus(); } catch (e) {} }
+      else { el.setAttribute('tabindex', '-1'); try { el.focus(); } catch (e) {} }
+    }, 0);
+  }
+
+  function alCerrar(id) {
+    const i = pila.indexOf(id);
+    if (i < 0) return;
+    pila.splice(i, 1);
+    const antes = focoPrevio.get(id);
+    focoPrevio.delete(id);
+    // El foco vuelve a donde estaba, salvo que ese elemento ya no exista o se
+    // haya ido de la página: en ese caso se deja donde esté, sin saltar.
+    if (antes && antes.focus && document.contains(antes) && antes.offsetParent !== null) {
+      setTimeout(function () { try { antes.focus(); } catch (e) {} }, 0);
+    }
+  }
+
+  /* Trampa de Tab: con un modal abierto, el tabulador no sale de él. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab' || !pila.length) return;
+    const el = $(pila[pila.length - 1]); if (!el || !abierto(el)) return;
+    const f = focosDe(el); if (!f.length) return;
+    const primero = f[0], ultimo = f[f.length - 1];
+    const dentro = el.contains(document.activeElement);
+    if (!dentro) { e.preventDefault(); (e.shiftKey ? ultimo : primero).focus(); return; }
+    if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+  }, true);
+
+  /* Alta: nombre y rol donde falten, y un observador por modal. */
+  function registrar(id, nombre) {
+    const el = $(id); if (!el) return false;
+    if (!el.getAttribute('role')) el.setAttribute('role', 'dialog');
+    if (!el.getAttribute('aria-modal')) el.setAttribute('aria-modal', 'true');
+    if (!el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby')) {
+      el.setAttribute('aria-label', nombre);
+    }
+    let antes = abierto(el);
+    new MutationObserver(function () {
+      const ahora = abierto(el);
+      if (ahora === antes) return;
+      antes = ahora;
+      if (ahora) alAbrir(id); else alCerrar(id);
+    }).observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+    if (antes) alAbrir(id);
+    return true;
+  }
+
+  const vivos = Object.keys(REGISTRO).filter(function (id) { return registrar(id, REGISTRO[id]); });
+
+  return {
+    REGISTRO: REGISTRO,
+    vigilados: vivos,
+    abiertos: function () { return pila.slice(); },
+    // Para las guardias: qué modal manda el teclado en este momento.
+    activo: function () { return pila.length ? pila[pila.length - 1] : null; },
+  };
+})();
+
 const v  = id => { const e=$(id); return e ? e.value : ''; };
 const show = id => $(id)?.classList.remove('hidden');
 const hide = id => $(id)?.classList.add('hidden');
