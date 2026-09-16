@@ -35,7 +35,10 @@ const si = (l, g) => eq(l, !!g, 'true');
   const ce = (esq.match(/\n  CAMAS_ESTADO: \{ headerRows: 2, cols: \[([\s\S]*?)\n  \]\}/) || [])[1] || '';
   ['ULT_MRC_FIRMA', 'ULT_FSS_FIRMA', 'ULT_PIM_FIRMA', 'AET_ACTIVA', 'AET_NIVEL', 'UPOT_ACTIVO'].forEach(c =>
     si('CAMAS_ESTADO tiene ' + c, ce.indexOf("['" + c + "'") !== -1));
-  si('★ EVOLUCIONES sigue en 396 columnas (no se toca)', /TOTAL_COLS\.EVOLUCIONES !== 396/.test(esq));
+  // 🗂️ 396 → 397 el 16-sep-2026: entró VENT_INTERFAZ con los tres ejes del
+  // respiratorio. Esta línea sigue protegiendo lo mismo: que la rama
+  // episodio/turno no haya tocado las columnas del turno.
+  si('★ EVOLUCIONES sigue con su total declarado a mano', /TOTAL_COLS\.EVOLUCIONES !== 397/.test(esq));
   si('la entrega imprime la firma junto a la fecha', /ULT_MRC_FIRMA/.test(fs.readFileSync(path.join(V2, 'svc_entrega.gs'), 'utf8')));
 
   console.log('\n2 · Servidor (simulador con hojas en memoria)');

@@ -158,7 +158,9 @@ const path = require('path');
     // terapia ventilatoria de arriba (ese estado previo es lo que justifica el
     // procedimiento); el evento trae su propio panel «queda con».
     $('fSop').value='Oxigenoterapia/OAF'; cascadeSop();
-    $('fModo').value='CNAF'; renderParams();
+    // 🗂️ 16-sep-2026: el alto flujo es una INTERFAZ, no un modo ventilatorio.
+    if ($('fInterfaz')) $('fInterfaz').value='CNAF'; else $('fModo').value='CNAF';
+    renderParams();
     $('cIntubO').checked=true; hIntub();
     $('fIntubHora').value='14:20'; $('fIntubDet').value='shock séptico';
     $('poIntubModo').value='ACVC';

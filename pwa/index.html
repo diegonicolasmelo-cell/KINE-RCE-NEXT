@@ -3233,7 +3233,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Vía Aérea</label>
                 <select id="fVA" class="bold" onchange="cascadeVA()" style="height:38px;">
                   <option value="">-</option>
-                  <option>Natural</option><option>TOT</option><option>TQT</option><option>Full Face</option><option>Oronasal</option>
+                  <option>Natural</option><option>TOT</option><option>TQT</option>
                 </select>
               </div>
               <div id="colDiasTOT" class="hidden" style="display:none;flex-direction:column;">
@@ -3669,7 +3669,15 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--muted);">Soporte</label>
                     <select id="fSop" onchange="cascadeSop()" style="height:27px;font-size:.78rem;border:1px solid #cbd5e1;border-radius:4px;padding:0 6px;"></select>
                   </div>
-                  <div style="display:flex;align-items:center;gap:5px;">
+                  <!-- 🫁 INTERFAZ (16-sep-2026): el dispositivo, en su propio campo.
+                       Antes vivía repartido entre la vía aérea (Full Face, Oronasal)
+                       y el modo (NRC, MR, CNAF, tubo T, HME…), que no son modos
+                       ventilatorios sino dispositivos. -->
+                  <div style="display:flex;align-items:center;gap:5px;" id="wInterfaz">
+                    <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--muted);">Interfaz</label>
+                    <select id="fInterfaz" style="height:27px;font-size:.78rem;border:1px solid #cbd5e1;border-radius:4px;padding:0 6px;"></select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px;" id="wModo">
                     <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--muted);">Modo</label>
                     <select id="fModo" onchange="renderParams()" style="height:27px;font-size:.78rem;border:1px solid #cbd5e1;border-radius:4px;padding:0 6px;"></select>
                   </div>
@@ -8381,7 +8389,7 @@ function guardar() {
     EX_CULT_RESULTADO: v('fCultVal'),
     VENT_VIA_AEREA:v('fVA'), VENT_TOT_NUM:v('fTOTn'), VENT_TOT_CM:v('fTOTcm'),
     VENT_TQT_CALIBRE: bv('cTqtO') ? (v('poTqtN')||v('fTQTn')) : v('fTQTn'),
-    VENT_TQT_TIPO:    bv('cTqtO') ? (v('poTqtTipo')||v('fTQTt')) : v('fTQTt'), VENT_SOPORTE:v('fSop'), VENT_MODO:v('fModo'),
+    VENT_TQT_TIPO:    bv('cTqtO') ? (v('poTqtTipo')||v('fTQTt')) : v('fTQTt'), VENT_SOPORTE:v('fSop'), VENT_MODO:v('fModo'), VENT_INTERFAZ:v('fInterfaz'),
     VENT_H_ACTIVA:bv('cHAct'), KTM_UMA:v('r_uma')||'',
     // '' = no evaluado (parte vacío, Diego ago-2026); true/false solo si se eligió
     VENT_ADAPTADO: ($('sAdapt') && v('sAdapt')) ? (v('sAdapt')==='Sincrónico') : '',
@@ -11044,7 +11052,12 @@ function genTexto() {
   // Espejo en dominio_texto.gs — mantener en paridad.
   if($('cDVE')?.checked){ const _dalt=gv('fDVEalt');
     L.push(`Derivación ventricular externa (DVE)${_dalt?` a ${_dalt} cmH2O`:''}.`); }
-  const sop=gv('fSop')||'Ambiente', modo=gv('fModo')||'';
+  /* 🫁 Igual que en el motor del servidor (16-sep-2026): con VM o VNI el
+     relato narra el MODO; con oxigenoterapia o ambiente narra el
+     DISPOSITIVO, que ahora vive en su propio campo. Sin esto, la
+     oxigenoterapia se narraba sin decir por dónde iba el oxígeno. */
+  const sop=gv('fSop')||'Ambiente';
+  const modo=(((sop==='VM'||sop==='VNI') ? gv('fModo') : (gv('fInterfaz')||gv('fModo'))) || '');
   const vt=parseFloat(gv('r_vt'))||0, fr=parseFloat(gv('r_fr'))||0;
   const peep=parseFloat(gv('r_peep'))||0, fio2=parseFloat(gv('r_fio2'))||0;
   const spo2=parseFloat(gv('r_spo2'))||0, dVM=gv('fDiasVM')||'?', dVA=gv('fDiasVA')||'?';
@@ -11661,16 +11674,33 @@ const VMAPS={
   // hasta que se registre la vía aérea — evita que un ingreso que llega con
   // tubo pase por "Natural" y dispare la lógica de transición (intubación).
   '':         {sops:[''],                              modos:{'':['']}},
-  'Natural':  {sops:['Ambiente','Oxigenoterapia/OAF'],  modos:{'Ambiente':['Sin soporte'],'Oxigenoterapia/OAF':['NRC','MMV','MR','CNAF']}},
-  'TOT':      {sops:['VM','Oxigenoterapia/OAF'],         modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS'],'Oxigenoterapia/OAF':['HME','Tubo T','CNAF']}},
+  'Natural':  {sops:['Ambiente','Oxigenoterapia/OAF','VNI'],
+               interfaces:{'Oxigenoterapia/OAF':['NRC','MMV','MR','CNAF'],'VNI':['Full Face','Oronasal']},
+               modos:{'Ambiente':['Sin soporte'],'VNI':['S/T','AVAPS','CPAP']}},
+  'TOT':      {sops:['VM','Oxigenoterapia/OAF'],
+               interfaces:{'Oxigenoterapia/OAF':['HME','Tubo T','CNAF']},
+               /* 🫁 Con TOT NO van S/T, AVAPS, CPAP ni CFLEX: son modos de
+                  ventilación no invasiva. Diego lo dijo con la traqueostomía —
+                  «el único caso donde puede ser considerado VMI ya que está por
+                  vía aérea invasiva»—, y un tubo orotraqueal no es ese caso: el
+                  paciente intubado se ventila con los modos invasivos. */
+               modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS']}},
   // El alto flujo POR TRAQUEOSTOMÍA se llama CTAF (cánula traqueal de alto
   // flujo) — decisión de Diego, ago-2026: «así nos entendemos». Antes decía
   // «OAF/CTAF», que mezcla el término general (oxigenoterapia de alto flujo)
   // con la interfaz. Las evoluciones que guardaron «OAF/CTAF» se siguen
   // leyendo: `poblar` conserva el valor guardado aunque salga del catálogo.
-  'TQT':      {sops:['VM','Oxigenoterapia/OAF','Ambiente'], modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS','CPAP','S/T','AVAPS','CFLEX'],'Oxigenoterapia/OAF':['HME','Tubo T','CTAF','CNAF','Válvula de fonación'],'Ambiente':['Válvula de fonación','Sin soporte']}},
-  'Full Face':{sops:['VNI'],                          modos:{'VNI':['S/T','AVAPS','CPAP']}},
-  'Oronasal': {sops:['VNI'],                          modos:{'VNI':['S/T','AVAPS','CPAP']}},
+  'TQT':      {sops:['VM','Oxigenoterapia/OAF','Ambiente'],
+               interfaces:{'Oxigenoterapia/OAF':['HME','Tubo T','CTAF','CNAF','Válvula de fonación'],'Ambiente':['Válvula de fonación']},
+               modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS','CPAP','S/T','AVAPS','CFLEX'],'Ambiente':['Sin soporte']}},
+  /* 🫁 'Full Face' y 'Oronasal' SALIERON de acá el 16-sep-2026. No son vías
+     aéreas: son INTERFACES de la VNI, y Diego lo dijo con todas sus letras —
+     «full face y oronasal no son invasivo». Un paciente con VNI tiene vía
+     aérea NATURAL, soporte VNI e interfaz la máscara, así que deja de sumar
+     días de vía aérea artificial. Los días de VNI se siguen contando por el
+     SOPORTE, que no cambió.
+     Las evoluciones viejas que guardaron 'Full Face' en la vía aérea se
+     siguen leyendo: `_vaCompat()` las traduce al abrirlas. */
 };
 /* Siglas de la unidad cuyo nombre completo no es obvio a primera vista. El
    VALOR guardado sigue siendo la sigla (es lo que el equipo escribe y lee en
@@ -11868,10 +11898,30 @@ function interpPTT(){
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
 }
-function cascadeSop(preModo) {
+function cascadeSop(preModo, preInterfaz) {
   const va=v('fVA'), sop=v('fSop'); const r=VMAPS[va]||VMAPS[''];
-  const modos=(r.modos&&r.modos[sop])||['Sin soporte'];
-  poblar('fModo', modos, preModo); renderParams();
+  /* 🪤 Un soporte SIN modos propios deja el modo VACÍO, no «Sin soporte».
+     Antes el respaldo era ['Sin soporte'] porque todo soporte tenía modos: la
+     oxigenoterapia listaba los dispositivos (NRC, MR, CNAF…) ahí mismo. Desde
+     los tres ejes (16-sep-2026) el dispositivo vive en la interfaz y la
+     oxigenoterapia se quedó sin modos, así que el respaldo escribía
+     VENT_MODO='Sin soporte' en un paciente que SÍ tiene soporte. Se veía
+     bien en pantalla —los consumidores filtran ese valor— pero quedaba escrito
+     en la planilla. Lo cazó `via_aerea_previo.js` al mirar el payload. */
+  const modos=(r.modos&&r.modos[sop])||[];
+  poblar('fModo', modos, preModo);
+  /* 🫁 La INTERFAZ se puebla igual que el modo, desde el mismo mapa
+     (16-sep-2026). Cada eje ofrece lo suyo y se esconde cuando no tiene nada
+     que ofrecer: con VM invasiva no hay interfaz que elegir —la vía aérea YA
+     dice cuál es, el tubo o la cánula— y con ambiente tampoco hay modo.
+     🪤 SE PUEBLA ANTES DE renderParams. Con oxigenoterapia los parámetros los
+     decide el DISPOSITIVO, así que dibujarlos antes de poblarlo dejaba la
+     mascarilla de Venturi sin su FiO₂ — lo cazó `fio2_venturi.js`. */
+  const interfaces=(r.interfaces&&r.interfaces[sop])||[];
+  poblar('fInterfaz', interfaces, preInterfaz);
+  const wI=$('wInterfaz'); if(wI) wI.style.display = interfaces.length ? '' : 'none';
+  const wM=$('wModo');     if(wM) wM.style.display = (modos.length && modos[0]!=='Sin soporte') ? '' : 'none';
+  renderParams();
   actualizarContadores();
   _updateSinKTR();
   _gatePronoStrip();
@@ -12087,7 +12137,18 @@ function renderParams(o) {
                'pr_':{va:'',sop:'poReintubSop',modo:'poReintubModo',vaFija:'TOT'},
                'pt_':{va:'',sop:'poTqtSop',modo:'poTqtModo',vaFija:'TQT'} }[P];
   const esPost=!!POST;
-  const modo=esPost?(v(POST.modo)||''):v('fModo');
+  /* 🫁 QUÉ PARÁMETROS PEDIR (16-sep-2026, los tres ejes).
+     Con VM o VNI los decide el MODO ventilatorio (ACVC, CPAP/PS, S/T…). Con
+     oxigenoterapia o ambiente no hay modo: los decide el DISPOSITIVO (naricera,
+     CNAF, tubo T, válvula…), que desde hoy vive en su propio campo.
+     🪤 Sin esta línea, al mover los dispositivos de «modo» a «interfaz» la
+     oxigenoterapia se quedó SIN parámetros: ni litros, ni flujo, ni FiO₂. Lo
+     cazó `v42.js` con el tubo en T y la válvula de fonación.
+     Los paneles de estado posterior (pi_/pr_/pt_) siguen por modo: ahí se
+     registra con qué queda el paciente y su selector es el de siempre. */
+  const _sopAquí=esPost?(v(POST.sop)||'VM'):v('fSop');
+  const _porDispositivo = !esPost && _sopAquí !== 'VM' && _sopAquí !== 'VNI';
+  const modo=esPost?(v(POST.modo)||''):(_porDispositivo?(v('fInterfaz')||v('fModo')):v('fModo'));
   const va=esPost?(POST.vaFija||v(POST.va)||'TOT'):v('fVA');
   const sop=esPost?(v(POST.sop)||'VM'):v('fSop');
   const b=$(o.box||'paramsBox'); if(!b) return;
@@ -13169,7 +13230,33 @@ let _iniKTM=null;        // estado de la KTM al abrir (lo cambian BNM y SAS 1)
 let _vaAnterior='';      // VA previa para detectar transiciones
 let _vmHistFlag=false;   // historial de VM detectado en los datos cargados (evo previa / cama)
 let _evoEventoGuardado=false; // el turno cargado YA tiene un evento único guardado (extub/PVE/decan/intub/reintub)
-const _VA_VALIDAS=['Natural','TOT','TQT','Full Face','Oronasal'];   // opciones válidas del select fVA
+/* 🫁 DE DÓNDE SALE EL DISPOSITIVO (16-sep-2026).
+   Desde hoy vive en su propio campo. Pero las evoluciones de antes lo
+   guardaron en el MODO (NRC, MR, MMV, CNAF, tubo T, HME, CTAF, válvula) o,
+   si era VNI, en la VÍA AÉREA (Full Face, Oronasal). Nada de eso se reescribe
+   en la planilla: se traduce al leerlo.
+   Regla: manda el campo nuevo; si está vacío, se mira el viejo. */
+const _INTERFACES = ['NRC','MMV','MR','CNAF','HME','Tubo T','CTAF','OAF/CTAF',
+                     'Válvula de fonación','Full Face','Oronasal','Mascarilla'];
+function esInterfaz(x){ return _INTERFACES.indexOf(String(x||'').trim()) !== -1; }
+/** El dispositivo de una fila, venga del campo nuevo o del viejo. */
+function interfazDe(e){
+  e = e || {};
+  const nueva = String(e.VENT_INTERFAZ || e.INTERFAZ || '').trim();
+  if(nueva) return nueva;
+  const modo = String(e.VENT_MODO || e.MODO || '').trim();
+  if(esInterfaz(modo)) return modo;                     // fila vieja: iba en el modo
+  const va = String(e.VENT_VIA_AEREA || e.VIA_AEREA || '').trim();
+  if(esInterfaz(va)) return va;                         // fila vieja de VNI: iba en la vía aérea
+  return '';
+}
+/** La vía aérea de una fila, ya traducida: la máscara vieja pasa a Natural. */
+function _vaCompat(x){
+  const va = String(x || '').trim();
+  return (va === 'Full Face' || va === 'Oronasal') ? 'Natural' : va;
+}
+
+const _VA_VALIDAS=['Natural','TOT','TQT'];   // 16-sep-2026: la vía aérea son tres; la máscara es interfaz
 let _iniVA='', _iniSop='';    // estado (VA/soporte) con que ABRIÓ el turno — base del aviso de transición
 let _transAvisoOk=false;      // el kine ya vio el aviso de transición y eligió guardar igual
 let _formDirty=false;         // hay cambios sin guardar en el panel (confirmación al cerrar)
@@ -13589,7 +13676,10 @@ let _dispSnapshot=null;
    arriba queda como ESTADO PREVIO y el evento despliega su propio panel con el
    estado en que QUEDA. El soporte previo ya no se escribe a mano: se deduce. */
 function _resumenPrevio(){
-  const va=v('fVA')||'—', sop=v('fSop')||'', modo=v('fModo')||'';
+  // 🫁 El dispositivo entra al resumen igual que el modo (16-sep-2026): con
+  // oxigenoterapia lo que identifica al paciente es la naricera o el alto
+  // flujo, no un modo ventilatorio que ahí no existe.
+  const va=v('fVA')||'—', sop=v('fSop')||'', modo=v('fInterfaz')||v('fModo')||'';
   const _n=id=>{ const x=v(id); return x!==''&&x!=null?x:null; };
   const par=[_n('r_flujo')?`Flujo ${v('r_flujo')} L/min`:null, _n('r_litros')?`${v('r_litros')} Lpm`:null,
              _n('r_fio2')?`FiO₂ ${v('r_fio2')}%`:null, _n('r_fr')?`FR ${v('r_fr')} rpm`:null,
@@ -13600,9 +13690,12 @@ function _resumenPrevio(){
 /** Soporte previo normalizado para la estadística (VNI, CNAF, naricera, ambiente…) */
 function _sopPrevioAuto(){
   const sop=v('fSop'), modo=v('fModo');
+  // 🫁 Desde los tres ejes (16-sep-2026) el dispositivo vive en su campo; el
+  // modo se mira igual para las evoluciones de antes, que lo guardaron ahí.
+  const disp=v('fInterfaz')||modo;
   if(sop==='VNI') return 'VNI';
-  if(sop==='Ambiente'||modo==='Sin soporte'||!sop) return 'Ambiente';
-  if(modo==='CNAF'||modo==='OAF/CTAF') return 'CNAF';
+  if(sop==='Ambiente'||disp==='Sin soporte'||!sop) return 'Ambiente';
+  if(disp==='CNAF'||disp==='OAF/CTAF') return 'CNAF';
   if(sop==='Oxigenoterapia/OAF') return 'Naricera-NRC';
   return sop||'Ambiente';
 }
@@ -15723,7 +15816,11 @@ function renderTabla(){
       // El MODO es el que dice CUÁL oxigenoterapia (CNAF · NRC · MMV ·
       // mascarilla, y con vía aérea artificial HME o tubo en T). Se lee igual
       // que el soporte: manda la evolución del día, si no el estado de la cama.
-      const modo=(evoRef&&evoRef.VENT_MODO)||(ocu?c.MODO:'');
+      // 🫁 El DISPOSITIVO, por el puente (16-sep-2026): desde los tres ejes
+      // vive en su propio campo, y las filas viejas lo guardaron en el modo.
+      // `interfazDe` devuelve '' cuando el modo es un modo de verdad (ACVC),
+      // que es justo lo que esta columna quiere: con VM la etiqueta es «VM».
+      const modo=interfazDe(evoRef||{})||(ocu?interfazDe(c):'');
       if(q&&!(String(nombre||'').toLowerCase().includes(q)||String(diag||'').toLowerCase().includes(q))) return;
 
       const tr=tb.insertRow();

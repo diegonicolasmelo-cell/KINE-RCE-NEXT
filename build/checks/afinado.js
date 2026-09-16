@@ -117,8 +117,12 @@ const { chromium } = require('playwright-core');
     r.sinSecrNarrado = /Sin secreciones\./.test(txtSinSecr);
     _secrQty = ''; $('fSecrQty') && ($('fSecrQty').value = '');
     // ── CPAP narra su presión ──
-    $('fVA').value = 'Full Face'; cascadeVA();
+    // 🗂️ 16-sep-2026: la VNI se registra con vía aérea NATURAL, soporte VNI e
+    // interfaz la máscara. «Full Face» dejó de ser una vía aérea — no es
+    // invasiva, es el dispositivo.
+    $('fVA').value = 'Natural'; cascadeVA();
     $('fSop').value = 'VNI'; cascadeSop();
+    if ($('fInterfaz')) $('fInterfaz').value = 'Full Face';
     $('fModo').value = 'CPAP'; renderParams();
     if ($('r_peep')) $('r_peep').value = '8';
     if ($('r_fio2')) $('r_fio2').value = '40';

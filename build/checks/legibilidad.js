@@ -115,7 +115,12 @@ const si = (l, cond, detalle) => {
     }).filter(x => x.lineas >= 3);
     return { rielN: riel.length, cortadoRiel, etiquetas };
   });
-  si('el riel de secciones se pintó', panel.rielN >= 8, panel.rielN + ' secciones');
+  /* 🗂️ El umbral bajó de 8 a 6 el 16-sep-2026. No se ablandó la guardia: el
+     PASO 1 tiene menos tarjetas que el modal viejo porque las evaluaciones
+     se fueron al paso 2 y los planes al 3. Lo que esta línea comprueba es
+     que el riel SE PINTE; lo que de verdad protege esta guardia —que ningún
+     nombre quede cortado— es la línea de abajo, y no cambió. */
+  si('el riel de secciones se pintó', panel.rielN >= 6, panel.rielN + ' secciones');
   si('los ' + panel.rielN + ' nombres del riel se leen enteros', panel.cortadoRiel.length === 0,
     panel.cortadoRiel.join(' · ') + ' — o se acorta el nombre, o se ensancha el riel: no se deja cortado');
   si('ninguna etiqueta del formulario envuelve en tres líneas o más', panel.etiquetas.length === 0,

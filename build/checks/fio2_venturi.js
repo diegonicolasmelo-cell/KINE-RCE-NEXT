@@ -53,10 +53,13 @@ const CATALOGO = ['24', '26', '28', '30', '35', '40', '50'];
   // Monta el módulo ventilatorio por la ruta REAL (las mismas cascadas que
   // corre fillForm al abrir un paciente), no fabricando HTML.
   const montar = (modo, sop) => p.evaluate(([m, s]) => {
-    $('fVA').value = 'Natural'; cascadeVA(s || 'Oxigenoterapia/OAF'); cascadeSop(m);
+    // 🗂️ 16-sep-2026: MMV, NRC, CNAF… son INTERFACES, no modos. cascadeSop
+    // recibe (preModo, preInterfaz): el dispositivo va en el segundo.
+    $('fVA').value = 'Natural'; cascadeVA(s || 'Oxigenoterapia/OAF'); cascadeSop('', m);
     const el = $('r_fio2');
     return {
-      modoVigente: v('fModo'),
+      // 🗂️ El dispositivo vigente se lee de su campo desde el 16-sep-2026.
+      modoVigente: v('fInterfaz') || v('fModo'),
       hayFio2: !!el,
       tag: el ? el.tagName : '',
       opciones: el && el.tagName === 'SELECT' ? [...el.options].map(o => o.value).filter(x => x !== '') : [],
@@ -87,12 +90,12 @@ const CATALOGO = ['24', '26', '28', '30', '35', '40', '50'];
     $('cBed').value = '3'; DB = [{ ID_CAMA: '3' }];
     const opt = document.createElement('option'); opt.value = 'Klgo. Test'; opt.textContent = 'Klgo. Test';
     $('fFirma').appendChild(opt); $('fFirma').value = 'Klgo. Test';
-    $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('MMV');
+    $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('', 'MMV');   // 🗂️ 16-sep-2026: MMV es interfaz, no modo
     set('r_fio2', '28'); set('r_fr', '22'); set('r_spo2', '95');
     _transAvisoOk = true; window._ll.length = 0; guardar();
     await new Promise(r => setTimeout(r, 80));
     const call = _ll.find(x => x.a === 'GUARDAR_EVOLUCION');
-    return { fio2: call ? call.d.VENT_FIO2 : null, modo: call ? call.d.VENT_MODO : null,
+    return { fio2: call ? call.d.VENT_FIO2 : null, modo: call ? (call.d.VENT_INTERFAZ || call.d.VENT_MODO) : null,
              litros: call ? call.d.VENT_LITROS : null };
   });
   eq('la FiO₂ elegida viaja al guardado', G.fio2, '28');
@@ -104,7 +107,7 @@ const CATALOGO = ['24', '26', '28', '30', '35', '40', '50'];
   const VIEJO = await p.evaluate(async () => {
     // Reapertura de una evolución guardada ANTES de este cambio: la FiO₂ se
     // escribía libre. Misma secuencia que fillForm: cascadas y después valores.
-    $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('MMV');
+    $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('', 'MMV');   // 🗂️ 16-sep-2026: MMV es interfaz, no modo
     if (typeof _fillParamsVent === 'function') _fillParamsVent({ VENT_FIO2: 33, VENT_FR: 20, VENT_SPO2: 93 });
     const el = $('r_fio2');
     const op = el && el.options ? [...el.options].find(o => o.value === '33') : null;

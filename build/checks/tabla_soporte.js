@@ -68,7 +68,9 @@ const path = require('path');
              vm: de('En Vm'), sinEvo: de('Sin Evolucion'), sopCnaf: de('Soporte Cnaf'),
              hist: de('Historico Mascarilla'),
              // El renombre de ago-2026: el catálogo ofrece MR, no «Mascarilla»
-             catalogo: VMAPS['Natural'].modos['Oxigenoterapia/OAF'].join(','),
+             // 🗂️ 16-sep-2026: los dispositivos de oxigenoterapia dejaron de ser
+             // «modos» y pasaron a ser INTERFACES, con su propio campo.
+             catalogo: VMAPS['Natural'].interfaces['Oxigenoterapia/OAF'].join(','),
              etiqueta: _MODO_ETIQ['MR'] || '', largo: _MODO_LARGO['MR'] || '' };
   });
 

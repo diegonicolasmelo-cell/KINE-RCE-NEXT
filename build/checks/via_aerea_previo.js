@@ -149,13 +149,16 @@ const { chromium } = require('playwright-core');
     // Paciente en oxigenoterapia (estado PREVIO)
     $('fVA').value = 'Natural'; cascadeVA();
     $('fSop').value = 'Oxigenoterapia/OAF'; cascadeSop();
-    $('fModo').value = 'NRC'; renderParams();
+    // 🗂️ 16-sep-2026: la naricera es una INTERFAZ, no un modo.
+    if ($('fInterfaz')) $('fInterfaz').value = 'NRC';
+    renderParams();
     $('r_litros').value = '5'; $('r_fr').value = '35'; $('r_spo2').value = '88';
     updateVAUI();
     const r = { seccionVisible: !$('dIntubSec').classList.contains('hidden') };
     $('cIntubO').click();
     // ── lo de arriba NO se toca ──
-    r.previoIntacto = { va: v('fVA'), sop: v('fSop'), modo: v('fModo'), fr: v('r_fr'), spo2: v('r_spo2') };
+    // 🗂️ El dispositivo previo se lee de su campo desde el 16-sep-2026.
+    r.previoIntacto = { va: v('fVA'), sop: v('fSop'), modo: v('fInterfaz') || v('fModo'), fr: v('r_fr'), spo2: v('r_spo2') };
     r.resumenPrevio = $('lblIntubPrevio').textContent;
     r.sopPrevioAuto = v('fIntubSopPrevio');
     // ── el panel posterior existe y trae los modos de la vía aérea elegida ──
@@ -224,7 +227,8 @@ const { chromium } = require('playwright-core');
     $('fFirma').appendChild(opt); $('fFirma').value = 'DMV';
     $('fVA').value = 'Natural'; cascadeVA();
     $('fSop').value = 'Oxigenoterapia/OAF'; cascadeSop();
-    $('fModo').value = 'CNAF'; renderParams();
+    // 🗂️ 16-sep-2026: el CNAF es una INTERFAZ, no un modo ventilatorio.
+    $('fInterfaz').value = 'CNAF'; renderParams();
     $('r_flujo').value = '50'; $('r_fio2').value = '80'; $('r_spo2').value = '89';
     updateVAUI();
     $('cIntubO').click();
@@ -238,7 +242,15 @@ const { chromium } = require('playwright-core');
     return c ? c.d : null;
   });
   eq('payload · el turno guarda el PREVIO en VENT_*',
-     P && P.VENT_VIA_AEREA === 'Natural' && P.VENT_SOPORTE === 'Oxigenoterapia/OAF' && P.VENT_MODO === 'CNAF', true);
+     P && P.VENT_VIA_AEREA === 'Natural' && P.VENT_SOPORTE === 'Oxigenoterapia/OAF' &&
+     P.VENT_INTERFAZ === 'CNAF', true);
+  /* 🗂️ 16-sep-2026 · EL MODO QUEDA VACÍO, NO «Sin soporte». La oxigenoterapia
+     se quedó sin modos propios al mudar el dispositivo a su campo, y el
+     respaldo de `cascadeSop` escribía el modo del aire ambiente en un paciente
+     que sí tiene soporte. En pantalla no se notaba (todos los consumidores
+     filtran ese valor) pero viajaba a la planilla. */
+  eq('payload · ★ y el modo va VACÍO: la oxigenoterapia no tiene modo ventilatorio',
+     P && (P.VENT_MODO || ''), '');
   eq('payload · el estado FINAL es el posterior a la intubación',
      P && P.VENT_VIA_AEREA_FINAL === 'TOT' && P.VENT_SOPORTE_FINAL === 'VM' && P.VENT_MODO_FINAL === 'ACVC', true);
   eq('payload · el soporte previo viaja deducido (CNAF)', P && P.INTUB_SOP_PREVIO, 'CNAF');
@@ -281,7 +293,8 @@ const { chromium } = require('playwright-core');
     // paciente extubado (VA no invasiva) con historial de VM → reintubación standalone
     $('fVA').value = 'Natural'; cascadeVA();
     $('fSop').value = 'Oxigenoterapia/OAF'; cascadeSop();
-    $('fModo').value = 'CNAF'; renderParams();
+    // 🗂️ 16-sep-2026: el CNAF es una INTERFAZ, no un modo ventilatorio.
+    $('fInterfaz').value = 'CNAF'; renderParams();
     $('r_flujo').value = '50'; $('r_fio2').value = '70'; $('r_spo2').value = '86';
     updateVAUI();
     r.panelViejo = !!$('fReintubTotT');   // los campos de texto libre ya no existen
@@ -293,7 +306,7 @@ const { chromium } = require('playwright-core');
     r.panelEnRama = $('dReintubQueda').closest('#dReintubDetT') !== null;
     r.visible = !$('dReintubQueda').classList.contains('hidden');
     r.modulo = ['pr_vt','pr_fr','pr_peep','pr_ppl','pr_autopeep','pr_fio2','pr_spo2'].every(id => !!$(id));
-    r.previoIntacto = { sop: v('fSop'), modo: v('fModo'), flujo: v('r_flujo'), spo2: v('r_spo2') };
+    r.previoIntacto = { sop: v('fSop'), modo: v('fInterfaz') || v('fModo'), flujo: v('r_flujo'), spo2: v('r_spo2') };
     $('poReintubTotN').value = '7.5'; $('poReintubTotCm').value = '21';
     $('poReintubModo').value = 'ACVC'; renderParams({P:'pr_',L:'prl_',box:'paramsBoxReintub'});
     $('pr_vt').value = '400'; $('pr_fr').value = '20'; $('pr_peep').value = '10'; $('pr_fio2').value = '80';

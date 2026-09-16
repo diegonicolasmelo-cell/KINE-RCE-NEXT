@@ -103,7 +103,13 @@ function ingresarPaciente(datos, ctx) {
       const sop    = datos.soporte || 'Ambiente';
 
       const esTOT = via === 'TOT', esTQT = via === 'TQT';
-      const tieneVA = esTOT || esTQT || via === 'Full Face' || via === 'Oronasal';
+      // 🫁 «Full face y oronasal no son invasivo» (Diego, 16-sep-2026). Una
+      // máscara de VNI NO es vía aérea artificial, así que no suma días de
+      // vía aérea. Lo que ese paciente suma son días de VNI, y esos se
+      // cuentan por el SOPORTE (`tieneVM` de abajo ya incluye 'VNI'), no por
+      // acá. Desde el mismo día la máscara dejó de ser vía aérea: es una
+      // interfaz, con su propio campo.
+      const tieneVA = esTOT || esTQT;
       const tieneVM = sop === 'VM' || sop === 'VNI';
 
       const patientId = Utilities.getUuid();
@@ -474,6 +480,8 @@ function _limpiarCamaInterno(idCama) {
     // Los pendientes son del episodio: se van con el paciente. Si quedaran,
     // el siguiente que ocupe la cama heredaría encargos de otra persona.
     PENDIENTES_JSON: '',
+    // La interfaz es del episodio: se va con el paciente.
+    INTERFAZ: '',
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }

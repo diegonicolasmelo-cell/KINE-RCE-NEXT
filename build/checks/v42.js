@@ -188,8 +188,9 @@ const { chromium } = require('playwright-core');
   const M = await p.evaluate(() => {
     const r = {};
     r.sopsTQT = VMAPS['TQT'].sops.join('|');
-    r.modosO2 = VMAPS['TQT'].modos['Oxigenoterapia/OAF'].join('|');
-    r.modosAmb = (VMAPS['TQT'].modos['Ambiente'] || []).join('|');
+    // 🗂️ 16-sep-2026: los dispositivos de O2 son INTERFACES, no modos.
+    r.modosO2 = (VMAPS['TQT'].interfaces['Oxigenoterapia/OAF'] || []).join('|');
+    r.modosAmb = (VMAPS['TQT'].interfaces['Ambiente'] || []).join('|');
     $('kf').reset(); $('cBed').value = '3';
     $('fVA').value = 'TQT'; cascadeVA();
     $('fSop').value = 'Oxigenoterapia/OAF'; cascadeSop();

@@ -39,13 +39,28 @@ const sops = va => {
   eq('  ' + va + ' ofrece ' + debe, sops(va).includes(debe), true);
   eq('  ' + va + ' NO ofrece ' + noDebe, sops(va).includes(noDebe), false);
 });
-[['Full Face', 'VNI', 'VM'], ['Oronasal', 'VNI', 'VM']].forEach(([va, debe, noDebe]) => {
+// 🗂️ 16-sep-2026 · LOS TRES EJES. La VNI ya no se elige poniendo la máscara
+// en la vía aérea: «full face y oronasal no son invasivo» (Diego). Ahora es
+// vía aérea NATURAL + soporte VNI + interfaz la máscara. Lo que esta guardia
+// protege no cambió —que VM y VNI no se mezclen— pero se mide donde ahora
+// vive: con vía natural se ofrece VNI y NO se ofrece VM.
+[['Natural', 'VNI', 'VM']].forEach(([va, debe, noDebe]) => {
   eq('  ' + va + ' ofrece ' + debe, sops(va).includes(debe), true);
   eq('  ★ ' + va + ' NO ofrece ' + noDebe, sops(va).includes(noDebe), false);
 });
-// Y una vía aérea natural no ofrece ninguno de los dos.
-eq('  Natural no ofrece VM ni VNI',
-  sops('Natural').includes('VM') || sops('Natural').includes('VNI'), false);
+/* 🗂️ 16-sep-2026 · LA REGLA CAMBIÓ DE FORMA, NO DE FONDO. Antes «Natural» no
+   ofrecía ninguno de los dos porque la VNI se elegía poniendo la máscara en la
+   vía aérea. Desde los tres ejes, la VNI se registra con vía aérea NATURAL —
+   «full face y oronasal no son invasivo» (Diego)—, así que Natural SÍ ofrece
+   VNI. Lo que sigue prohibido, y es lo que esta guardia existe para cuidar, es
+   que una vía aérea natural ofrezca VM: la ventilación invasiva necesita una
+   vía artificial. La única excepción son los modos de aspecto no invasivo
+   (S/T, AVAPS, CFLEX) POR TRAQUEOSTOMÍA, que van dentro de VM porque pasan por
+   una vía invasiva — y eso se cuida más abajo. */
+eq('  ★★ Natural NO ofrece VM: la invasiva necesita vía artificial',
+  sops('Natural').includes('VM'), false);
+eq('  ★★ …pero SÍ ofrece VNI, que no es invasiva',
+  sops('Natural').includes('VNI'), true);
 
 /* ══ 2 · LOS CONTADORES SON DOS, SEPARADOS ══════════════════════════════ */
 console.log('\n2 · Días de VM y días de VNI se cuentan por separado');

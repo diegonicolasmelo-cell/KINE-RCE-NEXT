@@ -25,11 +25,29 @@ const si = (l, c) => eq(l, !!c, true);
 const lee = f => fs.readFileSync(path.join(v2, f), 'utf8');
 
 /* ══ 1 · ESQUEMA ═══════════════════════════════════════════════════════ */
-console.log('1 · Las dos columnas van AL FINAL de EVOLUCIONES');
+console.log('1 · Las dos columnas se agregaron AL FINAL de EVOLUCIONES');
 const esq = lee('esquema.gs');
-si('PVE_SUP_SIN_EXT y PVE_SUP_SIN_EXT_RAZ existen, después de ANOTACIONES_JSON',
-  /\['ANOTACIONES_JSON','json'\],[\s\S]{0,400}?\['PVE_SUP_SIN_EXT','bool'\],\['PVE_SUP_SIN_EXT_RAZ','texto'\]\n\]/.test(esq));
-si('testEsquema exige 396 columnas', /TOTAL_COLS\.EVOLUCIONES !== 396/.test(esq));
+/* 🗂️ 16-sep-2026 · SE MIDE EL ORDEN, NO EL FINAL LITERAL. Antes esta línea
+   exigía que PVE_SUP_SIN_EXT_RAZ fuera la ÚLTIMA (el regex terminaba en «]»
+   del cierre de la lista), y se puso roja el día que entró VENT_INTERFAZ
+   detrás suyo. Lo que la convención del esquema pide no es ser la última para
+   siempre —eso lo rompe cualquier columna futura— sino haber entrado DESPUÉS
+   de las que ya existían, para no desplazar los índices de lo ya escrito en la
+   planilla. Eso es lo que se mide ahora, y sigue siendo rojo si alguien las
+   mueve al medio. */
+const COLS_EVO = (() => {
+  const m = /_COLS_EVOLUCIONES\s*=\s*\[([\s\S]*?)\n\];/.exec(esq);
+  return m ? Array.from(m[1].matchAll(/\['([A-Z_0-9]+)'/g)).map(x => x[1]) : [];
+})();
+const iCol = n => COLS_EVO.indexOf(n);
+si('PVE_SUP_SIN_EXT y PVE_SUP_SIN_EXT_RAZ existen',
+  iCol('PVE_SUP_SIN_EXT') >= 0 && iCol('PVE_SUP_SIN_EXT_RAZ') >= 0);
+si('…van juntas y en ese orden',
+  iCol('PVE_SUP_SIN_EXT_RAZ') === iCol('PVE_SUP_SIN_EXT') + 1);
+si('★ …y entraron DESPUÉS de ANOTACIONES_JSON, no al medio',
+  iCol('PVE_SUP_SIN_EXT') > iCol('ANOTACIONES_JSON'));
+// 🗂️ 397 desde el 16-sep-2026: entró VENT_INTERFAZ (los tres ejes).
+si('testEsquema exige el total al día', /TOTAL_COLS\.EVOLUCIONES !== 397/.test(esq));
 
 /* ══ 2 · SERVIDOR: texto, validación, estadística, entrega ══════════════ */
 console.log('\n2 · Servidor');

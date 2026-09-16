@@ -94,7 +94,7 @@ const bloquesAlias = [...alias.matchAll(/'([a-zA-Z]+)'/g)].map(m => m[1]);
 const bloquesMotor = new Set([...idx.matchAll(/_B\('([a-zA-Z]+)'\)/g)].map(m => m[1]));
 const huerfanos = bloquesAlias.filter(b => !bloquesMotor.has(b));
 eq('cada comodín apunta a bloques que el motor SÍ etiqueta', huerfanos.join(',') || 'ninguno huérfano', 'ninguno huérfano');
-si('el esquema trae la hoja PLANTILLAS_EVOLUCION y EVOLUCIONES no cambió por esto', /PLANTILLAS_EVOLUCION: \{ headerRows: 1/.test(lee('esquema.gs')) && /TOTAL_COLS\.EVOLUCIONES !== 396/.test(lee('esquema.gs')));
+si('el esquema trae la hoja PLANTILLAS_EVOLUCION y EVOLUCIONES no cambió por esto', /PLANTILLAS_EVOLUCION: \{ headerRows: 1/.test(lee('esquema.gs')) && /TOTAL_COLS\.EVOLUCIONES !== 397/.test(lee('esquema.gs')));   // 🗂️ 397 desde el 16-sep-2026: VENT_INTERFAZ
 si('el reset la CONSERVA (es configuración de la unidad)', /_RESET_CONSERVAR = \[[^\]]*'PLANTILLAS_EVOLUCION'/.test(lee('mantenimiento.gs')));
 si('el dispatcher: GET_PLANTILLAS, PLANTILLA_GUARDAR y PLANTILLA_RETIRAR auditados; GET_BOOT lleva el catálogo',
   /case 'GET_PLANTILLAS'/.test(lee('api.gs')) && /case 'PLANTILLA_GUARDAR':\s*return _auditar/.test(lee('api.gs')) && /case 'PLANTILLA_RETIRAR':\s*return _auditar/.test(lee('api.gs')) && /plantillas: \(typeof plantillasListar/.test(lee('api.gs')));

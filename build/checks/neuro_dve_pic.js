@@ -173,8 +173,9 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
   si('van al FINAL de la lista (insertarlas al medio desalinea la hoja)', iNeu > iSed && iSed !== -1);
   // v5.97 sumó ANOTACIONES_JSON ⇒ 394; la tanda 2a (PVE superada sin
   // extubar) sumó 2 ⇒ 396. Esta guardia acompaña al total.
-  si('el total escrito a mano de testEsquema subió a 396',
-    /TOTAL_COLS\.EVOLUCIONES !== 396/.test(esq));
+  // 🗂️ 397 desde el 16-sep-2026 (VENT_INTERFAZ).
+  si('el total escrito a mano de testEsquema acompaña a las columnas',
+    /TOTAL_COLS\.EVOLUCIONES !== 397/.test(esq));
 
   eq('sin errores JS', errs.join(' | '), '');
   await b.close();

@@ -408,6 +408,28 @@ function _reintubEquipoTxt(d) {
   return t;
 }
 
+/* 🫁 DE DÓNDE SALE EL DISPOSITIVO (16-sep-2026, los tres ejes del
+   respiratorio). Desde hoy la interfaz tiene su propio campo. Las evoluciones
+   de antes la guardaron en el MODO (NRC, MR, MMV, CNAF, tubo T, HME, CTAF,
+   válvula de fonación) o, si era VNI, en la VÍA AÉREA (Full Face, Oronasal).
+   Nada se reescribe en la planilla: el relato lo traduce al leerlo, así que
+   una evolución de agosto se sigue narrando igual que siempre.
+   🪤 Va en dominio_texto y no en un infra_ porque el motor de texto se evalúa
+   solo en varias guardias, sin cargar el resto del servidor. */
+var _TXT_INTERFACES = ['NRC', 'MMV', 'MR', 'CNAF', 'HME', 'Tubo T', 'CTAF', 'OAF/CTAF',
+                       'Válvula de fonación', 'Full Face', 'Oronasal', 'Mascarilla'];
+function txtEsInterfaz(x) { return _TXT_INTERFACES.indexOf(String(x || '').trim()) !== -1; }
+function txtInterfazDe(d) {
+  d = d || {};
+  var nueva = String(d.VENT_INTERFAZ || '').trim();
+  if (nueva) return nueva;
+  var modo = String(d.VENT_MODO || '').trim();
+  if (txtEsInterfaz(modo)) return modo;
+  var va = String(d.VENT_VIA_AEREA || '').trim();
+  if (txtEsInterfaz(va)) return va;
+  return '';
+}
+
 function generarTextoEvolucion(d) {
   const v  = k => (d[k] !== undefined && d[k] !== null && d[k] !== '') ? String(d[k]) : null;
   const vn = k => parseFloat(d[k]) || 0;
@@ -546,7 +568,11 @@ function generarTextoEvolucion(d) {
 
   // 6. Parámetros ventilatorios
   const sop = v('VENT_SOPORTE') || 'Ambiente';
-  const modo = v('VENT_MODO') || '';
+  /* 🫁 Con VM o VNI el relato narra el MODO ventilatorio; con oxigenoterapia o
+     ambiente narra el DISPOSITIVO, que desde el 16-sep-2026 vive en su propio
+     campo y en las filas viejas venía en el modo. `txtInterfazDe` resuelve las
+     dos formas, así que una evolución de agosto se narra igual que siempre. */
+  const modo = ((sop === 'VM' || sop === 'VNI') ? v('VENT_MODO') : (txtInterfazDe(d) || v('VENT_MODO'))) || '';
   const diasSop = v('DIAS_VM');
   const vt = vn('VENT_VT'), fr = vn('VENT_FR'), peep = vn('VENT_PEEP');
   const pmax = vn('VENT_PMAX'), fio2 = vn('VENT_FIO2'), spo2 = vn('VENT_SPO2');

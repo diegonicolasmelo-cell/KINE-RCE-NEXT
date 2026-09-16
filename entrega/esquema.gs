@@ -19,7 +19,7 @@
 // reinterprete fechas ISO, RUT/códigos, IDs o JSON como número/fecha).
 const _TIPOS_TEXTO = ['texto', 'fecha', 'ts', 'uuid', 'email', 'json'];
 
-// ── Columnas de EVOLUCIONES (396). Se reutilizan en EVOLUCIONES_ARCHIVO. ──
+// ── Columnas de EVOLUCIONES (397). Se reutilizan en EVOLUCIONES_ARCHIVO. ──
 const _COLS_EVOLUCIONES = [
   // A. Metadatos e identidad
   ['ID_EVOLUCION','texto'],['ID_CAMA','texto'],['PATIENT_ID','uuid'],['COD_PACIENTE','texto'],
@@ -290,7 +290,19 @@ const _COLS_EVOLUCIONES = [
   ['ANOTACIONES_JSON','json'],
   // PVE superada SIN extubación (tanda 2a, sep-2026, PRD_PVE_SUPERADA_SIN_EXTUBAR):
   // la prueba se superó y el paciente igual quedó en VM, con su razón. — AL FINAL
-  ['PVE_SUP_SIN_EXT','bool'],['PVE_SUP_SIN_EXT_RAZ','texto']
+  ['PVE_SUP_SIN_EXT','bool'],['PVE_SUP_SIN_EXT_RAZ','texto'],
+  // 🫁 LA INTERFAZ, en su propio campo (16-sep-2026, decisión de Diego). — AL FINAL
+  // Hasta aquí el dispositivo vivía en DOS campos según el caso: en la vía
+  // aérea si era invasiva o VNI (TOT, TQT, Full Face, Oronasal), y en el MODO
+  // si era oxigenoterapia (NRC, MR, CNAF, tubo T, HME, CTAF…). Ninguno de esos
+  // «modos» es un modo ventilatorio: son dispositivos.
+  // Con este campo, la vía aérea queda en Natural/TOT/TQT, el modo queda solo
+  // con modos de verdad, y el paciente con tubo en T se registra sin campo
+  // extra: vía aérea TOT + soporte oxigenoterapia + interfaz tubo T.
+  // 🪤 Va aquí y no junto a los otros VENT_: se agregó DESPUÉS del congelamiento,
+  // y meterla al medio desplaza los índices de todo lo ya escrito en la planilla.
+  // Lo cazó guardado_viajes.js, que compara fila a fila contra el árbol congelado.
+  ['VENT_INTERFAZ','texto']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -388,6 +400,9 @@ const ESQUEMA = {
     // 🔑 Cualquiera cierra (decisión de Diego): `ci` guarda quién lo hizo,
     // no se exige que sea quien lo abrió.  — SIEMPRE AL FINAL
     ['PENDIENTES_JSON','json'],
+    // 🫁 La interfaz vigente (16-sep-2026), hermana de VIA_AEREA y SOPORTE:
+    // la cama dice con qué dispositivo está el paciente ahora.  — AL FINAL
+    ['INTERFAZ','texto'],
   ]},
   EVOLUCIONES:         { headerRows: 3, cols: _COLS_EVOLUCIONES },
   EVOLUCIONES_ARCHIVO: { headerRows: 3, cols: _COLS_EVOLUCIONES },
@@ -591,7 +606,7 @@ const ESQUEMA = {
 // ── Derivados (generados una sola vez desde ESQUEMA) ───────
 const SH = {};          // SH.EVOLUCIONES → 'EVOLUCIONES'
 const COL = {};         // COL.EVOLUCIONES.FECHA → 6
-const TOTAL_COLS = {};  // TOTAL_COLS.EVOLUCIONES → 396
+const TOTAL_COLS = {};  // TOTAL_COLS.EVOLUCIONES → 397
 const FILA_DATOS = {};  // FILA_DATOS.EVOLUCIONES → 4
 (function _derivar() {
   Object.keys(ESQUEMA).forEach(hoja => {
@@ -1010,12 +1025,12 @@ function testEsquema() {
     if (TOTAL_COLS[hoja] !== nombres.length) errs.push(hoja + ': TOTAL_COLS inconsistente');
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
-  // y HAY QUE SUBIRLO al agregar una (396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
+  // y HAY QUE SUBIRLO al agregar una (397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
   // y NEURO_PIC_CAPTOR, ago-2026; antes 390 = 387 + SED_SAS_META, SED_VIGIL y
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 396) errs.push("EVOLUCIONES != 396 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 397) errs.push("EVOLUCIONES != 397 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

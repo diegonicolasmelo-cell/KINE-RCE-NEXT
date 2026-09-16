@@ -774,3 +774,81 @@ roja y lo cazó. La regla quedó acotada a los dos eventos que sí dejan al
 paciente en natural.
 
 **Batería: 162 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · Respiratorio (2 de 2) · los tres ejes: vía aérea · soporte · interfaz
+
+Diego lo resolvió en una frase: «lo más lógico es que vía aérea y soporte sean
+aparte y la interfaz aparezca», y lo cerró con «VNI. Full face y oronasal no son
+invasivo».
+
+### El problema: el dispositivo vivía en dos campos prestados
+
+Hasta acá la mascarilla, la naricera y el tubo en T se guardaban **donde
+cupieran**:
+
+- en la **vía aérea** si el sistema las consideraba invasivas o VNI
+  (`TOT`, `TQT`, `Full Face`, `Oronasal`);
+- en el **modo** si eran oxigenoterapia (`NRC`, `MR`, `CNAF`, `Tubo T`, `HME`,
+  `CTAF`, `Válvula de fonación`).
+
+Ninguno de esos «modos» es un modo ventilatorio: son dispositivos. Y una Full
+Face no es una vía aérea: es la interfaz de una VNI, que va por **vía aérea
+natural**. Guardarla como vía aérea le sumaba al paciente días de vía aérea
+artificial que no tenía.
+
+### Lo que quedó
+
+Tres ejes independientes:
+
+| eje | valores |
+|---|---|
+| **vía aérea** | Natural · TOT · TQT |
+| **soporte** | Ambiente · Oxigenoterapia/OAF · VNI · VM |
+| **interfaz** | la que ofrezca ese soporte en esa vía aérea |
+
+Cada eje se esconde cuando no tiene nada que ofrecer: con VM invasiva no hay
+interfaz que elegir —la vía aérea ya dice cuál es— y con aire ambiente no hay
+modo.
+
+El paciente con tubo en T se registra **sin campo nuevo**: vía aérea TOT +
+soporte oxigenoterapia + interfaz tubo T. El de VNI: vía aérea natural +
+soporte VNI + interfaz full face. Los días de VNI se siguen contando por el
+SOPORTE, que no cambió, y la VNI sigue sin sumar a los días de VM.
+
+**Lo guardado no se toca.** `VENT_VIA_AEREA` sigue recibiendo `TOT`/`TQT` con
+los mismos textos (125 comparaciones en el código dependen de ellos) y las
+evoluciones viejas que guardaron `Full Face` en la vía aérea se siguen leyendo:
+`_vaCompat()` las traduce al abrirlas y `_INTERFACES` reconoce el dispositivo
+esté donde esté escrito.
+
+### Una columna nueva, y al final de verdad
+
+`VENT_INTERFAZ` en EVOLUCIONES (397 columnas) e `INTERFAZ` en CAMAS_ESTADO.
+
+🪤 La primera versión la puso **junto a los otros `VENT_`**, que es donde se
+lee bonito y donde NO va: el esquema tiene una zona de extensiones
+post-congelamiento al final justamente para no desplazar los índices de lo ya
+escrito en la planilla. Lo cazó `guardado_viajes.js`, la guardia A/B que compara
+fila a fila contra el árbol congelado: cuatro comparaciones rojas que no eran
+por el cambio que se quería. La columna se movió al final del todo.
+
+Y al moverla se puso roja `pve_superada_sin_extubar.js`, que exigía que sus dos
+columnas fueran **las últimas**. Eso no es la convención —ser la última la
+rompe cualquier columna futura— sino haber entrado **después** de las que ya
+existían. La guardia ahora mide el orden, no el final literal.
+
+### 🔴 Y el modo del aire ambiente se colaba en la oxigenoterapia
+
+`cascadeSop` tenía un respaldo: si el soporte no declaraba modos, ponía
+`Sin soporte`. Funcionaba porque **todo** soporte tenía modos —la oxigenoterapia
+listaba los dispositivos ahí mismo—. Al mudar el dispositivo a su campo, la
+oxigenoterapia se quedó sin modos y el respaldo empezó a escribir
+`VENT_MODO='Sin soporte'` en un paciente que **sí tiene soporte**.
+
+En pantalla no se veía: todos los consumidores filtran ese valor. Pero quedaba
+escrito en la planilla, turno a turno. Lo cazó `via_aerea_previo.js` al mirar el
+payload del guardado.
+
+**Batería: 163 verdes, 0 rojas.**

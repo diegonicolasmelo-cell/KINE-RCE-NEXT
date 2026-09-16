@@ -38,9 +38,14 @@ const ce = (esq.match(/\n  CAMAS_ESTADO: \{ headerRows: 2, cols: \[([\s\S]*?)\n 
 si('CAMAS_ESTADO tiene PENDIENTES_JSON', ce.indexOf("['PENDIENTES_JSON'") !== -1);
 // Al FINAL: la convención del esquema es no insertar al medio para no
 // desplazar los índices de lo ya escrito en la planilla.
-const ultima = (ce.trim().match(/\['([A-Z0-9_]+)'/g) || []).slice(-1)[0] || '';
-eq('★ …y es la ÚLTIMA columna (no se insertó al medio)', ultima, "['PENDIENTES_JSON'");
-si('★ EVOLUCIONES sigue en 396 columnas', /TOTAL_COLS\.EVOLUCIONES !== 396/.test(esq));
+// 🗂️ Ya no es la última: el 16-sep-2026 entró INTERFAZ detrás suyo (los tres
+// ejes del respiratorio). Lo que importa no es ser la última, sino haber
+// entrado AL FINAL y no al medio — o sea, después de las que ya existían.
+const cols = (ce.match(/\['([A-Z0-9_]+)'/g) || []).map(x => x.slice(2, -1));
+si('★ …y entró AL FINAL, no al medio',
+   cols.indexOf('PENDIENTES_JSON') > cols.indexOf('UPOT_FECHA'));
+si('★ EVOLUCIONES sigue intacta en su total declarado',
+   /TOTAL_COLS\.EVOLUCIONES !== 39\d/.test(esq));
 si('★ PLAN_PENDIENTES del turno sigue existiendo (el REM no cambia de fuente)',
    /\['PLAN_PENDIENTES','json'\]/.test(esq));
 
