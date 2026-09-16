@@ -125,12 +125,18 @@ ok_('…y el contador de VNI ya no cae a FECHA_INICIO_VA (que es el ingreso)',
   /_diasVNIEpisodio=_esVNIDb\?\(parseInt\(dias\(c\.FECHA_INICIO_SOPORTE,fecha\)\)\|\|0\):0;/.test(idx));
 
 const esq = fs.readFileSync(path.join(v2, 'esquema.gs'), 'utf8');
-ok_('DIAS_VNI existe en EVOLUCIONES', /\['DIAS_VNI','entero'\]/.test(esq));
+// 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
+// Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
+// muestra el rótulo en castellano y el nombre técnico en la nota de la celda
+// (pedido de Diego). Los patrones de abajo aceptan el tercer elemento como
+// OPCIONAL: siguen exigiendo exactamente lo mismo —que la columna exista, con
+// su tipo y en su lugar— y no se aflojó nada.
+ok_('DIAS_VNI existe en EVOLUCIONES', /\['DIAS_VNI','entero'(?:,'[^']*')?\]/.test(esq));
 // Se agregó en el TRAMO FINAL (después del último bloque conocido). Ya no se
 // exige que cierre la lista: detrás pueden ir columnas nacidas después —
 // RESP_SNT en ago-2026— y eso es justamente la regla de la casa, agregar
 // siempre al final para no desalinear los datos ya escritos.
-ok_('…en el tramo final de la lista', /\['PRONO_HORAS','decimal'\],[\s\S]{0,700}\['DIAS_VNI','entero'\]/.test(esq));
+ok_('…en el tramo final de la lista', /\['PRONO_HORAS','decimal'(?:,'[^']*')?\],[\s\S]{0,700}\['DIAS_VNI','entero'(?:,'[^']*')?\]/.test(esq));
 
 console.log(fails.length ? `\n❌ ${fails.length} FALLOS` : '\n✅ dias_vni OK');
 process.exit(fails.length ? 1 : 0);

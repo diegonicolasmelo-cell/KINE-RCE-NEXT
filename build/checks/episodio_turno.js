@@ -31,7 +31,13 @@ const si = (l, g) => eq(l, !!g, 'true');
   const esq = fs.readFileSync(path.join(V2, 'esquema.gs'), 'utf8');
   si('hoja EVALUACIONES declarada', /\n  EVALUACIONES: \{ headerRows: 1, cols: \[/.test(esq));
   const tl = (esq.match(/\n  TIMELINE: \{ headerRows: 1, cols: \[([\s\S]*?)\n  \]\}/) || [])[1] || '';
-  si('TIMELINE termina en DATOS_JSON', /\['DATOS_JSON','json'\],\s*$/.test(tl.trim()) || /DATOS_JSON[^\n]*\n\s*$/.test(tl));
+  // 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
+  // Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
+  // muestra el rótulo en castellano y el nombre técnico en la nota de la celda
+  // (pedido de Diego). Los patrones de abajo aceptan el tercer elemento como
+  // OPCIONAL: siguen exigiendo exactamente lo mismo —que la columna exista, con
+  // su tipo y en su lugar— y no se aflojó nada.
+  si('TIMELINE termina en DATOS_JSON', /\['DATOS_JSON','json'(?:,'[^']*')?\],\s*$/.test(tl.trim()) || /DATOS_JSON[^\n]*\n\s*$/.test(tl));
   const ce = (esq.match(/\n  CAMAS_ESTADO: \{ headerRows: 2, cols: \[([\s\S]*?)\n  \]\}/) || [])[1] || '';
   ['ULT_MRC_FIRMA', 'ULT_FSS_FIRMA', 'ULT_PIM_FIRMA', 'AET_ACTIVA', 'AET_NIVEL', 'UPOT_ACTIVO'].forEach(c =>
     si('CAMAS_ESTADO tiene ' + c, ce.indexOf("['" + c + "'") !== -1));

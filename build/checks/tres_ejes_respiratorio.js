@@ -42,7 +42,13 @@ const no = (l, g) => eq(l, !!g, 'false');
 (async () => {
   console.log('\n1 · El dato: una columna propia para la interfaz');
   const esq = fs.readFileSync(path.join(V2, 'esquema.gs'), 'utf8');
-  si('★ EVOLUCIONES tiene VENT_INTERFAZ', /\['VENT_INTERFAZ','texto'\]/.test(esq));
+  // 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
+  // Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
+  // muestra el rótulo en castellano y el nombre técnico en la nota de la celda
+  // (pedido de Diego). Los patrones de abajo aceptan el tercer elemento como
+  // OPCIONAL: siguen exigiendo exactamente lo mismo —que la columna exista, con
+  // su tipo y en su lugar— y no se aflojó nada.
+  si('★ EVOLUCIONES tiene VENT_INTERFAZ', /\['VENT_INTERFAZ','texto'(?:,'[^']*')?\]/.test(esq));
   const ce = (esq.match(/\n  CAMAS_ESTADO: \{ headerRows: 2, cols: \[([\s\S]*?)\n  \]\}/) || [])[1] || '';
   si('★ CAMAS_ESTADO también, para el arrastre', ce.indexOf("['INTERFAZ'") !== -1);
 

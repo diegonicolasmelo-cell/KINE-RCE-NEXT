@@ -47,7 +47,13 @@ si('★ …y entró AL FINAL, no al medio',
 si('★ EVOLUCIONES sigue intacta en su total declarado',
    /TOTAL_COLS\.EVOLUCIONES !== 39\d/.test(esq));
 si('★ PLAN_PENDIENTES del turno sigue existiendo (el REM no cambia de fuente)',
-   /\['PLAN_PENDIENTES','json'\]/.test(esq));
+   // 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
+   // Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
+   // muestra el rótulo en castellano y el nombre técnico en la nota de la celda
+   // (pedido de Diego). Los patrones de abajo aceptan el tercer elemento como
+   // OPCIONAL: siguen exigiendo exactamente lo mismo —que la columna exista, con
+   // su tipo y en su lugar— y no se aflojó nada.
+   /\['PLAN_PENDIENTES','json'(?:,'[^']*')?\]/.test(esq));
 
 console.log('\n2 · Servidor (simulador con hojas en memoria)');
 const { api, DB, SIM } = require('../sim/sim_srv.js');

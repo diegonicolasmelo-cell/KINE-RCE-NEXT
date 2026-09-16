@@ -36,14 +36,23 @@ function cuadrarEncabezados() {
     if (!h) { informe.push(hoja + ': no existe (la creará crearORepararEstructura)'); return; }
 
     const primerNombre = def.cols[0][0];              // ej. 'ID_CAMA'
+    /* 🗂️ 16-sep-2026 · EL ENCABEZADO YA NO DICE LA SIGLA, DICE EL RÓTULO.
+       Esta herramienta ubica la fila de encabezado buscando el primer nombre en
+       la columna A. Desde que la celda muestra «Cama» en vez de `ID_CAMA`, hay
+       que reconocer las DOS formas: el rótulo (planilla nueva) y el nombre
+       técnico (una planilla escrita antes del cambio, que es justo la que esta
+       herramienta existe para reparar). Si solo se buscara una, contestaría «no
+       se encontró la fila de nombres — revisar a mano» en las 27 hojas. */
+    const primerRotulo = def.cols[0][2] || primerNombre;
     const filaNombresDiseno = def.headerRows >= 2 ? 2 : 1;
 
-    // 1. ¿Dónde está la fila de nombres ahora?
+    // 1. ¿Dónde está la fila de encabezado ahora?
     let filaNombres = -1;
     const tope = Math.min(h.getLastRow(), def.headerRows + 3) || 1;
     const colA = h.getRange(1, 1, Math.max(tope, 1), 1).getValues();
     for (let r = 0; r < colA.length; r++) {
-      if (String(colA[r][0]).trim() === primerNombre) { filaNombres = r + 1; break; }
+      const celda = String(colA[r][0]).trim();
+      if (celda === primerNombre || celda === primerRotulo) { filaNombres = r + 1; break; }
     }
     if (filaNombres === -1) {
       informe.push('⚠️ ' + hoja + ': no se encontró la fila de nombres (' + primerNombre + '). NO se tocó — revisar a mano.');

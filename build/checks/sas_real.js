@@ -51,14 +51,19 @@ console.log('\n1 · Esquema');
 // prueba acuse a la planilla de un error que no tiene.
 {
   const bloque = esq.slice(esq.indexOf('const _COLS_EVOLUCIONES'), esq.indexOf('const ESQUEMA'));
-  const declaradas = [...bloque.matchAll(/\['[A-Z0-9_]+','[a-z]+'\]/g)].length;
+// 🗂️ 16-sep-2026 · LA TUPLA TRAE TRES ELEMENTOS. Cada columna es
+// ['NOMBRE','tipo','Rótulo legible'] desde que la planilla muestra el rótulo en
+// castellano y el nombre técnico en la nota (pedido de Diego). Los dos patrones
+// de abajo cuentan y ordenan columnas, así que el tercer elemento va como
+// OPCIONAL: exigen lo mismo que antes.
+  const declaradas = [...bloque.matchAll(/\['[A-Z0-9_]+','[a-z]+'(?:,'[^']*')?\]/g)].length;
   const escrito = (esq.match(/TOTAL_COLS\.EVOLUCIONES !== (\d+)/) || [])[1];
   eq('el total de testEsquema calza con las columnas declaradas (' + declaradas + ')',
      String(escrito), String(declaradas));
 }
 // Regla de la casa: las columnas nuevas van SIEMPRE al final (la reparación
 // reescribe encabezados y meterlas al medio desalinea los datos guardados).
-const cols = [...esq.matchAll(/\['([A-Z0-9_]+)','(?:texto|bool|entero|decimal|fecha|ts|uuid|email)'\]/g)].map(m => m[1]);
+const cols = [...esq.matchAll(/\['([A-Z0-9_]+)','(?:texto|bool|entero|decimal|fecha|ts|uuid|email)'(?:,'[^']*')?\]/g)].map(m => m[1]);
 const iSnt = cols.lastIndexOf('RESP_SNT');
 eq('★ y van DESPUÉS de la última columna anterior (RESP_SNT)',
   cols.slice(iSnt + 1, iSnt + 4).join(','), 'SED_SAS_META,SED_VIGIL,SED_FARMACOS');

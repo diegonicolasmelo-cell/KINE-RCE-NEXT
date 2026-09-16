@@ -965,3 +965,86 @@ escrita: el sitio duplicado se fue, que era justamente el riesgo. En su lugar
 quedó el control de que no vuelva a nacer una segunda copia.
 
 **Batería: 165 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · La planilla se lee sin saber programar
+
+Diego, textual: «Te necesito que los nombres de la base de datos sean
+entendibles con tan solo mirarlos, no me sirve una abreviación que no sé qué es.
+Quizás esto para programadores es esencial pero para un clínico es necesario ser
+explícito».
+
+Tenía razón, y el ejemplo lo dio él mismo: `EVAL_T_PMANT_VA` es **presión cuff**,
+y no hay forma de adivinarlo. Lo mismo con `EXT_PE_SOP`, `PVE_SC_RAZON` o
+`CALC_CESR`. Son **1.166 columnas en 27 hojas** (769 distintas: EVOLUCIONES y
+EVOLUCIONES_ARCHIVO comparten lista).
+
+### Las tres opciones que se le pusieron, y la que eligió
+
+1. **Rótulo explícito en la planilla** ← *elegida*. La celda del encabezado dice
+   «Presión cuff» y la **nota de la celda** guarda `EVAL_T_PMANT_VA`, para quien
+   programe o analice.
+2. Renombrar las columnas de verdad, en planilla y código. Es posible —la
+   planilla de NEXT está vacía, así que no habría migración— pero son **8.348
+   referencias** entre el fuente y las guardias, y habría que puentear las dos
+   guardias A/B que comparan contra el código congelado. Queda como tanda aparte.
+3. Rótulo ahora y renombrar por secciones.
+
+Y el estilo lo fijó él: «castellano y con tildes pero simplificado, por ejemplo
+ese podría ser **presión cuff**». Corto, como se dice en la unidad — no «presión
+del manguito de la vía aérea».
+
+### Por qué el rótulo es seguro
+
+**El encabezado no lo lee nadie para cargar datos.** Las lecturas van por
+POSICIÓN (`esquemaFilaAObjeto`, desde `FILA_DATOS`), nunca buscando el texto de
+la fila de títulos. Por eso cambiar el texto no toca una sola línea de lo que
+lee o escribe datos — y por eso el nombre técnico tiene que quedar a la vista en
+algún lado, que es lo que hace la nota.
+
+El rótulo es el **tercer elemento de la misma tupla**: `['VENT_VIA_AEREA','texto',
+'Vía aérea (natural, TOT o TQT)']`. Una sola lista, un solo lugar. Dos listas de
+nombres para lo mismo es exactamente cómo nació el desajuste 119≠132 del sistema
+viejo.
+
+Se comprobó, antes y después, que **el orden, los tipos, los totales y las filas
+de datos de las 27 hojas quedaron idénticos**. EVOLUCIONES sigue en 397 columnas
+con los datos desde la fila 4.
+
+### Las ocho siglas que se quedan siendo siglas
+
+PEEP · IPAP · EPAP · FSS-ICU · VISAGE · RUT · INR · PCR. En la unidad nadie dice
+«presión positiva al final de la espiración»: dice PEEP, y escribirlo largo haría
+la planilla **menos** legible, que es lo contrario de lo que se pidió. La lista
+es corta, explícita y está escrita con su razón dentro de la guardia — igual que
+la lista de `rut_minimo.js`, no es una puerta abierta.
+
+### Lo que vigila la guardia nueva
+
+`rotulos_legibles.js`: que ninguna columna se quede sin rótulo, que el rótulo no
+sea la sigla otra vez, que quepa en la celda (42 caracteres), que dos columnas de
+una hoja no se lean igual, que las que motivaron el pedido digan lo que tienen
+que decir, y —corriendo `crearORepararEstructura()` de verdad contra una planilla
+de mentira— que el encabezado escriba el rótulo y la nota el nombre técnico.
+
+La comprobación también entró a `testEsquema()`, que corre **dentro de la app**:
+una columna sin rótulo sale con su sigla y nadie se entera hasta que alguien abre
+la planilla.
+
+🪤 Y `cuadrarEncabezados()` —la herramienta que arregla la planilla cuando se
+desalinea— ubica la fila de encabezado buscando el primer nombre en la columna A.
+Con el rótulo ahí habría contestado «no se encontró la fila de nombres, revisar a
+mano» en las 27 hojas. Ahora reconoce las dos formas: el rótulo, y el nombre
+técnico de una planilla escrita antes del cambio, que es justo la que esa
+herramienta existe para reparar.
+
+### Seis guardias se pusieron rojas, y estaba bien que se pusieran
+
+`dias_vni`, `equipos_categoria`, `episodio_turno`, `pendientes_episodio`,
+`sas_real` y `tres_ejes_respiratorio` leen `esquema.gs` como texto y buscaban la
+tupla de DOS elementos. Se actualizaron para aceptar el tercero como opcional:
+siguen exigiendo exactamente lo mismo —que la columna exista, con su tipo y en su
+lugar— y no se aflojó nada.
+
+**Batería: 166 verdes, 0 rojas.**

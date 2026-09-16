@@ -100,9 +100,15 @@ eq('y si el formulario la manda, esa manda', DB.VENTILADORES[1].CATEGORIA, 'APOY
 console.log('\n4 · Esquema y tarjeta de cama');
 const esq = fs.readFileSync(path.join(v2, 'esquema.gs'), 'utf8');
 const idx = fs.readFileSync(path.join(v2, 'index.html'), 'utf8');
-ok_('CATEGORIA existe en VENTILADORES', /\['CATEGORIA','texto'\]/.test(esq));
+// 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
+// Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
+// muestra el rótulo en castellano y el nombre técnico en la nota de la celda
+// (pedido de Diego). Los patrones de abajo aceptan el tercer elemento como
+// OPCIONAL: siguen exigiendo exactamente lo mismo —que la columna exista, con
+// su tipo y en su lugar— y no se aflojó nada.
+ok_('CATEGORIA existe en VENTILADORES', /\['CATEGORIA','texto'(?:,'[^']*')?\]/.test(esq));
 ok_('…y va AL FINAL de la lista (la reparación reescribe encabezados)',
-  /\['FECHA_MANT_PROX','texto'\][\s\S]{0,900}\['CATEGORIA','texto'\],\s*\]\}/.test(esq));
+  /\['FECHA_MANT_PROX','texto'(?:,'[^']*')?\][\s\S]{0,900}\['CATEGORIA','texto'(?:,'[^']*')?\],\s*\]\}/.test(esq));
 ok_('la tarjeta de cama pinta los equipos del paciente', /class="eqtag/.test(idx));
 ok_('…con estilo propio por categoría',
   /\.eqtag\.eq-vni\{/.test(idx) && /\.eqtag\.eq-cnaf\{/.test(idx) && /\.eqtag\.eq-apoyo\{/.test(idx));
