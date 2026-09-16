@@ -19,7 +19,7 @@
 // reinterprete fechas ISO, RUT/códigos, IDs o JSON como número/fecha).
 const _TIPOS_TEXTO = ['texto', 'fecha', 'ts', 'uuid', 'email', 'json'];
 
-// ── Columnas de EVOLUCIONES (195). Se reutilizan en EVOLUCIONES_ARCHIVO. ──
+// ── Columnas de EVOLUCIONES (396). Se reutilizan en EVOLUCIONES_ARCHIVO. ──
 const _COLS_EVOLUCIONES = [
   // A. Metadatos e identidad
   ['ID_EVOLUCION','texto'],['ID_CAMA','texto'],['PATIENT_ID','uuid'],['COD_PACIENTE','texto'],
@@ -582,7 +582,7 @@ const ESQUEMA = {
 // ── Derivados (generados una sola vez desde ESQUEMA) ───────
 const SH = {};          // SH.EVOLUCIONES → 'EVOLUCIONES'
 const COL = {};         // COL.EVOLUCIONES.FECHA → 6
-const TOTAL_COLS = {};  // TOTAL_COLS.EVOLUCIONES → 195
+const TOTAL_COLS = {};  // TOTAL_COLS.EVOLUCIONES → 396
 const FILA_DATOS = {};  // FILA_DATOS.EVOLUCIONES → 4
 (function _derivar() {
   Object.keys(ESQUEMA).forEach(hoja => {
