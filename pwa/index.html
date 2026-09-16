@@ -1124,6 +1124,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
   #spPasos{top:0;}
 }
 .paso-oculto{display:none!important;}
+#epBannerCaja:empty,#epBannerCaja:has(.hidden){display:none;}
+#epBannerCaja{padding:10px 14px 0;background:var(--card);}
 #spRiel{display:none;}
 @media(min-width:1100px){
   #sp .pcontent{display:flex;gap:14px;align-items:flex-start;}
@@ -2940,6 +2942,15 @@ document.documentElement.setAttribute('data-piel', 'inst');
        escritorio no hace falta (el nombre va en la ficha y en el encabezado),
        así que esto vive solo bajo 740 px. -->
   <div id="mPac" aria-live="polite"></div>
+  <!-- 🗂️ BANNER DEL EPISODIO (rama episodio/turno, Diego 10-sep: «arriba, en
+       una franja extendida a lo largo de la pantalla, los datos personales,
+       los días de VM… y las escalas pre-UCI detrás de un ícono»). Se pinta
+       desde la CAMA, no desde el turno: lo que vive en el episodio no se
+       hereda, se lee.
+       16-sep-2026 · Salió del formulario y subió acá: es el ÚNICO verificador
+       de identidad del panel, y va ARRIBA de los pasos porque primero se ve
+       de quién se trata y después qué se va a registrar (pedido de Diego). -->
+  <div id="epBannerCaja"><div id="epBanner" class="hidden"></div></div>
   <div id="spPasos" role="tablist" aria-label="Pasos de la evolución">
     <button type="button" class="paso-t" role="tab" aria-selected="true" data-p="1" data-nodirty onclick="pasoIr(1)">
       <span class="paso-n">1</span><span class="paso-et">Turno</span></button>
@@ -2952,12 +2963,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
     <nav id="spRiel" aria-label="Secciones de la evolución"></nav>
     <form id="kf" onsubmit="return false;" autocomplete="off">
       <input type="hidden" id="cBed">
-      <!-- 🗂️ BANNER DEL EPISODIO (rama episodio/turno, Diego 10-sep: «arriba, en
-           una franja extendida a lo largo de la pantalla, los datos personales,
-           los días de VM… y las escalas pre-UCI detrás de un ícono»). Se pinta
-           desde la CAMA, no desde el turno: lo que vive en el episodio no se
-           hereda, se lee. -->
-      <div id="epBanner" class="hidden"></div>
       <!-- 📌 Lo que te dejaron encargado: se pinta desde la CAMA (episodio),
            no desde el turno anterior. Ver `svc_pendientes.gs`. -->
       <div id="pendEpi" class="hidden" data-paso="1"></div>
@@ -6189,8 +6194,13 @@ function abrirPanel(id, esIng, verFicha) {
 function actualizarTituloPanel(nombre) {
   const el = $('spTitle');
   if (!el) return;
-  const tipo = el.dataset.tipo || 'Evolución';
-  el.textContent = nombre && nombre.trim() ? `${nombre.trim()} — ${tipo}` : tipo;
+  // 🪤 El nombre NO va acá (16-sep-2026): lo dice el banner del episodio,
+  // dos centímetros más arriba y con edad, día, vía aérea y soporte. Repetirlo
+  // gastaba alto de pantalla —lo único escaso en un teléfono— y obligaba a
+  // leer dos veces para estar seguro de que era el mismo paciente. El
+  // parámetro se conserva porque lo llaman desde el campo del nombre al
+  // teclear, y porque distingue Ingreso de Evolución.
+  el.textContent = el.dataset.tipo || 'Evolución';
 }
 function cerrarPanel(force) {
   // H1 + PRD guardado obligatorio (O2): cerrar con cambios sin guardar abre el
@@ -7745,7 +7755,10 @@ let _fichaAbierta=false;
  *  que dice «—» ocupa el mismo espacio que los campos y no informa nada. */
 function _fichaResumen(){
   const p=[];
-  const nom=String(v('fNombre')||'').trim(); if(nom) p.push('<b>'+_escSt(nom)+'</b>');
+  // 🪤 El nombre tampoco va acá (16-sep-2026): el banner del episodio ya lo
+  // dice arriba. Lo que esta ficha aporta es lo que el banner NO trae —talla,
+  // hora de ingreso, Barthel, Charlson, APACHE, ECF—, así que empieza por la
+  // edad.
   const ed=String(v('fEdad')||'').trim(), sx=String(v('fSexo')||'').trim();
   if(ed) p.push(_escSt(ed)+'a'+(sx?' · '+_escSt(sx):''));
   else if(sx) p.push(_escSt(sx));
@@ -12656,6 +12669,14 @@ function _mFaltaTxt(el){
 /** Cabecera del paciente (solo celular). */
 function _mPacBar(){
   const el=$('mPac'); if(!el) return;
+  // 🪤 SIN CONTENIDO desde el 16-sep-2026. Esta barra nació porque en el
+  // teléfono el nombre no aparecía en ninguna parte del panel; desde que el
+  // banner del episodio subió arriba de los pasos, decía lo MISMO (nombre,
+  // día, vía aérea, soporte) una fila más abajo. Se deja la función y el
+  // contenedor —los llama el riel en cada repintado— vacíos, en vez de
+  // desperdigar la limpieza por todos sus llamadores.
+  el.innerHTML=''; return;
+  /* eslint-disable no-unreachable */
   if(!esMovil()){ el.innerHTML=''; return; }
   const c=_camaPanel()||{};
   const nom=String(v('fNombre')||c.NOMBRE||'').trim();

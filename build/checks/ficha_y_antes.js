@@ -194,7 +194,14 @@ const { chromium } = require('playwright-core');
   });
   eq('la ficha arranca plegada', R5.plegada, true);
   eq('…con su línea de resumen a la vista', R5.chipVisible, true);
-  eq('el resumen trae nombre y evaluaciones', /Rosa Pérez Muñoz/.test(R5.resumen) && /Barthel/.test(R5.resumen) && /APACHE II/.test(R5.resumen), true);
+  // 🪤 EL NOMBRE SALIÓ DE ACÁ (16-sep-2026, pedido de Diego). El banner del
+  // episodio, arriba de la barra de pasos, es el único verificador de
+  // identidad del panel; esta línea lo repetía dos veces más abajo. Lo que la
+  // ficha plegada aporta es justo lo que el banner NO trae —Barthel,
+  // Charlson, APACHE, ECF, talla—, y eso se sigue exigiendo.
+  eq('★ el resumen trae las evaluaciones que el banner no muestra',
+     /Barthel/.test(R5.resumen) && /APACHE II/.test(R5.resumen), true);
+  eq('★ …y ya NO repite el nombre', /Rosa Pérez Muñoz/.test(R5.resumen), false);
   eq('la identificación queda oculta hasta pedirla', R5.identOculta, true);
   eq('★ los valores SIGUEN en el formulario', R5.valoresVivos, '85|4|18|3|14:30|Rosa Pérez Muñoz');
   eq('★ …y el payload los lee igual', R5.leePayload, '85/18/Rosa Pérez Muñoz');

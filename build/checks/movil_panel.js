@@ -43,6 +43,14 @@ const MONTAR = () => {
   $('fSed').value = 'Escalón 2';
   $('r_vt').value = '420'; $('r_peep').value = '8'; $('r_fio2').value = '40';
   $('fKTRcnt').value = '2';
+  // 🪤 El identificador del paciente es ahora el banner del episodio, que se
+  // pinta desde la CAMA y calcula los días contra la fecha del turno. Este
+  // montaje abre el panel a mano (sin abrirPanel), así que hay que pintarlo
+  // y, sobre todo, FIJAR la fecha: con el reloj real el «Día N» cambiaría
+  // cada vez que se corre la batería. Ingreso el 04-08 + fecha 10-08 = Día 6.
+  $('gDate').value = '2026-08-10';
+  $('spBed').textContent = 'CAMA 1';
+  renderBannerEpisodio();
   mAcordeonInit(); rielRender();
 };
 
@@ -60,24 +68,35 @@ const MONTAR = () => {
   await m.waitForTimeout(500);
   await m.evaluate(MONTAR);
 
+  // 🪤 LA CABECERA SE MUDÓ (16-sep-2026, pedido de Diego mirando la pantalla
+  // armada). Esta sección medía #mPac, la barra que existía porque en el
+  // teléfono el nombre no aparecía en ninguna parte. Con el camino de tres
+  // pasos el banner del episodio subió arriba de la barra de pasos y pasó a
+  // ser el ÚNICO verificador de identidad: #mPac decía lo mismo una fila más
+  // abajo. Lo que esta sección protege —que en el teléfono se sepa sin dudar
+  // de qué paciente se trata— NO cambió; cambió dónde se lee.
   console.log('1 · Cabecera del paciente');
   const R1 = await m.evaluate(() => {
-    const el = $('mPac');
+    const el = $('epBanner');
+    const t = (el.textContent || '');
     return {
       visible: el.offsetParent !== null,
-      cama: el.querySelector('.cama') ? el.querySelector('.cama').textContent : '',
-      nombre: el.querySelector('.nom') ? el.querySelector('.nom').textContent : '',
-      chips: [...el.querySelectorAll('.ch')].map(c => c.textContent).join(' | '),
-      clinico: el.querySelector('.ch.vm') ? el.querySelector('.ch.vm').textContent : '',
+      cama: ($('spBed') || {}).textContent || '',
+      nombre: /Rosa Pérez Muñoz/.test(t),
+      clinico: /TOT/.test(t) && /VM/.test(t),
+      dias: /Día 6/.test(t),
+      // ★ y lo dice UNA sola vez: la barra vieja ya no repite
+      mPacVacio: (($('mPac') || {}).textContent || '').trim() === '',
       // el nombre largo trunca, no desborda
       sinDesborde: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     };
   });
-  eq('la cabecera del paciente se ve', R1.visible, true);
+  eq('el identificador del paciente se ve', R1.visible, true);
   eq('dice la cama', R1.cama, 'CAMA 1');
-  eq('…y el nombre, que antes no aparecía en ninguna parte', R1.nombre, 'Rosa Pérez Muñoz');
-  eq('trae el estado clínico del turno', R1.clinico, 'TOT · VM · ACVC');
-  eq('…y los días de estadía', /Día 6/.test(R1.chips), true);
+  eq('…y el nombre, que antes no aparecía en ninguna parte', R1.nombre, true);
+  eq('trae el estado clínico', R1.clinico, true);
+  eq('…y los días de estadía', R1.dias, true);
+  eq('★ y la barra vieja ya no lo repite', R1.mPacVacio, true);
   eq('nada se desborda de la pantalla', R1.sinDesborde, true);
 
   console.log('\n2 · Cada sección dice qué tiene adentro');

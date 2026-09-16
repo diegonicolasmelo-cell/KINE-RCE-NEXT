@@ -583,3 +583,60 @@ El paso 2 hoy es el bloque viejo movido: sigue siendo una casilla «registrar
 evaluación este turno» que hay que marcar. Le falta lo que lo hace valer —los
 chips del episodio con su firma y su fecha, y el botón **«No medí nada este
 turno»** que lo cruza en un clic—. Ahí también sale la regla del SBC.
+
+---
+
+## 16-sep-2026 · Un solo verificador de identidad, y los pasos debajo
+
+Diego, mirando la pantalla ya armada: «deja un solo verificador de
+identificación, el nombre se repite. Bajo el nombre viene turno, evaluación y
+relato».
+
+### Lo medido
+
+Una sonda contó el nombre sobre los elementos HOJA visibles del panel. Salía
+**tres veces en cada tamaño**:
+
+| | escritorio | teléfono |
+|---|---|---|
+| 1 | `#epBanner` | `#mPac` |
+| 2 | `#spTitle` («R. FUENZALIDA — Evolución») | `#epBanner` |
+| 3 | el chip de la ficha dentro de GENERAL | `#spTitle` |
+
+Tres identificaciones no identifican mejor: gastan el alto de pantalla —lo
+único escaso en un teléfono— y obligan a leer dos veces para estar seguro de
+que es el mismo paciente.
+
+### Lo que se hizo
+
+Queda **uno**: el banner del episodio, que además del nombre trae edad, día de
+estadía, vía aérea, soporte y las escalas pre-UCI. Verificar identidad es
+verificar todo eso, no solo el nombre.
+
+- **Salió del formulario y subió arriba de la barra de pasos.** Ese es el orden
+  que pidió Diego: primero de quién se trata, después qué se va a registrar.
+- `#spTitle` quedó con «Evolución» / «Ingreso» a secas.
+- `_mPacBar` quedó vacía. Nació porque en el teléfono el nombre no aparecía en
+  ninguna parte del panel; desde que el banner subió, decía lo mismo una fila
+  más abajo. Se deja la función y el contenedor vacíos —los llama el riel en
+  cada repintado— en vez de desperdigar la limpieza por sus llamadores.
+- La ficha plegada empieza por la edad. Lo que ella aporta es lo que el banner
+  NO trae: talla, hora de ingreso, Barthel, Charlson, APACHE, ECF.
+
+### Dos guardias cambiaron de sitio, ninguna se ablandó
+
+- `movil_panel.js` medía `#mPac`. Lo que protegía —que en el teléfono se sepa
+  sin dudar de qué paciente se trata— no cambió; cambió dónde se lee. Ahora
+  mide el banner **y además exige que la barra vieja ya no lo repita**.
+  🪤 Su montaje abre el panel a mano, sin `abrirPanel`, así que hubo que
+  pintar el banner y **fijar `gDate`**: el banner calcula los días contra la
+  fecha del turno, y con el reloj real el «Día 6» habría cambiado cada vez que
+  se corre la batería. Ingreso el 04-08 + fecha 10-08 = Día 6, inventada.
+- `ficha_y_antes.js` exigía que el resumen trajera el nombre. Ahora exige lo
+  contrario —que NO lo repita— y mantiene lo que sí le toca: Barthel y APACHE.
+
+La guardia nueva `identidad_una_vez.js` cuenta el nombre en las dos pantallas y
+exige que el identificador esté por encima de los pasos. Se vio roja con 5
+fallos.
+
+**Batería: 157 verdes, 0 rojas.**
