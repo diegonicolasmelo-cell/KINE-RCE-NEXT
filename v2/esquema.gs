@@ -379,6 +379,15 @@ const ESQUEMA = {
     // adecuó», no es del turno). Se leen de aquí; no se heredan. — AL FINAL
     ['AET_ACTIVA','bool'],['AET_NIVEL','texto'],['AET_FECHA','texto'],
     ['UPOT_ACTIVO','bool'],['UPOT_MEDIDAS','texto'],['UPOT_FECHA','texto'],
+    // 📌 Pendientes del EPISODIO (rediseño de los tres pasos, 16-sep-2026).
+    // Los chips de PLAN_PENDIENTES viven en la fila del turno y no se
+    // replican: lo que la noche deja encargado no existe para el día
+    // siguiente, así que nadie puede cerrarlo. Estos cruzan el turno y mueren
+    // con el alta, como AET y UPOT. Lista de
+    // {id, tx, ab, abTs, ci, ciTs} — `ci` vacío = sigue abierto.
+    // 🔑 Cualquiera cierra (decisión de Diego): `ci` guarda quién lo hizo,
+    // no se exige que sea quien lo abrió.  — SIEMPRE AL FINAL
+    ['PENDIENTES_JSON','json'],
   ]},
   EVOLUCIONES:         { headerRows: 3, cols: _COLS_EVOLUCIONES },
   EVOLUCIONES_ARCHIVO: { headerRows: 3, cols: _COLS_EVOLUCIONES },

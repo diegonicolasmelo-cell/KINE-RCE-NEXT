@@ -95,6 +95,11 @@ function api(accion, datos, token) {
       case 'GET_EVALUACIONES': return obtenerEvaluaciones(datos);
       case 'EVAL_REGISTRAR':   return _auditar(ctx, accion, () => evalRegistrar(datos, ctx), datos);
       case 'EPISODIO_ESCALA':  return _auditar(ctx, accion, () => episodioEscala(datos, ctx), datos);
+      // 📌 Pendientes del episodio (16-sep-2026). No hay PEND_LISTAR: viajan
+      // dentro de la cama, que el arranque ya trae — una acción de listar
+      // sería un viaje más por nada.
+      case 'PEND_ABRIR':       return _auditar(ctx, accion, () => pendAbrir(datos, ctx), datos);
+      case 'PEND_CERRAR':      return _auditar(ctx, accion, () => pendCerrar(datos, ctx), datos);
 
       // ── Escrituras (auditadas) ──
       case 'GUARDAR_SUGERENCIA':

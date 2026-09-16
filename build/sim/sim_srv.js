@@ -197,6 +197,7 @@ const ARCHIVOS = [
   'dominio_validacion.gs', 'dominio_calculos.gs', 'dominio_texto.gs',
   'svc_camas.gs', 'svc_evoluciones.gs', 'svc_procedimientos.gs', 'svc_timeline.gs',
   'svc_evaluaciones.gs',   // 🗂️ rama episodio/turno: serie fechada + escalas del episodio
+  'svc_pendientes.gs',     // 📌 rediseño tres pasos: pendientes del episodio
   'svc_turnos.gs', 'svc_stats.gs', 'svc_indicadores.gs', 'svc_auditoria.gs',
   'svc_entrega.gs', 'svc_eventos.gs', 'svc_equipos.gs', 'svc_rem.gs',
   'svc_coordinacion.gs',

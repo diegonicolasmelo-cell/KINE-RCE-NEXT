@@ -457,6 +457,23 @@ function _limpiarCamaInterno(idCama) {
     ULT_COOP: '', ULT_MRC: '', ULT_MRC_FECHA: '', ULT_FSS: '', ULT_FSS_FECHA: '', ULT_DINAMO: '',
     DISP_HME_FECHA: '', DISP_HEPA_FECHA: '', DISP_TC_FECHA: '', DISP_HUMID_FECHA: '',
     WEAN_PVE_JSON: '', WEAN_CAND_PVE: false,
+    // 🪤 QUINCE COLUMNAS SE ARRASTRABAN AL PACIENTE SIGUIENTE (16-sep-2026).
+    // Todas se habían agregado «SIEMPRE AL FINAL» del esquema después de que
+    // se escribió esta lista, y nadie las sumó también acá — el mismo olvido
+    // que ya había pasado con los relojes TS_* en agosto, arriba.
+    // La peor era AET_ACTIVA/AET_NIVEL: un paciente recién ingresado aparecía
+    // con la adecuación del esfuerzo terapéutico del que ocupó la cama antes,
+    // y «AET Grupo IIIC» es una ruta automática de contraindicación de KTM.
+    // Ahora `alta_no_deja_rastro.js` DERIVA la lista del esquema en vez de
+    // enumerarla, así que la columna que se agregue mañana la pone roja sola.
+    DISP_CONFIRMADO: false, APACHE2: '', CORRECCIONES_JSON: '',
+    ULT_PS: '', ULT_PIM: '', ULT_PIM_FECHA: '',
+    ULT_MRC_FIRMA: '', ULT_FSS_FIRMA: '', ULT_PIM_FIRMA: '',
+    AET_ACTIVA: false, AET_NIVEL: '', AET_FECHA: '',
+    UPOT_ACTIVO: false, UPOT_MEDIDAS: '', UPOT_FECHA: '',
+    // Los pendientes son del episodio: se van con el paciente. Si quedaran,
+    // el siguiente que ocupe la cama heredaría encargos de otra persona.
+    PENDIENTES_JSON: '',
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }

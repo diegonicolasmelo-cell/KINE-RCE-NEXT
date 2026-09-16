@@ -431,3 +431,83 @@ tocar código.
 Batería al cierre del día: **147 verdes, 0 rojas**, en 147 guardias. Sin cambio de esquema que
 obligue a correr `crearORepararEstructura()` (la clave nueva de CONFIG se
 agrega sola).
+
+---
+
+## 16-sep-2026 · El rediseño de los tres pasos, y quince columnas que se colaban al paciente siguiente
+
+Diego aclaró que NEXT no es una copia de RCE-KINE con arreglos: es un
+**rediseño**. La idea de fondo es que el registro de un turno sea un **modal
+secuencial** —turno (con sus eventos) → evaluaciones → relato— en vez del modal
+único de 225 campos donde hoy conviven las cuatro cosas.
+
+### Lo que se midió antes de opinar
+
+El modelo de datos YA está segmentado desde la rama episodio/turno: episodio,
+serie fechada, evento y turno, con 88 comprobaciones verdes en
+`checks/episodio_turno.js`. **La pantalla es la que no respeta ese corte.** El
+campo `fMRC` vive dentro del formulario del turno y al guardar escribe en tres
+lugares a la vez.
+
+Así que el rediseño no toca datos: lleva a la pantalla un corte que ya existe.
+
+### Las decisiones de Diego (quedan en `docs/PRD_EVOLUCION_TRES_PASOS.md`)
+
+Modal secuencial de tres pasos · el relato se retoca a mano porque «es solo
+narrativo» · al volver atrás se regenera · **cualquiera** cierra un pendiente ·
+el plan va en el paso 3 · se elimina la regla del SBC (KTM nivel 3 exigía un
+FSS del episodio), que con el camino secuencial pediría el FSS *antes* del paso
+donde se mide. Esa regla sale con la tanda que construya el paso 2, no antes:
+hoy el FSS está en el mismo formulario y el candado todavía se cumple sin
+fricción.
+
+El mockup navegable que sirvió para decidir:
+https://claude.ai/artifact/2uroNmVyBSw5tHgyRFGo5D
+
+### Tanda A · el pendiente deja de morir a las 12 horas
+
+`PLAN_PENDIENTES` es una lista de chips en la fila del turno y el esquema lo
+dice con todas sus letras: «NO se replican». Lo que la noche deja encargado no
+existe para el día siguiente, así que **nadie puede cerrarlo**.
+
+Ahora hay `PENDIENTES_JSON` en CAMAS_ESTADO —o sea en el episodio, como AET y
+UPOT—, con `svc_pendientes.gs` y las acciones `PEND_ABRIR` / `PEND_CERRAR`.
+Cada uno guarda quién lo abrió y cuándo; cerrarlo guarda quién lo cerró sin
+exigir que sea el mismo (decisión de Diego). No se borra: el histórico del
+episodio dice qué se encargó y qué se cumplió.
+
+No hay `PEND_LISTAR` a propósito: viajan dentro de la cama, que el arranque ya
+trae. Una acción de listar sería un viaje más por nada.
+`PLAN_PENDIENTES` del turno se sigue escribiendo igual, para que la entrega de
+turno y el REM no cambien de fuente.
+
+La guardia `pendientes_episodio.js` se escribió primero y se vio roja con 18
+fallos. Lo que de verdad prueba es el **contraste**: en el mismo escenario, el
+chip del turno no cruza el cambio de turno y el pendiente del episodio sí.
+
+### 🪤 Lo que apareció de paso: el alta dejaba rastro del paciente anterior
+
+Al agregar `PENDIENTES_JSON` a `_limpiarCamaInterno` se vio que esa lista de
+campos está escrita **a mano**, y que quince columnas nunca se habían sumado:
+`DISP_CONFIRMADO`, `APACHE2`, `CORRECCIONES_JSON`, `ULT_PS`, `ULT_PIM`,
+`ULT_PIM_FECHA`, las tres `ULT_*_FIRMA`, las tres `AET_*` y las tres `UPOT_*`.
+
+Todas se habían agregado «SIEMPRE AL FINAL» del esquema después de que se
+escribió el limpiador. Medido en el simulador: un paciente recién ingresado
+aparecía con **AET activa nivel IIIC**, seguimiento UPOT y la Pimáx del que
+ocupó la cama antes. La AET no es un adorno — «AET Grupo IIIC» es una ruta
+automática de contraindicación de kinesiterapia.
+
+Ya había pasado idéntico con los relojes `TS_*` el 4 de agosto, y está escrito
+en el propio código. **Volvió a pasar porque aquel arreglo fue agregar los tres
+nombres que faltaban, no impedir el olvido siguiente.**
+
+Por eso `alta_no_deja_rastro.js` no enumera columnas: las **deriva del
+esquema** y exige que toda columna de CAMAS_ESTADO salvo `ID_CAMA` aparezca en
+el limpiador. La columna 84 que alguien agregue mañana la pone roja sola.
+
+🪤 Y la guardia tropezó consigo misma: su primera versión leía las claves con
+`/([A-Z0-9_]+):/` sobre el bloque crudo, y se comió la palabra «EPISODIO» de un
+comentario. Los comentarios se quitan antes de parsear.
+
+**Batería: 154 verdes, 0 rojas.**
