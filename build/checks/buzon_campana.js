@@ -187,6 +187,18 @@ si('★ con sesión: entra al buzón como tipo coord y con la FIRMA de quien avi
 
 /* ── Parte 2 · cliente ── */
 const { chromium } = require('playwright-core');
+
+// El sello NO se escribe a mano acá: se lee del empaquetador, que es su única
+// fuente. Fijarlo a mano («7.04») rompía esta guardia en CADA entrega, que es
+// ruido y no protección — y peor, no cazaba el olvido clásico: subir VERSION
+// en el empaquetador y dejar el meta del index con el sello viejo.
+function selloEsperado() {
+  const src = require('fs').readFileSync(
+    require('path').resolve(__dirname, '..', 'empaquetar_cohete.js'), 'utf8');
+  const m = /const VERSION = '([^']+)'/.exec(src);
+  return m ? m[1] : '';
+}
+
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
   const p = await b.newPage({ viewport: { width: 1300, height: 950 } });
@@ -229,7 +241,13 @@ const { chromium } = require('playwright-core');
     buzNum: $('buzNum').textContent, buzOculto: $('buzNum').classList.contains('hidden'),
   }));
   console.log('\n4 · Cliente: los números salen del boot');
-  si('★ el boot manda el sello de versión al servidor', /^\d+\.\d+/.test(R.version));
+  // 🪤 Antes exigía que el sello EMPEZARA con dígitos (`/^\d+\.\d+/`). Eso ató
+  // la guardia a una forma de numeración concreta y se rompió en cuanto NEXT
+  // estrenó la suya. Lo que importa es que el sello VIAJE y sea el de esta
+  // entrega, no cómo se numere.
+  si('★ el boot manda el sello de versión al servidor',
+    !!R.version && R.version === selloEsperado(),
+    'el boot mandó «' + (R.version || '(vacío)') + '» y el empaquetador dice «' + selloEsperado() + '»');
   eq('★ la campana marca 2 alertas', R.campNum + '/' + R.campOculto, '2/false');
   eq('★ el buzón marca 2 sin leer', R.buzNum + '/' + R.buzOculto, '2/false');
 

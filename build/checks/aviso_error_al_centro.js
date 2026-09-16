@@ -31,6 +31,18 @@ const path = require('path');
 
 const VW = 1280, VH = 900;
 
+
+// El sello NO se escribe a mano acá: se lee del empaquetador, que es su única
+// fuente. Fijarlo a mano («7.04») rompía esta guardia en CADA entrega, que es
+// ruido y no protección — y peor, no cazaba el olvido clásico: subir VERSION
+// en el empaquetador y dejar el meta del index con el sello viejo.
+function selloEsperado() {
+  const src = require('fs').readFileSync(
+    require('path').resolve(__dirname, '..', 'empaquetar_cohete.js'), 'utf8');
+  const m = /const VERSION = '([^']+)'/.exec(src);
+  return m ? m[1] : '';
+}
+
 (async () => {
   const fails = [];
   const si = (l, c, d) => { console.log((c ? '✅' : '❌') + ' ' + l + (d !== undefined ? ': ' + d : '')); if (!c) fails.push(l); };
@@ -174,7 +186,9 @@ const VW = 1280, VH = 900;
 
   /* ── 9 · El sello de versión de esta entrega ────────────────────────────── */
   const sello = await p.evaluate(() => (document.querySelector('meta[name="rce-version"]') || {}).content || '');
-  si('el meta rce-version lleva el sello de esta entrega', /^7\.04-/.test(sello), sello || '(sin meta)');
+  si('el meta rce-version lleva el sello de esta entrega',
+    !!sello && sello === selloEsperado(),
+    'el index dice «' + (sello || '(sin meta)') + '» y el empaquetador «' + selloEsperado() + '»');
 
   si('sin errores JS en toda la corrida', errs.filter(e => !/favicon/.test(e)).length === 0, errs.join(' | '));
 
