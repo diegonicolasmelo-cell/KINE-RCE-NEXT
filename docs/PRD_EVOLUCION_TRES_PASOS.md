@@ -181,9 +181,9 @@ PROMESAS
 
 | Tanda | Qué | Por qué en ese orden |
 |---|---|---|
-| **A** | Los pendientes del episodio: dato, servicio, guardia | Sin esto los pasos 1 y 3 no tienen qué mostrar |
-| **B** | El armazón de los tres pasos y el paso 1 | Es donde entra lo de la tanda A |
-| **C** | El paso 2 y la salida barata; sale la regla del SBC (§7) | Necesita el armazón de B |
+| ~~**A**~~ ✅ | Los pendientes del episodio: dato, servicio, guardia | Sin esto los pasos 1 y 3 no tienen qué mostrar |
+| ~~**B**~~ ✅ | El armazón de los tres pasos y el paso 1 | Es donde entra lo de la tanda A |
+| **C** ← aquí | El paso 2 de verdad: chips del episodio y la salida barata; sale la regla del SBC (§7) | El armazón ya está; hoy el paso 2 solo tiene el bloque viejo movido |
 | **D** | El paso 3: guardado, relato, regeneración con aviso, plan | Cierra el ciclo con los pendientes de A |
 
 Cada tanda con su guardia **escrita primero y vista roja**, como el resto de la

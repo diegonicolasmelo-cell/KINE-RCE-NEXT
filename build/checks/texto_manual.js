@@ -144,13 +144,18 @@ const MANUAL = 'EVOLUCION REDACTADA A MANO POR EL COLEGA - no debe perderse.';
       despuesDelTexto: !!(pos & Node.DOCUMENT_POSITION_FOLLOWING),
       sticky: st.position === 'sticky',
       aLaVista: r.top < window.innerHeight && r.bottom > 0,
-      grande: document.getElementById('btnGuardar').getBoundingClientRect().height >= 50,
+      // 🪤 Desde el rediseño (16-sep-2026) el botón que se aprieta es el del
+      // camino: en el paso 2 es el que guarda, y el 💾 de siempre quedó
+      // oculto detrás de él. Lo que esta guardia protege —que el botón sea
+      // grande para el dedo— vale para el que se ve, no para el que ya no.
+      grande: (document.getElementById('pasoAvanza') || document.getElementById('btnGuardar'))
+                .getBoundingClientRect().height >= 50,
     };
   });
   eq('★ la barra está DESPUÉS del texto en el flujo', barra.despuesDelTexto, true);
   eq('★ y es pegajosa (sticky)', barra.sticky, true);
   eq('…o sea queda a la vista', barra.aLaVista, true);
-  eq('★ el botón de guardar es grande (≥50px)', barra.grande, true);
+  eq('★ el botón que se aprieta es grande (≥50px)', barra.grande, true);
 
   eq('sin errores JS', errs.filter(e => !/favicon/.test(e)).join(' | '), '');
   await b.close();

@@ -511,3 +511,75 @@ el limpiador. La columna 84 que alguien agregue mañana la pone roja sola.
 comentario. Los comentarios se quitan antes de parsear.
 
 **Batería: 154 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · Tanda B · el modal deja de ser un muro y pasa a ser un camino
+
+El registro de un turno era **un modal con 225 campos** en una sola pantalla.
+Ahora son tres pasos: **turno (con sus eventos) → evaluaciones → relato**.
+
+### Cómo se hizo, y lo que NO se hizo
+
+🔴 **No se reescribió el formulario.** Las tarjetas siguen donde estaban, con
+sus ids y sus funciones; lo único nuevo es un director (`pasoIr`) que muestra
+las del paso vigente y esconde el resto. Una tarjeta sin `data-paso` cae en el
+turno, que es donde va el 90% de lo que se registra — así una tarjeta nueva
+aparece en el paso correcto sin que nadie se acuerde de tocar el director.
+
+Lo único que sí se movió: **el bloque de evaluaciones salió de dentro de
+REHABILITACIÓN**, donde era una sub-sección plegada entre 225 campos, a su
+propia tarjeta (`#fcEval`). Las 91 líneas viajaron tal cual.
+
+### Dos decisiones que importan
+
+**El guardado ocurre al salir del PASO 2, no al final.** En la UCI se sale
+corriendo: si suena una alarma mientras se lee el relato, lo escrito ya está en
+la planilla. El enganche es `pasoTrasGuardar()` justo después del `show('rarea')`
+del guardado con éxito — o sea, el paso 3 solo existe si el guardado salió bien.
+
+**Un solo botón a la vista, como pidió Diego el 30-ago.** El 💾 de siempre
+sigue en el DOM y sigue llamando a `guardar()`, pero nace oculto: el botón que
+se aprieta es el del camino, y en el paso 2 ese botón ES el de guardar. Se le
+dio el mismo tamaño y la misma piel institucional que tenía el 💾 — si no, el
+botón que se usa todo el día quedaba más chico que el que ya nadie ve.
+
+### Tres guardias que cambiaron, y por qué (ninguna se ablandó)
+
+- `plantillas_evolucion.js` manipulaba el textarea del relato desde el paso 1.
+  Un textarea con `display:none` no acepta `focus()` ni `setSelectionRange`, así
+  que el ➕ de «crear plantilla» no aparecía **nunca**. No estaba roto: la
+  guardia lo medía desde el paso equivocado. Ahora va al paso 3 primero.
+- `texto_congelado.js` exigía que el único botón visible dijera «Guardar». La
+  intención de Diego —UN solo botón— se mantiene; cambió cuál. Ahora exige más
+  que antes: un solo botón, **que sea el del camino**, y que en el paso 2 sea
+  el que guarda.
+- `texto_manual.js` medía el alto del 💾, que ahora está oculto. Mide el botón
+  que de verdad se aprieta.
+
+### 🪤 El token que no existía: texto blanco sobre blanco
+
+Escribí `background:var(--acc)` en la barra de pasos. **Ese token no existe en
+este proyecto** — el de acento se llama `--primary`. CSS no da error con un
+token inexistente: se lo traga y pinta con el valor inicial. Resultado: el
+número del paso en el que estabas quedaba blanco sobre blanco.
+
+En el escritorio casi no se notaba. **En el teléfono, donde el rótulo se
+esconde y solo queda el número, el paso activo se veía como un hueco vacío.**
+Lo vi en el pantallazo, no en el código — otra vez.
+
+`tokens_existen.js` lee el CSS y exige que todo `var(--x)` sin respaldo tenga
+su token definido en alguna parte. Se vio roja con el bug puesto y verde con él
+sacado, las dos veces.
+🪤 Y tropezó con un falso positivo: `--own-bar` no está en ningún `:root`
+porque lo define el JavaScript con `setProperty` al armar cada tarjeta de cama.
+Es tan real como los demás; la guardia ahora también los cuenta.
+
+**Batería: 156 verdes, 0 rojas.**
+
+### Lo que queda (tanda C)
+
+El paso 2 hoy es el bloque viejo movido: sigue siendo una casilla «registrar
+evaluación este turno» que hay que marcar. Le falta lo que lo hace valer —los
+chips del episodio con su firma y su fecha, y el botón **«No medí nada este
+turno»** que lo cruza en un clic—. Ahí también sale la regla del SBC.

@@ -74,9 +74,14 @@ const GUARDADO = 'TEXTO QUE QUEDO GUARDADO AYER EN LA EVOLUCION.';
   // sección anterior es parte del escenario, no ruido — medirlo al final daba
   // un falso rojo sobre una barra correcta.
   const barra = await p.evaluate(() => {
+    if (typeof pasoIr === 'function') pasoIr(1);
     const act = document.querySelector('.act-bar');
     const btns = [...act.querySelectorAll('button')].filter(x => x.offsetParent !== null);
-    return { textos: btns.map(x => x.textContent.trim()), n: btns.length };
+    const av = document.getElementById('pasoAvanza');
+    let enPaso2 = '';
+    if (typeof pasoIr === 'function') { pasoIr(2); enPaso2 = (av || {}).textContent || ''; pasoIr(1); }
+    return { textos: btns.map(x => x.textContent.trim()), n: btns.length,
+             esDelCamino: !!(btns.length === 1 && av && btns[0] === av), enPaso2: enPaso2 };
   });
 
   /* ══ 1 · LO QUE SE ESCRIBE ES TUYO, y basta con tocarlo UNA vez ═══════ */
@@ -139,9 +144,16 @@ const GUARDADO = 'TEXTO QUE QUEDO GUARDADO AYER EN LA EVOLUCION.';
 
   /* ══ 6 · LA BARRA TIENE UN SOLO BOTÓN ════════════════════════════════ */
   console.log('\n6 · Solamente el botón de guardar');
+  // 🪤 LA CONVENCIÓN CAMBIÓ (16-sep-2026, rediseño de los tres pasos). La
+  // decisión de Diego del 30-ago —«solamente existirá botón de guardar»— era
+  // que hubiera UN SOLO botón a la vista, y eso se mantiene. Lo que cambió es
+  // cuál: ahora es el del camino, que en el paso 2 es el que guarda. El 💾 de
+  // siempre sigue en el DOM y sigue llamando a guardar(), pero oculto, para no
+  // ofrecer dos botones que hacen lo mismo.
   si('★ el 👁️ Preview salió de la barra', !barra.textos.some(t => /Preview/i.test(t)));
-  si('…y el que queda es Guardar', barra.textos.some(t => /Guardar/i.test(t)));
-  eq('un solo botón visible antes de guardar', barra.n, 1);
+  eq('★ un solo botón visible en la barra', barra.n, 1);
+  si('★ …y es el del camino, no un segundo guardar', barra.esDelCamino);
+  si('★ en el paso 2 ese mismo botón es el que guarda', /Guardar/i.test(barra.enPaso2));
 
   /* ══ 7 · «Deterioro», no «Alteración» ════════════════════════════════ */
   console.log('\n7 · La contraindicación dice «Deterioro del nivel de consciencia»');

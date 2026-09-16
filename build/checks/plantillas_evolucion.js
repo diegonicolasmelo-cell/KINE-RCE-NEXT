@@ -143,6 +143,12 @@ const HACE3 = hace(3), HACE1 = hace(1);
       const r = document.querySelector('input[name="pveRes"][value="frustra"]'); r.checked = true; hPVEres();
       const m = document.querySelector('input[name="pveFrMot"]'); if (m) m.checked = true;
       document.getElementById('fPlanes').value = 'nueva PVE mañana';
+      // 🪤 El relato vive en el PASO 3 desde el rediseño (16-sep-2026), y en
+      // el paso 1 está oculto. Un textarea con display:none no acepta focus()
+      // ni setSelectionRange, así que el ➕ de «crear plantilla con lo
+      // seleccionado» no aparecía nunca — no porque estuviera roto, sino
+      // porque esta guardia lo manipulaba desde el paso equivocado.
+      if (typeof pasoIr === 'function') pasoIr(3);
     });
   };
 

@@ -1087,6 +1087,43 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .act-bar{display:flex;gap:10px;align-items:center;padding:12px 2px 14px;position:sticky;bottom:0;z-index:5;background:linear-gradient(to top,var(--bg) 72%,rgba(244,246,248,0));}
 /* ── Riel de secciones del panel (v5.25, prueba): índice con estado por
    tarjeta. Solo escritorio ancho; el celular conserva su acordeón. ── */
+
+/* ── Camino de tres pasos (16-sep-2026) ─────────────────────────────────
+   El modal pasa de muro a camino: turno → evaluaciones → relato. La barra
+   dice dónde se está y cuánto falta; es informativa Y navegable (se puede
+   volver a un paso ya visto tocándolo). */
+#spPasos{display:flex;gap:0;background:var(--card);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:7;}
+.paso-t{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;
+  padding:11px 8px;font-size:.84rem;font-weight:700;color:var(--muted);font-family:inherit;
+  background:none;border:0;border-bottom:3px solid transparent;cursor:pointer;}
+.paso-t .paso-n{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;
+  background:var(--bg);color:var(--muted);font-size:.72rem;font-weight:800;flex-shrink:0;
+  border:1px solid var(--border);}
+.paso-t .paso-et{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.paso-t[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary);}
+.paso-t[aria-selected="true"] .paso-n{background:var(--primary);color:#fff;border-color:var(--primary);}
+.paso-t.paso-hecho .paso-n{background:#e6f0ee;color:#0f766e;border-color:#0f766e;}
+/* 📌 Pendientes que dejó el turno anterior — abren el paso 1 porque son lo
+   que te encargaron: se leen ANTES de decir qué hiciste. */
+#pendEpi{background:#fffbeb;border:1px solid #f0d9a8;border-radius:10px;
+  padding:11px 14px;margin-bottom:12px;}
+#pendEpi .pe-t{font-size:.68rem;font-weight:800;text-transform:uppercase;
+  letter-spacing:.08em;color:#b45309;margin-bottom:7px;}
+#pendEpi .pe-i{display:flex;align-items:flex-start;gap:10px;padding:6px 0;
+  border-top:1px solid #f0d9a8;}
+#pendEpi .pe-i:first-of-type{border-top:0;}
+#pendEpi .pe-tx{flex:1;min-width:0;font-size:.86rem;line-height:1.4;}
+#pendEpi .pe-de{display:block;font-size:.7rem;color:var(--muted);margin-top:2px;}
+#pendEpi .pe-btn{flex-shrink:0;border:1px solid #f0d9a8;background:#fff;color:#b45309;
+  font-size:.75rem;font-weight:700;border-radius:999px;padding:4px 11px;cursor:pointer;
+  font-family:inherit;white-space:nowrap;}
+#pendEpi .pe-btn:hover{background:#fef3c7;}
+@media (max-width:740px){
+  .paso-t .paso-et{display:none;}
+  #spPasos{top:0;}
+}
+.paso-oculto{display:none!important;}
 #spRiel{display:none;}
 @media(min-width:1100px){
   #sp .pcontent{display:flex;gap:14px;align-items:flex-start;}
@@ -1112,10 +1149,15 @@ table.rhb2 .rl{width:128px;text-align:left;}
 #gFalta{text-align:right;font-size:.75rem;font-weight:800;color:#b45309;min-height:15px;padding:0 4px;}
 .act-bar .btn{height:46px;border-radius:12px;}
 /* El botón de guardar GRANDE (Diego, 15-ago-2026): es la acción del panel. */
-.act-bar #btnGuardar{height:52px;font-size:1.02rem;}
-#btnGuardar{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
-#btnGuardar:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
-#btnGuardar:disabled{background:#94a3b8;box-shadow:none;filter:none;}
+/* 🪤 El botón principal del panel es AHORA el del camino (16-sep-2026):
+   en el paso 2 es el que guarda. Hereda el mismo tamaño y el mismo peso
+   visual que tenía el 💾, incluida la piel institucional de más abajo —
+   si no, el botón que se aprieta todo el día quedaba más chico que el que
+   ya nadie ve. */
+.act-bar #btnGuardar,.act-bar #pasoAvanza{height:52px;font-size:1.02rem;}
+#btnGuardar,#pasoAvanza{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
+#btnGuardar:hover,#pasoAvanza:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
+#btnGuardar:disabled,#pasoAvanza:disabled{background:#94a3b8;box-shadow:none;filter:none;}
 
 /* TOAST */
 #tc{position:fixed;bottom:20px;right:20px;z-index:9998;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
@@ -1732,7 +1774,7 @@ html[data-piel="inst"] .tab{color:#cfe3f5;}
 html[data-piel="inst"] .tab:hover{color:#fff;}
 html[data-piel="inst"] .tab.on{color:#fff;border-bottom-color:#F0A000;}
 html[data-piel="inst"] .tbanner{display:none!important;}
-html[data-piel="inst"] #btnGuardar{background:linear-gradient(135deg,#0058A0,#04345E);box-shadow:0 5px 16px rgba(0,88,160,.32);}
+html[data-piel="inst"] #btnGuardar,html[data-piel="inst"] #pasoAvanza{background:linear-gradient(135deg,#0058A0,#04345E);box-shadow:0 5px 16px rgba(0,88,160,.32);}
 html[data-piel="inst"] #btnGuardar:hover{background:linear-gradient(135deg,#0d69b6,#0058A0);filter:none;}
 html[data-piel="inst"] .col input:focus,html[data-piel="inst"] .col select:focus{border-color:#0058A0;box-shadow:0 0 0 3px #f0a00055;}
 html[data-piel="inst"] .mnav button.on{color:#0058A0;}
@@ -2898,6 +2940,14 @@ document.documentElement.setAttribute('data-piel', 'inst');
        escritorio no hace falta (el nombre va en la ficha y en el encabezado),
        así que esto vive solo bajo 740 px. -->
   <div id="mPac" aria-live="polite"></div>
+  <div id="spPasos" role="tablist" aria-label="Pasos de la evolución">
+    <button type="button" class="paso-t" role="tab" aria-selected="true" data-p="1" data-nodirty onclick="pasoIr(1)">
+      <span class="paso-n">1</span><span class="paso-et">Turno</span></button>
+    <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="2" data-nodirty onclick="pasoIr(2)">
+      <span class="paso-n">2</span><span class="paso-et">Evaluaciones</span></button>
+    <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="3" data-nodirty onclick="pasoIr(3)">
+      <span class="paso-n">3</span><span class="paso-et">Relato</span></button>
+  </div>
   <div class="pcontent">
     <nav id="spRiel" aria-label="Secciones de la evolución"></nav>
     <form id="kf" onsubmit="return false;" autocomplete="off">
@@ -2908,6 +2958,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
            desde la CAMA, no desde el turno: lo que vive en el episodio no se
            hereda, se lee. -->
       <div id="epBanner" class="hidden"></div>
+      <!-- 📌 Lo que te dejaron encargado: se pinta desde la CAMA (episodio),
+           no desde el turno anterior. Ver `svc_pendientes.gs`. -->
+      <div id="pendEpi" class="hidden" data-paso="1"></div>
       <input type="hidden" id="cIng" value="false">
       <!-- Etapa 1(a): aviso de turnos previos sin evolución (regla: todo turno se evoluciona) -->
       <div id="spGapAviso" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;border-radius:9px;padding:8px 12px;font-size:.78rem;font-weight:600;margin-bottom:10px;"></div>
@@ -3464,7 +3517,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <div class="sp-col"><!-- columna derecha -->
 
         <!-- ▌ RESPIRATORIO — Terapia Ventilatoria + Manejo -->
-        <div class="fcard fc-r mega-card">
+        <div class="fcard fc-r mega-card" id="fcRespCard" data-paso="1">
           <div class="fcard-hdr"><span class="fcard-title">🫁 Respiratorio — 💨 Terapia Ventilatoria</span></div>
           <div class="fcard-body">
             <div id="evStrip" class="hidden" style="margin:10px 16px 0;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;font-size:.78rem;line-height:1.9;"></div>
@@ -4399,97 +4452,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
             </div>
 
-        <!-- EVALUACIONES FUNCIONALES (unificadas) -->
-        <div class="sub-sec" id="fcEgrCard">
-          <div class="sub-sec-title" style="color:var(--fisico);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <span>📏 Evaluaciones Funcionales</span>
-            <div class="check wa" style="border:none;background:transparent;padding:0;">
-              <input type="checkbox" id="cEgr" onchange="hEgr()">
-              <label for="cEgr" style="font-size:.78rem;">Registrar evaluación este turno</label>
-            </div>
-          </div>
-          <div id="dEgr" class="hidden" style="padding-top:6px;">
-            <div id="coopGateNota" class="hidden" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:7px;padding:7px 10px;font-size:.76rem;font-weight:600;margin-bottom:8px;">
-              🔒 Paciente no cooperador — MRC-SS, FSS-ICU y dinamometría requieren cooperación (SAS 3-4 · S5Q ≥3).
-              Disponibles: PIM/PEM con válvula, ecografía diafragmática/cuádriceps y CPAx (observacional).
-            </div>
-            <!-- 1) FUERZA MUSCULAR (visible): MRC-SS + prensión manual -->
-            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:4px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">💪 Fuerza muscular</div>
-            <div class="row" id="rowEscalas">
-              <div class="col wa" id="rowMrc"><label>MRC-SS (0-60)</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <input type="number" id="fMRC" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpMRC()">
-                  <span id="lblMRC" class="interp-pill interp-empty">—</span>
-                  <button type="button" id="btnMrc" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('mrc')" title="Completar por ítem">📋</button>
-                </div>
-              </div>
-              <div class="col wa"><label>Prensión / Dinam. (kg)</label><input type="number" id="fPrension" min="0" step="0.5" placeholder="kg" oninput="interpDinamo()"></div>
-              <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPrension" class="interp-pill interp-empty">—</span></div>
-            </div>
-            <!-- 2) FUNCIONALIDAD (visible): FSS-ICU + CPAx -->
-            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:10px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">🏃 Funcionalidad</div>
-            <div class="row">
-              <div class="col wa" id="rowFss"><label>FSS-ICU (0-35)</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <input type="number" id="fFSS" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpFSS()">
-                  <span id="lblFSS" class="interp-pill interp-empty">—</span>
-                  <button type="button" id="btnFss" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('fss')" title="Completar por ítem">📋</button>
-                </div>
-              </div>
-              <div class="col wa" id="rowCpax">
-                <label>CPAx (0-50)</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <input type="hidden" id="fCpaxTotal">
-                  <span id="cpaxTotalPill" class="interp-pill interp-empty">—</span>
-                  <button type="button" id="btnCpax" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('cpax')" title="Completar por ítem (siempre disponible)">📋</button>
-                </div>
-              </div>
-            </div>
-            <!-- 3) desplegable: FUERZA MUSCULAR RESPIRATORIA (PIM/PEM) -->
-            <details id="dxFzaResp" style="margin-top:10px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
-              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">💨 Fuerza muscular respiratoria (PIM · PEM)</summary>
-              <div class="row" style="margin-top:6px;">
-                <div class="col wa"><label>PIM (cmH₂O)</label><input type="number" id="fPIM" oninput="interpPIM()"></div>
-                <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPIM" class="interp-pill interp-empty">—</span></div>
-                <div class="col wa"><label>PEM (cmH₂O)</label><input type="number" id="fPEM"></div>
-              </div>
-            </details>
-            <!-- 4) desplegable: ECOGRAFÍA muscular y diafragmática -->
-            <details id="dxEco" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
-              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">📡 Ecografía muscular y diafragmática</summary>
-              <div class="row" style="margin-top:6px;">
-                <div class="col wa"><label>Cuádriceps D (mm)</label><input type="number" id="fCuadD" step="0.1"></div>
-                <div class="col wa"><label>Cuádriceps I (mm)</label><input type="number" id="fCuadI" step="0.1"></div>
-                <div class="col wa"><label>Heckmatt</label>
-                  <select id="fHeckmatt"><option value="">--</option><option>I</option><option>II</option><option>III</option><option>IV</option></select></div>
-                <div class="col wa"><label>Grosor diafr. (mm)</label><input type="number" id="fGrosor" step="0.1"></div>
-              </div>
-              <div class="row">
-                <div class="col wa"><label>FED D (%)</label><input type="number" id="fFedD" step="1"></div>
-                <div class="col wa"><label>FED I (%)</label><input type="number" id="fFedI" step="1"></div>
-                <div class="col wa"><label>Excursión D (cm)</label><input type="number" id="fExcD" step="0.1"></div>
-                <div class="col wa"><label>Excursión I (cm)</label><input type="number" id="fExcI" step="0.1"></div>
-                <div class="col grow"><label>Hallazgos ecográficos</label><input type="text" id="fDiaf" placeholder="Descripción..."></div>
-              </div>
-            </details>
-            <!-- 5) desplegable: TOS Y DEGLUCIÓN -->
-            <details id="dxTos" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
-              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">😮‍💨 Tos y deglución</summary>
-              <div class="row" style="margin-top:6px;">
-                <div class="col wa"><label>FEM (L/s)</label><input type="number" id="fFEM" step="0.1"></div>
-                <div class="col wa"><label>Deglución</label>
-                  <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option><option>No evaluable</option></select></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTp"><label for="fBDTp">BDT +</label></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTn"><label for="fBDTn">BDT -</label></div>
-                <div class="col wa" id="dPmantVA" style="display:none;"><label>P. transtraqueal · válv. fonación (cmH₂O)</label>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <input type="number" id="fPVA" oninput="interpPTT()" style="width:82px;">
-                    <span id="pttChip" class="disp-chip disp-none">—</span>
-                  </div></div>
-              </div>
-            </details>
-          </div>
-        </div>
 
 
           </div>
@@ -4581,7 +4543,109 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div><!-- /sp-2col -->
 
       <!-- PLANES Y PENDIENTES — ancho completo -->
-      <div class="fcard fc-g">
+      <!-- 📏 PASO 2 · EVALUACIONES — salió de dentro de REHABILITACIÓN
+           (16-sep-2026). Ahí era una sub-sección plegada entre 225 campos y se
+           saltaba sin que nadie lo notara; acá es un paso del camino, así que
+           pasa por delante de los ojos en cada turno. El bloque va TAL CUAL:
+           los ids y sus funciones (hEgr, cEgr, abrirEvalModal) no cambian. -->
+      <div class="fcard fc-eval" id="fcEval" data-paso="2">
+        <div class="fcard-hdr"><span class="fcard-title">📏 Evaluaciones del episodio</span></div>
+        <div class="fcard-body">
+        <!-- EVALUACIONES FUNCIONALES (unificadas) -->
+        <div class="sub-sec" id="fcEgrCard">
+          <div class="sub-sec-title" style="color:var(--fisico);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <span>📏 Evaluaciones Funcionales</span>
+            <div class="check wa" style="border:none;background:transparent;padding:0;">
+              <input type="checkbox" id="cEgr" onchange="hEgr()">
+              <label for="cEgr" style="font-size:.78rem;">Registrar evaluación este turno</label>
+            </div>
+          </div>
+          <div id="dEgr" class="hidden" style="padding-top:6px;">
+            <div id="coopGateNota" class="hidden" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:7px;padding:7px 10px;font-size:.76rem;font-weight:600;margin-bottom:8px;">
+              🔒 Paciente no cooperador — MRC-SS, FSS-ICU y dinamometría requieren cooperación (SAS 3-4 · S5Q ≥3).
+              Disponibles: PIM/PEM con válvula, ecografía diafragmática/cuádriceps y CPAx (observacional).
+            </div>
+            <!-- 1) FUERZA MUSCULAR (visible): MRC-SS + prensión manual -->
+            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:4px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">💪 Fuerza muscular</div>
+            <div class="row" id="rowEscalas">
+              <div class="col wa" id="rowMrc"><label>MRC-SS (0-60)</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <input type="number" id="fMRC" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpMRC()">
+                  <span id="lblMRC" class="interp-pill interp-empty">—</span>
+                  <button type="button" id="btnMrc" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('mrc')" title="Completar por ítem">📋</button>
+                </div>
+              </div>
+              <div class="col wa"><label>Prensión / Dinam. (kg)</label><input type="number" id="fPrension" min="0" step="0.5" placeholder="kg" oninput="interpDinamo()"></div>
+              <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPrension" class="interp-pill interp-empty">—</span></div>
+            </div>
+            <!-- 2) FUNCIONALIDAD (visible): FSS-ICU + CPAx -->
+            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:10px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">🏃 Funcionalidad</div>
+            <div class="row">
+              <div class="col wa" id="rowFss"><label>FSS-ICU (0-35)</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <input type="number" id="fFSS" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpFSS()">
+                  <span id="lblFSS" class="interp-pill interp-empty">—</span>
+                  <button type="button" id="btnFss" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('fss')" title="Completar por ítem">📋</button>
+                </div>
+              </div>
+              <div class="col wa" id="rowCpax">
+                <label>CPAx (0-50)</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <input type="hidden" id="fCpaxTotal">
+                  <span id="cpaxTotalPill" class="interp-pill interp-empty">—</span>
+                  <button type="button" id="btnCpax" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('cpax')" title="Completar por ítem (siempre disponible)">📋</button>
+                </div>
+              </div>
+            </div>
+            <!-- 3) desplegable: FUERZA MUSCULAR RESPIRATORIA (PIM/PEM) -->
+            <details id="dxFzaResp" style="margin-top:10px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">💨 Fuerza muscular respiratoria (PIM · PEM)</summary>
+              <div class="row" style="margin-top:6px;">
+                <div class="col wa"><label>PIM (cmH₂O)</label><input type="number" id="fPIM" oninput="interpPIM()"></div>
+                <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPIM" class="interp-pill interp-empty">—</span></div>
+                <div class="col wa"><label>PEM (cmH₂O)</label><input type="number" id="fPEM"></div>
+              </div>
+            </details>
+            <!-- 4) desplegable: ECOGRAFÍA muscular y diafragmática -->
+            <details id="dxEco" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">📡 Ecografía muscular y diafragmática</summary>
+              <div class="row" style="margin-top:6px;">
+                <div class="col wa"><label>Cuádriceps D (mm)</label><input type="number" id="fCuadD" step="0.1"></div>
+                <div class="col wa"><label>Cuádriceps I (mm)</label><input type="number" id="fCuadI" step="0.1"></div>
+                <div class="col wa"><label>Heckmatt</label>
+                  <select id="fHeckmatt"><option value="">--</option><option>I</option><option>II</option><option>III</option><option>IV</option></select></div>
+                <div class="col wa"><label>Grosor diafr. (mm)</label><input type="number" id="fGrosor" step="0.1"></div>
+              </div>
+              <div class="row">
+                <div class="col wa"><label>FED D (%)</label><input type="number" id="fFedD" step="1"></div>
+                <div class="col wa"><label>FED I (%)</label><input type="number" id="fFedI" step="1"></div>
+                <div class="col wa"><label>Excursión D (cm)</label><input type="number" id="fExcD" step="0.1"></div>
+                <div class="col wa"><label>Excursión I (cm)</label><input type="number" id="fExcI" step="0.1"></div>
+                <div class="col grow"><label>Hallazgos ecográficos</label><input type="text" id="fDiaf" placeholder="Descripción..."></div>
+              </div>
+            </details>
+            <!-- 5) desplegable: TOS Y DEGLUCIÓN -->
+            <details id="dxTos" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">😮‍💨 Tos y deglución</summary>
+              <div class="row" style="margin-top:6px;">
+                <div class="col wa"><label>FEM (L/s)</label><input type="number" id="fFEM" step="0.1"></div>
+                <div class="col wa"><label>Deglución</label>
+                  <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option><option>No evaluable</option></select></div>
+                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTp"><label for="fBDTp">BDT +</label></div>
+                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTn"><label for="fBDTn">BDT -</label></div>
+                <div class="col wa" id="dPmantVA" style="display:none;"><label>P. transtraqueal · válv. fonación (cmH₂O)</label>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <input type="number" id="fPVA" oninput="interpPTT()" style="width:82px;">
+                    <span id="pttChip" class="disp-chip disp-none">—</span>
+                  </div></div>
+              </div>
+            </details>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      <div class="fcard fc-g" id="fcPlanes" data-paso="3">
         <div class="fcard-hdr"><span class="fcard-title">📋 Planes y Pendientes</span></div>
         <div class="fcard-body">
           <!-- Pendientes predefinidos: recordatorios del turno (sin fecha, NO se
@@ -4618,7 +4682,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div>
 
       <!-- TEXTO DE LA EVOLUCIÓN — editor real: se guarda tal como se ve -->
-      <div id="rarea" class="hidden">
+      <div id="rarea" class="hidden" data-paso="3">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
           <span style="color:#94a3b8;font-size:.7rem;font-weight:700;">📄 TEXTO DE LA EVOLUCIÓN — editable; se guarda tal como lo ves<span id="rtxtEditBadge" style="display:none;color:#b45309;"> · ✍️ editado a mano</span></span>
           <div style="display:flex;gap:8px;">
@@ -4646,7 +4710,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <div class="act-bar">
         <span id="gSinGuardar" class="hidden" style="align-self:center;font-size:.72rem;font-weight:800;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:20px;padding:3px 10px;margin-right:6px;white-space:nowrap;">⚠️ Sin guardar</span>
         <span id="gEstadoGuardado" class="hidden" data-estado="" style="align-self:center;font-size:.72rem;font-weight:800;border-radius:20px;padding:3px 10px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;"></span>
-        <button type="button" id="btnGuardar" class="btn btn-p" data-nodirty onclick="guardar()">💾 Guardar Evolución</button>
+        <button type="button" id="pasoAtras" class="btn" style="width:auto;padding:0 16px;flex-shrink:0;background:#fff;color:var(--txt);border:1px solid var(--border);display:none;" data-nodirty onclick="pasoRetroceder()">← Atrás</button>
+        <!-- 🪤 btnGuardar SIGUE EXISTIENDO y sigue llamando a guardar(): es
+             el que usan las guardias y el que dispara el guardado real. En el
+             camino queda oculto y lo aprieta `pasoAvanza` al salir del paso 2,
+             para que haya UN solo botón a la vista en cada paso. -->
+        <button type="button" id="btnGuardar" class="btn btn-p" style="display:none;" data-nodirty onclick="guardar()">💾 Guardar Evolución</button>
+        <button type="button" id="pasoAvanza" class="btn btn-p" data-nodirty onclick="pasoAvanzar()">Siguiente: evaluaciones →</button>
 <!-- 👁️ Preview salió de la barra (Diego, 30-ago-2026: «solamente existirá
              botón de guardar»). El texto está siempre a la vista, arriba. -->
         <button type="button" id="btnCerrarPost" class="btn" style="width:auto;padding:0 15px;flex-shrink:0;background:#334155;color:#fff;display:none;" data-nodirty onclick="cerrarPanel()">✖ Cerrar</button>
@@ -5850,6 +5920,108 @@ document.addEventListener('wheel', ()=>{
  *                  de la tarjeta de cama, que es hoy la única vía para
  *                  corregir un nombre o un RUT despues del ingreso.
  */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EL CAMINO DE TRES PASOS (16-sep-2026)
+   Turno (con sus eventos) → Evaluaciones → Relato.
+
+   POR QUÉ. El modal tenía 225 campos en una sola pantalla y el MRC era uno
+   más entre ellos: se saltaba sin que nadie lo notara. Partido en pasos, cada
+   uno escribe en UNA sola de las casas del dato (episodio · serie · evento ·
+   turno), y las evaluaciones pasan por delante de los ojos en cada turno.
+
+   🔴 NO se movió el formulario: las tarjetas siguen donde estaban, con sus
+   ids y sus funciones. Lo único que hace este director es MOSTRAR las del
+   paso vigente. Una tarjeta nueva sin data-paso cae en el turno, que es donde
+   va el 90% de lo que se registra.
+
+   🪤 El guardado ocurre al salir del PASO 2, no al final. En la UCI se sale
+   corriendo: si suena una alarma mientras se lee el relato, lo escrito ya
+   está en la planilla.
+   ══════════════════════════════════════════════════════════════════════════ */
+var PASO_ACTUAL = 1;
+const _PASO_TXT = { 1:'Siguiente: evaluaciones →', 2:'💾 Guardar y ver el relato', 3:'✖ Cerrar la evolución' };
+
+/** Muestra el paso n y esconde lo de los otros. */
+function pasoIr(n){
+  n = Math.max(1, Math.min(3, Number(n) || 1));
+  PASO_ACTUAL = n;
+  // Sin dueño declarado = del turno. Así una tarjeta nueva aparece en el paso
+  // correcto sin que nadie se acuerde de tocar esta función.
+  document.querySelectorAll('#kf .fcard, #kf [data-paso]').forEach(el => {
+    const mio = String(el.dataset.paso || '1') === String(n);
+    el.classList.toggle('paso-oculto', !mio);
+  });
+  document.querySelectorAll('#spPasos [data-p]').forEach(t => {
+    const p = Number(t.dataset.p);
+    t.setAttribute('aria-selected', p === n ? 'true' : 'false');
+    t.classList.toggle('paso-hecho', p < n);
+  });
+  const at = $('pasoAtras'); if(at) at.style.display = (n === 1) ? 'none' : '';
+  const av = $('pasoAvanza'); if(av) av.textContent = _PASO_TXT[n];
+  // El 💾 de siempre queda fuera de la vista: en el camino hay UN solo botón
+  // de avance por paso. Sigue en el DOM y sigue guardando.
+  const g = $('btnGuardar'); if(g) g.style.display = 'none';
+  const pc = document.querySelector('#sp .pcontent'); if(pc) pc.scrollTop = 0;
+  if(typeof _rielDeb === 'function') _rielDeb();
+}
+
+function pasoRetroceder(){ pasoIr(PASO_ACTUAL - 1); }
+
+/** El botón de avance. En el paso 2 lo que hace es GUARDAR. */
+function pasoAvanzar(){
+  if(PASO_ACTUAL === 1){ pasoIr(2); return; }
+  if(PASO_ACTUAL === 2){ guardar(); return; }   // pasoTrasGuardar() lleva al 3
+  cerrarPanel();
+}
+
+/** Lo llama el guardado cuando terminó bien: recién ahí existe el relato. */
+function pasoTrasGuardar(){ if(PASO_ACTUAL === 2) pasoIr(3); }
+
+/* ── 📌 Los pendientes que dejó el turno anterior ────────────────────────
+   Se pintan desde la CAMA (el episodio), no desde el turno previo: los chips
+   de PLAN_PENDIENTES mueren a las 12 horas y por eso nadie podía cerrarlos.
+   Van arriba del paso 1 porque son lo que te encargaron: se leen ANTES de
+   decir qué hiciste. */
+function pendEpiPintar(){
+  const caja = $('pendEpi'); if(!caja) return;
+  const cama = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  let lista = [];
+  try { lista = JSON.parse(cama.PENDIENTES_JSON || '[]') || []; } catch(e) { lista = []; }
+  const abiertos = lista.filter(p => p && !p.ci);
+  if(!abiertos.length){ caja.classList.add('hidden'); caja.innerHTML = ''; return; }
+  caja.classList.remove('hidden');
+  caja.innerHTML = '<div class="pe-t">📌 Te dejaron pendiente</div>' + abiertos.map(p =>
+    '<div class="pe-i"><span class="pe-tx">' + escapeHtml(p.tx || '') +
+      (p.ab ? '<span class="pe-de">' + escapeHtml(p.ab) + (p.abTs ? ' · ' + escapeHtml(String(p.abTs).slice(0,10)) : '') + '</span>' : '') +
+    '</span>' +
+    '<button type="button" class="pe-btn" data-nodirty data-pend="' + escapeHtml(p.id || '') +
+      '" onclick="pendEpiCerrar(&quot;' + escapeJs(p.id || '') + '&quot;)">Cerrar</button></div>'
+  ).join('');
+}
+
+function pendEpiCerrar(id){
+  const idCama = v('cBed'); if(!idCama || !id) return;
+  _pedirFirma().then(firma => {
+    if(firma === null) return;
+    api('PEND_CERRAR', { idCama: String(idCama), id: String(id), firma: firma || '' })
+      .then(() => {
+        // La cama en memoria también: si no, vuelve a aparecer al repintar.
+        const c = (typeof _camaPanel === 'function') ? _camaPanel() : null;
+        if(c){
+          try {
+            const l = JSON.parse(c.PENDIENTES_JSON || '[]') || [];
+            const p = l.filter(x => String(x.id) === String(id))[0];
+            if(p){ p.ci = firma || ''; c.PENDIENTES_JSON = JSON.stringify(l); }
+          } catch(e) {}
+        }
+        pendEpiPintar();
+        toast('✓ Pendiente cerrado');
+      })
+      .catch(e => toast('❌ No se pudo cerrar: ' + (e && e.message ? e.message : e)));
+  });
+}
+
 function abrirPanel(id, esIng, verFicha) {
   const fecha=v('gDate')||hoy();
   const tkey=`${fecha}-${SHIFT}`;
@@ -6009,6 +6181,9 @@ function abrirPanel(id, esIng, verFicha) {
   // (lo escrito manda sobre el formulario recién cargado). Lo último del abrir.
   _estadoGuardado(null);
   _borradorRestaurar(id);
+  // El camino empieza de nuevo en cada cama, con lo que le dejaron encargado.
+  pendEpiPintar();
+  pasoIr(1);
 }
 
 function actualizarTituloPanel(nombre) {
@@ -8215,6 +8390,7 @@ function guardar() {
       _congelarTexto(true);
     }
     show('rarea');
+    pasoTrasGuardar();   // el relato ya existe: paso 3
     // SIN desplazarse al texto (Diego, 15-ago-2026: «que solo guarde antes
     // de progresar»): guardar es para seguir con el próximo paciente. El
     // texto queda disponible arriba de la barra por si hay que copiarlo, y
