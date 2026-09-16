@@ -899,3 +899,69 @@ calculan por duplicado: el navegador los muestra en vivo y el servidor los sella
 al guardar. La guardia nueva `interfaz_un_lector.js` comprueba los dos.
 
 **Batería: 164 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · La extubación se pregunta una sola vez (decisión 1 de Diego)
+
+Textual: «**1 si unifica.** Esto resolvería el cómo queda luego de ese evento en
+particular. Y comparte la lógica que ya está».
+
+### Lo que había: dos copias de las mismas cinco preguntas
+
+A la extubación se llega por dos caminos —con PVE superada y sin PVE— y **cada
+camino traía su propia copia** de todo lo que se pregunta después:
+
+| concepto | camino PVE | camino sin PVE |
+|---|---|---|
+| con qué queda | `peModo` | `peModoNo` |
+| sus parámetros | `peParamsBox` | `peParamsBoxNo` |
+| evaluación post | `fPostExtDet` | `fPostExtDetNo` |
+| ¿hubo reintubación? | `cReintub` | `cReintubNo` |
+| hora de la reintubación | `fReintubHoraN1` | `fReintubHoraN2` |
+| razón de la reintubación | `fReintubRaz` | `fReintubRazNo` |
+
+Y con ellas una copia entera del dibujante de parámetros: `renderParamsPEno`,
+sesenta líneas que **empiezan diciendo** «reutiliza misma lógica que
+renderParamsPE» y no reutilizan nada. Ocho campos más por duplicado ahí dentro.
+
+Dos lugares para la misma pregunta es un lugar donde quedar a medias, y ya había
+pasado: cuando en agosto se arregló la mascarilla de Venturi hubo que acordarse
+de arreglarla en los dos. Salió bien por suerte, no por diseño.
+
+### La forma buena ya estaba en la casa
+
+El panel «Queda con» de la **reintubación** es uno solo desde hace meses: vive
+fuera de las tres ramas y se **inserta** en la que esté activa. Esta tanda le
+aplica el mismo patrón al resto del bloque — que es exactamente lo que Diego
+pidió con «comparte la lógica que ya está».
+
+Ahora hay un `#dExtPost` único con las cinco preguntas, y `_panelExtPost()` lo
+muda al camino activo. **15 ids duplicados menos, 72 líneas menos.**
+
+🪤 Y de regalo: mudarlo **no borra lo escrito**. Si el colega cambia de camino a
+mitad de la declaración, su «queda con NRC» lo sigue. Antes lo escrito en un
+camino se perdía al pasar al otro, sin aviso.
+
+### 🔴 La máscara de VNI seguía escribiéndose como vía aérea
+
+`_PE_META` traduce «con qué queda» a vía aérea y soporte, y para los tres modos
+de VNI decía `va:'Full Face'`. O sea que **cada extubación a VNI escribía
+`VENT_VIA_AEREA_FINAL = 'Full Face'`**, un valor que dejó de ser vía aérea esa
+misma mañana. Se leía bien gracias al traductor de compatibilidad, pero se
+seguía escribiendo mal, y le sumaba días de vía aérea artificial a un paciente
+que acababa de ser extubado. Ahora deja `Natural` con soporte `VNI`.
+
+### El contrato que no se movió
+
+Los dos caminos ya guardaban exactamente lo mismo. La guardia nueva
+`extubacion_una_ruta.js` recorre los dos por pantalla y compara **doce campos
+del payload uno por uno**, más los valores concretos para que «coinciden» no
+pueda significar «los dos vacíos». Unificar la pantalla no cambió ni una celda
+de lo que llega a la planilla.
+
+`fio2_venturi.js` pasó de vigilar tres pantallas a vigilar dos, con la razón
+escrita: el sitio duplicado se fue, que era justamente el riesgo. En su lugar
+quedó el control de que no vuelva a nacer una segunda copia.
+
+**Batería: 165 verdes, 0 rojas.**

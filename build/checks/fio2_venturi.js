@@ -149,30 +149,33 @@ const CATALOGO = ['24', '26', '28', '30', '35', '40', '50'];
   si('en Ambiente no aparece FiO₂ (no hay oxígeno que programar)', !AMB.hayFio2);
   si('…pero sí la FR', AMB.hayFr);
 
-  /* ══ 5 · LA MISMA REGLA EN LAS TRES PANTALLAS ═════════════════════════ */
-  // Regla de la casa: una regla clínica vive en 3-4 sitios. La FiO₂ de la
-  // Venturi vive en el módulo del turno, en el «queda con» de post-extubación
-  // (PVE superada) y en su rama «no superada» — que hasta hoy pedía LITROS.
+  /* ══ 5 · LA MISMA REGLA EN LAS DOS PANTALLAS ══════════════════════════
+     🗂️ 16-sep-2026 · ERAN TRES, AHORA SON DOS — Y ES LO QUE SE QUERÍA.
+     Este bloque comprobaba la Venturi en el módulo del turno, en el «queda
+     con» del post-extubación con PVE superada, y otra vez en la copia que
+     tenía el camino SIN PVE (`peModoNo` / `renderParamsPEno`), que hasta
+     ago-2026 pedía LITROS. Esa copia ya no existe: el panel del
+     post-extubación es UNO solo y se muda al camino activo (decisión de Diego,
+     «1 si unifica»; lo fija `extubacion_una_ruta.js`).
+     Que haya un sitio menos que vigilar no es que la guardia vigile menos: es
+     que el sitio duplicado se fue, que era justamente el riesgo — la Venturi
+     se arregló en los dos por suerte, no por diseño. Acá queda el control de
+     que no vuelva a nacer una segunda copia. */
   console.log('\n5 · Post-extubación dice lo mismo que el turno');
   const PE = await p.evaluate(() => {
     const sel = $('peModo'); if (sel) sel.value = 'MMV';
     renderParamsPE();
     const e = $('pe_fio2');
-    const selNo = $('peModoNo'); if (selNo) selNo.value = 'MMV';
-    renderParamsPEno();
-    const eNo = $('peFiO2No');
     return {
       pe: e ? [...e.options].map(o => o.value).filter(x => x !== '') : [],
       peTag: e ? e.tagName : '', peLitros: !!$('pe_litros'),
-      no: eNo ? [...eNo.options].map(o => o.value).filter(x => x !== '') : [],
-      noTag: eNo ? eNo.tagName : '', noLitros: !!$('peLtNo'),
+      segundaCopia: !!$('peModoNo') || !!$('peFiO2No') || typeof renderParamsPEno === 'function',
     };
   });
-  eq('PVE superada · mismo catálogo', PE.pe.join(','), CATALOGO.join(','));
-  si('PVE superada · sin litros', !PE.peLitros);
-  eq('PVE no superada · es desplegable', PE.noTag, 'SELECT');
-  eq('PVE no superada · mismo catálogo', PE.no.join(','), CATALOGO.join(','));
-  si('PVE no superada · ya no pide litros con Venturi', !PE.noLitros);
+  eq('post-extubación · es desplegable', PE.peTag, 'SELECT');
+  eq('post-extubación · mismo catálogo', PE.pe.join(','), CATALOGO.join(','));
+  si('post-extubación · sin litros', !PE.peLitros);
+  si('★ y no hay una segunda copia del panel donde el arreglo pueda faltar', !PE.segundaCopia);
 
   /* ══ 6 · EL CATÁLOGO CABE EN LA VALIDACIÓN DEL GUARDADO ═══════════════ */
   // Propiedad, no memoria: los límites se leen del validador del propio front.
