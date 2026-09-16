@@ -202,6 +202,87 @@ Queda anotado, sin arreglar: la tabla del registro deja **175 píxeles fuera de
 la vista** a la derecha (mide 1.529 y el contenedor 1.354). Se puede
 desplazar, pero lo único que avisa es la palabra «TURN…» cortada a la mitad.
 
+## 16-sep-2026 · La app se instala en el teléfono (tanda 3 del PRD)
+
+Diego: «arma la tanda 3, la PWA». El PRD la tenía escrita desde el 8-sep,
+esperando dos respuestas de informática y cuatro decisiones suyas.
+
+**Lo que faltaba no era configuración, era código**, y se midió antes de
+empezar: el servidor no tenía puerta HTTP —ni `doPost` ni `ContentService`— y
+la pantalla hablaba solo por `google.script.run`, que existe únicamente dentro
+del iframe de Apps Script. Servida desde otro sitio, la app abría y se quedaba
+sin servidor.
+
+### La puerta · `v2/api_web.gs`
+
+🪤 **La trampa que define su forma.** Antes de mandar un POST a otro dominio
+con `Content-Type: application/json`, el navegador pregunta primero con una
+petición OPTIONS, y **Apps Script no contesta OPTIONS**: la llamada muere sin
+llegar nunca al código. Lo que se ve en la consola habla de CORS, que manda a
+buscar al lugar equivocado. Por eso el cuerpo viaja como `text/plain` y el
+servidor lo interpreta él mismo. Es el error que se va a cometer cada vez que
+alguien toque esta parte, así que lo fija una guardia.
+
+🔴 **La puerta no decide nada**: llama al mismo `api()` de siempre. Un segundo
+catálogo de acciones haría que una acción nueva sirva por un camino y no por el
+otro, y el día que pase nadie se va a acordar de que hay dos listas. De paso
+hereda gratis el candado del turno.
+
+### El puente · una pantalla, dos caminos
+
+`v2/index.html` detecta dónde está. Dentro del iframe, `google.script.run`;
+fuera, `fetch` al `/exec`. Mantener dos pantallas sería mantener dos verdades.
+
+🔒 **La dirección del `/exec` no se escribe en el código.** La app la pide la
+primera vez en cada aparato y la guarda ahí. El sitio publicado es público y la
+dirección no tiene por qué estarlo; además, así el mismo sitio sirve para la
+planilla de pruebas y para la de producción.
+
+Si falta la dirección, la app **no arranca**: la pide. Arrancar sin servidor
+dejaría una pantalla muerta sin decir por qué.
+
+### El paquete · `pwa/`, generado desde `v2/`
+
+Manifiesto, service worker e iconos propios —azul institucional con una curva
+de presión de la vía aérea, generados con Chromium y versionados—. El index
+aquí **no viaja como cohete**: ese formato existe por el lector estricto de
+Google, y fuera de Apps Script solo haría la carga más lenta.
+
+🔴 **El service worker no guarda ni un dato clínico, y es deliberado.** Guarda
+solo el armazón. Si guardara las respuestas, el censo de la UCI quedaría
+escrito en el aparato de cada uno, sobreviviría al cierre de sesión y estaría
+ahí si el teléfono se pierde. Dos filtros y cualquiera basta: solo `GET` y solo
+del propio origen.
+
+🪤 El nombre del caché lleva el sello de versión. Con un nombre fijo el equipo
+se queda con la pantalla vieja para siempre, y el síntoma es «pegué el archivo
+y no cambió nada»: el peor rato de depuración que hay, porque el código nuevo
+sí está.
+
+### 🪤 Dos cosas que cazaron las guardias, y una era mía de hace un día
+
+**`entrega/LEEME.md` llevaba borrado desde el 15-sep y no me había dado
+cuenta.** El empaquetador hacía `rmSync` de la carpeta entera y se lo llevaba
+en cada regeneración; mi propia guardia de paridad lo **excluía** de la
+comparación en vez de exigir que siguiera ahí. Ahora los dos empaquetadores
+borran solo lo que generan, y las dos guardias exigen que el LEEME exista.
+
+**`api_web.gs` no entraba en el paquete.** Lo cazó `checks/paquete.js`: dos
+funciones del repositorio quedaban fuera del proyecto que se pega. Sin eso
+`doPost` nunca habría llegado al editor y la PWA habría fallado con un error de
+red que no dice nada. Ahora viaja junto a `webapp.gs`, que es el otro punto de
+entrada.
+
+### Lo que NO se hizo, y por qué
+
+- **Guardar sin conexión**: fuera de alcance del PRD y, sobre todo, guardar
+  datos clínicos en el teléfono es el riesgo que el service worker evita.
+- **Elegir el alojamiento por él (D1)**: el PRD recomendaba Firebase porque
+  GitHub Pages deja el sitio público. Diego pidió GitHub, así que se armó el
+  flujo para GitHub, pero la carpeta es estática y sirve tal cual en Firebase o
+  Cloudflare. Lo público es la pantalla, no los datos.
+- **Encender nada**: el flujo se dispara a mano, no en cada empujón.
+
 ## 16-sep-2026 · Un login que no depende de informática
 
 Diego: «¿puedes crear un login de acceso?». El plan maestro eligió Google

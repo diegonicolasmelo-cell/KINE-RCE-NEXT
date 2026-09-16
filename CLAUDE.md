@@ -102,10 +102,42 @@ sigue construido y esperando el proyecto de Google Cloud.
 - **Espacios separados**: una clave de coordinación no abre el turno, ni al
   revés. Son dos permisos distintos.
 
+### 🔴 Dos caminos al servidor, una sola pantalla
+La app sirve en dos sitios y la pantalla es **una**: `v2/index.html` detecta
+dónde está.
+
+- **Dentro del iframe** de Apps Script usa `google.script.run`, como siempre.
+- **Como app instalada** llama al `/exec` por `fetch`, y el servidor contesta
+  por `doPost` (`v2/api_web.gs`).
+- 🪤 **El cuerpo del POST viaja como `text/plain`, no `application/json`.** Con
+  JSON el navegador pregunta primero con OPTIONS y **Apps Script no contesta
+  OPTIONS**: la llamada muere sin llegar. El error que se ve habla de CORS y
+  manda a buscar al lugar equivocado. Lo fija `checks/puente_doble.js`.
+- 🔴 **La puerta HTTP no decide nada**: llama al mismo `api()`. Un segundo
+  catálogo de acciones haría que una acción nueva sirva por un camino y no por
+  el otro.
+- 🔒 **La dirección del `/exec` no se escribe en el código.** Cada aparato la
+  configura la primera vez y queda en su localStorage.
+
+### 🔴 El service worker no guarda datos clínicos
+`pwa/sw.js` cachea **solo el armazón**: pantalla, manifiesto e iconos. Dos
+filtros, y cualquiera basta: solo `GET` y solo del propio origen. Guardar las
+respuestas dejaría el censo de la UCI escrito en el teléfono de cada uno.
+🪤 El nombre del caché lleva el **sello de versión**: con un nombre fijo el
+equipo se queda con la pantalla vieja y el síntoma es «pegué el archivo y no
+cambió nada».
+
 ### 🔴 El paquete de entrega se genera, no se edita
-`node build/paquete_migracion.js entrega`. La guardia `paridad_entrega.js`
-compara `entrega/` contra lo generado **byte a byte**: editar ahí es trabajo
-que se pierde, y olvidar regenerar pone la batería roja.
+`node build/paquete_migracion.js entrega` para el editor de Apps Script, y
+`node build/empaquetar_pwa.js` para la app instalable. Las guardias
+`paridad_entrega.js` y `pwa_paquete.js` comparan cada carpeta contra lo
+generado **byte a byte**: editar ahí es trabajo que se pierde, y olvidar
+regenerar pone la batería roja.
+🪤 **Un empaquetador borra solo lo que genera, nunca la carpeta entera.** Con
+`rmSync` de la carpeta se llevaba por delante el `LEEME.md` escrito a mano, y
+eso pasó de verdad: el de `entrega/` estuvo borrado desde el 15-sep sin que
+nadie lo notara, porque la guardia lo EXCLUÍA de la comparación en vez de
+exigir que siguiera ahí. Ahora las dos guardias lo exigen.
 
 ---
 

@@ -1,0 +1,55 @@
+# Publica la carpeta pwa/ como sitio, para que la app se instale en el teléfono.
+#
+# 🔴 NO se dispara solo en cada empujón: se corre a mano desde la pestaña
+# Actions, o al empujar a main. Publicar desde una rama de trabajo pondría en
+# el teléfono del equipo lo que todavía se está probando.
+#
+# Antes de que esto sirva hay que activar Pages una vez en el repositorio:
+# Settings → Pages → Source: «GitHub Actions».
+#
+# 🔒 Lo que se publica es solo la PANTALLA. Los datos siguen en la planilla,
+# detrás del /exec de Apps Script, y la dirección de ese /exec NO va en el
+# sitio: cada aparato la configura la primera vez que abre la app.
+name: Publicar la app instalable
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['pwa/**', '.github/workflows/publicar-pwa.yml']
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Una publicación a la vez; si entra otra, esta termina y no se cancela a mitad.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      # 🔴 No se publica una carpeta editada a mano ni desactualizada: la
+      # guardia compara pwa/ contra lo que genera el empaquetador desde v2/.
+      - name: La carpeta pwa/ está al día con v2/
+        run: node build/checks/pwa_paquete.js
+
+  publicar:
+    needs: comprobar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: pwa }
+      - id: despliegue
+        uses: actions/deploy-pages@v4

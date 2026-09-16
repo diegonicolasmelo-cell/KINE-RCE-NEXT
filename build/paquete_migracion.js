@@ -23,7 +23,11 @@ const GRUPOS = [
   ['infra.gs', ['infra_respuesta.gs', 'infra_util.gs', 'infra_fechas.gs', 'infra_lock.gs', 'infra_log.gs', 'infra_auth.gs']],
   ['dominio.gs', ['dominio_calculos.gs', 'dominio_validacion.gs', 'dominio_texto.gs']],
   ['api.gs', ['api.gs']],
-  ['webapp.gs', ['webapp.gs']],
+  // Los DOS puntos de entrada de la Web App viajan juntos: `doGet` sirve la
+  // pantalla dentro del iframe y `doPost` contesta datos a la app instalada.
+  // Separarlos dejaría que se pegue uno y no el otro, y la PWA fallaría con un
+  // error de red que no dice nada.
+  ['webapp.gs', ['webapp.gs', 'api_web.gs']],
   ['mantenimiento.gs', ['mantenimiento.gs']],
   // Correcciones puntuales del arranque real (Manuel, ago-2026). Es TEMPORAL
   // por diseño — se borra cuando terminen las tandas —, pero mientras exista
@@ -42,8 +46,14 @@ module.exports = { GRUPOS };
 // Generar solo cuando se ejecuta directamente, no al importarlo.
 if (require.main !== module) return;
 
-fs.rmSync(salida, { recursive: true, force: true });
+// 🪤 ANTES ERA `fs.rmSync(salida, {recursive:true})`, y se llevaba por delante
+// el LEEME.md escrito a mano de la carpeta. Pasó de verdad: el de `entrega/`
+// estuvo borrado desde el 15-sep sin que nadie lo notara, porque la guardia de
+// paridad lo EXCLUÍA de la comparación en vez de exigir que siguiera ahí.
+// Ahora se borra solo lo que este script genera; lo demás se respeta.
+const _GENERA = GRUPOS.map(g => g[0]).concat(['servicios.gs', 'index.html', 'spike_gis.html', 'appsscript.json']);
 fs.mkdirSync(salida, { recursive: true });
+for (const f of _GENERA) { try { fs.rmSync(path.join(salida, f), { force: true }); } catch (e) {} }
 
 const generados = [];
 for (const [destino, fuentes] of GRUPOS) {

@@ -1,0 +1,33 @@
+{
+  "name": "RCE KINE · UCI",
+  "short_name": "RCE KINE",
+  "description": "Registro Clínico Electrónico de Kinesiología UCI",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "es-CL",
+  "dir": "ltr",
+  "theme_color": "#04345E",
+  "background_color": "#EEF3F9",
+  "icons": [
+    {
+      "src": "iconos/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "iconos/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "iconos/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -226,6 +226,22 @@ tiene 145 guardias que la protegen **como está**, y mover código por moverlo
 no arregla nada que hoy esté roto. Conviene hacerlo cuando haya un motivo
 medido —un bug que nazca de ese acoplamiento— y no antes.
 
+### 🟢 G7 · La app se instala en el teléfono (PRD de la PWA)
+
+> **16-sep-2026.** Hecha la tanda 3. El servidor ahora tiene puerta HTTP
+> (`v2/api_web.gs`), la pantalla habla por los dos caminos según dónde corra, y
+> `pwa/` es el paquete instalable, generado desde `v2/`.
+>
+> **Falta solo lo que no depende de programar**: activar Pages una vez en el
+> repositorio, y pedirle a informática la lista blanca que el PRD detalla en su
+> §7 (el dominio del sitio, y confirmar `script.google.com`,
+> `script.googleusercontent.com` y `accounts.google.com`).
+>
+> ⚠️ **Decisión D1 del PRD, sin tomar**: GitHub Pages deja el sitio público.
+> Lo público sería la **pantalla**, no los datos, que siguen detrás del `/exec`
+> con el candado del turno. Si prefieres que ni la pantalla lo sea, la misma
+> carpeta sirve tal cual en Firebase Hosting, que era la recomendación del PRD.
+
 ### ⚪ G6 · `clasp` (§2.8, §13)
 
 No hay `.clasp.json`. El `appsscript.json` sí está versionado y el paquete del
@@ -245,8 +261,9 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | 2 | **G2** · Snapshot mensual permanente, con guardia | ✅ hecho |
 | 3 | **G4** · Minimización medida y con guardia | ✅ hecho · sacarlo entero espera a Diego |
 | 4 | **G5** · Capa `core/` en la interfaz | ✅ escape, puente y modales · queda `core/estado.js` |
-| 5 | Estética · textos cortados | ✅ hecho |
-| 6 | Estética · las cinco decisiones de Diego | esperando su respuesta |
+| 5 | **G7** · La app instalable (PWA) | ✅ hecho · falta activar Pages y la lista blanca |
+| 6 | Estética · textos cortados | ✅ hecho |
+| 7 | Estética · las cinco decisiones de Diego | esperando su respuesta |
 | — | **G3** | ✅ resuelto con clave propia · el de Google sigue esperando a informática |
 | — | **G6** | esperando a Diego |
 

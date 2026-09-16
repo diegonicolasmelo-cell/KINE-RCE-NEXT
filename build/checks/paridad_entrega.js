@@ -50,9 +50,16 @@ try {
 }
 
 /* ── 1 · Mismo conjunto de archivos ───────────────────────────────────────── */
-// LEEME.md es documentación escrita a mano y no la genera el empaquetador:
-// se excluye a propósito de la comparación.
+// LEEME.md es documentación escrita a mano y no la genera el empaquetador, así
+// que no entra en la comparación byte a byte. 🪤 Pero SÍ se exige que exista:
+// excluirlo sin más fue lo que dejó pasar que el empaquetador lo borrara en
+// cada regeneración —estuvo perdido desde el 15-sep y nadie lo notó—.
 const MANUAL = new Set(['LEEME.md']);
+// La documentación escrita a mano tiene que seguir ahí después de regenerar.
+for (const f of MANUAL) {
+  si('el ' + f + ' de la carpeta sobrevivió a la regeneración', fs.existsSync(path.join(entrega, f)),
+    'el empaquetador se lo llevó: debe borrar solo lo que genera, no la carpeta entera');
+}
 const listar = d => fs.readdirSync(d).filter(f => !MANUAL.has(f)).sort();
 const aqui = listar(entrega), debe = listar(fresco);
 const sobran = aqui.filter(f => !debe.includes(f));
