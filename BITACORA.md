@@ -640,3 +640,76 @@ exige que el identificador esté por encima de los pasos. Se vio roja con 5
 fallos.
 
 **Batería: 157 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · Tandas C y D · el camino queda funcional de punta a punta
+
+### Paso 2 · lo que el episodio lleva medido, y la salida barata
+
+Los chips salen de la CAMA (el arrastre del episodio), con **valor · fecha ·
+firma**: `MRC-ss 36 · 14-09 · MCC`. Lo que nunca se midió sale en ámbar
+(«FSS-ICU sin medir»). Tocar un chip abre su calculadora de siempre.
+
+Y el botón **«No medí nada este turno»**, que era el punto: las escalas no se
+miden todos los turnos y son 12 a 20 camas por turno. Un paso que obligue a
+llenar algo se abandona en tres días — el equipo aprende a apretar «siguiente»
+sin mirar y el paso deja de servir. Se cruza en un clic y aun así deja visto
+qué le falta al episodio.
+
+### La regla del SBC salió (D6)
+
+`validarSBC` se **borró** del dominio, el servicio dejó de llamarla y el
+cliente dejó de bloquear. No quedó dormida detrás de una bandera.
+
+La sección 2d/3d de `episodio_turno.js` no se borró: **cambió de signo**. Antes
+probaba que rechazaba; ahora prueba que NO rechaza, así que si alguien
+reintrodujera el candado se pone roja.
+
+### Paso 3 · el ciclo se cierra
+
+«✓ Guardado · evolución del turno Día, 16-09» arriba de todo, porque se llega
+ahí solo si el guardado salió bien. Después el relato (se movió delante del
+plan, como el mockup), el plan, y **dejar pendiente** — con sugerencias que
+salen de lo que el paso 2 mostró sin medir. Ahí se cierra el círculo con la
+tanda A: lo que se deja encargado vive en el episodio y el colega de mañana lo
+ve al abrir la cama.
+
+**D2 + D3 juntas**: el relato se retoca a mano y al volver atrás se regenera.
+Si HABÍA retoque, se avisa antes de pisarlo, con tres salidas (regenerar ·
+conservar mi texto · quedarme acá). Nunca se borra trabajo escrito en silencio.
+
+### 🪤 El id del botón se comió a la función
+
+El botón quedó con `id="pasoEvalNada"` y la función se llamó igual. Al tocarlo:
+«pasoEvalNada is not a function». No falla al cargar — **falla solo al
+apretarlo**.
+
+El mecanismo, medido y no deducido: un handler inline no se evalúa en el ámbito
+global; su cadena pasa por el elemento, **después por su formulario**, después
+por el documento y recién ahí por el global. Y un `<form>` expone sus controles
+por id. Dentro de `#kf`, `pasoEvalNada` resolvía al BOTÓN.
+
+De paso aparecieron cinco funciones más que comparten nombre con un id
+(`sugMias`, `plantModNota`, `plantPreview`, `plantModRetirar`, `stkResumen`).
+**No son bugs**: se comprobó una por una en el navegador que resuelven a
+`function`, porque esos ids están FUERA del formulario. Por eso
+`id_no_pisa_funcion.js` mira solo los 467 ids de adentro — acusar a las otras
+sería ruido.
+
+### 🪤 Y en el teléfono el paso 2 salía vacío
+
+El acordeón del celular pliega las `.fcard`, y los chips y el botón de salida
+vivían dentro de la única tarjeta del paso: se abría mostrando un título
+plegado que decía «sin registrar». **Lo que tiene que verse siempre no puede
+vivir dentro de algo que se pliega.** Los chips, la salida y la caja de
+pendientes salieron de las tarjetas.
+
+Otras dos de la misma mirada: el textarea del relato trae `rows="20"` y
+empujaba el plan y los pendientes fuera de la pantalla con el relato casi
+vacío (ahora se acota por altura); y el botón «No medí nada», con borde
+punteado y fondo de papel, parecía un aviso y no algo que se aprieta.
+
+**Batería: 160 verdes, 0 rojas.** Quedan cuatro guardias nuevas del rediseño
+(`tres_pasos`, `paso_evaluaciones`, `paso_relato`, `identidad_una_vez`) más las
+dos de trampas genéricas (`tokens_existen`, `id_no_pisa_funcion`).

@@ -1118,6 +1118,48 @@ table.rhb2 .rl{width:128px;text-align:left;}
   #spPasos{top:0;}
 }
 .paso-oculto{display:none!important;}
+/* Paso 3 · quedó guardado, y lo que se deja encargado */
+#pasoGuardado{display:flex;align-items:center;gap:9px;font-size:.88rem;font-weight:700;
+  color:#0f766e;background:#e6f0ee;border:1px solid #0f766e33;border-radius:10px;
+  padding:9px 13px;margin-bottom:12px;}
+#pasoGuardado .pg-tic{width:20px;height:20px;border-radius:50%;background:#0f766e;color:#fff;
+  display:grid;place-items:center;font-size:.72rem;flex-shrink:0;}
+/* 🪤 El textarea trae rows="20" y en el paso 3 empujaba el plan y los
+   pendientes fuera de la pantalla — con el relato casi vacío. Se acota por
+   altura, que sí se puede mandar desde CSS. */
+#rarea #rtxt{height:clamp(170px,32vh,400px);}
+.pp-sugs{display:flex;gap:6px;flex-wrap:wrap;}
+.pp-sugs:empty{display:none;}
+.pp-sug{border:1px dashed var(--border);background:var(--card);color:var(--muted);
+  font-family:inherit;font-size:.8rem;border-radius:999px;padding:5px 12px;cursor:pointer;}
+.pp-sug:hover{border-style:solid;border-color:var(--warn);color:var(--warn);}
+.pp-sug:focus-visible{outline:2px solid var(--warn);outline-offset:2px;}
+#pasoPend{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:13px 15px;margin-top:12px;}
+.pp-hdr{font-size:.8rem;font-weight:800;color:var(--txt);margin-bottom:9px;}
+.pp-libre{display:flex;gap:7px;align-items:center;margin-top:9px;}
+.pp-libre input{flex:1;min-width:0;height:32px;}
+.pp-libre button{flex-shrink:0;width:auto;padding:0 16px;height:32px;font-size:.82rem;
+  font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--txt);
+  border-radius:8px;cursor:pointer;font-family:inherit;}
+.pp-libre button:hover{border-color:var(--primary);color:var(--primary);}
+.pp-puesto{font-size:.82rem;color:#0f766e;margin-top:6px;font-weight:600;}
+/* Paso 2 · los chips del episodio y la salida barata */
+#pasoEvalChips{margin-bottom:14px;}
+.pe2-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--muted);margin:0 0 7px;}
+.pe2-fila{display:flex;gap:6px;flex-wrap:wrap;}
+.pe2-fila .abadge{font-size:.8rem;padding:5px 11px;}
+/* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
+   aprieta. Lo que es interactivo tiene que verse interactivo. */
+#pasoEvalNada{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);border-radius:10px;padding:13px 15px;
+  font-size:.92rem;font-weight:700;color:var(--txt);margin-top:12px;
+  box-shadow:0 1px 2px rgba(15,23,42,.06);}
+#pasoEvalNada:hover{border-color:var(--primary);color:var(--primary);
+  box-shadow:0 2px 8px rgba(15,23,42,.10);}
+#pasoEvalNada:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+#pasoEvalNada small{display:block;font-weight:400;font-size:.76rem;color:var(--muted);margin-top:3px;}
 #epBannerCaja:empty,#epBannerCaja:has(.hidden){display:none;}
 #epBannerCaja{padding:10px 14px 0;background:var(--card);}
 #spRiel{display:none;}
@@ -4547,8 +4589,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
            saltaba sin que nadie lo notara; acá es un paso del camino, así que
            pasa por delante de los ojos en cada turno. El bloque va TAL CUAL:
            los ids y sus funciones (hEgr, cEgr, abrirEvalModal) no cambian. -->
+      <!-- 🪤 Los chips y la salida van FUERA de la tarjeta. En el teléfono el
+           acordeón pliega las .fcard, y con todo adentro el paso 2 se abría
+           vacío: solo un título plegado que decía «sin registrar». Lo que
+           tiene que verse siempre no puede vivir dentro de algo que se pliega. -->
+      <div id="pasoEvalChips" data-paso="2"></div>
       <div class="fcard fc-eval" id="fcEval" data-paso="2">
-        <div class="fcard-hdr"><span class="fcard-title">📏 Evaluaciones del episodio</span></div>
+        <div class="fcard-hdr"><span class="fcard-title">📏 Registrar una medición</span></div>
         <div class="fcard-body">
         <!-- EVALUACIONES FUNCIONALES (unificadas) -->
         <div class="sub-sec" id="fcEgrCard">
@@ -4644,6 +4691,28 @@ document.documentElement.setAttribute('data-piel', 'inst');
         </div>
       </div>
 
+      <!-- ✓ Se llega al paso 3 SOLO si el guardado salió bien, así que lo
+           primero que se lee es eso. -->
+      <div id="pasoGuardado" data-paso="3"></div>
+      <!-- TEXTO DE LA EVOLUCIÓN — editor real: se guarda tal como se ve -->
+      <div id="rarea" class="hidden" data-paso="3">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+          <span style="color:#94a3b8;font-size:.7rem;font-weight:700;">📄 TEXTO DE LA EVOLUCIÓN — editable; se guarda tal como lo ves<span id="rtxtEditBadge" style="display:none;color:#b45309;"> · ✍️ editado a mano</span></span>
+          <div style="display:flex;gap:8px;">
+            <button type="button" id="btnRegenTexto" style="display:none;width:auto;padding:8px 14px;font-size:.8rem;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:8px;cursor:pointer;" onclick="regenerarTexto()" title="Vuelve al texto del generador (descarta los retoques manuales)">🔄 Regenerar</button>
+            <button type="button" class="btn btn-c" style="width:auto;padding:8px 20px;font-size:.85rem;font-weight:800;" data-nodirty onclick="copiar()">📋 Copiar Texto</button>
+          </div>
+        </div>
+        <!-- Plantillas desde el texto (v6.04, Diego 6-sep): el 📋 abajo a la
+             derecha elige/crea; el ➕ verde aparece al seleccionar frases. -->
+        <div class="rtxt-caja">
+          <textarea id="rtxt" rows="20"></textarea>
+          <button type="button" class="plant-mas hidden" id="plantMas" data-nodirty onmousedown="event.preventDefault()" onclick="plantCrearDesdeSeleccion()" title="Crear una plantilla con las frases seleccionadas"><b>+</b> Crear plantilla con lo seleccionado</button>
+          <span class="plant-enuso" id="plantEnUso"></span>
+          <button type="button" class="plant-ico" id="plantIco" data-nodirty onclick="plantPopAbrir()" title="Plantillas de evolución">📋<span class="plant-ico-n hidden" id="plantIcoN"></span></button>
+          <div class="plant-pop" id="plantPop"></div>
+        </div>
+      </div>
       <div class="fcard fc-g" id="fcPlanes" data-paso="3">
         <div class="fcard-hdr"><span class="fcard-title">📋 Planes y Pendientes</span></div>
         <div class="fcard-body">
@@ -4680,23 +4749,25 @@ document.documentElement.setAttribute('data-piel', 'inst');
         </div>
       </div>
 
-      <!-- TEXTO DE LA EVOLUCIÓN — editor real: se guarda tal como se ve -->
-      <div id="rarea" class="hidden" data-paso="3">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
-          <span style="color:#94a3b8;font-size:.7rem;font-weight:700;">📄 TEXTO DE LA EVOLUCIÓN — editable; se guarda tal como lo ves<span id="rtxtEditBadge" style="display:none;color:#b45309;"> · ✍️ editado a mano</span></span>
-          <div style="display:flex;gap:8px;">
-            <button type="button" id="btnRegenTexto" style="display:none;width:auto;padding:8px 14px;font-size:.8rem;font-weight:700;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:8px;cursor:pointer;" onclick="regenerarTexto()" title="Vuelve al texto del generador (descarta los retoques manuales)">🔄 Regenerar</button>
-            <button type="button" class="btn btn-c" style="width:auto;padding:8px 20px;font-size:.85rem;font-weight:800;" data-nodirty onclick="copiar()">📋 Copiar Texto</button>
+
+      <button type="button" id="pasoEvalNada" data-paso="2" data-nodirty onclick="pasoSinMedir()">
+        No medí nada este turno
+        <small>Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
+      </button>
+
+      <!-- 📌 Lo que queda encargado para el turno que viene. Vive en el
+           EPISODIO (svc_pendientes.gs), así que el colega que abra esta cama
+           mañana lo va a ver arriba de su paso 1. -->
+      <div id="pasoPend" data-paso="3">
+        <div class="pp-hdr">📌 Dejar pendiente para el turno que viene</div>
+        <div class="pp-body">
+          <div id="pasoPendSugs" class="pp-sugs"></div>
+          <div class="pp-libre">
+            <input type="text" id="pasoPendTxt" placeholder="Otro encargo para el turno que viene…"
+                   onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();pasoPendEscrito();}">
+            <button type="button" id="pasoPendBtn" data-nodirty onclick="pasoPendEscrito()">Dejar</button>
           </div>
-        </div>
-        <!-- Plantillas desde el texto (v6.04, Diego 6-sep): el 📋 abajo a la
-             derecha elige/crea; el ➕ verde aparece al seleccionar frases. -->
-        <div class="rtxt-caja">
-          <textarea id="rtxt" rows="20"></textarea>
-          <button type="button" class="plant-mas hidden" id="plantMas" data-nodirty onmousedown="event.preventDefault()" onclick="plantCrearDesdeSeleccion()" title="Crear una plantilla con las frases seleccionadas"><b>+</b> Crear plantilla con lo seleccionado</button>
-          <span class="plant-enuso" id="plantEnUso"></span>
-          <button type="button" class="plant-ico" id="plantIco" data-nodirty onclick="plantPopAbrir()" title="Plantillas de evolución">📋<span class="plant-ico-n hidden" id="plantIcoN"></span></button>
-          <div class="plant-pop" id="plantPop"></div>
+          <div id="pasoPendPuestos"></div>
         </div>
       </div>
 
@@ -5961,11 +6032,180 @@ function pasoIr(n){
   // El 💾 de siempre queda fuera de la vista: en el camino hay UN solo botón
   // de avance por paso. Sigue en el DOM y sigue guardando.
   const g = $('btnGuardar'); if(g) g.style.display = 'none';
+  if(n === 2 && typeof pasoEvalPintar === 'function') pasoEvalPintar();
+  if(n === 3 && typeof pasoRelatoPintar === 'function') pasoRelatoPintar();
   const pc = document.querySelector('#sp .pcontent'); if(pc) pc.scrollTop = 0;
   if(typeof _rielDeb === 'function') _rielDeb();
 }
 
-function pasoRetroceder(){ pasoIr(PASO_ACTUAL - 1); }
+function pasoRetroceder(){
+  // Desde el relato, volver puede costar el retoque a mano: se avisa.
+  if(PASO_ACTUAL === 3){ pasoAtrasDesdeRelato(); return; }
+  pasoIr(PASO_ACTUAL - 1);
+}
+
+/* ── 📄 PASO 3 · el relato, el plan y lo que queda encargado ──────────────
+   Se llega acá SOLO si el guardado salió bien, así que lo primero que dice es
+   justamente eso. Después el relato ya escrito (retocable: «es solo
+   narrativo», dijo Diego), el plan, y los pendientes para el turno que viene.
+
+   🔑 El ciclo se cierra acá: las sugerencias de pendiente salen de lo que el
+   PASO 2 mostró sin medir. Lo que se deja encargado vive en el episodio y
+   cruza el turno, así que el colega del turno siguiente lo ve al abrir la
+   cama — que es todo el punto de la tanda A. */
+
+function pasoRelatoPintar(){
+  const g = $('pasoGuardado');
+  if(g){
+    const f = String(v('gDate') || (typeof hoy === 'function' ? hoy() : ''));
+    const t = (typeof SHIFT !== 'undefined' && SHIFT === 'Noche') ? 'Noche' : 'Día';
+    g.innerHTML = '<span class="pg-tic">✓</span> Guardado · evolución del turno ' +
+      escapeHtml(t) + ', ' + escapeHtml(_fdd(f) || f);
+  }
+  pasoPendSugerir();
+}
+
+/** Las sugerencias son lo que el paso 2 dejó sin medir. Nada inventado. */
+function pasoPendSugerir(){
+  const caja = $('pasoPendSugs'); if(!caja) return;
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  const faltan = (typeof _PASO_SERIE !== 'undefined' ? _PASO_SERIE : [])
+    .filter(e => e.col && String(c[e.col] == null ? '' : c[e.col]).trim() === '')
+    .map(e => 'Medir ' + e.lbl);
+  if(!faltan.length){ caja.innerHTML = ''; return; }
+  caja.innerHTML = faltan.map(t =>
+    '<button type="button" class="pp-sug" data-nodirty data-sug="1"' +
+    ' onclick="pasoPendDejar(&quot;' + escapeJs(t) + '&quot;)">+ ' + escapeHtml(t) + '</button>'
+  ).join('');
+}
+
+/** Deja un pendiente en el EPISODIO (cruza el turno; ver svc_pendientes.gs). */
+function pasoPendDejar(texto){
+  const t = String(texto || '').trim();
+  const idCama = v('cBed');
+  if(!t || !idCama) return;
+  _pedirFirma().then(firma => {
+    if(firma === null) return;
+    api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '' })
+      .then(() => {
+        const i = $('pasoPendTxt'); if(i) i.value = '';
+        const lista = $('pasoPendPuestos');
+        if(lista) lista.innerHTML += '<div class="pp-puesto">📌 ' + escapeHtml(t) + '</div>';
+        toast('📌 Pendiente dejado para el turno que viene');
+      })
+      .catch(e => toast('❌ No se pudo dejar el pendiente: ' + (e && e.message ? e.message : e)));
+  });
+}
+
+function pasoPendEscrito(){
+  const i = $('pasoPendTxt'); if(!i) return;
+  pasoPendDejar(i.value);
+}
+
+/* 🪤 D2 + D3 JUNTAS (decisiones de Diego). El relato se retoca a mano porque
+   «es solo narrativo», y al volver atrás a corregir un dato se REGENERA. Las
+   dos juntas significan que la regeneración se lleva el retoque — y con un
+   botón «atrás» eso va a pasar seguido.
+   Regla: regenerar es lo normal y no pregunta. Pero si HAY retoque a mano, se
+   avisa antes de pisarlo. Nunca se borra trabajo escrito en silencio. */
+function pasoAtrasDesdeRelato(){
+  const hayRetoque = (typeof _textoManual !== 'undefined') && _textoManual &&
+                     String(($('rtxt') || {}).value || '').trim() !== '';
+  if(!hayRetoque){ pasoIr(PASO_ACTUAL - 1); return; }
+  uiConfirm({
+    icono: '✍️',
+    titulo: 'Tenías el relato retocado',
+    mensaje: 'El <b>relato</b> tiene retoques tuyos a mano.',
+    detalle: 'Si corriges un dato y vuelves a guardar, el relato se arma de nuevo y ' +
+             'los retoques se pierden. Puedes volver conservando tu texto: entonces el ' +
+             'relato se queda tal como lo dejaste.',
+    confirmar: 'Volver y regenerar',
+    alterno: 'Volver conservando mi texto',
+    cancelar: 'Quedarme acá',
+  }).then(r => {
+    if(r === false) return;                       // se queda en el paso 3
+    if(r === true && typeof _marcarTextoGenerado === 'function'){
+      // Regenerar: el próximo guardado vuelve a armar el texto desde los datos.
+      _textoManual = false;
+      const badge = $('rtxtEditBadge'); if(badge) badge.style.display = 'none';
+    }
+    pasoIr(PASO_ACTUAL - 1);
+  });
+}
+
+
+
+/* ── 📏 PASO 2 · lo que el EPISODIO lleva medido ──────────────────────────
+   Diego, sobre el riesgo de partir el modal: las escalas NO se miden todos
+   los turnos, y son 12 a 20 camas por turno. Un paso que obligue a llenar
+   algo se abandona en tres días — el equipo aprende a apretar «siguiente»
+   sin mirar y el paso deja de servir.
+
+   Por eso este paso hace DOS cosas y ninguna obliga: muestra qué lleva medido
+   el episodio (con la firma de quien midió, que es procedencia y no
+   propiedad) y se cruza en un clic con «No medí nada este turno».
+
+   Los chips salen de la CAMA, no del turno: ULT_MRC/_FECHA/_FIRMA y sus
+   hermanos son el arrastre del episodio. */
+const _PASO_SERIE = [
+  { k:'mrc',    lbl:'MRC-ss',    col:'ULT_MRC',    fec:'ULT_MRC_FECHA', fir:'ULT_MRC_FIRMA', modal:true,  tip:'MRC sum-score (0-60)' },
+  { k:'fss',    lbl:'FSS-ICU',   col:'ULT_FSS',    fec:'ULT_FSS_FECHA', fir:'ULT_FSS_FIRMA', modal:true,  tip:'FSS-ICU (0-35)' },
+  { k:'cpax',   lbl:'CPAx',      col:'',           fec:'',              fir:'',              modal:true,  tip:'Chelsea Critical Care Physical Assessment' },
+  { k:'pim',    lbl:'Pimáx',     col:'ULT_PIM',    fec:'ULT_PIM_FECHA', fir:'ULT_PIM_FIRMA', campo:'fPIM',      tip:'Presión inspiratoria máxima' },
+  { k:'dinamo', lbl:'Dinamom.',  col:'ULT_DINAMO', fec:'',              fir:'',              campo:'fPrension', tip:'Dinamometría de prensión (kg)' },
+];
+
+function pasoEvalPintar(){
+  const caja = $('pasoEvalChips'); if(!caja) return;
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  if(!c.PATIENT_ID){ caja.innerHTML = ''; return; }
+
+  // Las repetibles, con su procedencia.
+  const serie = _PASO_SERIE.map(e => {
+    const val = e.col ? String(c[e.col] == null ? '' : c[e.col]).trim() : '';
+    const pend = val === '';
+    const fec = e.fec ? String(c[e.fec] || '') : '';
+    const fir = e.fir ? String(c[e.fir] || '') : '';
+    const detalle = pend ? '' : [val, fec ? _fdd(fec) : '', fir].filter(Boolean).join(' · ');
+    const tit = pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
+                     : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo';
+    return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') + '" style="cursor:pointer;"' +
+      ' data-esc="' + escapeHtml(e.k) + '" title="' + escapeHtml(tit) + '"' +
+      ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)">' +
+      escapeHtml(e.lbl) + (pend ? ' sin medir' : ' ' + escapeHtml(detalle)) + '</span>';
+  }).join('');
+
+  // Y las pre-UCI, que son dato único del episodio y ya tienen su propio
+  // generador (el mismo de la tarjeta de la cama).
+  const preUci = (typeof _escalasEpisodioHTML === 'function') ? _escalasEpisodioHTML(c, true) : '';
+
+  caja.innerHTML =
+    '<div class="pe2-t">Lo que este episodio lleva medido</div>' +
+    '<div class="pe2-fila">' + serie + '</div>' +
+    (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
+}
+
+/** Un chip del paso 2: abre su calculadora, o lleva al campo si no tiene. */
+function pasoEvalMedir(kind){
+  const e = _PASO_SERIE.filter(x => x.k === kind)[0]; if(!e) return;
+  if(e.modal && typeof abrirEvalModal === 'function'){ abrirEvalModal(kind); return; }
+  const el = $(e.campo);
+  if(el){ el.scrollIntoView({ block:'center' }); el.focus(); }
+}
+
+/** «No medí nada este turno»: cruza el paso sin escribir en la serie.
+    No es un atajo escondido — es la salida normal, y por eso está a la vista:
+    la mayoría de los turnos no mide ninguna escala.
+
+    🪤 NO se llama `pasoEvalNada`, que sería el nombre obvio, porque ASÍ SE
+    LLAMA EL BOTÓN. Un elemento con id crea una global con ese nombre y pisa a
+    la función: el onclick reventaba con «pasoEvalNada is not a function» y el
+    paso 2 no avanzaba. No da error al cargar — solo falla al tocarlo. */
+function pasoSinMedir(){
+  pasoAvanzar();   // en el paso 2 eso es guardar y pasar al relato
+}
+
+
 
 /** El botón de avance. En el paso 2 lo que hace es GUARDAR. */
 function pasoAvanzar(){
@@ -8030,13 +8270,11 @@ function guardar() {
   }
   // ★ Etapa 1(b) + 2: avisos NO bloqueantes antes de guardar — cambio de
   //   estado sin evento y mediciones heredadas sin confirmar ★
-  // ★ 🗂️ SBC exige FSS-ICU del episodio, al menos uno (Diego, 9 y 11-sep:
-  //   «lo evalué, después lo traté»). El mismo mensaje que da el servidor. ★
-  if(_ktmEstado()==='r' && v('fKTMniv')==='3' && v('fFSS')==='' && !_episodioTieneFSS()){
-    toast('⚠️ SBC (KTM nivel 3) exige al menos un FSS-ICU en el episodio: mídelo en Evaluaciones y vuelve a guardar', 6000);
-    const _r=$('rowFss'); if(_r){ $('cEgr')&&($('cEgr').checked=true); if(typeof hEgr==='function') hEgr(); _r.scrollIntoView({behavior:'smooth',block:'center'}); _r.style.outline='2px solid var(--danger)'; setTimeout(()=>{_r.style.outline='';},3000); }
-    return;
-  }
+  // 🗂️ Acá estaba el candado del SBC (KTM nivel 3 exigía un FSS del
+  //   episodio). Salió el 16-sep-2026 con el camino de tres pasos: el FSS se
+  //   mide en el paso 2, o sea DESPUÉS de marcar la KTM, así que bloquear
+  //   acá mandaba a arreglar algo que todavía no podía estar. Ver la nota
+  //   larga en `dominio_validacion.gs`.
   if(!_transAvisoOk){
     const _avs=_avisosPreGuardado();
     if(_avs.length){ _mostrarTransAviso(_avs); return; }

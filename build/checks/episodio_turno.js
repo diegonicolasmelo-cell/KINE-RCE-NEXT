@@ -95,10 +95,19 @@ const si = (l, g) => eq(l, !!g, 'true');
   r = api('GUARDAR_EVOLUCION', base(6, tk2, {}), null);
   eq('un turno sin medir no agrega nada a la serie', (DB.EVALUACIONES || []).filter(e => !e.ANULADA).length, 2);
 
-  console.log('\n2d · SBC (KTM nivel 3) exige al menos un FSS-ICU del episodio');
+  // 🗂️ LA REGLA DEL SBC SE ELIMINÓ (16-sep-2026, decisión D6 de Diego en
+  // `docs/PRD_EVOLUCION_TRES_PASOS.md`). Exigía un FSS-ICU del episodio para
+  // registrar KTM nivel 3; con el camino de tres pasos el FSS se mide en el
+  // paso 2, o sea DESPUÉS de marcar la KTM, así que rechazar el guardado
+  // mandaba a arreglar algo que todavía no podía estar.
+  // Esta sección NO se borró: cambió de signo. Antes probaba que rechazaba;
+  // ahora prueba que NO rechaza — si alguien reintrodujera el candado, esto
+  // se pone rojo.
+  console.log('\n2d · ★ D6 · el SBC ya NO exige el FSS (la regla se eliminó)');
   ingresar(7);
   r = api('GUARDAR_EVOLUCION', base(7, tk1, { KTM_REALIZADA: true, KTM_NIVEL_KTR: '3' }), null);
-  si('★ sin ningún FSS en el episodio: se RECHAZA', !r.ok && /FSS-ICU/.test(String(r.error || '')));
+  si('★★ KTM nivel 3 sin ningún FSS en el episodio: GUARDA', r.ok);
+  si('…y el error no habla de FSS-ICU', !/FSS-ICU/.test(String(r.error || '')));
   r = api('GUARDAR_EVOLUCION', base(7, tk1, { KTM_REALIZADA: true, KTM_NIVEL_KTR: '3', EVAL_T_FSS: 15 }), null);
   si('con el FSS medido en el mismo turno: pasa', r.ok);
   r = api('GUARDAR_EVOLUCION', base(7, tk2, { KTM_REALIZADA: true, KTM_NIVEL_KTR: '3' }), null);
@@ -271,7 +280,7 @@ const si = (l, g) => eq(l, !!g, 'true');
   await p.evaluate(() => { document.getElementById('transMotivo').value = 'llegó extubado desde pabellón'; transAvisoGuardar(); });
   si('★ con motivo, guarda y el motivo viaja', await p.evaluate(() => window.__guardo === true && _transMotivo === 'llegó extubado desde pabellón'));
 
-  console.log('\n3d · SBC exige FSS también en la pantalla');
+  console.log('\n3d · ★ D6 · la pantalla tampoco exige el FSS');
   await p.evaluate(() => {
     window.__toasts = []; window.toast = (m) => { window.__toasts.push(String(m)); };
     setEventoVA('nada');
@@ -292,9 +301,9 @@ const si = (l, g) => eq(l, !!g, 'true');
   await p.evaluate(() => { try { guardar(); } catch (e) { window.__guardarErr = String(e); } });
   await p.waitForTimeout(200);
   const toastsSBC = await p.evaluate(() => window.__toasts.join(' | '));
-  si('★ guardar() se detiene con el mensaje del SBC', toastsSBC.indexOf('SBC') !== -1);
-  if (toastsSBC.indexOf('SBC') === -1) console.log('   toasts: ' + toastsSBC + (await p.evaluate(() => window.__guardarErr ? ' · error: ' + window.__guardarErr : '')));
-  si('…y no salió ningún GUARDAR_EVOLUCION', await p.evaluate(() => !window.__llamadas.some(x => x.a === 'GUARDAR_EVOLUCION')));
+  // Mismo cambio de signo que en 2d: la pantalla tampoco frena ya.
+  si('★★ la pantalla tampoco frena por el SBC', toastsSBC.indexOf('SBC') === -1);
+  si('★ …y el guardado sale igual', await p.evaluate(() => window.__llamadas.some(x => x.a === 'GUARDAR_EVOLUCION')));
 
   console.log('\n3e · El banner del episodio');
   await p.evaluate(() => renderBannerEpisodio());

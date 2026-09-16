@@ -1,6 +1,6 @@
 # PRD · La evolución en tres pasos — el rediseño de NEXT
 
-**Estado**: decidido, sin programar. **Dueño**: Diego Melo Villagrán.
+**Estado**: las cuatro tandas construidas y verdes (16-sep-2026); falta la revisión campo por campo con Diego. **Dueño**: Diego Melo Villagrán.
 **Escribe**: Claude, 16-sep-2026.
 **Alcance**: el camino de registro de un turno. **Fuera**: el modelo de datos de
 la rama episodio/turno (ya está y no se toca), la PWA y el login (hechos), la
@@ -183,8 +183,9 @@ PROMESAS
 |---|---|---|
 | ~~**A**~~ ✅ | Los pendientes del episodio: dato, servicio, guardia | Sin esto los pasos 1 y 3 no tienen qué mostrar |
 | ~~**B**~~ ✅ | El armazón de los tres pasos y el paso 1 | Es donde entra lo de la tanda A |
-| **C** ← aquí | El paso 2 de verdad: chips del episodio y la salida barata; sale la regla del SBC (§7) | El armazón ya está; hoy el paso 2 solo tiene el bloque viejo movido |
-| **D** | El paso 3: guardado, relato, regeneración con aviso, plan | Cierra el ciclo con los pendientes de A |
+| ~~**C**~~ ✅ | El paso 2 de verdad: chips del episodio y la salida barata; salió la regla del SBC (§7) | El armazón ya está |
+| ~~**D**~~ ✅ | El paso 3: guardado, relato, regeneración con aviso, plan y pendientes | Cierra el ciclo con los pendientes de A |
+| **E** ← aquí | Revisión campo por campo con Diego | El camino ya funciona; ahora se afina el contenido |
 
 Cada tanda con su guardia **escrita primero y vista roja**, como el resto de la
 batería.

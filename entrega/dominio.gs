@@ -306,26 +306,23 @@ function _rango(errs, val, etiqueta, min, max, entero) {
 //  planilla, para poder probarlas en Node como el resto de este archivo.
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * validarSBC — «PARA REGISTRAR SBC DEBE TENER NECESARIAMENTE FSS-ICU» (Diego,
- * 9-sep), afinado el 11-sep: «del episodio, al menos 1; eso quiere decir: lo
- * evalué, después lo traté». SBC es el nivel 3 de KTM (sedente al borde de la
- * cama) y el ítem 3 del FSS-ICU es esa misma actividad: si el paciente se
- * sentó al borde de la cama, la escala tiene que existir.
- * @param d        payload del turno
- * @param tieneFSS true si el episodio YA tiene al menos un FSS (serie o ULT_FSS)
- */
-function validarSBC(d, tieneFSS) {
-  const errs = [];
-  if (!d) return errs;
-  const vv = function (x) { return x === true || String(x) === 'true'; };
-  if (!vv(d.KTM_REALIZADA)) return errs;
-  if (String(d.KTM_NIVEL_KTR || '') !== '3') return errs;
-  const fssHoy = d.EVAL_T_FSS !== '' && d.EVAL_T_FSS != null;
-  if (fssHoy || tieneFSS) return errs;
-  errs.push('SBC (KTM nivel 3) exige al menos un FSS-ICU en el episodio: mídelo en Evaluaciones y vuelve a guardar.');
-  return errs;
-}
+/* 🗂️ validarSBC SE ELIMINÓ el 16-sep-2026 (decisión D6 de Diego, en el PRD
+ * `docs/PRD_EVOLUCION_TRES_PASOS.md`).
+ *
+ * Decía: «PARA REGISTRAR SBC DEBE TENER NECESARIAMENTE FSS-ICU» — KTM nivel 3
+ * exigía al menos un FSS-ICU en el episodio. Tenía sentido cuando la KTM y el
+ * FSS vivían en el MISMO formulario.
+ *
+ * Con el camino de tres pasos ya no lo tienen: la KTM se marca en el paso 1 y
+ * el FSS se mide en el paso 2, o sea DESPUÉS. Rechazar el guardado del paso 1
+ * sería rechazar algo que todavía no podía estar, y el colega no tendría
+ * dónde arreglarlo sin perder lo escrito.
+ *
+ * Consecuencia clínica, escrita para que quede: se puede registrar SBC sin
+ * ningún FSS en el episodio. Diego lo decidió sabiéndolo. Lo que queda en su
+ * lugar es el paso 2, que muestra el FSS sin medir en ámbar en cada turno.
+ * No se «desactivó» ni quedó dormida: se borró, y `paso_evaluaciones.js`
+ * exige que no vuelva. */
 
 /**
  * validarTransicionVA — la vía aérea NO cambia sin un evento declarado

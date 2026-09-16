@@ -4693,13 +4693,11 @@ function guardarEvolucion(datos, ctx) {
         // estos dos viven en dominio_validacion / svc_evaluaciones: se preguntan
         // por typeof, como hace notifRegistrar, para que un banco que no los
         // trae siga guardando como siempre.
-        const _pidV = String(cama.PATIENT_ID || '');
-        let _tieneFSS = (cama.ULT_FSS !== '' && cama.ULT_FSS != null);
-        if (!_tieneFSS && _pidV && typeof evalDelEpisodio === 'function') {
-          try { _tieneFSS = evalDelEpisodio(_pidV).some(function (e) { return e.ESCALA === 'FSS'; }); } catch (e) {}
-        }
-        const _errsEp = (typeof validarSBC === 'function' ? validarSBC(datos, _tieneFSS) : [])
-          .concat(typeof validarTransicionVA === 'function' ? validarTransicionVA(datos, cama) : []);
+        // 🗂️ La regla del SBC (KTM nivel 3 exigía un FSS del episodio) salió
+        // el 16-sep-2026 con el camino de tres pasos: el FSS se mide en el
+        // paso 2, DESPUÉS de marcar la KTM. Ver la nota en
+        // `dominio_validacion.gs`. La vía aérea sí se sigue validando.
+        const _errsEp = (typeof validarTransicionVA === 'function' ? validarTransicionVA(datos, cama) : []);
         if (_errsEp.length) return err('Validación: ' + _errsEp.join('; '), ERR.VALIDACION);
       }
 
