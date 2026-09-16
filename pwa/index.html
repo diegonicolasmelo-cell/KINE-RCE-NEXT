@@ -3576,7 +3576,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
                    módulo de abajo se oculta (no se llena dos veces). -->
               <div id="dTqtSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#7c3aed;margin-bottom:7px;letter-spacing:.04em;">🔪 Traqueostomía</div>
-                <div class="check wa" style="margin-bottom:8px;"><input type="checkbox" id="cTqtO" onchange="hTqtO()"><label for="cTqtO" style="font-weight:700;">Ocurrió TQT este turno</label></div>
+                <!-- 🔴 SEGUNDA PREGUNTA RETIRADA (16-sep-2026, Diego: «sácalo y deja
+                     solo eventos»). El paso 1 ya abre con «¿Qué pasó hoy con la vía
+                     aérea?»; preguntarlo otra vez acá abría la puerta a declararlo
+                     en un lado y no en el otro. La casilla NO se borra: el guardado
+                     la lee y la fila de eventos la marca por dentro. Lo que se va es
+                     la pregunta repetida, no el dato. -->
+                <div class="check wa" style="margin-bottom:8px;display:none;"><input type="checkbox" id="cTqtO" onchange="hTqtO()"><label for="cTqtO" style="font-weight:700;">Ocurrió TQT este turno</label></div>
                 <div id="dTqtDet" class="hidden">
                   <div class="row" style="margin-bottom:8px;gap:8px;align-items:flex-end;">
                     <div class="col wa"><label>Hora</label><input type="time" id="fTqtHora" style="height:30px;"></div>
@@ -3752,7 +3758,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <!-- DECANULACIÓN (solo si VA = TQT) -->
               <div id="dDecanSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#7c3aed;margin-bottom:7px;letter-spacing:.04em;">✂️ Decanulación</div>
-                <div class="check wa" style="margin-bottom:8px;"><input type="checkbox" id="cDecanOcurrio" onchange="hDecan()"><label for="cDecanOcurrio" style="font-weight:700;">Ocurrió decanulación este turno</label></div>
+                <!-- 🔴 SEGUNDA PREGUNTA RETIRADA (16-sep-2026, Diego: «sácalo y deja
+                     solo eventos»). El paso 1 ya abre con «¿Qué pasó hoy con la vía
+                     aérea?»; preguntarlo otra vez acá abría la puerta a declararlo
+                     en un lado y no en el otro. La casilla NO se borra: el guardado
+                     la lee y la fila de eventos la marca por dentro. Lo que se va es
+                     la pregunta repetida, no el dato. -->
+                <div class="check wa" style="margin-bottom:8px;display:none;"><input type="checkbox" id="cDecanOcurrio" onchange="hDecan()"><label for="cDecanOcurrio" style="font-weight:700;">Ocurrió decanulación este turno</label></div>
                 <div id="dDecanDet" class="hidden">
                   <label style="font-size:.73rem;font-weight:700;color:#7c3aed;display:block;margin-bottom:5px;">Tipo de decanulación:</label>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
@@ -11074,7 +11086,9 @@ function genTexto() {
   const _humid=$('cHAct')?.checked;
   // Sin elección no se narra interacción (parte vacío, Diego ago-2026)
   const _interac=($('sAdapt')&&v('sAdapt'))?(v('sAdapt')==='Sincrónico'?'adecuada':'inadecuada'):null;
-  const _CTRL=['ACVC','ACPC'];
+  // 🫁 Para el relato, un SIMV no es «ventilación espontánea»: hay
+  // mandatorias de por medio.
+  const _CTRL=['ACVC','ACPC','SIMV VC','SIMV PC'];
   const _espontaneo = !_CTRL.includes(modo);
   const _ps=_np('r_ps'), _tobin=_mon('l_tobin');
   const _pveNoCond = v('fPVEval')==='no' && !$('cExtSinPve')?.checked;
@@ -11648,13 +11662,13 @@ const VMAPS={
   // tubo pase por "Natural" y dispare la lógica de transición (intubación).
   '':         {sops:[''],                              modos:{'':['']}},
   'Natural':  {sops:['Ambiente','Oxigenoterapia/OAF'],  modos:{'Ambiente':['Sin soporte'],'Oxigenoterapia/OAF':['NRC','MMV','MR','CNAF']}},
-  'TOT':      {sops:['VM','Oxigenoterapia/OAF'],         modos:{'VM':['ACVC','ACPC','CPAP/PS'],'Oxigenoterapia/OAF':['HME','Tubo T','CNAF']}},
+  'TOT':      {sops:['VM','Oxigenoterapia/OAF'],         modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS'],'Oxigenoterapia/OAF':['HME','Tubo T','CNAF']}},
   // El alto flujo POR TRAQUEOSTOMÍA se llama CTAF (cánula traqueal de alto
   // flujo) — decisión de Diego, ago-2026: «así nos entendemos». Antes decía
   // «OAF/CTAF», que mezcla el término general (oxigenoterapia de alto flujo)
   // con la interfaz. Las evoluciones que guardaron «OAF/CTAF» se siguen
   // leyendo: `poblar` conserva el valor guardado aunque salga del catálogo.
-  'TQT':      {sops:['VM','Oxigenoterapia/OAF','Ambiente'], modos:{'VM':['ACVC','ACPC','CPAP/PS','CPAP','S/T','AVAPS','CFLEX'],'Oxigenoterapia/OAF':['HME','Tubo T','CTAF','CNAF','Válvula de fonación'],'Ambiente':['Válvula de fonación','Sin soporte']}},
+  'TQT':      {sops:['VM','Oxigenoterapia/OAF','Ambiente'], modos:{'VM':['ACVC','ACPC','SIMV VC','SIMV PC','CPAP/PS','CPAP','S/T','AVAPS','CFLEX'],'Oxigenoterapia/OAF':['HME','Tubo T','CTAF','CNAF','Válvula de fonación'],'Ambiente':['Válvula de fonación','Sin soporte']}},
   'Full Face':{sops:['VNI'],                          modos:{'VNI':['S/T','AVAPS','CPAP']}},
   'Oronasal': {sops:['VNI'],                          modos:{'VNI':['S/T','AVAPS','CPAP']}},
 };
@@ -11910,6 +11924,32 @@ function updateVAUI() {
     _hideCol('colDiasTOT');_hideCol('colDiasTQT');
     if(_diasVABase>0||esVNI) _showCol('colDiasVAA'); else _hideCol('colDiasVAA');
   }
+  /* 🪤 EL EVENTO DECLARADO MANDA SOBRE LA VÍA AÉREA DE SALIDA
+     (16-sep-2026, encontrado midiendo el bloque respiratorio con Diego).
+
+     Las tres secciones de evento se mostraban SOLO según la vía aérea actual:
+     extubación con TOT, decanulación con TQT. Pero declarar una extubación
+     DEJA al paciente en natural — y en cuanto la vía aérea cambiaba, el
+     formulario escondía la sección donde había que poner la hora, el tipo y
+     con qué quedaba el paciente. O sea: declarabas el evento y el formulario
+     se llevaba su propio bloque de detalle.
+
+     Con la fila «¿Qué pasó hoy con la vía aérea?» el caso es el normal, no el
+     raro: el evento se declara ARRIBA y la vía aérea se fija sola. La
+     traqueostomía se salvaba de casualidad, porque deja al paciente en TQT.
+
+     REGLA: un evento declarado en este turno mantiene su sección a la vista,
+     diga lo que diga la vía aérea de salida. Se mira lo anunciado en la fila
+     y también la casilla, para que un turno guardado se reabra igual.
+
+     🪤 SOLO PARA LOS DOS QUE DEJAN AL PACIENTE EN NATURAL. La traqueostomía
+     NO entra: deja al paciente EN TQT, así que si la vía aérea dice natural
+     la TQT no aplica y su sección tiene que desaparecer — eso ya funcionaba y
+     lo cuida `via_aerea_previo.js`, que se puso roja cuando esta regla se
+     escribió de más. */
+  const _evAnun = (typeof _evVAAnunciado !== 'undefined') ? _evVAAnunciado : '';
+  if(_evAnun==='ext'   || $('cExtSinPve')?.checked || v('fPVEval')) show('dExtSec');
+  if(_evAnun==='decan' || $('cDecanOcurrio')?.checked)              show('dDecanSec');
   // VNI contador
   const vniTotal=_diasVNIPrevios+_diasVNIEpisodio;
   if(esVNI||vniTotal>0) _showCol('colDiasVNI'); else _hideCol('colDiasVNI');
@@ -12052,7 +12092,9 @@ function renderParams(o) {
   const sop=esPost?(v(POST.sop)||'VM'):v('fSop');
   const b=$(o.box||'paramsBox'); if(!b) return;
   let h='';
-  const ctrl=['ACVC','ACPC'].includes(modo);
+  // 🫁 Los SIMV entregan respiraciones MANDATORIAS, así que para lo que
+  // depende de eso —la humidificación activa— van con los controlados.
+  const ctrl=['ACVC','ACPC','SIMV VC','SIMV PC'].includes(modo);
   const esVM=sop==='VM'||va==='TOT'||va==='TQT';
   if(esVM && !esPost) h+=_humChk(ctrl);
 
@@ -12062,6 +12104,18 @@ function renderParams(o) {
     h+=`<div class="row">${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;
   } else if(modo==='ACPC'){
     h+=`<div class="row">${fld(P+'pinsp','Pinsp',80)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${fld(P+'ti','Ti seg',68)}${mon(L+'ie','I:E')}</div>`;
+    h+=`<div class="row">${fld(P+'peep','PEEP',70)}${fld(P+'pmax','Pmax',70)}${fld(P+'autopeep','AutoPEEP',80)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;
+  } else if(modo==='SIMV VC'){
+    // 🫁 SIMV es MIXTO: respiraciones mandatorias por volumen + espontáneas
+    // con presión de soporte. Por eso pide lo de ACVC Y ADEMÁS la PS — sin
+    // ella no se sabe con cuánta ayuda respiraba el paciente entre
+    // mandatorias, que es justo lo que distingue este modo del ACVC puro.
+    h+=`<div class="row">${fld(P+'vt','VT ml',80)}<div class="col" style="width:60px;flex-grow:0;"><label></label><span id="${L}mlkg" style="font-size:.68rem;font-weight:700;color:#64748b;display:block;margin-top:24px;">--</span></div>${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${fld(P+'ps','PS',70)}${fld(P+'flujo','Flujo L/m',78)}${fld(P+'ti','Ti seg',68)}${mon(L+'ie','I:E')}</div>`;
+    h+=`<div class="row">${fld(P+'pmax','Pmax',70)}${fld(P+'pmedia','Pmedia',70)}${fld(P+'peep','PEEP',70)}${fld(P+'ppl','Ppl',70)}${fld(P+'autopeep','AutoPEEP',80)}${mon(L+'dp','DP',true)}${mon(L+'cesr','Cesr',true)}</div>`;
+    h+=`<div class="row">${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;
+  } else if(modo==='SIMV PC'){
+    // Igual que arriba, pero las mandatorias van por presión: lo de ACPC + PS.
+    h+=`<div class="row">${fld(P+'pinsp','Pinsp',80)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${fld(P+'ps','PS',70)}${fld(P+'ti','Ti seg',68)}${mon(L+'ie','I:E')}</div>`;
     h+=`<div class="row">${fld(P+'peep','PEEP',70)}${fld(P+'pmax','Pmax',70)}${fld(P+'autopeep','AutoPEEP',80)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;
   } else if(modo==='CPAP/PS'){
     h+=`<div class="row">${fld(P+'ps','PS',70)}${fld(P+'peep','PEEP',70)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${mon(L+'tobin','I.Tobin',true)}${esPost?'':_umaFld()}</div>`;

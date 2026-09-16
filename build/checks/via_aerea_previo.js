@@ -194,7 +194,9 @@ const { chromium } = require('playwright-core');
      /Natural/.test(I.resumenPrevio) && /NRC/.test(I.resumenPrevio) && /FR 35/.test(I.resumenPrevio), true);
   eq('el soporte previo se deduce solo (ya no se escribe a mano)', I.sopPrevioAuto, 'Naricera-NRC');
   eq('hay panel «queda con» propio', I.panelPost, true);
-  eq('sus modos salen de la matriz de vía aérea (TOT + VM)', I.modosVM, 'ACVC|ACPC|CPAP/PS');
+  // 🗂️ Los dos SIMV entraron el 16-sep-2026: decisión de Diego, «los modos
+  // son nueve, falta SIMV VC y SIMV PC».
+  eq('sus modos salen de la matriz de vía aérea (TOT + VM)', I.modosVM, 'ACVC|ACPC|SIMV VC|SIMV PC|CPAP/PS');
   eq('el texto narra previo → intubación → cómo queda',
      /Previo en naricera-NRC/.test(I.texto) && /a las 13:40 hrs/.test(I.texto) &&
      /Queda con TOT N° 8\.0 a 22 cm de arcada dental, conectado a VM en modo ACVC/.test(I.texto) &&

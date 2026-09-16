@@ -713,3 +713,64 @@ punteado y fondo de papel, parecía un aviso y no algo que se aprieta.
 **Batería: 160 verdes, 0 rojas.** Quedan cuatro guardias nuevas del rediseño
 (`tres_pasos`, `paso_evaluaciones`, `paso_relato`, `identidad_una_vez`) más las
 dos de trampas genéricas (`tokens_existen`, `id_no_pisa_funcion`).
+
+---
+
+## 16-sep-2026 · Revisión del bloque respiratorio con Diego (1 de 2)
+
+Primera vuelta de la revisión campo por campo. El bloque respiratorio es el más
+grande: ~130 campos de los 266 del formulario. **En el turno más común se ven
+30**; el resto son bloques de evento y rutas alternativas.
+
+### Lo medido antes de opinar
+
+Nueve escenarios (cuatro estados de vía aérea/soporte + los cinco eventos
+declarados). El filtro por modo resultó estar **bien hecho**: ACVC pide sus doce
+parámetros y CPAP/PS pide otros doce apropiados, incluidos P0.1, ΔPocc y Pmusc.
+Ahí no había nada que arreglar — lo dije al revés en la primera lectura y se
+corrigió midiendo.
+
+### Los modos son nueve (decisión de Diego)
+
+Faltaban **SIMV VC** y **SIMV PC**. Un modo que no está en la lista se registra
+como otro parecido y el parámetro que lo distingue se pierde.
+
+SIMV es MIXTO: mandatorias + espontáneas con presión de soporte. Por eso
+SIMV VC = los parámetros de ACVC **+ PS**, y SIMV PC = los de ACPC **+ PS**. Sin
+la PS no se puede saber con cuánta ayuda respiraba entre mandatorias, que es
+justo lo que lo distingue del modo controlado puro. Y para lo que depende de
+tener mandatorias —humidificación activa, y el relato, que no puede llamarlo
+«ventilación espontánea»— los SIMV van con los controlados.
+
+### El evento se declara una sola vez (decisión de Diego)
+
+«Ocurrió TQT este turno» y «Ocurrió decanulación este turno» preguntaban lo
+mismo que la fila del paso 1. Dos lugares para el mismo hecho es un lugar donde
+quedar a medias. Las casillas **no se borraron, se escondieron**: el guardado
+las lee y la fila de eventos las marca por dentro. Lo que se fue es la segunda
+pregunta, no el dato.
+
+### 🔴 Y apareció un bug que costaba la extubación entera
+
+Al declarar la extubación desde la fila de eventos, la vía aérea pasa a natural
+—correcto— y **el formulario escondía la sección donde se escribe su hora, su
+tipo y con qué queda el paciente**. Lo mismo con la decanulación. La
+traqueostomía se salvaba de casualidad: deja al paciente en TQT.
+
+Las tres secciones se mostraban solo según la vía aérea del momento, y declarar
+el evento cambia esa vía aérea. El evento más importante para el REM —la
+extubación— era el más afectado.
+
+🔎 Se comprobó contra el commit `1e88f60`: **el bug ya existía**, viene de la
+rama episodio/turno. No lo trajo este cambio.
+
+Regla nueva: un evento declarado este turno mantiene su sección a la vista,
+diga lo que diga la vía aérea de salida.
+
+🪤 Y la primera versión de esa regla se escribió **de más**: incluía la
+traqueostomía, que deja al paciente EN TQT — con vía natural una TQT no aplica y
+su sección debe desaparecer. `via_aerea_previo.js`, una guardia vieja, se puso
+roja y lo cazó. La regla quedó acotada a los dos eventos que sí dejan al
+paciente en natural.
+
+**Batería: 162 verdes, 0 rojas.**
