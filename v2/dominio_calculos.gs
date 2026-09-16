@@ -27,7 +27,13 @@ function calcularRespiratorio(evo) {
   const fio2 = n(evo.VENT_FIO2);
   const spo2 = n(evo.VENT_SPO2);
   const pi   = n(evo.PAC_PESO_IDEAL);
+  /* 🫁 El ROX es del DISPOSITIVO, no del modo. Desde los tres ejes
+     (16-sep-2026) el alto flujo vive en VENT_INTERFAZ; en las filas de antes
+     venía en el modo. `txtInterfazDe` (dominio_texto.gs, también puro) resuelve
+     las dos formas, así que una evolución de agosto calcula igual que siempre.
+     El resto de los derivados sí son del modo ventilatorio y lo siguen leyendo. */
   const modo = evo.VENT_MODO || '';
+  const disp = (typeof txtInterfazDe === 'function' ? txtInterfazDe(evo) : '') || modo;
   const calc = {};
 
   if (vt > 0 && pi > 0) calc.CALC_ML_KG = Math.round((vt / pi) * 10) / 10;
@@ -43,7 +49,9 @@ function calcularRespiratorio(evo) {
   if (['CPAP/PS', 'CFLEX', 'S/T'].indexOf(modo) !== -1 && fr > 0 && vt > 0) {
     calc.CALC_TOBIN = Math.round((fr / (vt / 1000)) * 10) / 10;
   }
-  if (['CNAF', 'OAF/CTAF'].indexOf(modo) !== -1 && spo2 > 0 && fio2 > 0 && fr > 0) {
+  // 🪤 «OAF/CTAF» pasó a llamarse «CTAF» en ago-2026 y esta lista se quedó con
+  // el nombre viejo: el alto flujo por traqueostomía nunca tuvo su ROX.
+  if (['CNAF', 'CTAF', 'OAF/CTAF'].indexOf(disp) !== -1 && spo2 > 0 && fio2 > 0 && fr > 0) {
     // ROX estándar: SpO2 / FiO2 (fracción) / FR — corte clásico 4.88
     calc.CALC_IROX = Math.round(((spo2 / (fio2 / 100)) / fr) * 100) / 100;
   }

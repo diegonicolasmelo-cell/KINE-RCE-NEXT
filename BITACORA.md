@@ -852,3 +852,50 @@ escrito en la planilla, turno a turno. Lo cazó `via_aerea_previo.js` al mirar e
 payload del guardado.
 
 **Batería: 163 verdes, 0 rojas.**
+
+---
+
+## 16-sep-2026 · Los lectores del dispositivo, y el alto flujo por traqueostomía
+
+Mudar el dispositivo a su propio campo era la mitad del trabajo. La otra mitad
+son los **lectores**: había doce lugares preguntando `v('fModo')` para saber qué
+llevaba puesto el paciente. Ninguno se cae con un error — simplemente empiezan a
+contestar «no hay dispositivo», y el síntoma es una casilla que falta, un índice
+que no se calcula o un puntaje más bajo. Nada de eso se ve mirando la pantalla
+un rato.
+
+Ahora hay **un solo lector**, `dispositivoActual()`, con su respaldo al campo
+viejo para las evoluciones de antes. Lo que arregló:
+
+| dónde | qué pasaba |
+|---|---|
+| **«Sin requerimientos KTR»** | no aparecía **nunca**: preguntaba por el modo, y con los tres ejes el aire ambiente pasó a llamarse «Sin soporte» ahí y la naricera se mudó |
+| **FiO₂ estimada de la naricera** | `l_fio2nrc` se quedaba en `--` |
+| **Índice ROX** | no se calculaba en alto flujo |
+| **Puntaje de asistencia ventilatoria** | un paciente en CNAF puntuaba «espontánea» (1) en vez de 2 |
+| **SAFI** | perdía la FiO₂ estimada de la naricera |
+| **Tarjeta de dispositivos** | el gate del HME dejaba sin Trach Care al que respira por él |
+| **Horas de válvula de fonación** | no sumaban |
+| **`INTUB_MODO_PREVIO`** | viajaba vacío |
+| **Chips del móvil** | sin dispositivo, y mostrando «Sin soporte» |
+| **Sugerencia del CPAx** | dos ramas muertas (`sop==='CNAF'`, `sop==='Oxigenoterapia'` — nombres que no existen en el catálogo) |
+
+### 🔴 Y el CTAF no tenía dónde escribirse — desde agosto
+
+El alto flujo por traqueostomía se renombró de `OAF/CTAF` a `CTAF` en ago-2026
+(«así nos entendemos», Diego). **Seis listas se quedaron con el nombre viejo**,
+cuatro en la interfaz y dos en el servidor. Consecuencia: un paciente en CTAF
+caía en el `else` final de `renderParams()` —FR, SpO₂ y nada más— y **el flujo,
+la temperatura y la FiO₂ no tenían casilla**. Tampoco índice ROX, ni puntaje de
+asistencia, y el relato lo narraba con el párrafo genérico.
+
+Es el mismo bug que ya se pagó con la mascarilla de Venturi en agosto: un valor
+del catálogo que nadie atiende, y el dato de ese paciente se pierde turno a
+turno sin avisar. Ahora los tres nombres viven en una sola función,
+`esAltoFlujo()`.
+
+Se arregló en los dos lados —navegador y servidor— porque el relato y el ROX se
+calculan por duplicado: el navegador los muestra en vivo y el servidor los sella
+al guardar. La guardia nueva `interfaz_un_lector.js` comprueba los dos.
+
+**Batería: 164 verdes, 0 rojas.**

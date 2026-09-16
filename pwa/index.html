@@ -8554,7 +8554,7 @@ function guardar() {
     INTUB_DET:       v('fIntubDet'),
     INTUB_SOP_PREVIO: bv('cIntubO') ? (v('fIntubSopPrevio')||_sopPrevioAuto()) : '',
     INTUB_VA_PREVIA:  bv('cIntubO') ? v('fVA') : '',
-    INTUB_MODO_PREVIO: bv('cIntubO') ? v('fModo') : '',
+    INTUB_MODO_PREVIO: bv('cIntubO') ? (dispositivoActual()||v('fModo')) : '',
     TOT_CAMBIO:      bv('cCambioTOT'),
     TOT_CAMBIO_MOTIVO: v('fCambioTOTmot')==='Otro' ? (v('fCambioTOTdet')||'Otro') : v('fCambioTOTmot'),
     TQT_CAMBIO:      bv('cCambioTQT'),
@@ -11166,7 +11166,7 @@ function genTexto() {
     const _pb=_pjoin([fl?`Flujo ${fl} L/min`:null, fio2?`FiO2 ${fio2}%`:null, spo2?`SpO2 ${spo2}%`:null, _numTxt('l_irox')?`índice ROX ${_numTxt('l_irox')}`:null]);
     _B('param'); if(_pb) L.push(`Parámetros: ${_pb}.`);
   } else if(sop==='Oxigenoterapia/OAF'){
-    if(['CNAF','OAF/CTAF'].includes(modo)){
+    if(esAltoFlujo(modo)){
       const _fl=_np('r_flujo'), _tmp=gv('r_temp');
       _B('sop'); L.push(`Ventila espontáneo con apoyo de ${modo}${_humid?' con humidificación activa':''}.`);
       const _pb=_pjoin([_fl?`Flujo ${_fl} L/min`:null, _tmp?`T° ${_tmp}°C`:null, fio2?`FiO2 ${fio2}%`:null, fr?`FR ${fr} rpm`:null, gv('r_uma')?`UMA ${gv('r_uma')}`:null, spo2?`SpO2 ${spo2}%`:null, _numTxt('l_irox')?`índice ROX ${_numTxt('l_irox')}`:null]);
@@ -11262,7 +11262,7 @@ function genTexto() {
   if(v('fVA')==='TQT' && $('cDecanOcurrio')?.checked){
     const _dt=document.querySelector('input[name="decanTipo"]:checked')?.value||'';
     const _dtTxt=_dt==='protocolo'?' según protocolo':_dt==='sin_protocolo'?' sin protocolo':_dt==='accidental'?' accidental':'';
-    const _vfh=(window._vfonHoras||0)+((v('fModo')==='Válvula de fonación'||$('cVfon')?.checked)?12:0);
+    const _vfh=(window._vfonHoras||0)+((dispositivoActual()==='Válvula de fonación'||$('cVfon')?.checked)?12:0);
     const _cumple=_vfh>=12?`Cumple ~${_vfh} h con válvula de fonación, por lo que se`:`Se`;
     let _t=`${_cumple} realiza decanulación${_dtTxt}${v('fDecanHora')?' a las '+v('fDecanHora')+' hrs':''}`;
     if($('cRecanul')?.checked){ _t+=', sin embargo paciente requiere recanulación'; }
@@ -11613,7 +11613,10 @@ function calcResp(el) {
   const peep=parseFloat(v(P+'peep'))||0, ppl=parseFloat(v(P+'ppl'))||0;
   const fl=parseFloat(v(P+'flujo'))||0, ti=parseFloat(v(P+'ti'))||0;
   const fio2=parseFloat(v(P+'fio2'))||0, spo2=parseFloat(v(P+'spo2'))||0;
-  const modo={'pi_':'poIntubModo','pr_':'poReintubModo','pt_':'poTqtModo'}[P] ? v({'pi_':'poIntubModo','pr_':'poReintubModo','pt_':'poTqtModo'}[P]) : v('fModo');
+  // 🫁 En el bloque principal el que decide los derivados es el DISPOSITIVO
+  // cuando lo hay (ROX del alto flujo, FiO₂ estimada de la naricera): desde los
+  // tres ejes vive en su campo. En los paneles «queda con» sigue siendo el modo.
+  const modo={'pi_':'poIntubModo','pr_':'poReintubModo','pt_':'poTqtModo'}[P] ? v({'pi_':'poIntubModo','pr_':'poReintubModo','pt_':'poTqtModo'}[P]) : (dispositivoActual()||v('fModo'));
   const set=(id,val)=>{ const e=$(id); if(e) e.textContent=val; };
   if(vt&&pi>0) set(L+'mlkg',`${(vt/pi).toFixed(1)} ml/kg`);
   if(vt&&fr) set(L+'vm',`${(vt*fr/1000).toFixed(1)} L/m`);
@@ -11626,7 +11629,7 @@ function calcResp(el) {
   if(ppl>0) set(L+'dp',`DP: ${(ppl-peepTot).toFixed(0)}`); else set(L+'dp','--');
   if(vt>0&&(ppl-peepTot)>0) set(L+'cesr',`${(vt/(ppl-peepTot)).toFixed(0)}`); else set(L+'cesr','--');
   if(['CPAP/PS','CFLEX'].includes(modo)&&fr>0&&vt>0) set(L+'tobin',`${(fr/(vt/1000)).toFixed(0)}`);
-  if(['CNAF','OAF/CTAF'].includes(modo)&&spo2>0&&fio2>0&&fr>0) set(L+'irox',`${((spo2/(fio2/100))/fr).toFixed(2)}`);
+  if(esAltoFlujo(modo)&&spo2>0&&fio2>0&&fr>0) set(L+'irox',`${((spo2/(fio2/100))/fr).toFixed(2)}`);
   const ip=parseFloat(v(P+'ipap'))||0, ep=parseFloat(v(P+'epap'))||0;
   if(ip>0&&ep>0) set(L+'pscalc',`${ip-ep}`);
   const lit=parseFloat(v(P+'litros'))||0;
@@ -12118,7 +12121,7 @@ function _gateDispositivos(){
   // usa respirando POR él (modo HME), así que la tarjeta se muestra en esos
   // casos — si no, el reloj del Trach Care de un decanulando a CTAF no tendría
   // dónde mantenerse.
-  const _vaG=v('fVA'), _modoG=v('fModo');
+  const _vaG=v('fVA'), _modoG=dispositivoActual()||v('fModo');
   const conDisp = sopFin==='VM' || _vaG==='TOT' || _vaG==='TQT' || _modoG==='HME';
   const dc=$('fcDisp'); if(dc) dc.classList.toggle('hidden', !conDisp);
   if(sopFin==='VM' && typeof autoFechasDispositivos==='function') autoFechasDispositivos(false);
@@ -12196,7 +12199,7 @@ function renderParams(o) {
     h+=`<div class="row">${fld(P+'peep','CPAP',80)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}${esPost?'':_umaFld()}</div>`;
   } else if(modo==='CFLEX'){
     h+=`<div class="row">${fld(P+'ps','PS',70)}${fld(P+'peep','PEEP',70)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'tobin','I.Tobin',true)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}${esPost?'':_umaFld()}</div>`;
-  } else if(['CNAF','OAF/CTAF'].includes(modo)){
+  } else if(esAltoFlujo(modo)){
     h+=`<div class="row">${fld(P+'flujo','Flujo L/m',80)}${fld(P+'temp','T° °C',70)}${fld(P+'fr','FR rpm',75)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}${mon(L+'irox','IROX',true)}${esPost?'':_umaFld()}</div>`;
   } else if(modo==='NRC'){
     h+=`<div class="row">${fld(P+'litros','Litros L/m',88)}${fld(P+'fr','FR rpm',75)}${fld(P+'spo2','SpO₂ %',80)}${mon(L+'fio2nrc','FiO₂~')}${esPost?'':_umaFld()}</div>`;
@@ -12530,8 +12533,13 @@ function _loadCultFechas(jsonStr, soloHist){
 
 // — Sin requerimientos KTR: visible solo con NRC/MMV/Ambiente —
 function _updateSinKTR(){
-  const modo=v('fModo')||'', va=v('fVA')||'Natural';
-  const sinKTRVisible=(va==='Natural'&&['Ambiente','NRC','MMV'].includes(modo));
+  /* 🫁 Se ofrece con vía natural y apoyo liviano: aire ambiente, naricera o
+     Venturi. Antes preguntaba por el MODO, y con los tres ejes el aire ambiente
+     dejó de llamarse «Ambiente» ahí (su modo pasó a «Sin soporte») y la naricera
+     se mudó a la interfaz: la casilla no aparecía nunca. Ahora se pregunta por
+     lo que de verdad decide — el soporte y el dispositivo. */
+  const disp=dispositivoActual()||v('fModo')||'', va=v('fVA')||'Natural', sop=v('fSop')||'';
+  const sinKTRVisible=(va==='Natural'&&(sop==='Ambiente'||['Ambiente','NRC','MMV'].includes(disp)));
   sinKTRVisible?show('dSinKTR'):hide('dSinKTR');
   if(!sinKTRVisible){ const c=$('cSinKTR'); if(c) c.checked=false; }
   // SET solo aplica a vía aérea artificial (TOT o TQT)
@@ -13036,8 +13044,8 @@ function _mPacBar(){
   const cama=String(v('cBed')||'');
   const chips=[];
   const d=String(v('fDias')||'').trim(); if(d!=='') chips.push('Día '+_escSt(d));
-  const va=v('fVA'), sop=v('fSop'), modo=v('fModo');
-  const clin=[va,sop,modo].filter(x=>x&&x!=='--'&&x!=='-').map(_escSt).join(' · ');
+  const va=v('fVA'), sop=v('fSop'), modo=dispositivoActual()||v('fModo');
+  const clin=[va,sop,modo].filter(x=>x&&x!=='--'&&x!=='-'&&x!=='Sin soporte').map(_escSt).join(' · ');
   if(clin) chips.push('<span class="ch vm">'+clin+'</span>');
   const f=v('gDate')||hoy();
   chips.push((SHIFT==='Noche'?'🌙 ':'☀️ ')+String(f).slice(8,10)+'-'+String(f).slice(5,7));
@@ -13250,6 +13258,19 @@ function interfazDe(e){
   if(esInterfaz(va)) return va;                         // fila vieja de VNI: iba en la vía aérea
   return '';
 }
+/** 🫁 El dispositivo QUE ESTÁ PUESTO EN EL FORMULARIO, de su campo o del viejo.
+ *  `interfazDe` traduce una FILA guardada; esta traduce la PANTALLA. Existe
+ *  porque al mudar el dispositivo a su propio campo quedaron una docena de
+ *  lugares preguntando `v('fModo')` para saber qué llevaba puesto el paciente,
+ *  y ninguno se cae: contestan «no hay dispositivo» y el síntoma es una casilla
+ *  que falta o un puntaje más bajo. Lo cuida `interfaz_un_lector.js`.
+ *  El respaldo al modo no es decorativo: al reabrir una evolución vieja el
+ *  dispositivo llega escrito ahí. */
+function dispositivoActual(){ return v('fInterfaz') || v('fModo') || ''; }
+/** Los tres nombres del alto flujo: el de hoy, el general y el viejo de la TQT.
+ *  🪤 «OAF/CTAF» pasó a «CTAF» en ago-2026 y cuatro listas se quedaron con el
+ *  nombre viejo, así que el paciente en CTAF no tenía dónde anotar el flujo. */
+function esAltoFlujo(x){ return ['CNAF','CTAF','OAF/CTAF'].indexOf(String(x||'').trim()) !== -1; }
 /** La vía aérea de una fila, ya traducida: la máscara vieja pasa a Natural. */
 function _vaCompat(x){
   const va = String(x || '').trim();
@@ -14551,7 +14572,10 @@ const PLANT_DATOS={
   dias_vm:{ v:()=>v('fDiasVM')||'', pre:'\\(día ', post:' de VM' },
   dias_va:{ v:()=>v('fDiasVA')||'', pre:'\\(día ', post:'\\)' },
   soporte_tipo:{ v:()=>{ const s=v('fSop')||''; return s==='VM'?'VMI':s; }, pre:'En ' },
-  modo:{ v:()=>v('fModo')||'', pre:'modo ' },
+  // 🫁 Con oxigenoterapia no hay modo ventilatorio: lo que el colega escribe
+  // en su plantilla como «modo» es el dispositivo. Se respalda para que las
+  // plantillas escritas antes de los tres ejes sigan rindiendo lo mismo.
+  modo:{ v:()=>v('fModo')||dispositivoActual()||'', pre:'modo ' },
   vt:{ v:()=>_pn('r_vt'), pre:'Vti? ', post:' ml' }, fr:{ v:()=>_pn('r_fr'), pre:'FR ', post:' rpm' },
   ti:{ v:()=>_pn('r_ti'), pre:'Ti ', post:' s' }, pmax:{ v:()=>_pn('r_pmax'), pre:'Pmax ' },
   pmedia:{ v:()=>_pn('r_pmedia'), pre:'Pmedia ' }, peep:{ v:()=>_pn('r_peep'), pre:'PEEP ' },
@@ -15631,11 +15655,14 @@ function sumCPAX(){
 function cpaxSugerir(){
   const sug={};
   // 1. Función respiratoria (mapa sólido desde soporte/modo)
-  const sop=v('fSop'), modo=v('fModo');
-  if(sop==='VM') sug[1]=['ACVC','ACPC'].includes(modo)?1:2;
+  /* 🫁 El alto flujo y la oxigenoterapia se preguntaban por un SOPORTE que no
+     existe con esos nombres ('CNAF' nunca fue soporte; el catálogo dice
+     'Oxigenoterapia/OAF'): las dos ramas estaban muertas y el ítem quedaba sin
+     sugerencia. Ahora se mira el soporte real y el dispositivo. */
+  const sop=v('fSop'), modo=v('fModo'), disp=dispositivoActual();
+  if(sop==='VM') sug[1]=['ACVC','ACPC','SIMV VC','SIMV PC'].includes(modo)?1:2;
   else if(sop==='VNI') sug[1]=2;
-  else if(sop==='CNAF') sug[1]=3;
-  else if(sop==='Oxigenoterapia') sug[1]=3;
+  else if(sop==='Oxigenoterapia/OAF') sug[1]=3;
   else if(sop==='Ambiente') sug[1]=5;
   // 2. Tos (grueso: asistencia de tos registrada / FEM si existe)
   if($('cATos')?.checked) sug[2]=2;
@@ -17908,19 +17935,19 @@ function _catEsc(hoyStr,ultV,ultF,nivelFn){
 const _CAT_VARS={
   // ── Respiratorias ──
   ASISTENCIA:{nombre:'Asistencia ventilatoria',ev:()=>{
-    const sop=v('fSop'), modo=v('fModo');
+    const sop=v('fSop'), modo=dispositivoActual()||v('fModo');
     let p=1, t='espontánea';
     if(sop==='VM'){
       if(modo==='CPAP/PS'&&!$('cBNM')?.checked){ p=2; t='VM modo espontáneo'; }
       else { p=3; t='VM controlada/asistida'+($('cBNM')?.checked?' + BNM':''); }
     } else if(sop==='VNI'){ p=2; t='VNI'; }
-    else if(['CNAF','OAF/CTAF'].includes(modo)){ p=2; t=modo; }
+    else if(esAltoFlujo(modo)){ p=2; t=modo; }
     return {pts:p,txt:t,dato:p>1}; // el default del formulario (espontánea) no cuenta como dato
   }},
   SAFI:{nombre:'Oxigenación (SAFI)',def2:300,def3:150,ev:(u2,u3)=>{
     const spo2=parseFloat(v('r_spo2'))||0;
     let fio2=parseFloat(v('r_fio2'))||0;
-    if(!fio2){ const l=parseFloat(v('r_litros'))||0; fio2=(v('fModo')==='NRC'&&l>0)?Math.min(100,21+4*l):21; }
+    if(!fio2){ const l=parseFloat(v('r_litros'))||0; fio2=(dispositivoActual()==='NRC'&&l>0)?Math.min(100,21+4*l):21; }
     if(!(spo2>0)) return {pts:1,txt:'sin dato',dato:false};
     const safi=Math.round(spo2/(fio2/100));
     return {pts:safi>u2?1:(safi>=u3?2:3),txt:'SAFI '+safi,dato:true};

@@ -268,7 +268,9 @@ function generarTextoEvolucion(d) {
     if (spo2 > 0) ventStr += `, SpO₂ ${spo2}%`;
     if (pafi > 0) ventStr += `, PaFiO₂ ${pafi}`;
     txt.push(ventStr + '.');
-  } else if (modo === 'CNAF' || modo === 'OAF/CTAF' || sop === 'CNAF') {
+  // 🪤 Y «CTAF» —el alto flujo por traqueostomía desde ago-2026— faltaba acá:
+  // se narraba con el párrafo genérico, sin flujo, sin T° y sin ROX.
+  } else if (modo === 'CNAF' || modo === 'CTAF' || modo === 'OAF/CTAF' || sop === 'CNAF') {
     // v2: CNAF/OAF es un MODO bajo soporte 'Oxigenoterapia/OAF' (sop==='CNAF' cubre filas v1)
     const temp = vn('VENT_TEMP'), umaC = v('KTM_UMA');
     txt.push(`Ventila espontáneo con apoyo de ${modo || 'CNAF'}${hact ? ' con humidificación activa' : ''}.`);
