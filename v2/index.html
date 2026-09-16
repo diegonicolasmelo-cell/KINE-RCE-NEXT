@@ -4905,6 +4905,30 @@ document.documentElement.setAttribute('data-piel', 'inst');
     <div style="font-size:1.15rem;font-weight:800;color:#0e3a5f;margin-top:6px;">RCE KINE UCIA</div>
     <div id="loginSub" style="font-size:.82rem;color:#64748b;margin:8px 0 18px;">Registro Clínico Electrónico · Kinesiología<br>Inicia sesión con tu cuenta Google registrada.</div>
     <div id="gisBtn" style="display:flex;justify-content:center;"></div>
+
+    <!-- ACCESO DEL TURNO (clave propia · svc_acceso.gs, 15-sep-2026).
+         Oculto salvo que CONFIG.LOGIN_EQUIPO_ACTIVO esté en TRUE. -->
+    <form id="accForm" style="display:none;text-align:left;" onsubmit="accEntrar(event)">
+      <label for="accUsr" style="display:block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px;">Tu firma</label>
+      <input id="accUsr" type="text" autocomplete="username" autocapitalize="characters" spellcheck="false"
+             placeholder="DMV" maxlength="8"
+             style="width:100%;height:42px;border:1px solid #cbd5e1;border-radius:9px;padding:0 12px;font-size:1rem;font-weight:700;text-transform:uppercase;box-sizing:border-box;">
+      <label for="accClave" style="display:block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin:12px 0 4px;">Tu clave</label>
+      <input id="accClave" type="password" autocomplete="current-password"
+             style="width:100%;height:42px;border:1px solid #cbd5e1;border-radius:9px;padding:0 12px;font-size:1rem;box-sizing:border-box;">
+
+      <!-- Solo aparece cuando la clave es temporal y hay que cambiarla -->
+      <div id="accNuevaBox" style="display:none;">
+        <label for="accNueva" style="display:block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#b45309;margin:12px 0 4px;">Elige tu clave nueva</label>
+        <input id="accNueva" type="password" autocomplete="new-password"
+               style="width:100%;height:42px;border:1px solid #fbbf24;border-radius:9px;padding:0 12px;font-size:1rem;box-sizing:border-box;">
+        <div style="font-size:.7rem;color:#92400e;margin-top:4px;">Al menos 6 caracteres. Nadie más la ve, ni queda escrita en la planilla.</div>
+      </div>
+
+      <button id="accBtn" type="submit"
+              style="width:100%;height:44px;margin-top:16px;background:#0e3a5f;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:.95rem;cursor:pointer;">Entrar</button>
+    </form>
+
     <div id="loginMsg" style="font-size:.78rem;color:#64748b;margin-top:14px;min-height:18px;"></div>
   </div>
 </div>
@@ -4937,7 +4961,16 @@ setTimeout(function () {
 </script>
 <script>
 //  PUENTE v2 — google.script.run → api(accion, datos, TOKEN)
-let TOKEN = ''; // id_token de Google (GIS); vacío en AUTH_DEV_MODE
+/* El token que viaja en cada llamada. Lleva DOS cosas según el candado que
+   esté puesto: el id_token de Google (GIS) o el de la sesión del turno
+   (svc_acceso.gs). Es el mismo campo a propósito — `api(accion, datos, token)`
+   no cambia de forma, y el servidor sabe cuál mirar por la configuración.
+   🪤 Se guarda en sessionStorage, no en localStorage: así una pestaña cerrada
+   cierra la sesión del dispositivo, y la tablet del office no queda abierta
+   para el turno siguiente. */
+const ACC_TK_KEY = 'rce_acceso_token';
+let TOKEN = '';
+try { TOKEN = sessionStorage.getItem(ACC_TK_KEY) || ''; } catch (e) { TOKEN = ''; }
 let YO = { firma:'', dev:false };
 let FASES = [];
 let FASES_SEL = new Set();
@@ -4958,7 +4991,7 @@ function gs(accion, datos, ok, fail) {
   api(accion, datos).then(d => { if (ok) ok(d); }).catch(e => {
     const msg = (e && e.message) || String(e);
     // Token GIS expirado a mitad de sesión → pedir re-login sin perder la vista
-    if (/Sesión no válida|Inicia sesión/i.test(msg)) { loading(false); mostrarLogin(); }
+    if (/Sesión no válida|Inicia sesión|Entra con tu clave|Tu sesión expiró/i.test(msg)) { loading(false); mostrarLogin(); }
     else if (msg !== 'offline') toast('❌ ' + msg);
     if (fail) fail(msg);
   });
@@ -15476,12 +15509,17 @@ function hSesUsuarioClick(){
   const yo=(typeof YO!=='undefined'&&YO)||{};
   const firma=String(yo.firma||'').trim();
   if(yo.dev||!firma){
-    if(typeof LOGIN_UI_ACTIVO!=='undefined'&&LOGIN_UI_ACTIVO){ mostrarLogin(); return; }
+    if(window.__ACC_ACTIVO||(typeof LOGIN_UI_ACTIVO!=='undefined'&&LOGIN_UI_ACTIVO)){ mostrarLogin(); return; }
     toast('👤 La app está abierta sin usuario: la identidad de Google aún no está activada (decisión de coordinación).', 5200);
     return;
   }
   uiConfirm({icono:'👤', titulo:'Sesión de '+firma, mensaje:(yo.email?_cEsc(yo.email)+'<br>':'')+'¿Cerrar la sesión en este equipo?', confirmar:'Cerrar sesión'})
-    .then(ok=>{ if(ok!==true) return; TOKEN=''; YO={firma:'',dev:false}; hSesRender(); mostrarLogin(); });
+    .then(ok=>{ if(ok!==true) return;
+      // Con el acceso del turno puesto hay que cerrar EN EL SERVIDOR: limpiar
+      // la variable dejaría el token vivo en el caché y la tablet del office
+      // abierta para el turno siguiente.
+      if(window.__ACC_ACTIVO){ accSalir(); return; }
+      TOKEN=''; YO={firma:'',dev:false}; hSesRender(); mostrarLogin(); });
 }
 function hSesCandadoClick(){
   if(COORD_TK){
@@ -18934,9 +18972,125 @@ function bootApp(){
 //  cambiar a true (ver CLAUDE.md).
 const LOGIN_UI_ACTIVO=false;
 let _gisCargado=false;
+/* ══ ACCESO DEL TURNO · clave propia (svc_acceso.gs, 15-sep-2026) ══════════
+   El plan maestro eligió Google Sign-In, pero depende de un proyecto de Google
+   Cloud trabado en informática. Mientras tanto cualquiera con el enlace entra
+   y firma con el nombre que teclee. Esto lo cierra sin depender de nadie.
+
+   🔴 Nace APAGADO. Con CONFIG.LOGIN_EQUIPO_ACTIVO en FALSE nada de esto se ve
+   y la app se comporta como antes, letra por letra. */
+let _accCambiando = false;   // la clave era temporal: hay que elegir una nueva
+
+function _accGuardarToken(t){
+  TOKEN = t || '';
+  try { if (TOKEN) sessionStorage.setItem(ACC_TK_KEY, TOKEN); else sessionStorage.removeItem(ACC_TK_KEY); }
+  catch (e) { /* sin sessionStorage la sesión dura lo que dure la página */ }
+}
+
+/** Muestra la puerta del turno dentro de la pantalla de acceso. */
+function accMostrarPuerta(mensaje){
+  const ovl=$('loginOvl'); if(!ovl) return;
+  ovl.style.display='flex';
+  const gb=$('gisBtn'); if(gb) gb.style.display='none';
+  const sub=$('loginSub');
+  if(sub) sub.innerHTML='Registro Clínico Electrónico · Kinesiología<br>Entra con tu firma y tu clave.';
+  const f=$('accForm'); if(f) f.style.display='block';
+  $('loginMsg').textContent = mensaje || '';
+  setTimeout(()=>{ const u=$('accUsr'); if(u&&!u.value) u.focus(); else $('accClave')?.focus(); }, 60);
+}
+
+/** Entrar, o —si la clave era temporal— entrar y cambiarla en el mismo paso. */
+function accEntrar(ev){
+  if(ev) ev.preventDefault();
+  const btn=$('accBtn'), msg=$('loginMsg');
+  const usuario=String(v('accUsr')||'').trim();
+  const clave=String(v('accClave')||'');
+  if(!usuario||!clave){ msg.textContent='Escribe tu firma y tu clave.'; return; }
+
+  if(_accCambiando){ accCambiarClave(); return; }
+
+  btn.disabled=true; btn.textContent='Entrando…'; msg.textContent='';
+  api('ACCESO_ENTRAR',{usuario:usuario, clave:clave}).then(d=>{
+    _accGuardarToken(d.token);
+    if(d.debeCambiarClave){
+      // No se entra a la app con una clave que repartió otra persona.
+      _accCambiando=true;
+      $('accNuevaBox').style.display='block';
+      $('accUsr').readOnly=true;
+      btn.disabled=false; btn.textContent='Guardar y entrar';
+      msg.innerHTML='Tu clave es temporal. <b>Elige una tuya para continuar.</b>';
+      setTimeout(()=>$('accNueva')?.focus(),60);
+      return;
+    }
+    accAdentro(d);
+  }).catch(e=>{
+    btn.disabled=false; btn.textContent='Entrar';
+    msg.textContent = (e&&e.message) || 'No se pudo entrar.';
+    const c=$('accClave'); if(c){ c.value=''; c.focus(); }
+  });
+}
+
+function accCambiarClave(){
+  const btn=$('accBtn'), msg=$('loginMsg');
+  const actual=String(v('accClave')||''), nueva=String(v('accNueva')||'');
+  if(nueva.length<6){ msg.textContent='La clave nueva debe tener al menos 6 caracteres.'; return; }
+  btn.disabled=true; btn.textContent='Guardando…';
+  api('ACCESO_CAMBIAR_CLAVE',{token:TOKEN, actual:actual, nueva:nueva}).then(()=>{
+    _accCambiando=false;
+    accAdentro({firma:String(v('accUsr')||'').toUpperCase()});
+  }).catch(e=>{
+    btn.disabled=false; btn.textContent='Guardar y entrar';
+    msg.textContent=(e&&e.message)||'No se pudo cambiar la clave.';
+  });
+}
+
+/** Ya adentro: se cierra la puerta y arranca la app con la identidad puesta. */
+function accAdentro(d){
+  const ovl=$('loginOvl'); if(ovl) ovl.style.display='none';
+  const f=$('accForm'); if(f) f.style.display='none';
+  const c=$('accClave'); if(c) c.value='';
+  const nv=$('accNueva'); if(nv) nv.value='';
+  $('accNuevaBox').style.display='none';
+  $('accUsr').readOnly=false;
+  const btn=$('accBtn'); if(btn){ btn.disabled=false; btn.textContent='Entrar'; }
+  toast('👋 Hola '+((d&&d.nombre)||(d&&d.firma)||''));
+  // Se recarga en vez de continuar a mano: el arranque ya sabe pedirlo todo
+  // con el token puesto, y repetir esa secuencia acá sería mantener dos.
+  location.reload();
+}
+
+/** Salir: cierra la sesión EN EL SERVIDOR, no solo en esta pantalla. */
+function accSalir(){
+  uiConfirm({ icono:'🔒', titulo:'Cerrar tu sesión',
+    mensaje:'Tendrás que entrar de nuevo con tu clave para registrar.',
+    confirmar:'Cerrar sesión', tono:'rojo' }).then(okk=>{
+    if(!okk) return;
+    const t=TOKEN;
+    api('ACCESO_SALIR',{token:t}).catch(()=>{}).then(()=>{
+      _accGuardarToken('');
+      location.reload();
+    });
+  });
+}
+
 function mostrarLogin(){
   const ovl=$('loginOvl'); if(!ovl) return;
   ovl.style.display='flex';
+  // El candado del turno manda sobre el de Google: si está puesto, la puerta
+  // es la clave propia.
+  if(window.__ACC_ACTIVO){ accMostrarPuerta(); return; }
+  // Primera vez: se le pregunta al servidor cuál de los dos candados hay.
+  // ACCESO_ESTADO es pública (va antes de la identidad en el dispatcher), que
+  // es lo que permite preguntarlo justamente cuando no se puede entrar.
+  if(window.__ACC_ACTIVO===undefined){
+    window.__ACC_ACTIVO=null;                       // null = preguntando
+    $('loginMsg').textContent='Comprobando el acceso…';
+    api('ACCESO_ESTADO',{token:TOKEN}).then(d=>{
+      window.__ACC_ACTIVO=!!(d&&d.activo);
+      mostrarLogin();
+    }).catch(()=>{ window.__ACC_ACTIVO=false; mostrarLogin(); });
+    return;
+  }
   if(!LOGIN_UI_ACTIVO){
     // Mensaje neutro de reconexión: sin GIS, sin mención a demo ni desarrollo.
     const sub=$('loginSub'); if(sub) sub.innerHTML='Registro Clínico Electrónico · Kinesiología';

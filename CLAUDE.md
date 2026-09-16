@@ -83,6 +83,25 @@ una cadena de JavaScript en un atributo, `hEsc` como tag de plantilla. **No se
 define un escapador local nunca**: la guardia `escapado_unico.js` lo rechaza, y
 existe porque había nueve distintos llamados casi todos `esc`.
 
+### 🔴 Dos candados, y el del turno manda
+`svc_acceso.gs` da identidad real sin depender de nadie de fuera: cada
+kinesiólogo entra con su firma y su clave. Convive con el de Google (D1b), que
+sigue construido y esperando el proyecto de Google Cloud.
+
+- **Nace apagado.** Sin `CONFIG.LOGIN_EQUIPO_ACTIVO=TRUE` no cambia nada.
+- **Se enciende con `accesoEncender()`**, que se NIEGA si algún kinesiólogo
+  activo quedaría sin clave. Antes va `accesoSembrarClaves()`, que reparte una
+  temporal a cada uno y las imprime para entregarlas.
+- **En `autorizar()` va primero**, antes del modo desarrollo: si quedara
+  después, encenderlo con `AUTH_DEV_MODE` olvidado en TRUE no protegería nada
+  y ese olvido no se ve en ninguna pantalla.
+- **La criptografía no se reescribe.** La primitiva es `credHuellaDe`
+  (infra_util.gs) y la comparten el turno y coordinación. 🔴 El texto que se
+  resume en coordinación **no se toca**: sus claves ya existen y cambiarlo las
+  invalidaría todas de una vez.
+- **Espacios separados**: una clave de coordinación no abre el turno, ni al
+  revés. Son dos permisos distintos.
+
 ### 🔴 El paquete de entrega se genera, no se edita
 `node build/paquete_migracion.js entrega`. La guardia `paridad_entrega.js`
 compara `entrega/` contra lo generado **byte a byte**: editar ahí es trabajo
@@ -107,10 +126,19 @@ depuración.
 - **La guardia se escribe PRIMERO y se ve ROJA** contra el código sin arreglar.
   Una guardia que nunca se vio roja no prueba lo que dice probar.
 - 🪤 **Congelar el reloj.** Una guardia que lee el reloj real da distinto según
-  la hora a la que se corra. Ya pasó dos veces: el `hoyISO` sombreado por el
-  eval, y el arranque que hacía dos viajes **solo en los 30 minutos previos al
-  cambio de turno** (a las 10:00 verde, a las 19:39 rojo). Si el código bajo
-  prueba mira la hora, el reloj se congela en el caso peor.
+  **cuándo** se corra. Ya pasó TRES veces: el `hoyISO` sombreado por el eval; el
+  arranque que hacía dos viajes **solo en los 30 minutos previos al cambio de
+  turno** (a las 10:00 verde, a las 19:39 rojo); y `tutorial.js`, que se puso
+  roja sola al cambiar el día porque **del 16 al 20 de septiembre Mauri sale de
+  huaso** y sus poses cambian de imagen.
+  · Si el código bajo prueba mira la hora o la fecha, el reloj se congela: en
+  el caso peor si se está probando eso, y en un día cualquiera si no.
+  · **Las ventanas trampa del calendario, hoy**: 16 al 20 de septiembre
+  (Fiestas Patrias), los cumpleaños del equipo, el cierre de año (26-dic a
+  febrero) y la media hora previa a cada cambio de turno.
+  · La forma buena está en `checks/fiestas_patrias.js`: **la fecha se INVENTA,
+  no se espera**. Congelar `Date` en la página sirve cuando la fecha no se
+  puede pasar por parámetro.
 - 🪤 **Las `const` no cuelgan de globalThis con eval indirecto** — solo
   `function` y `var`. Un servicio evaluado en otro ámbito revienta con «ERR is
   not defined», y si el arnés se lo traga, la prueba se salta en silencio.

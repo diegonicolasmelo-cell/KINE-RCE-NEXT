@@ -24,6 +24,16 @@ function api(accion, datos, token) {
   // público por diseño). Reemplaza al scriptlet de plantilla que se eliminó.
   if (accion === 'GET_LOGIN_INFO') return ok({ clientId: configVal('OAUTH_CLIENT_ID', '') });
 
+  // ── ACCESO DEL TURNO (svc_acceso.gs) ──────────────────────────────────
+  // 🔴 Estas cuatro van ANTES de `autorizar()` por necesidad: son la puerta.
+  // Si pasaran por la identidad, entrar exigiría estar dentro y nadie podría
+  // entrar nunca. Cada una se defiende sola: ENTRAR valida clave con espera
+  // por intentos, y CAMBIAR_CLAVE exige la sesión y además la clave actual.
+  if (accion === 'ACCESO_ESTADO')         return accesoEstado(datos);
+  if (accion === 'ACCESO_ENTRAR')         return accesoEntrar(datos);
+  if (accion === 'ACCESO_SALIR')          return accesoSalir(datos);
+  if (accion === 'ACCESO_CAMBIAR_CLAVE')  return accesoCambiarClave(datos);
+
   // Identidad (en AUTH_DEV_MODE=TRUE pasa siempre con una firma simulada).
   const firmaDecl = datos.PLAN_FIRMA_KINE || datos.firmaKine || '';
   const auth = autorizar(token, firmaDecl);

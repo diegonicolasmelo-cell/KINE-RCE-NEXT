@@ -82,6 +82,24 @@ function firmaDeEmail(email) {
  * @return {{ok:true,email,firma,nombre} | {ok:false,error,codigo}}
  */
 function autorizar(idToken, firmaDeclarada) {
+  // ── ACCESO DEL TURNO (clave propia, svc_acceso.gs) ───────────────
+  // Va PRIMERO a propósito: cuando el candado del turno está puesto, manda él
+  // y no hay puerta de atrás. Si quedara después del modo desarrollo, encender
+  // el acceso con AUTH_DEV_MODE=TRUE olvidado en TRUE no protegería nada, y
+  // ese olvido no se ve en ninguna pantalla.
+  if (typeof accesoActivo === 'function' && accesoActivo()) {
+    const ses = accesoSesion(idToken);
+    if (!ses) {
+      return { ok: false, error: 'Entra con tu clave para registrar.', codigo: ERR.NO_AUTORIZADO };
+    }
+    const declarada = firmaDeclarada ? String(firmaDeclarada).trim().toUpperCase() : '';
+    if (declarada && declarada !== ses.firma) {
+      return { ok: false, error: 'No puedes firmar como ' + declarada + ': tu firma es ' + ses.firma + '.',
+               codigo: ERR.NO_AUTORIZADO };
+    }
+    return { ok: true, email: 'acceso:' + ses.firma.toLowerCase(), firma: ses.firma, nombre: ses.nombre };
+  }
+
   // ── MODO DESARROLLO ──────────────────────────────────────────────
   // Permite construir/probar la app SIN que GIS funcione todavía.
   // Se activa con CONFIG.AUTH_DEV_MODE = TRUE. ⚠️ Poner FALSE en producción.

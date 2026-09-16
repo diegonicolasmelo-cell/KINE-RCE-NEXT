@@ -2,6 +2,19 @@
 // recorrido de globos con anillo-foco, cambio de pestaña por paso, fallback
 // centrado cuando el ancla no existe, cierre con Salir/Escape y regreso a
 // CAMAS. Uso: node build/checks/tutorial.js
+//
+// 🪤 EL RELOJ VA CONGELADO, Y NO ES UN DETALLE (16-sep-2026). Esta guardia se
+// puso ROJA sola, sin que nadie tocara el tutorial: del 16 al 20 de septiembre
+// «manda Mauri» de huaso por Fiestas Patrias (v6.23), sus poses de reposo
+// cambian de imagen y las seis comprobaciones de Don Mauri devolvían «?».
+// O sea: la batería del proyecto se ponía roja sola CADA 16 DE SEPTIEMBRE y el
+// motivo no se veía en ninguna parte.
+// Es la tercera vez que pasa lo mismo —el `hoyISO` sombreado por el eval, y el
+// arranque que hacía dos viajes solo en la media hora previa al cambio de
+// turno—. `checks/fiestas_patrias.js` ya lo tenía resuelto y lo dice en su
+// cabecera: «la fecha se INVENTA, no se espera». Acá se congela en un día
+// cualquiera fuera de la ventana dieciochera, así lo que se mide es el
+// tutorial y no el calendario. La ropa de huaso tiene su propia guardia.
 const path = require('path');
 const { chromium } = require('playwright-core');
 
@@ -9,6 +22,15 @@ const { chromium } = require('playwright-core');
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
   const p = await b.newPage({ viewport: { width: 1100, height: 900 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push('c:' + m.text()); });
+  // Un martes de julio: ni Fiestas Patrias, ni cumpleaños, ni cierre de año.
+  const CONGELADO = new Date('2026-07-14T11:00:00').getTime();
+  await p.addInitScript(({ congelado }) => {
+    const Real = Date;
+    function Falso(...a) { return a.length ? new Real(...a) : new Real(congelado); }
+    Falso.now = () => congelado;
+    Falso.parse = Real.parse; Falso.UTC = Real.UTC; Falso.prototype = Real.prototype;
+    window.Date = Falso;
+  }, { congelado: CONGELADO });
   await p.addInitScript(() => {
     window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
       api(a, d) { setTimeout(() => ok({ ok: true, data: null }), 5); }

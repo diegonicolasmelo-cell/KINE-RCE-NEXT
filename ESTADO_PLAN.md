@@ -104,7 +104,20 @@ estadística— no está escrita.
 
 ---
 
-### 🟡 G3 · El login real está construido pero apagado (D1b, F4)
+### 🟢 G3 · Ya hay identidad real, sin esperar a informática (D1b, F4)
+
+> **16-sep-2026.** Diego pidió un login y eligió **clave propia para el
+> equipo**. `svc_acceso.gs` la da: cada kinesiólogo entra con su firma y su
+> clave, reusando el mecanismo probado del Modo Coordinación y sin depender de
+> Google Cloud ni del correo institucional. **Nace apagado**; se enciende con
+> `accesoEncender()`, que se niega si alguien del equipo quedaría sin clave.
+>
+> El de Google **no se descarta**: sigue construido detrás y se enciende el día
+> que llegue el identificador de cliente. Lo que cambia es que la app ya no
+> depende de eso para tener autoría real. Lo que sigue es el diagnóstico
+> original de por qué el de Google no alcanzaba.
+
+### 🟡 El diagnóstico original (D1b, F4)
 
 No es deuda de código: el servidor está entero (ver §1). Lo que falta es
 encenderlo, y eso no depende de programar.
@@ -234,7 +247,8 @@ Primero lo que no depende de nadie más, y de mayor a menor riesgo evitado.
 | 4 | **G5** · Capa `core/` en la interfaz | ✅ escape, puente y modales · queda `core/estado.js` |
 | 5 | Estética · textos cortados | ✅ hecho |
 | 6 | Estética · las cinco decisiones de Diego | esperando su respuesta |
-| — | **G3** y **G6** | esperando a Diego / informática |
+| — | **G3** | ✅ resuelto con clave propia · el de Google sigue esperando a informática |
+| — | **G6** | esperando a Diego |
 
 ### Estética
 

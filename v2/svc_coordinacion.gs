@@ -70,9 +70,12 @@ function _coordFirmaDe(usuario) { return COORD_USUARIOS[_coordUsuarioNorm(usuari
 
 /** Huella de una clave. La sal es por persona: dos claves iguales no coinciden. */
 function _coordHuella(usuario, clave, sal) {
-  const crudo = String(sal) + '|' + _coordUsuarioNorm(usuario) + '|' + String(clave);
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, crudo, Utilities.Charset.UTF_8);
-  return Utilities.base64Encode(bytes);
+  // 🔴 El texto que se resume NO se toca: las claves de coordinación ya están
+  // creadas en la planilla y cualquier cambio acá las invalidaría todas de una
+  // vez, sin que el motivo se vea en ninguna parte. Lo único que cambió
+  // (15-sep-2026) es de dónde sale el SHA-256: ahora es la primitiva común
+  // `credHuellaDe` de infra_auth.gs, que comparte con el acceso del turno.
+  return credHuellaDe(String(sal) + '|' + _coordUsuarioNorm(usuario) + '|' + String(clave));
 }
 
 function _coordProps() { return PropertiesService.getScriptProperties(); }

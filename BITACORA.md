@@ -202,6 +202,74 @@ Queda anotado, sin arreglar: la tabla del registro deja **175 píxeles fuera de
 la vista** a la derecha (mide 1.529 y el contenedor 1.354). Se puede
 desplazar, pero lo único que avisa es la palabra «TURN…» cortada a la mitad.
 
+## 16-sep-2026 · Un login que no depende de informática
+
+Diego: «¿puedes crear un login de acceso?». El plan maestro eligió Google
+Sign-In (D1b) y el servidor para eso ya estaba entero, pero depende de un
+proyecto de Google Cloud trabado en informática. Mientras tanto la app corre
+en marcha blanca abierta: **cualquiera con el enlace entra y firma con el
+nombre que teclee**.
+
+Se le ofrecieron cuatro caminos y eligió **clave propia para el equipo**. Sobre
+qué pasa si alguien no logra entrar en medio del turno no tuvo preferencia, así
+que se decidió lo más conservador y se le dijo: **nace apagado**, y cuando esté
+encendido, sin identidad no se guarda —si no, no resuelve el problema de que
+cualquiera firme con el nombre que teclee—.
+
+**No se escribió criptografía nueva.** El Modo Coordinación ya tenía un
+mecanismo probado: huella SHA-256 con sal por persona en PropertiesService y
+nunca en la planilla, intentos fallidos con espera, sesión con token que muere
+por inactividad, cierre en el servidor. `svc_acceso.gs` reusa esa receta con un
+**espacio distinto**: una clave de coordinación no abre el turno ni al revés.
+
+🪤 La primitiva del resumen se factorizó a `credHuellaDe`, pero **el texto que
+resume coordinación no se tocó**: sus claves ya están creadas en la planilla de
+Diego y cambiarlo las habría invalidado todas de una vez, sin que el motivo se
+viera en ninguna parte.
+
+🪤 `credHuellaDe` vive en `infra_util.gs` y no en `infra_auth.gs`, que sería su
+sitio natural: el simulador y el banco de medición NO cargan infra_auth, así
+que una función de identidad puesta allá revienta en cuanto coordinación la
+llama. Se vio al mover la huella.
+
+🪤 La misma trampa de las `const` con eval indirecto apareció otra vez en la
+guardia nueva: el camino feliz pasaba y el mensaje de error moría con «ERR is
+not defined». Se arregla cargando `infra_respuesta.gs` en el mismo ámbito.
+
+**Cómo se enciende**, y esto importa: `accesoSembrarClaves()` reparte una clave
+temporal a cada kinesiólogo activo y las imprime para entregarlas;
+`accesoEncender()` **se niega** si alguno quedaría sin clave. Encender el
+candado sin repartir las llaves deja a la unidad sin poder registrar, que es el
+peor resultado posible.
+
+Dos guardias: `acceso_equipo.js` prueba el servidor —que nadie firme como otro,
+que la clave no quede en la planilla, que el mensaje no delate quién existe,
+que la espera sea por persona y no global, que salir cierre en el servidor— y
+`acceso_pantalla.js` abre la app en un navegador real y comprueba que con el
+candado puesto **el censo no se pinta**, que la puerta aparece, y que una clave
+temporal obliga a elegir una propia antes de entrar.
+
+### 🪤 Y la batería se ponía roja sola cada 16 de septiembre
+
+Al correr la batería con el login apareció `tutorial.js` en rojo, sin que nadie
+hubiera tocado el tutorial. Se comprobó contra el índice anterior: también
+fallaba. **Del 16 al 20 de septiembre «manda Mauri» de huaso** por Fiestas
+Patrias, sus poses de reposo cambian de imagen y las seis comprobaciones de Don
+Mauri devolvían «?».
+
+Es la TERCERA vez que una guardia se pone roja por leer el reloj real. Y
+`checks/fiestas_patrias.js` ya lo tenía resuelto y escrito en su cabecera —«la
+fecha se INVENTA, no se espera»—; el tutorial nunca lo aplicó. Ahora congela la
+fecha en un martes de julio.
+
+Se barrieron las 94 guardias de navegador: la mayoría no congela el reloj. No
+se reescribieron, porque casi ninguna mira la fecha y cambiarlas sin un motivo
+medido es mover código por moverlo. Lo que sí quedó en `CLAUDE.md` son las
+**ventanas trampa del calendario**: 16 al 20 de septiembre, los cumpleaños, el
+cierre de año y la media hora previa a cada cambio de turno.
+
+---
+
 ### Estética · segunda tanda, mirando las vistas que faltaban
 
 Había sacado diez pantallazos y mirado tres. Al revisar el resto apareció lo

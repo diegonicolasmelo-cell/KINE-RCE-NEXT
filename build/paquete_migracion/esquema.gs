@@ -805,6 +805,11 @@ function _sembrar(ss) {
     // DEBE quedar en FALSE en producción.
     ['AUTH_DEV_MODE', 'FALSE'],
     ['AUTH_DEV_FIRMA', 'DMV'],
+    // Acceso del turno con clave propia (svc_acceso.gs, 15-sep-2026). Nace
+    // APAGADO: encenderlo sin repartir las claves deja a la unidad sin poder
+    // registrar. Se enciende con accesoEncender(), que se niega si alguien
+    // del equipo activo quedaría afuera.
+    ['LOGIN_EQUIPO_ACTIVO', 'FALSE'],
     // Modo Coordinación · recuperar la clave por correo (ago-2026).
     // APAGADO a propósito: Diego rechazó el envío de correos y hoy el sistema
     // no manda ninguno. El mecanismo está escrito y probado; encenderlo es

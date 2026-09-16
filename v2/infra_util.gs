@@ -1,4 +1,27 @@
 /**
+ * Huella de una clave. Primitiva ÚNICA de todo el proyecto: SHA-256 del texto
+ * que se le pase, en base64.
+ *
+ * 🪤 Recibe el texto YA ARMADO a propósito, en vez de armarlo aquí con
+ * usuario+sal. Hay dos espacios de credenciales —el Modo Coordinación y el
+ * acceso del turno— y cada uno arma su texto con su propio separador, así una
+ * clave de coordinación no abre el turno ni al revés. Si esta función armara
+ * el texto, cambiarla para el espacio nuevo habría invalidado TODAS las claves
+ * de coordinación que ya existen en la planilla de Diego: nadie habría podido
+ * entrar y el motivo no se vería en ninguna parte.
+ */
+function credHuellaDe(crudo) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(crudo), Utilities.Charset.UTF_8);
+  return Utilities.base64Encode(bytes);
+}
+
+// 🪤 Vive en infra_util y no en infra_auth, que sería su sitio natural, por una
+// razón de arnés: el simulador (`build/sim/sim_srv.js`) y el banco de medición
+// NO cargan infra_auth, así que una función de identidad puesta allá revienta
+// con «no está definida» en cuanto svc_coordinacion la llama. Se vio al mover
+// la huella de las claves el 15-sep-2026.
+
+/**
  * infra_util.gs — Utilidades transversales chicas.
  */
 
