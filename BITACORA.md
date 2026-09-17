@@ -1118,3 +1118,125 @@ columna **y el modo vacío**.
 
 **Batería: 167 verdes, 0 rojas.** Comprobado además en pantalla de teléfono: los
 tres paneles muestran y esconden cada eje como corresponde, sin desborde.
+
+---
+
+## 17-sep-2026 · El paso 1 · Prevención de NAVM, y la tercera copia de la fecha
+
+Primera tanda de programación del PRD de la revisión campo por campo. Diego la
+eligió como punto de partida después de ver el mockup.
+
+### Qué se hizo, en una línea
+
+El bloque «Dispositivos» —que vivía en medio del paso del turno con tres
+calendarios escritos a mano y 534 caracteres de párrafo— se convirtió en un
+paso propio, **primero del camino**, de cinco líneas y un toque cada una.
+
+### Por qué va primero
+
+Es el orden real del trabajo. Diego: *«llegas, miras: está con tubo traqueal,
+está ventilado, está sentado o en 30 grados en la cama, tiene el cuff bien… y
+después me voy a revisar lo ventilatorio»*. Si fuera al final se completaría de
+memoria al cerrar la evolución, en vez de mirando al paciente.
+
+### 🔴 La tercera copia de la fecha era una segunda puerta
+
+Midiendo antes de tocar apareció que el cambio de dispositivo **ya era un
+evento** (`svc_eventos.gs`): el ➕ reinicia el reloj en la cama, deja el hito en
+la línea de tiempo con hora y autor, y se niega a anotar hacia atrás si la cama
+ya tiene otro paciente. La fecha vivía en tres lugares:
+
+| Dónde | Qué guarda | ¿Hacía falta? |
+|---|---|---|
+| La cama | el reloj vigente | **sí** — estado del episodio |
+| La línea de tiempo | el cambio, con hora y quién | **sí** — el evento |
+| La fila del turno | una copia | **no** |
+
+Peor que redundante: la fecha se escribía desde el formulario del turno **y**
+desde el evento ➕. Dos puertas a un mismo dato es lo que este proyecto ya pagó
+tres veces (el desajuste 119≠132, los nueve escapadores, las dos rutas de la
+extubación). Ahora el paso **marca** (`NAVM_HME`/`HEPA`/`TC`) y el reloj lo
+reinicia el servidor, con la fecha efectiva del turno, por el mismo camino de
+siempre.
+
+**Lo que hizo seguro el corte**: la sincronización a la cama ya usaba
+`val(loDelTurno, loDeLaCama)`, que conserva lo de la cama cuando el turno llega
+vacío. O sea que saltarse el paso NO borra el reloj de un dispositivo
+instalado — el 🔴 que CLAUDE.md señalaba. Se ancló en la guardia (B5-B7) para
+que nadie lo cambie por una asignación directa sin darse cuenta.
+
+### Las dos reglas que ya sabía el servidor
+
+Diego planteó dos casos como problemas a resolver, y los dos **ya estaban
+decididos** en `estadoDispositivos`:
+
+- **Humidificación activa**: excluye al HME (pasiva ↔ activa). En pantalla es un
+  selector de dos posiciones en la propia fila del HME; al elegir la activa su
+  reloj se apaga y deja de pedirse.
+- **HEPA del ventilador**: en un Puritan Bennett o una Avea el filtro es del
+  equipo (`CONFIG HEPA_FIJO_EQUIPOS`, por prefijo). La fila **se muestra** —su
+  fecha es la referencia de instalación— pero no pide toque ni bloquea.
+
+`prevFilas()` es el espejo cliente de esa función. La única diferencia es
+deliberada y está escrita: allá `aplica` incluye «y además tiene fecha», acá se
+separa en `aplica` (la regla clínica) y `conReloj`, porque la pantalla necesita
+mostrar la fila aunque falte la fecha — que es justo cuando hay que instalarlo.
+
+### Qué obliga y qué no
+
+Filtros y Trach Care obligan (kinesiología está a cargo y son medida de IAS),
+**pero se pasa con razón escrita**: bloquear de verdad haría que la gente
+invente una fecha para poder avanzar, y ahí se pierde el dato *y* la medida.
+Cabecera y cuff son opcionales — su omisión **es** el dato del cumplimiento.
+
+La cabecera tenía columna (`VENT_CAB_RSS`) y un lector en el resumen de NAVM
+desde hacía tiempo, pero **nadie la escribía**: el indicador salía siempre
+vacío. Ahora se escribe. El cuff se mudó entero desde Respiratorio conservando
+sus ids, `setCuff()` y `cuffGate()`.
+
+### 🪤 Las cuatro trampas de esta tanda
+
+1. **El default de `data-paso` sigue al TURNO, no al número uno.** `pasoIr`
+   reparte las tarjetas por `data-paso` y la que no lo declara «cae en el
+   turno». Con el turno en el paso 1 daba igual escribir `'1'`; al meter la
+   prevención delante, dejarlo habría mandado **todas** las tarjetas sin dueño
+   —que son casi todas— al paso de prevención, con el turno vacío.
+
+2. **Una guardia que pasa en verde antes del cambio no prueba nada.** Tres de
+   las comprobaciones nacieron verdes por accidente y hubo que afinarlas:
+   `Math.min(4,` casaba con `_charlsonEdadPts`, el Trach Care no viaja como
+   `DISP_TC_FECHA` sino como `VENT_FECHA_SONDA`, y los tres calendarios salían
+   «invisibles» solo porque se medían desde el paso 1 y con el formulario en
+   blanco (la tarjeta se muestra únicamente en VM). Al medir el escenario real
+   —parado en el paso 2, con el paciente en VM— salieron rojas de verdad: **sí
+   se veían y ya no guardaban nada**. Ese era el bug que iba camino a Diego.
+
+3. **`DB` se declara con `let`, así que no cuelga de `window`.** La guardia le
+   asignaba `window.DB` y la cama quedaba vacía: la lista de filas salía en
+   blanco con todo lo demás en verde. Es la misma trampa que CLAUDE.md
+   documenta para las `const` y el eval indirecto.
+
+4. **El resumen del acordeón del celular se arma leyendo los `<input>`
+   visibles, y la prevención son botones.** Sin resumen propio decía «sin
+   registrar» aunque estuviera toda revisada — un falso «te falta» en la única
+   pantalla donde la sección va plegada y el colega no puede abrirla para
+   desmentirlo.
+
+### Lo que quedó escondido y por qué
+
+Los tres calendarios siguen en el DOM como campos **ocultos**, porque
+`calcInsumosDias()`, `autoFechasDispositivos()` y `_dispSnapshot` los leen para
+el arrastre entre turnos. No se ven, no se llenan y no mienten. ⏳ Sacarlos del
+todo queda pendiente para cuando esas funciones se muden a leer el reloj de la
+cama.
+
+### La batería
+
+`tres_pasos.js` pasó a llamarse `cuatro_pasos.js`: la convención cambió de
+verdad, no se ablandó la guardia. Otras 14 salieron rojas por la renumeración
+de pasos y el total de columnas (401 → 405); todas se actualizaron con su razón
+escrita, ninguna con una excepción.
+
+**168 guardias · 168 verdes.** `prevencion_navm.js` es la nueva (32
+comprobaciones en siete secciones), y se vio roja con 14 fallos antes de
+escribir una línea de código.

@@ -60,7 +60,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();
     const f = $('fFirma'); if (f) { if (!f.options.length) f.add(new Option('DMV', 'DMV')); f.value = 'DMV'; }
-    pasoIr(2);
+    pasoIr(3);   // 🗂️ evaluaciones: del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(200);
   await p.evaluate(() => $('pasoEvalNada').click());
@@ -79,7 +79,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   });
 
   console.log('\n1 · Lo primero: quedó guardado');
-  eq('se llegó al paso 3', await paso(), '3');
+  eq('se llegó al relato', await paso(), '4');   // 🗂️ era el 3 hasta que entró la prevención
   si('★ el paso 3 dice que ya quedó guardado', await ver('#pasoGuardado'));
   const g = await txt('#pasoGuardado');
   si('…con la palabra guardado', /guardad/i.test(g));
@@ -121,7 +121,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.evaluate(() => { window.__avisos = 0; });
   await p.evaluate(() => $('pasoAtras').click());
   await p.waitForTimeout(300);
-  eq('sin retoque a mano, volver atrás no pregunta nada', await paso(), '2');
+  eq('sin retoque a mano, volver atrás no pregunta nada', await paso(), '3');
   no('…y no se abrió ningún aviso', await avisoAbierto());
 
   // Con retoque: avisa antes de pisarlo.
@@ -129,7 +129,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   // evaluate() crea OTRA variable en window y la de adentro sigue en false.
   // El retoque se marca por la vía real, con la función que usa la app.
   await p.evaluate(() => {
-    pasoIr(3);
+    pasoIr(4);   // 🗂️ el relato: del 3 al 4
     const t = $('rtxt'); t.value = 'Texto escrito a mano por el colega.';
     _setTextoManual(true);
   });
@@ -139,7 +139,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   si('★★ con retoque a mano, avisa antes de volver', await avisoAbierto());
   const aviso = await txt('#ucMsg');
   si('…y dice de qué se trata', /retoc|mano|relato/i.test(aviso));
-  eq('★ …y todavía NO se movió de paso', await paso(), '3');
+  eq('★ …y todavía NO se movió de paso', await paso(), '4');
 
   eq('sin errores de JavaScript', errs.join(' | '), '');
   await b.close();

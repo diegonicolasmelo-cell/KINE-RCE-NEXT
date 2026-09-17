@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.1-pwa">
+<meta name="rce-version" content="NEXT-1.2-navm">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1124,6 +1124,53 @@ table.rhb2 .rl{width:128px;text-align:left;}
   #spPasos{top:0;}
 }
 .paso-oculto{display:none!important;}
+/* ── Paso 1 · Prevención de NAVM (17-sep-2026) ───────────────────────────
+   Un toque por línea y NINGÚN párrafo. El bloque que reemplaza («Dispositivos»,
+   dentro del turno) traía tres calendarios escritos a mano y 534 caracteres de
+   explicación: era la sección con más texto de la app. Diego, 17-sep-2026:
+   «las reglas en sí no hay que explicarlas tanto; si el filtro vence hoy, se
+   debe cambiar hoy». El chip dice la regla. */
+.fc-nav{--fc:var(--fisico);}
+.pv-fila{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--border);
+  border-radius:12px;padding:11px 14px;margin-bottom:8px;flex-wrap:wrap;}
+.pv-fila.pv-urge{border-color:var(--danger);border-width:1.5px;}
+.pv-nom{width:150px;flex-shrink:0;}
+.pv-nom b{display:block;font-size:.93rem;font-weight:700;color:var(--txt);}
+.pv-nom span{display:block;font-size:.74rem;color:var(--muted);margin-top:1px;}
+.pv-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;
+  font-size:.74rem;font-weight:700;white-space:nowrap;background:var(--n-gray-bg);color:var(--n-gray);}
+/* Ámbar y rojo propios: los tonos de chip de la paleta no llegan a 4,5:1
+   sobre su fondo, y acá el color ES la urgencia. */
+.pv-chip.pv-ambar{background:var(--n-yellow-bg);color:#7a5c00;}
+.pv-chip.pv-rojo{background:var(--n-red-bg);color:#b3261e;}
+.pv-esp{flex-grow:1;}
+.pv-b{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;
+  border-radius:10px;border:1.5px solid var(--border);background:#fff;color:#5f5c58;
+  font-family:inherit;font-size:.86rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+.pv-b:hover{border-color:#cbd5e1;}
+.pv-b.on{border-color:var(--ok);background:var(--n-green-bg);color:var(--n-green);}
+.pv-b.pv-w.on{border-color:#8a5200;background:var(--n-orange-bg);color:#8a5200;}
+.pv-b.pv-d.on{border-color:#b3261e;background:var(--n-red-bg);color:#b3261e;}
+/* Selector HME ↔ humidificación activa: son EXCLUYENTES (humidificación
+   pasiva vs activa), así que es un selector y no dos casillas que puedan
+   quedar ambas marcadas. Al elegir la activa, el reloj del HME se apaga. */
+.pv-seg{display:inline-flex;background:var(--n-gray-bg);border-radius:9px;padding:3px;}
+.pv-seg button{min-height:36px;padding:0 11px;border:0;border-radius:7px;background:transparent;
+  color:#5f5c58;font-family:inherit;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+.pv-seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 2px rgba(15,23,42,.14);}
+.pv-sep{display:flex;align-items:center;gap:10px;margin:15px 0 9px;}
+.pv-sep span{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.pv-sep i{flex-grow:1;height:1px;background:var(--border);}
+.pv-razon{border:1.5px solid var(--danger);border-radius:12px;padding:12px 14px;background:#fff;margin-top:4px;}
+.pv-razon label{display:block;font-size:.78rem;font-weight:700;color:#b3261e;margin-bottom:7px;}
+.pv-razon textarea{width:100%;min-height:52px;border:1px solid var(--border);border-radius:9px;
+  padding:9px 11px;font-family:inherit;font-size:.88rem;resize:vertical;box-sizing:border-box;}
+.pv-vacio{font-size:.82rem;color:var(--muted);padding:6px 2px;}
+@media (max-width:740px){
+  .pv-nom{width:100%;}
+  .pv-esp{display:none;}
+  .pv-b{flex-grow:1;}
+}
 /* Paso 3 · quedó guardado, y lo que se deja encargado */
 #pasoGuardado{display:flex;align-items:center;gap:9px;font-size:.88rem;font-weight:700;
   color:#0f766e;background:#e6f0ee;border:1px solid #0f766e33;border-radius:10px;
@@ -2995,11 +3042,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
   <div id="epBannerCaja"><div id="epBanner" class="hidden"></div></div>
   <div id="spPasos" role="tablist" aria-label="Pasos de la evolución">
     <button type="button" class="paso-t" role="tab" aria-selected="true" data-p="1" data-nodirty onclick="pasoIr(1)">
-      <span class="paso-n">1</span><span class="paso-et">Turno</span></button>
+      <span class="paso-n">1</span><span class="paso-et">Prevención</span></button>
     <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="2" data-nodirty onclick="pasoIr(2)">
-      <span class="paso-n">2</span><span class="paso-et">Evaluaciones</span></button>
+      <span class="paso-n">2</span><span class="paso-et">Turno</span></button>
     <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="3" data-nodirty onclick="pasoIr(3)">
-      <span class="paso-n">3</span><span class="paso-et">Relato</span></button>
+      <span class="paso-n">3</span><span class="paso-et">Evaluaciones</span></button>
+    <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="4" data-nodirty onclick="pasoIr(4)">
+      <span class="paso-n">4</span><span class="paso-et">Relato</span></button>
   </div>
   <div class="pcontent">
     <nav id="spRiel" aria-label="Secciones de la evolución"></nav>
@@ -3007,7 +3056,56 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <input type="hidden" id="cBed">
       <!-- 📌 Lo que te dejaron encargado: se pinta desde la CAMA (episodio),
            no desde el turno anterior. Ver `svc_pendientes.gs`. -->
-      <div id="pendEpi" class="hidden" data-paso="1"></div>
+      <div id="pendEpi" class="hidden" data-paso="2"></div>
+      <!-- ▌ PASO 1 · PREVENCIÓN DE NAVM (17-sep-2026) ───────────────────────
+           🔴 EL PASO NO ESCRIBE FECHAS. Hasta hoy la fecha de cada dispositivo
+           vivía en TRES lugares: la cama (el reloj vigente), la línea de tiempo
+           (el cambio, con hora y autor) y una copia en la fila del turno. La
+           tercera sobraba y era peor que redundante: era una SEGUNDA PUERTA al
+           mismo reloj, porque se escribía desde el formulario del turno Y desde
+           el evento ➕. Dos puertas a un mismo dato es lo que este proyecto ya
+           pagó tres veces (el desajuste 119≠132, los nueve escapadores, las dos
+           rutas de la extubación).
+           Ahora el paso solo MARCA que se cambió; el reloj lo reinicia el
+           servidor por el mismo camino de siempre (svc_evoluciones.gs). -->
+      <div class="fcard fc-nav" id="fcPrevNavm" data-paso="1">
+        <div class="fcard-hdr"><span class="fcard-title">Prevención de NAVM</span></div>
+        <div class="fcard-body">
+          <div id="pvLista"></div>
+          <div class="pv-sep" id="pvSepTerapia"><span>Antes de la terapia</span><i></i></div>
+          <div class="pv-fila" id="pvf_cab">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#787066" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18"></path><path d="M21 19v-7"></path><path d="M3 19v-4l14-5"></path></svg>
+            <div class="pv-nom"><b>Cabecera 30-45°</b></div>
+            <span class="pv-esp"></span>
+            <button type="button" class="pv-b" id="pvb_cab_ok" data-nodirty onclick="prevToca('cab','ok')">Correcta</button>
+            <button type="button" class="pv-b pv-w" id="pvb_cab_chg" data-nodirty onclick="prevToca('cab','chg')">La corregí</button>
+          </div>
+          <!-- CUFF: verificación 1 vez por turno (protocolo de la unidad). Se
+               mudó acá desde Respiratorio el 17-sep-2026 porque pertenece al
+               paquete de prevención, no a la terapia ventilatoria: Diego,
+               «antes de hacer alguna terapia tengo que asegurarme de que el
+               cuff esté bien inflado». Conserva sus ids, setCuff() y cuffGate(). -->
+          <div class="pv-fila hidden" id="dCuff">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#787066" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 13l4-3"></path><path d="M12 5V3"></path></svg>
+            <div class="pv-nom"><b>Presión de cuff</b><span id="cuffMeta">20-30 cmH₂O</span></div>
+            <span class="pv-esp"></span>
+            <button type="button" class="pv-b" id="cuffB1" data-nodirty onclick="setCuff('rango')">En rango</button>
+            <button type="button" class="pv-b pv-w" id="cuffB2" data-nodirty onclick="setCuff('ajuste')">La ajusté</button>
+            <button type="button" class="pv-b pv-d" id="cuffB3" data-nodirty onclick="setCuff('desinflado')">Desinflado</button>
+            <div class="col wa hidden" id="dCuffVal" style="margin:0;"><label style="font-size:.62rem;">Encontrado (cmH₂O)</label>
+              <input type="number" id="fCuffVal" min="0" max="120" style="height:30px;width:88px;text-align:center;"></div>
+            <input type="hidden" id="fCuffEst">
+          </div>
+          <!-- 🔴 Se puede pasar con razón escrita. Bloquear de verdad haría que
+               la gente invente una fecha para poder avanzar, y ahí se pierde el
+               dato Y la medida (Diego, 17-sep-2026). -->
+          <div id="pvRazonCaja" class="pv-razon hidden">
+            <label for="fPrevRazon">Por qué no se pudo cambiar</label>
+            <textarea id="fPrevRazon" placeholder="En una línea: qué lo impidió" oninput="prevAvanceUI()"></textarea>
+          </div>
+          <input type="hidden" id="fCabRss">
+        </div>
+      </div>
       <input type="hidden" id="cIng" value="false">
       <!-- Etapa 1(a): aviso de turnos previos sin evolución (regla: todo turno se evoluciona) -->
       <div id="spGapAviso" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;border-radius:9px;padding:8px 12px;font-size:.78rem;font-weight:600;margin-bottom:10px;"></div>
@@ -3313,20 +3411,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col wa hidden" id="dCambioTQTdet"><label>Detalle</label>
                   <input type="text" id="fCambioTQTdet" placeholder="Motivo..." style="min-width:160px;"></div>
               </div>
-              <!-- CUFF: verificación 1 vez por turno (protocolo de la unidad).
-                   Un toque; el número solo se pide cuando hubo que ajustar. -->
-              <div id="dCuff" class="row hidden" style="margin-bottom:2px;align-items:center;gap:7px;">
-                <span style="font-size:.72rem;font-weight:800;color:var(--pdark);">🎈 Cuff</span>
-                <span id="cuffMeta" style="font-size:.66rem;color:var(--muted);">20-30 cmH₂O</span>
-                <span style="display:inline-flex;gap:7px;flex-wrap:nowrap;">
-                  <button type="button" class="cuff-b" id="cuffB1" onclick="setCuff('rango')">✓ En rango</button>
-                  <button type="button" class="cuff-b" id="cuffB2" onclick="setCuff('ajuste')">⚠ Ajusté</button>
-                  <button type="button" class="cuff-b" id="cuffB3" onclick="setCuff('desinflado')">○ Desinflado</button>
-                </span>
-                <div class="col wa hidden" id="dCuffVal" style="margin:0;"><label style="font-size:.62rem;">Encontrado (cmH₂O)</label>
-                  <input type="number" id="fCuffVal" min="0" max="120" style="height:30px;width:88px;text-align:center;"></div>
-                <input type="hidden" id="fCuffEst">
-              </div>
+              <!-- 🗂️ El CUFF se mudó al paso 1 (Prevención de NAVM) el
+                   17-sep-2026. Conserva sus ids: setCuff() y cuffGate() siguen
+                   funcionando igual, y el guardado no cambió. -->
             </div>
           </div>
         </div>
@@ -3534,17 +3621,27 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
         <!-- DISPOSITIVOS — circuito VM (solo visible con soporte VM) -->
         <div class="fcard fc-r hidden" id="fcDisp">
-          <div class="fcard-hdr"><span class="fcard-title">🧰 Dispositivos</span></div>
+          <div class="fcard-hdr"><span class="fcard-title">🧰 Humidificación</span></div>
           <div class="fcard-body">
-            <div class="row" style="align-items:flex-end;">
+            <!-- 🗂️ 17-sep-2026 · LOS TRES CALENDARIOS SE ESCONDIERON. El HME, el
+                 HEPA y el Trach Care se revisan ahora en el paso 1 (Prevención
+                 de NAVM), que no escribe fechas: marca el cambio y el servidor
+                 reinicia el reloj. Dejarlos VISIBLES aquí sería peor que
+                 quitarlos: un colega llenaría la fecha creyendo que registra el
+                 cambio de filtro, y no registraría nada — el turno dejó de
+                 mandar esas claves. Se conservan como campos ocultos porque
+                 calcInsumosDias(), autoFechasDispositivos() y _dispSnapshot
+                 siguen leyéndolos para el arrastre entre turnos.
+                 ⏳ PENDIENTE: sacarlos del todo cuando esas cuatro funciones se
+                 muden a leer el reloj de la cama. Mientras tanto no se ven, no
+                 se llenan y no mienten. Lo fija prevencion_navm.js (G1-G3). -->
+            <div class="row hidden" style="align-items:flex-end;">
               <div class="col wa"><label>HME</label><input type="date" id="fFecHME" onchange="calcInsumosDias()"></div>
-              <span id="sHMEDias" class="disp-chip disp-none" style="align-self:flex-end;margin-bottom:8px;">—</span>
+              <span id="sHMEDias" class="disp-chip disp-none">—</span>
               <div class="col wa"><label>HEPA</label><input type="date" id="fFecHEPA" onchange="calcInsumosDias()"></div>
-              <span id="sHEPADias" class="disp-chip disp-none" style="align-self:flex-end;margin-bottom:8px;">—</span>
-            </div>
-            <div class="row" style="align-items:flex-end;">
+              <span id="sHEPADias" class="disp-chip disp-none">—</span>
               <div class="col wa"><label>Trach Care</label><input type="date" id="fFecSonda" onchange="calcInsumosDias()"></div>
-              <span id="sSondaDias" class="disp-chip disp-none" style="align-self:flex-end;margin-bottom:8px;">—</span>
+              <span id="sSondaDias" class="disp-chip disp-none">—</span>
             </div>
             <div id="dispConfirm" class="hidden" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:7px 11px;margin-bottom:8px;font-size:.76rem;">
               <span>🔧 Dispositivos <b>asumidos instalados</b> al conectar a VM — corrobora:</span>
@@ -3556,7 +3653,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div class="col wa"><label>Desde</label><input type="date" id="fFecHumid" onchange="humidFechaManual(this.value)"></div>
               <span id="sHumidDias" class="disp-chip disp-none" style="align-self:flex-end;margin-bottom:8px;">—</span>
             </div>
-            <div style="font-size:.68rem;color:var(--muted);">Se fechan solos al conectar a VM (ingreso, intubación o reintubación). HME se cambia en su día 2; HEPA y Trach Care en su día 3 (por fecha, no horas). En los equipos con HEPA fijo (PB, Avea) el filtro es del ventilador y no se cambia: su fecha es solo referencia. Al activar humidificación activa se retira el filtro HME (humidificación pasiva↔activa son excluyentes) — fechar la humidificación también la activa; la humidificación activa no vence. El Trach Care acompaña a la vía aérea artificial aunque el paciente ya no esté en VM.</div>
+            <div style="font-size:.68rem;color:var(--muted);">Excluyente con el filtro HME: al activarla se retira. No vence.</div>
           </div>
         </div>
 
@@ -3564,7 +3661,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <div class="sp-col"><!-- columna derecha -->
 
         <!-- ▌ RESPIRATORIO — Terapia Ventilatoria + Manejo -->
-        <div class="fcard fc-r mega-card" id="fcRespCard" data-paso="1">
+        <div class="fcard fc-r mega-card" id="fcRespCard" data-paso="2">
           <div class="fcard-hdr"><span class="fcard-title">🫁 Respiratorio — 💨 Terapia Ventilatoria</span></div>
           <div class="fcard-body">
             <div id="evStrip" class="hidden" style="margin:10px 16px 0;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;font-size:.78rem;line-height:1.9;"></div>
@@ -4586,8 +4683,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
            acordeón pliega las .fcard, y con todo adentro el paso 2 se abría
            vacío: solo un título plegado que decía «sin registrar». Lo que
            tiene que verse siempre no puede vivir dentro de algo que se pliega. -->
-      <div id="pasoEvalChips" data-paso="2"></div>
-      <div class="fcard fc-eval" id="fcEval" data-paso="2">
+      <div id="pasoEvalChips" data-paso="3"></div>
+      <div class="fcard fc-eval" id="fcEval" data-paso="3">
         <div class="fcard-hdr"><span class="fcard-title">📏 Registrar una medición</span></div>
         <div class="fcard-body">
         <!-- EVALUACIONES FUNCIONALES (unificadas) -->
@@ -4686,9 +4783,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
       <!-- ✓ Se llega al paso 3 SOLO si el guardado salió bien, así que lo
            primero que se lee es eso. -->
-      <div id="pasoGuardado" data-paso="3"></div>
+      <div id="pasoGuardado" data-paso="4"></div>
       <!-- TEXTO DE LA EVOLUCIÓN — editor real: se guarda tal como se ve -->
-      <div id="rarea" class="hidden" data-paso="3">
+      <div id="rarea" class="hidden" data-paso="4">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
           <span style="color:#94a3b8;font-size:.7rem;font-weight:700;">📄 TEXTO DE LA EVOLUCIÓN — editable; se guarda tal como lo ves<span id="rtxtEditBadge" style="display:none;color:#b45309;"> · ✍️ editado a mano</span></span>
           <div style="display:flex;gap:8px;">
@@ -4706,7 +4803,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="plant-pop" id="plantPop"></div>
         </div>
       </div>
-      <div class="fcard fc-g" id="fcPlanes" data-paso="3">
+      <div class="fcard fc-g" id="fcPlanes" data-paso="4">
         <div class="fcard-hdr"><span class="fcard-title">📋 Planes y Pendientes</span></div>
         <div class="fcard-body">
           <!-- Pendientes predefinidos: recordatorios del turno (sin fecha, NO se
@@ -4743,7 +4840,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div>
 
 
-      <button type="button" id="pasoEvalNada" data-paso="2" data-nodirty onclick="pasoSinMedir()">
+      <button type="button" id="pasoEvalNada" data-paso="3" data-nodirty onclick="pasoSinMedir()">
         No medí nada este turno
         <small>Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
       </button>
@@ -4751,7 +4848,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <!-- 📌 Lo que queda encargado para el turno que viene. Vive en el
            EPISODIO (svc_pendientes.gs), así que el colega que abra esta cama
            mañana lo va a ver arriba de su paso 1. -->
-      <div id="pasoPend" data-paso="3">
+      <div id="pasoPend" data-paso="4">
         <div class="pp-hdr">📌 Dejar pendiente para el turno que viene</div>
         <div class="pp-body">
           <div id="pasoPendSugs" class="pp-sugs"></div>
@@ -5985,8 +6082,14 @@ document.addEventListener('wheel', ()=>{
  */
 
 /* ══════════════════════════════════════════════════════════════════════════
-   EL CAMINO DE TRES PASOS (16-sep-2026)
-   Turno (con sus eventos) → Evaluaciones → Relato.
+   EL CAMINO DE CUATRO PASOS (16-sep-2026 · la prevención entró el 17-sep)
+   Prevención NAVM → Turno (con sus eventos) → Evaluaciones → Relato.
+
+   LA PREVENCIÓN VA PRIMERO porque es el orden real del trabajo (Diego,
+   17-sep-2026): «llegas, miras: está con tubo traqueal, está ventilado, está
+   en 30 grados, tiene el cuff bien… y después me voy a revisar lo
+   ventilatorio». Si fuera al final se completaría de memoria al cerrar la
+   evolución, en vez de mirando al paciente.
 
    POR QUÉ. El modal tenía 225 campos en una sola pantalla y el MRC era uno
    más entre ellos: se saltaba sin que nadie lo notara. Partido en pasos, cada
@@ -5998,21 +6101,27 @@ document.addEventListener('wheel', ()=>{
    paso vigente. Una tarjeta nueva sin data-paso cae en el turno, que es donde
    va el 90% de lo que se registra.
 
+   🪤 EL DEFAULT SIGUE AL TURNO, NO AL NÚMERO UNO. Mientras el turno fue el
+   paso 1 daba igual escribir '1'. Al meter la prevención delante, dejar el
+   '1' mandaría todas las tarjetas sin dueño —que son casi todas— al paso de
+   prevención, y el turno aparecería vacío. Lo fija prevencion_navm.js.
+
    🪤 El guardado ocurre al salir del PASO 2, no al final. En la UCI se sale
    corriendo: si suena una alarma mientras se lee el relato, lo escrito ya
    está en la planilla.
    ══════════════════════════════════════════════════════════════════════════ */
 var PASO_ACTUAL = 1;
-const _PASO_TXT = { 1:'Siguiente: evaluaciones →', 2:'💾 Guardar y ver el relato', 3:'✖ Cerrar la evolución' };
+const _PASO_TXT = { 1:'Siguiente: el turno →', 2:'Siguiente: evaluaciones →',
+                    3:'💾 Guardar y ver el relato', 4:'✖ Cerrar la evolución' };
 
 /** Muestra el paso n y esconde lo de los otros. */
 function pasoIr(n){
-  n = Math.max(1, Math.min(3, Number(n) || 1));
+  n = Math.max(1, Math.min(4, Number(n) || 1));
   PASO_ACTUAL = n;
   // Sin dueño declarado = del turno. Así una tarjeta nueva aparece en el paso
   // correcto sin que nadie se acuerde de tocar esta función.
   document.querySelectorAll('#kf .fcard, #kf [data-paso]').forEach(el => {
-    const mio = String(el.dataset.paso || '1') === String(n);
+    const mio = String(el.dataset.paso || '2') === String(n);
     el.classList.toggle('paso-oculto', !mio);
   });
   document.querySelectorAll('#spPasos [data-p]').forEach(t => {
@@ -6025,15 +6134,229 @@ function pasoIr(n){
   // El 💾 de siempre queda fuera de la vista: en el camino hay UN solo botón
   // de avance por paso. Sigue en el DOM y sigue guardando.
   const g = $('btnGuardar'); if(g) g.style.display = 'none';
-  if(n === 2 && typeof pasoEvalPintar === 'function') pasoEvalPintar();
-  if(n === 3 && typeof pasoRelatoPintar === 'function') pasoRelatoPintar();
+  if(n === 1 && typeof prevPintar === 'function'){ prevPintar(); prevAvanceUI(); }
+  if(n === 3 && typeof pasoEvalPintar === 'function') pasoEvalPintar();
+  if(n === 4 && typeof pasoRelatoPintar === 'function') pasoRelatoPintar();
   const pc = document.querySelector('#sp .pcontent'); if(pc) pc.scrollTop = 0;
   if(typeof _rielDeb === 'function') _rielDeb();
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PASO 1 · PREVENCIÓN DE NAVM (17-sep-2026)
+
+   Cinco líneas, un toque cada una. Reemplaza al bloque «Dispositivos», que
+   vivía en medio del paso del turno con tres calendarios escritos a mano y
+   534 caracteres de párrafo.
+
+   🔴 EL PASO NO ESCRIBE FECHAS. Solo marca qué se cambió; el reloj lo
+   reinicia el servidor al guardar la evolución, por el mismo camino que ya
+   usaba el evento ➕. Una sola puerta al mismo dato.
+
+   🔴 QUÉ OBLIGA. Los filtros y el Trach Care están a cargo de kinesiología y
+   son medida de IAS: obligan para avanzar. Pero SE PASA CON RAZÓN ESCRITA —
+   bloquear de verdad haría que la gente invente una fecha para poder seguir, y
+   ahí se pierde el dato y la medida. Cabecera y cuff son opcionales: su
+   omisión ES el dato del cumplimiento.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var _PREV = { hme:'', hepa:'', tc:'', cab:'', humid:false };
+
+/** Lo elegido en el paso, para el payload y para las pruebas. */
+function prevEstado(){ return Object.assign({}, _PREV); }
+
+const _PV_ICO = {
+  hme:  '<path d="M4 5h16l-6 7v6l-4 2v-8z"></path>',
+  hepa: '<path d="M12 4l8 4-8 4-8-4z"></path><path d="M4 12l8 4 8-4"></path><path d="M4 16l8 4 8-4"></path>',
+  tc:   '<path d="M7 4v6a5 5 0 0 0 5 5h5"></path><path d="M17 12l3 3-3 3"></path>'
+};
+
+/**
+ * Qué se le pregunta a ESTE paciente y en qué estado está su reloj.
+ *
+ * 🔴 ESPEJO de estadoDispositivos (svc_eventos.gs) — si cambias una regla,
+ * cámbiala en los dos. La única diferencia es deliberada: allá `aplica` incluye
+ * «y además tiene fecha», porque el servidor solo avisa de relojes que existen.
+ * Acá se separan en `aplica` (a quién le corresponde el dispositivo: la regla
+ * clínica) y `conReloj` (además ya tiene fecha), porque la pantalla necesita
+ * mostrar la fila aunque falte la fecha — que es justo cuando hay que instalarlo.
+ *
+ * 🪤 `ref` entra POR PARÁMETRO. Una guardia que lee el reloj real da distinto
+ * según cuándo se corra, y en este proyecto eso ya costó tres sesiones.
+ *
+ * ctx = { va, sop, modo, humid, vmTag, fechas:{hme,hepa,tc}, ref }
+ */
+function prevFilas(ctx){
+  const c = ctx || {}, f = c.fechas || {};
+  const ref = _isoDia(c.ref || v('gDate') || hoy());
+  const enVM = String(c.sop || '') === 'VM';
+  const va = String(c.va || '');
+  const vaArt = (va === 'TOT' || va === 'TQT');
+  const modoHME = String(c.modo || '') === 'HME';
+  const vmTag = String(c.vmTag || '');
+  const hepaFija = !!vmTag && typeof _hepaFijoEquipo === 'function' && _hepaFijoEquipo(vmTag);
+  const defs = [
+    // Cada dispositivo sigue a lo que le da sentido, no todos al soporte VM
+    // (Diego, 14-ago-2026): el HME al circuito de gas (y la humidificación
+    // activa lo excluye: son pasiva vs activa), el HEPA al ventilador, el
+    // Trach Care a la vía aérea artificial, esté o no en VM.
+    { k:'hme',  nombre:'Filtro HME',  frec:2, fecha:_isoDia(f.hme || ''),
+      aplica:(enVM && !c.humid) || modoHME, fija:false },
+    { k:'hepa', nombre:'Filtro HEPA', frec:3, fecha:_isoDia(f.hepa || ''),
+      aplica:enVM && !!vmTag, fija:hepaFija },
+    { k:'tc',   nombre:'Trach Care',  frec:3, fecha:_isoDia(f.tc || ''),
+      aplica:vaArt, fija:false }
+  ];
+  return defs.map(d => {
+    const conReloj = d.aplica && !!d.fecha;
+    const fija = d.aplica && d.fija;
+    // La MISMA cuenta de noches que calcInsumosDias, estadoDispositivos, la
+    // entrega y la hoja de control de filtros: el cambio se ejecuta en la
+    // madrugada de etiqueta+frec, o sea cuando han pasado frec-1 noches.
+    let rest = null;
+    if (conReloj && !fija) rest = (d.frec - 1) - Math.round(
+      (new Date(ref + 'T12:00:00Z') - new Date(d.fecha + 'T12:00:00Z')) / 864e5);
+    let chip = '', tono = '';
+    if (!d.aplica)       chip = '';
+    else if (fija)     { chip = 'del ventilador'; }
+    else if (!conReloj) { chip = 'sin fecha'; tono = 'pv-ambar'; }
+    else if (rest > 1)   chip = 'vence en ' + rest + ' días';
+    else if (rest === 1){ chip = 'vence mañana'; tono = 'pv-ambar'; }
+    else if (rest === 0){ chip = 'vence hoy'; tono = 'pv-rojo'; }
+    else               { chip = 'venció ' + (rest === -1 ? 'ayer' : 'hace ' + (-rest) + ' días'); tono = 'pv-rojo'; }
+    return { k:d.k, nombre:d.nombre, frec:d.frec, fecha:d.fecha, aplica:d.aplica,
+             conReloj:conReloj, fija:fija, pide:d.aplica && !fija, chip:chip, tono:tono, rest:rest };
+  });
+}
+
+/** El contexto sale de la pantalla y de la cama. Nada se inventa. */
+function _prevCtx(){
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  return {
+    va:    v('fVA')  || c.VIA_AEREA || '',
+    sop:   v('fSop') || c.SOPORTE   || '',
+    modo:  v('fInterfaz') || v('fModo') || c.MODO || '',
+    humid: !!_PREV.humid,
+    vmTag: c.VM_TAG || '',
+    fechas:{ hme:c.DISP_HME_FECHA || '', hepa:c.DISP_HEPA_FECHA || '', tc:c.DISP_TC_FECHA || '' },
+    ref:   v('gDate') || (typeof hoy === 'function' ? hoy() : '')
+  };
+}
+
+/** ¿Hay algo que prevenir en este paciente? Si no, el paso se salta entero. */
+function prevAplicaAlgo(){
+  const ctx = _prevCtx();
+  return prevFilas(ctx).some(f => f.aplica) ||
+         ctx.sop === 'VM' || ctx.va === 'TOT' || ctx.va === 'TQT';
+}
+
+function prevToca(k, val){
+  _PREV[k] = (_PREV[k] === val) ? '' : val;
+  if (k === 'cab'){
+    const h = $('fCabRss');
+    if (h) h.value = _PREV.cab === 'ok' ? 'correcta' : (_PREV.cab === 'chg' ? 'corregida' : '');
+  }
+  prevPintar(); prevAvanceUI();
+}
+
+/** El selector HME ↔ humidificación activa: son excluyentes. */
+function prevHumid(activa){
+  _PREV.humid = !!activa;
+  if (activa) _PREV.hme = '';        // su reloj queda en pausa: no hay qué cambiar
+  prevPintar(); prevAvanceUI();
+}
+
+function prevNoPude(){
+  const caja = $('pvRazonCaja'); if (!caja) return;
+  caja.classList.remove('hidden');
+  setTimeout(() => $('fPrevRazon') && $('fPrevRazon').focus(), 40);
+}
+
+function prevPintar(){
+  const caja = $('pvLista'); if (!caja) return;
+  const filas = prevFilas(_prevCtx()).filter(f => f.aplica);
+  if (!filas.length){
+    caja.innerHTML = '<div class="pv-vacio">Sin dispositivos de vía aérea en este paciente.</div>';
+  } else {
+    caja.innerHTML = filas.map(f => {
+      const marca = _PREV[f.k] || '';
+      const urge = (f.tono === 'pv-rojo' && !marca) ? ' pv-urge' : '';
+      const sub = f.fija ? 'del equipo, desde el ' + _ddmm(f.fecha)
+                : (f.fecha ? 'puesto el ' + _ddmm(f.fecha) : 'sin fecha registrada');
+      // El nombre del HME es un selector: humidificación pasiva y activa son
+      // excluyentes, y al elegir la activa su reloj se apaga.
+      const nombre = (f.k === 'hme')
+        ? '<div class="pv-nom" style="width:246px;">' +
+            '<span class="pv-seg">' +
+              '<button type="button" id="pvSegHme" data-nodirty class="' + (_PREV.humid ? '' : 'on') + '" onclick="prevHumid(false)">Filtro HME</button>' +
+              '<button type="button" id="pvSegHumid" data-nodirty class="' + (_PREV.humid ? 'on' : '') + '" onclick="prevHumid(true)">Humidificación activa</button>' +
+            '</span>' +
+            '<span>' + escapeHtml(sub) + '</span>' +
+          '</div>'
+        : '<div class="pv-nom"><b>' + escapeHtml(f.nombre) + '</b><span>' + escapeHtml(sub) + '</span></div>';
+      // El HEPA fijo (PB/Avea) se MUESTRA —su fecha es la referencia de
+      // instalación— pero no pide toque: no se cambia, así que no se pregunta.
+      const botones = f.pide
+        ? '<button type="button" class="pv-b' + (marca === 'ok' ? ' on' : '') + '" id="pvb_' + f.k + '_ok" data-nodirty' +
+            ' onclick="prevToca(&quot;' + escapeJs(f.k) + '&quot;,&quot;ok&quot;)">Vigente</button>' +
+          '<button type="button" class="pv-b pv-w' + (marca === 'chg' ? ' on' : '') + '" id="pvb_' + f.k + '_chg" data-nodirty' +
+            ' onclick="prevToca(&quot;' + escapeJs(f.k) + '&quot;,&quot;chg&quot;)">Lo cambié</button>'
+        : '';
+      return '<div class="pv-fila' + urge + '" id="pvf_' + f.k + '" data-pide="' + (f.pide ? '1' : '0') + '">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + (f.pide ? '#2a6395' : '#787066') +
+          '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + _PV_ICO[f.k] + '</svg>' +
+        nombre +
+        (f.chip ? '<span class="pv-chip ' + f.tono + '" id="pvc_' + f.k + '">' + escapeHtml(f.chip) + '</span>' : '') +
+        '<span class="pv-esp"></span>' + botones +
+      '</div>';
+    }).join('');
+  }
+  // Cabecera y cuff: el paquete «antes de la terapia». La cabecera acompaña a
+  // todo paciente ventilado; el cuff, solo a la vía aérea artificial (cuffGate).
+  const ctx = _prevCtx();
+  const hayCab = ctx.sop === 'VM' || ctx.va === 'TOT' || ctx.va === 'TQT';
+  const fc = $('pvf_cab'); if (fc) fc.classList.toggle('hidden', !hayCab);
+  const sep = $('pvSepTerapia'); if (sep) sep.classList.toggle('hidden', !hayCab);
+  const bo = $('pvb_cab_ok'); if (bo) bo.classList.toggle('on', _PREV.cab === 'ok');
+  const bc = $('pvb_cab_chg'); if (bc) bc.classList.toggle('on', _PREV.cab === 'chg');
+  if (typeof cuffGate === 'function') cuffGate();
+}
+
+/**
+ * ¿Se puede avanzar? Los filtros y el Trach Care que APLICAN y no son fijos
+ * deben estar tocados… o haber una razón escrita. Cabecera y cuff nunca
+ * bloquean: su omisión es el dato del cumplimiento.
+ */
+function prevListo(){
+  const razon = String(($('fPrevRazon') || {}).value || '').trim();
+  if (razon.length >= 10) return true;
+  return prevFilas(_prevCtx()).filter(f => f.pide).every(f => !!_PREV[f.k]);
+}
+
+/** El botón de avance dice si falta algo, sin regañar. */
+function prevAvanceUI(){
+  if (PASO_ACTUAL !== 1) return;
+  const av = $('pasoAvanza'); if (!av) return;
+  const listo = prevListo();
+  av.disabled = !listo;
+  av.style.opacity = listo ? '' : '.55';
+}
+
+/** Esconde la pestaña 1 cuando no hay nada que prevenir en este paciente. */
+function prevGateTab(){
+  const t = document.querySelector('#spPasos [data-p="1"]');
+  if (t) t.classList.toggle('paso-oculto', !prevAplicaAlgo());
+}
+
+function prevAvisar(){
+  const faltan = prevFilas(_prevCtx()).filter(f => f.pide && !_PREV[f.k]).map(f => f.nombre);
+  if (!faltan.length) return;
+  toast('⚠️ Falta revisar: ' + faltan.join(', ') + '. Si no se pudo, deja la razón escrita.');
+  prevNoPude();
+}
+
 function pasoRetroceder(){
   // Desde el relato, volver puede costar el retoque a mano: se avisa.
-  if(PASO_ACTUAL === 3){ pasoAtrasDesdeRelato(); return; }
+  if(PASO_ACTUAL === 4){ pasoAtrasDesdeRelato(); return; }
   pasoIr(PASO_ACTUAL - 1);
 }
 
@@ -6202,13 +6525,17 @@ function pasoSinMedir(){
 
 /** El botón de avance. En el paso 2 lo que hace es GUARDAR. */
 function pasoAvanzar(){
-  if(PASO_ACTUAL === 1){ pasoIr(2); return; }
-  if(PASO_ACTUAL === 2){ guardar(); return; }   // pasoTrasGuardar() lleva al 3
+  // El paso 1 es el único que puede negarse a avanzar: los filtros y el
+  // Trach Care son medida de IAS y están a cargo de kinesiología. Pero se pasa
+  // con razón escrita — ver prevListo().
+  if(PASO_ACTUAL === 1){ if(typeof prevListo === 'function' && !prevListo()){ prevAvisar(); return; } pasoIr(2); return; }
+  if(PASO_ACTUAL === 2){ pasoIr(3); return; }
+  if(PASO_ACTUAL === 3){ guardar(); return; }   // pasoTrasGuardar() lleva al 4
   cerrarPanel();
 }
 
 /** Lo llama el guardado cuando terminó bien: recién ahí existe el relato. */
-function pasoTrasGuardar(){ if(PASO_ACTUAL === 2) pasoIr(3); }
+function pasoTrasGuardar(){ if(PASO_ACTUAL === 3) pasoIr(4); }
 
 /* ── 📌 Los pendientes que dejó el turno anterior ────────────────────────
    Se pintan desde la CAMA (el episodio), no desde el turno previo: los chips
@@ -6415,7 +6742,12 @@ function abrirPanel(id, esIng, verFicha) {
   _borradorRestaurar(id);
   // El camino empieza de nuevo en cada cama, con lo que le dejaron encargado.
   pendEpiPintar();
-  pasoIr(1);
+  // 🔴 El paso de prevención SOLO existe si hay algo que prevenir. A un
+  // paciente sin vía aérea artificial ni ventilación no se le muestra un paso
+  // vacío que además le bloquearía el avance: la pestaña se esconde y el
+  // camino arranca en el turno.
+  prevGateTab();
+  pasoIr(prevAplicaAlgo() ? 1 : 2);
 }
 
 function actualizarTituloPanel(nombre) {
@@ -8368,8 +8700,21 @@ function guardar() {
     VENT_LITROS:n(v('r_litros')),
     VENT_AUTOPEEP:n(v('r_autopeep')), VENT_P01:n(v('r_p01')), VENT_DPOCC:n(v('r_dpocc')),
     VENT_PMUSC:n(v('r_pmusc')),
-    VENT_FECHA_SONDA:v('fFecSonda'),
-    DISP_HME_FECHA:v('fFecHME'), DISP_HEPA_FECHA:v('fFecHEPA'), DISP_HUMID_FECHA:v('fFecHumid'),
+    // 🔴 17-sep-2026 · SE CORTÓ LA SEGUNDA PUERTA. El turno ya no manda las
+    // fechas del HME, del HEPA ni del Trach Care: las mandaba a la vez que el
+    // evento ➕, o sea dos caminos escribiendo el mismo reloj. Ahora el paso 1
+    // solo MARCA que se cambió (NAVM_*) y el reloj lo reinicia el servidor.
+    // Que estas claves lleguen VACÍAS es justamente lo que conserva el reloj
+    // de la cama: svc_evoluciones.gs usa val(delTurno, deLaCama).
+    // La humidificación activa sí sigue acá: es estado del episodio, no reloj.
+    DISP_HUMID_FECHA:v('fFecHumid'),
+    // Prevención de NAVM (paso 1): '' sin revisar · 'ok' vigente · 'chg' cambiado.
+    // El vacío NO es un olvido del programa: ES el dato del cumplimiento.
+    NAVM_HME:_PREV.hme, NAVM_HEPA:_PREV.hepa, NAVM_TC:_PREV.tc,
+    NAVM_RAZON:v('fPrevRazon'),
+    // La cabecera tenía columna desde siempre y un lector en el resumen de
+    // NAVM, pero NADIE la escribía: el indicador salía vacío. Ahora se escribe.
+    VENT_CAB_RSS:v('fCabRss'),
     EX_RUIDOS_JSON: ruidosExtraJSON(),
     EVAL_DEGLUCION:v('fDeglucion'),
     APNEA_TEST:v('fApneaTest'),
@@ -12947,7 +13292,29 @@ function _mOculto(el, tope){
   }
   return false;
 }
+/** Cómo se lee cada marca del paso de prevención cuando la sección va plegada. */
+const _PV_LEE = { ok:'vigente', chg:'cambiado' };
+
 function _mResumen(cont){
+  /* 🪤 El paso de prevención son BOTONES, no <input>: el resumen genérico de
+     más abajo recorre los controles y en esta tarjeta no encontraba ninguno,
+     así que el acordeón decía «sin registrar» aunque estuviera toda revisada.
+     En el celular la sección va PLEGADA, o sea que el colega leía un falso
+     «te falta» sin poder abrirla para desmentirlo. Resume su propio estado.
+     Y dice QUÉ SE HIZO, no qué fecha se tecleó: el paso no escribe fechas. */
+  if(cont && cont.id==='fcPrevNavm'){
+    const pv=[];
+    prevFilas(_prevCtx()).filter(f=>f.aplica && _PREV[f.k]).forEach(f=>{
+      pv.push(f.nombre.replace(/^Filtro /,'')+' '+_PV_LEE[_PREV[f.k]]);
+    });
+    if(_PREV.humid) pv.push('humidificación activa');
+    if(_PREV.cab) pv.push('cabecera '+(_PREV.cab==='ok'?'correcta':'corregida'));
+    const cu=v('fCuffEst');
+    if(cu) pv.push('cuff '+(cu==='rango'?'en rango':(cu==='ajuste'?'ajustado':'desinflado')));
+    const rz=String(v('fPrevRazon')||'').trim();
+    if(rz) pv.push('no se pudo cambiar');
+    return pv.join(' · ');
+  }
   const out=[];
   const ctrls=cont.querySelectorAll('input:not([type=hidden]),select,textarea');
   for(const el of ctrls){

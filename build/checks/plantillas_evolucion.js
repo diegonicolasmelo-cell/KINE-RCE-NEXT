@@ -94,8 +94,9 @@ const bloquesAlias = [...alias.matchAll(/'([a-zA-Z]+)'/g)].map(m => m[1]);
 const bloquesMotor = new Set([...idx.matchAll(/_B\('([a-zA-Z]+)'\)/g)].map(m => m[1]));
 const huerfanos = bloquesAlias.filter(b => !bloquesMotor.has(b));
 eq('cada comodín apunta a bloques que el motor SÍ etiqueta', huerfanos.join(',') || 'ninguno huérfano', 'ninguno huérfano');
-// 🗂️ 17-sep-2026 · 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-si('el esquema trae la hoja PLANTILLAS_EVOLUCION y EVOLUCIONES no cambió por esto', /PLANTILLAS_EVOLUCION: \{ headerRows: 1/.test(lee('esquema.gs')) && /TOTAL_COLS\.EVOLUCIONES !== 401/.test(lee('esquema.gs')));   // 🗂️ 397 desde el 16-sep-2026: VENT_INTERFAZ
+// 🗂️ 17-sep-2026 · 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
+  // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
+si('el esquema trae la hoja PLANTILLAS_EVOLUCION y EVOLUCIONES no cambió por esto', /PLANTILLAS_EVOLUCION: \{ headerRows: 1/.test(lee('esquema.gs')) && /TOTAL_COLS\.EVOLUCIONES !== 405/.test(lee('esquema.gs')));   // 🗂️ 397 desde el 16-sep-2026: VENT_INTERFAZ
 si('el reset la CONSERVA (es configuración de la unidad)', /_RESET_CONSERVAR = \[[^\]]*'PLANTILLAS_EVOLUCION'/.test(lee('mantenimiento.gs')));
 si('el dispatcher: GET_PLANTILLAS, PLANTILLA_GUARDAR y PLANTILLA_RETIRAR auditados; GET_BOOT lleva el catálogo',
   /case 'GET_PLANTILLAS'/.test(lee('api.gs')) && /case 'PLANTILLA_GUARDAR':\s*return _auditar/.test(lee('api.gs')) && /case 'PLANTILLA_RETIRAR':\s*return _auditar/.test(lee('api.gs')) && /plantillas: \(typeof plantillasListar/.test(lee('api.gs')));
@@ -130,6 +131,9 @@ const HACE3 = hace(3), HACE1 = hace(1);
     await p.evaluate(([HACE3, HACE1]) => {
       DB = [{ ID_CAMA: '1', OCUPADA: true, NOMBRE: 'PACIENTE PRUEBA', PATIENT_ID: 'p1', WEAN_PVE_JSON: JSON.stringify({ [HACE3 + '-Dia']: 'frustra', [HACE1 + '-Dia']: 'frustra' }) }];
       abrirPanel('1', false, false);
+      // 🗂️ 17-sep-2026 · El camino ganó el paso 1 (Prevención de NAVM), así
+      // que abrirPanel ya no deja el turno a la vista: hay que pararse en él.
+      pasoIr(2);
     }, [HACE3, HACE1]);
     await p.waitForTimeout(200);
     await p.evaluate(() => {
@@ -144,12 +148,13 @@ const HACE3 = hace(3), HACE1 = hace(1);
       const r = document.querySelector('input[name="pveRes"][value="frustra"]'); r.checked = true; hPVEres();
       const m = document.querySelector('input[name="pveFrMot"]'); if (m) m.checked = true;
       document.getElementById('fPlanes').value = 'nueva PVE mañana';
-      // 🪤 El relato vive en el PASO 3 desde el rediseño (16-sep-2026), y en
-      // el paso 1 está oculto. Un textarea con display:none no acepta focus()
-      // ni setSelectionRange, así que el ➕ de «crear plantilla con lo
-      // seleccionado» no aparecía nunca — no porque estuviera roto, sino
-      // porque esta guardia lo manipulaba desde el paso equivocado.
-      if (typeof pasoIr === 'function') pasoIr(3);
+      // 🪤 El relato vive en el ÚLTIMO paso desde el rediseño (16-sep-2026),
+      // y en los anteriores está oculto. Un textarea con display:none no
+      // acepta focus() ni setSelectionRange, así que el ➕ de «crear plantilla
+      // con lo seleccionado» no aparecía nunca — no porque estuviera roto,
+      // sino porque esta guardia lo manipulaba desde el paso equivocado.
+      // 🗂️ 17-sep-2026 · ese último paso pasó del 3 al 4 (entró la prevención).
+      if (typeof pasoIr === 'function') pasoIr(4);
     });
   };
 

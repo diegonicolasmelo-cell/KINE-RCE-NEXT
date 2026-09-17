@@ -42,6 +42,10 @@ const no = (l, g) => eq(l, !!g, 'false');
             VIA_AEREA: x, SOPORTE: 'VM' }];
     window.recargarSilencioso = () => {};
     renderGrid(); abrirPanel('7', false, false);
+    // 🗂️ 17-sep-2026 · El camino ganó el paso 1 (Prevención de NAVM), así que
+    // abrirPanel ya no deja el turno a la vista: hay que pararse en él. La
+    // guardia mide lo mismo de siempre, solo desde donde ahora se ve.
+    pasoIr(2);
     $('fVA').value = x; cascadeVA();
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();

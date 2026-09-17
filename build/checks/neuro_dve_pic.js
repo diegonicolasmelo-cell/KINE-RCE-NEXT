@@ -175,8 +175,9 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
   // extubar) sumó 2 ⇒ 396. Esta guardia acompaña al total.
   // 🗂️ 397 desde el 16-sep-2026 (VENT_INTERFAZ).
   si('el total escrito a mano de testEsquema acompaña a las columnas',
-    // 🗂️ 17-sep-2026 · 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-    /TOTAL_COLS\.EVOLUCIONES !== 401/.test(esq));
+    // 🗂️ 17-sep-2026 · 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
+  // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
+    /TOTAL_COLS\.EVOLUCIONES !== 405/.test(esq));
 
   eq('sin errores JS', errs.join(' | '), '');
   await b.close();

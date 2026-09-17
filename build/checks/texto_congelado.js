@@ -74,12 +74,16 @@ const GUARDADO = 'TEXTO QUE QUEDO GUARDADO AYER EN LA EVOLUCION.';
   // sección anterior es parte del escenario, no ruido — medirlo al final daba
   // un falso rojo sobre una barra correcta.
   const barra = await p.evaluate(() => {
+    // 🗂️ 17-sep-2026 · la barra se mide en el PRIMER paso, que es donde no
+    // se ofrece «atrás»: lo que esta guardia protege es que no haya un segundo
+    // botón de guardar, no el número del paso. El primero pasó a ser la
+    // prevención, y el botón que guarda es ahora el de salir de evaluaciones.
     if (typeof pasoIr === 'function') pasoIr(1);
     const act = document.querySelector('.act-bar');
     const btns = [...act.querySelectorAll('button')].filter(x => x.offsetParent !== null);
     const av = document.getElementById('pasoAvanza');
     let enPaso2 = '';
-    if (typeof pasoIr === 'function') { pasoIr(2); enPaso2 = (av || {}).textContent || ''; pasoIr(1); }
+    if (typeof pasoIr === 'function') { pasoIr(3); enPaso2 = (av || {}).textContent || ''; pasoIr(1); }
     return { textos: btns.map(x => x.textContent.trim()), n: btns.length,
              esDelCamino: !!(btns.length === 1 && av && btns[0] === av), enPaso2: enPaso2 };
   });

@@ -51,6 +51,10 @@ const MONTAR = () => {
   $('gDate').value = '2026-08-10';
   $('spBed').textContent = 'CAMA 1';
   renderBannerEpisodio();
+  // 🗂️ 17-sep-2026 · El paso 1 (Prevención de NAVM) se dibuja al entrar en él;
+  // este montaje abre el panel a mano, así que hay que pintarlo igual que
+  // hace pasoIr(1). Sin esto sus filas no existen y no hay nada que resumir.
+  if (typeof prevPintar === 'function') prevPintar();
   mAcordeonInit(); rielRender();
 };
 
@@ -112,8 +116,8 @@ const MONTAR = () => {
     const sed = porTitulo[k.find(x => /Sedaci/i.test(x))];
     const aus = porTitulo[k.find(x => /Auscultaci/i.test(x))];
     const plan = porTitulo[k.find(x => /Planes/i.test(x))];
-    const disp = porTitulo[k.find(x => /Dispositivos/i.test(x))];
-    return { sed, aus, plan, disp, todas: k.length };
+    const prev = porTitulo[k.find(x => /Prevenci/i.test(x))];
+    return { sed, aus, plan, prev, todas: k.length };
   });
   eq('la sección con datos queda en ✓', R2.sed.st, '✓');
   eq('…y resume lo registrado', /Escalón 2/.test(R2.sed.res), true);
@@ -121,8 +125,28 @@ const MONTAR = () => {
   eq('…y lo dice sin inventar', R2.aus.res, 'sin registrar');
   eq('la que tiene un obligatorio pendiente queda en !', R2.plan.st, '!');
   eq('…y nombra lo que falta', /falta la firma/.test(R2.plan.res), true);
-  eq('las fechas se resumen legibles (dd-mm) y con su etiqueta',
-    /HME \d{2}-\d{2}/.test(R2.disp.res), true);
+  // 🗂️ 17-sep-2026 · Antes acá se medía la tarjeta «Dispositivos» y sus tres
+  // fechas resumidas en dd-mm. Esas fechas ya no se escriben en el turno: se
+  // revisan en el paso 1 (Prevención de NAVM), que marca y no fecha. Lo que
+  // hay que poder leer plegado ahora es QUÉ SE REVISÓ, no qué fecha se tecleó.
+  // 🪤 El resumen del acordeón se arma leyendo los <input> visibles de la
+  // tarjeta, y la prevención son BOTONES: sin un resumen propio decía
+  // «sin registrar» aunque estuviera toda revisada — un falso «te falta» en
+  // la única pantalla donde el colega no puede abrir la sección para
+  // desmentirlo.
+  eq('★ la prevención existe en el acordeón del celular', !!R2.prev, true);
+  const R2b = await m.evaluate(() => {
+    const b = $('pvb_hme_ok'); if (b) b.click();
+    if (typeof rielRender === 'function') rielRender();
+    const c = document.getElementById('fcPrevNavm');
+    const rs = c && c.querySelector('.fcard-hdr .mres');
+    const st = c && c.querySelector('.fcard-hdr .mst');
+    return { res: rs ? rs.textContent : '', st: st ? st.textContent : '' };
+  });
+  eq('★★ …y al revisar el HME el resumen lo dice', /HME/.test(R2b.res), true);
+  eq('★★ …con lo que se hizo, no con una fecha cruda',
+    /vigente/i.test(R2b.res) && !/\d{2}-\d{2}/.test(R2b.res), true);
+  eq('…y la sección queda marcada como hecha', R2b.st, '✓');
 
   console.log('\n3 · ★ El resumen lee las secciones PLEGADAS');
   const R3 = await m.evaluate(() => {

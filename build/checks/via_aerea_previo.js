@@ -360,7 +360,10 @@ const { chromium } = require('playwright-core');
   const ORD = await p.evaluate(async () => {
     DB = [{ ID_CAMA: '1', OCUPADA: true, NOMBRE: 'Juan P', VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'CPAP/PS',
       TOT_NUMERO: '7.5', TOT_CM_LABIO: '21', FECHA_INGRESO: '2026-07-20', FECHA_INICIO_VA: '2026-07-20' }];
-    abrirPanel('1', false);
+    abrirPanel('1', false); // 🗂️ 17-sep-2026 · El camino ganó el paso 1 (Prevención de NAVM), así que
+    // abrirPanel ya no deja el turno a la vista: hay que pararse en él. La
+    // guardia mide lo mismo de siempre, solo desde donde ahora se ve.
+    pasoIr(2);
     await new Promise(r => setTimeout(r, 350));
     const vis = id => { const e = $(id); return !!(e && e.offsetParent !== null); };
     const o = {};
@@ -395,7 +398,10 @@ const { chromium } = require('playwright-core');
   const FIJ = await p.evaluate(async () => {
     DB = [{ ID_CAMA: '1', OCUPADA: true, NOMBRE: 'Juan P', VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'ACVC',
       TOT_NUMERO: '7.5', TOT_CM_LABIO: '21', FECHA_INGRESO: '2026-07-20', FECHA_INICIO_VA: '2026-07-20' }];
-    abrirPanel('1', false);
+    abrirPanel('1', false); // 🗂️ 17-sep-2026 · El camino ganó el paso 1 (Prevención de NAVM), así que
+    // abrirPanel ya no deja el turno a la vista: hay que pararse en él. La
+    // guardia mide lo mismo de siempre, solo desde donde ahora se ve.
+    pasoIr(2);
     await new Promise(r => setTimeout(r, 350));
     const o = {};
     o.heredaDeLaCama = { n: v('fTOTn'), cm: v('fTOTcm') };

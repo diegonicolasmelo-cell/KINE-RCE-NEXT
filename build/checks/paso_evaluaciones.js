@@ -66,7 +66,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();
     const f = $('fFirma'); if (f) { if (!f.options.length) f.add(new Option('DMV', 'DMV')); f.value = 'DMV'; }
-    pasoIr(2);
+    pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(300);
 
@@ -106,9 +106,9 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.evaluate(() => { window.__llamadas.length = 0; $('pasoEvalNada').click(); });
   await p.waitForTimeout(700);
   si('★★ guarda', (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);
-  eq('★★ …y lleva al paso 3', await p.evaluate(() => {
+  eq('★★ …y lleva al relato (paso 4 desde el 17-sep-2026)', await p.evaluate(() => {
     const t = document.querySelector('#spPasos [aria-selected="true"]'); return t ? t.dataset.p : '';
-  }), '3');
+  }), '4');
   no('★ …sin escribir NADA en la serie (no midió nada)',
      (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'EVAL_REGISTRAR').length)) > 0);
 
@@ -126,7 +126,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     if (typeof setKTMstate === 'function') setKTMstate('r');
     const n = $('fKTMniv'); if (n) { n.value = '3'; n.dispatchEvent(new Event('change')); }
     window.__llamadas.length = 0;
-    pasoIr(2);
+    pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(200);
   await p.evaluate(() => $('pasoEvalNada').click());

@@ -100,7 +100,9 @@ const si = (l, cond, detalle) => {
     tarjetas.cortados.join(' · '));
 
   /* ── Panel: riel de secciones y etiquetas ─────────────────────────────── */
-  await pagina.evaluate(() => { setTab('G'); abrirPanel('1', false); });
+  // 🗂️ 17-sep-2026 · el riel de secciones es el del TURNO, que ahora es el
+  // paso 2: desde la prevención solo se veía una sección.
+  await pagina.evaluate(() => { setTab('G'); abrirPanel('1', false); pasoIr(2); });
   await pagina.waitForTimeout(1000);
 
   const panel = await pagina.evaluate(() => {

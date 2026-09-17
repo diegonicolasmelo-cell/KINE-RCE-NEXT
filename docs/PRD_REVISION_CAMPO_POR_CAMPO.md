@@ -66,16 +66,52 @@ respiratorio. Lo único que lo rompía era que los datos del tubo estaban en
 
 ## 2 · Paso 1 · Prevención de NAVM (módulo nuevo)
 
-Cuatro líneas, **un toque cada una, sin párrafos**:
+Cinco líneas, **un toque cada una, sin párrafos**:
 
 ```
-🛡️ Prevención NAVM
+Prevención de NAVM                   Cama 7 · TOT · ventilación mecánica
 
-  Filtro HME        vence hoy      · puesto el 15-09   [ ✓ vigente ] [ ⟳ lo cambié ]
-  Trach Care        vence mañana   · puesto el 16-09   [ ✓ vigente ] [ ⟳ lo cambié ]
-  Cabecera 30-45°                                      [ ✓ correcta ] [ ⟳ la corregí ]
-  Presión de cuff                                      [ ✓ en rango ] [ ⟳ la ajusté ] [ ⚠ desinflado ]
+  Filtro HME  ( Filtro HME | Humidificación activa )     vence hoy
+              puesto el 15-09                      [ vigente ] [ lo cambié ]
+  Filtro HEPA   vence mañana · puesto el 16-09     [ vigente ] [ lo cambié ]
+  Trach Care    vence mañana · puesto el 16-09     [ vigente ] [ lo cambié ]
+  ── ANTES DE LA TERAPIA ──
+  Cabecera 30-45°                                  [ correcta ] [ la corregí ]
+  Presión de cuff  20-30 cmH₂O        [ en rango ] [ la ajusté ] [ desinflado ]
+
+                    No pude — dejar razón        →  Seguir al turno
 ```
+
+**Son tres relojes, no dos** (Diego, 17-sep-2026): *«cada uno tiene sus fechas
+distintivas: dos días para HME, tres días para HEPA, al igual que la Trach
+Care»*.
+
+**La salida «no pude» no es un tercer botón en cada fila**: es uno solo abajo,
+al lado de «Seguir al turno». Así cada fila queda en dos toques limpios y la
+excepción vive donde de verdad bloquea.
+
+**El paso entero desaparece —pestaña incluida— cuando no hay nada que
+prevenir**: sin vía aérea artificial ni ventilación no se muestra un paso vacío
+que además bloquearía el avance.
+
+### Los dos casos que se resuelven solos
+
+Diego los planteó como problemas, con varias opciones cada uno. Midiendo
+apareció que **el servidor ya los decide** (`estadoDispositivos`, svc_eventos.gs):
+
+- **Humidificación activa.** Es excluyente con el HME (humidificación pasiva ↔
+  activa). En pantalla, la fila del HME lleva un **selector de dos posiciones**
+  en el lugar del nombre; al elegir la activa el reloj del HME se apaga, la
+  fila deja de pedir toque y deja de bloquear. Es la segunda opción que
+  propuso Diego: *«que aquí mismo esté desplegable la opción en la misma fila
+  de HME… si uno selecciona humidificación activa, anula las fechas del HME»*.
+
+- **HEPA del ventilador.** En un Puritan Bennett o una Avea el filtro es del
+  equipo y no se cambia (`CONFIG HEPA_FIJO_EQUIPOS`, por prefijo del nombre:
+  «PB 1», «PB 2», «Avea 1», «Avea 3» calzan sin enumerarlos). La fila **se
+  muestra** —su fecha es la referencia de instalación, un dato real que no hay
+  que perder— pero no pide toque ni bloquea. Nadie tiene que escribir «no
+  corresponde ventilador»: el sistema ya sabe qué ventilador tiene la cama.
 
 ### 🔴 El paso NO escribe fechas
 

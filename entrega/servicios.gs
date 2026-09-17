@@ -5281,6 +5281,19 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
   const esIngreso = esVerdadero(evo.ES_INGRESO);
   const val = (a, b) => (a !== undefined && a !== null && a !== '') ? a : (b || '');
 
+  /* 🔴 UNA SOLA PUERTA AL RELOJ (17-sep-2026). El paso de prevención no manda
+     fechas: manda la MARCA ('' sin revisar · 'ok' vigente · 'chg' cambiado).
+     Solo 'chg' reinicia el reloj, y lo hace con la FECHA EFECTIVA del turno —
+     el mismo criterio del evento ➕ y de autoFechasDispositivos en la pantalla:
+     el turno Noche transcurre casi entero en el día siguiente, así que el
+     dispositivo nuevo queda etiquetado con ese día y entre dos cambios pasan
+     exactamente `frec` días.
+     🔴 Cualquier otra marca DEJA PASAR el valor que ya venía, que es
+     val(loDelTurno, loDeLaCama). Así saltarse el paso NO borra el reloj de un
+     dispositivo instalado: el turno llega vacío y la cama conserva el suyo. */
+  const _navmEfec = _fechaEfectivaTurno(fecha, turno);
+  const _navm = (marca, actual) => String(marca || '') === 'chg' ? _navmEfec : actual;
+
   // Estado con el que TERMINA el turno: si hubo un evento de vía aérea, la cama
   // (y el turno siguiente) deben partir de ahí, no del estado previo con el que
   // el paciente llegó al turno. El previo queda guardado en las columnas VENT_*.
@@ -5481,9 +5494,9 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
        guardadas antes venía en el modo, así que se miran los dos — igual que
        `interfazDe` en el resto del sistema. Sin esto, el weaning por TQT a HME
        descartaba el HME que el paciente tiene puesto. */
-    DISP_HME_FECHA: (humidFinal || (dejaVM && ifazFin !== 'HME' && modoFin !== 'HME')) ? '' : val(evo.DISP_HME_FECHA, cama.DISP_HME_FECHA),
-    DISP_HEPA_FECHA: dejaVM ? '' : val(evo.DISP_HEPA_FECHA, cama.DISP_HEPA_FECHA),
-    DISP_TC_FECHA: (dejaVM && vaNew !== 'TOT' && vaNew !== 'TQT') ? '' : val(evo.VENT_FECHA_SONDA, cama.DISP_TC_FECHA),
+    DISP_HME_FECHA: (humidFinal || (dejaVM && ifazFin !== 'HME' && modoFin !== 'HME')) ? '' : _navm(evo.NAVM_HME, val(evo.DISP_HME_FECHA, cama.DISP_HME_FECHA)),
+    DISP_HEPA_FECHA: dejaVM ? '' : _navm(evo.NAVM_HEPA, val(evo.DISP_HEPA_FECHA, cama.DISP_HEPA_FECHA)),
+    DISP_TC_FECHA: (dejaVM && vaNew !== 'TOT' && vaNew !== 'TQT') ? '' : _navm(evo.NAVM_TC, val(evo.VENT_FECHA_SONDA, cama.DISP_TC_FECHA)),
     DISP_HUMID_FECHA: humidFinal,
     WEAN_PVE_JSON: JSON.stringify(weanPve),
     WEAN_CAND_PVE: candPve,

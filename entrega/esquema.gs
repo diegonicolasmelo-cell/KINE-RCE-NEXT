@@ -314,7 +314,19 @@ const _COLS_EVOLUCIONES = [
   ['INTUB_INTERFAZ_POST','texto','Tras intubar: interfaz'],
   ['REINTUB_INTERFAZ_POST','texto','Tras reintubar: interfaz'],
   ['TQT_INTERFAZ_POST','texto','Tras la TQT: interfaz'],
-  ['VENT_INTERFAZ_FINAL','texto','Al cierre del turno: interfaz']
+  ['VENT_INTERFAZ_FINAL','texto','Al cierre del turno: interfaz'],
+  /* 🛡️ PREVENCIÓN DE NAVM (paso 1 · 17-sep-2026) — AL FINAL, como todas.
+     '' sin revisar · 'ok' vigente · 'chg' cambiado en este turno. El VACÍO no
+     es un olvido del programa: ES el dato del cumplimiento. El indicador se
+     mide solo — turnos con las líneas tocadas ÷ turnos con vía aérea
+     artificial — y no hay que preguntarle a nadie «¿lo hiciste?».
+     🔴 Estas columnas NO guardan la fecha del dispositivo: esa vive en la cama
+     (el reloj vigente) y en la línea de tiempo (el cambio, con hora y autor).
+     Una tercera copia acá era la segunda puerta que este paso vino a cerrar. */
+  ['NAVM_HME','texto','Prevención: filtro HME'],
+  ['NAVM_HEPA','texto','Prevención: filtro HEPA'],
+  ['NAVM_TC','texto','Prevención: Trach Care'],
+  ['NAVM_RAZON','texto','Prevención: por qué no se pudo cambiar']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1054,12 +1066,13 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
-  // y VENT_INTERFAZ_FINAL, 17-sep-2026; 397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
+  // 405 = 401 + NAVM_HME, NAVM_HEPA, NAVM_TC, NAVM_RAZON (paso de prevención, 17-sep-2026);
+  // 401 = 397 + los tres «tras el evento» y VENT_INTERFAZ_FINAL, 17-sep-2026; 397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
   // y NEURO_PIC_CAPTOR, ago-2026; antes 390 = 387 + SED_SAS_META, SED_VIGIL y
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 401) errs.push("EVOLUCIONES != 401 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 405) errs.push("EVOLUCIONES != 405 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }
