@@ -668,7 +668,23 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
   // el paciente llegó al turno. El previo queda guardado en las columnas VENT_*.
   const vaFin  = evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '';
   const sopFin = evo.VENT_SOPORTE_FINAL || evo.VENT_SOPORTE || '';
-  const modoFin = evo.VENT_MODO_FINAL || evo.VENT_MODO || '';
+  /* 🫁 EL MODO Y LA INTERFAZ SE ARRASTRAN JUNTOS (17-sep-2026).
+     🔴 Y el modo se ARRASTRA VACÍO cuando el soporte no tiene modo. Antes esto
+     era `val(modoFin, cama.MODO)`: con el modo final vacío —que es lo normal en
+     oxigenoterapia y en aire ambiente— la cama se quedaba con el ANTERIOR, así
+     que un paciente extubado a naricera heredaba el «CPAP/PS» de cuando estaba
+     en VM y el turno siguiente abría con ese modo puesto. El respaldo al valor
+     de la cama solo tiene sentido cuando el turno no dijo nada del tema; si el
+     turno declaró un soporte sin modo, el vacío ES el dato. */
+  const sopSinModo = (sopFin === 'Oxigenoterapia/OAF' || sopFin === 'Ambiente');
+  const modoFin = sopSinModo ? '' : (evo.VENT_MODO_FINAL || evo.VENT_MODO || '');
+  /* El dispositivo al cierre. Respalda al MODO final porque una evolución
+     guardada antes del 17-sep-2026 lo escribía ahí (`esInterfaz` reconoce la
+     lista); sin ese respaldo, reabrir o resincronizar una fila vieja perdería
+     el dispositivo que el paciente tiene puesto. */
+  const _modoCrudo = evo.VENT_MODO_FINAL || evo.VENT_MODO || '';
+  const ifazFin = evo.VENT_INTERFAZ_FINAL || evo.VENT_INTERFAZ ||
+                  (typeof txtEsInterfaz === 'function' && txtEsInterfaz(_modoCrudo) ? _modoCrudo : '');
   // Fecha de inicio de soporte: se reinicia si cambia el tipo (Ambiente↔VM↔VNI).
   const sopNew = sopFin || cama.SOPORTE || 'Ambiente';
   const sopAnt = cama.SOPORTE || '';
@@ -796,7 +812,9 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
     TOT_NUMERO: val(evo.INTUB_TOT_N, val(evo.VENT_TOT_NUM, cama.TOT_NUMERO)),
     TOT_CM_LABIO: val(evo.INTUB_TOT_CM, val(evo.VENT_TOT_CM, cama.TOT_CM_LABIO)),
     TQT_TIPO: val(evo.VENT_TQT_TIPO, cama.TQT_TIPO),
-    TQT_CALIBRE: val(evo.VENT_TQT_CALIBRE, cama.TQT_CALIBRE), SOPORTE: sopNew, MODO: val(modoFin, cama.MODO),
+    TQT_CALIBRE: val(evo.VENT_TQT_CALIBRE, cama.TQT_CALIBRE), SOPORTE: sopNew,
+    MODO: sopSinModo ? '' : val(modoFin, cama.MODO),
+    INTERFAZ: sopSinModo || ifazFin ? ifazFin : val(ifazFin, cama.INTERFAZ),
     FASE_JSON: val(evo.FASE_JSON, cama.FASE_JSON),
     KTM_NIVEL: esVerdadero(evo.KTM_REALIZADA) ? (evo.KTM_NIVEL_KTR || '') : (turno === 'Noche' ? (cama.KTM_NIVEL || '') : ''),
     KTM_SUSP: esVerdadero(evo.KTM_SUSPENDIDA),
@@ -840,7 +858,12 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
     // manda sobre el HME (excluyentes) y sigue al paciente (CNAF humidificada
     // la conserva); una reintubación fecha circuito nuevo desde el cliente
     // (force=true).
-    DISP_HME_FECHA: (humidFinal || (dejaVM && modoFin !== 'HME')) ? '' : val(evo.DISP_HME_FECHA, cama.DISP_HME_FECHA),
+    /* 🫁 «Respira POR el HME» se pregunta al DISPOSITIVO (17-sep-2026). El HME
+       es una interfaz, y desde los tres ejes vive en su campo; en las filas
+       guardadas antes venía en el modo, así que se miran los dos — igual que
+       `interfazDe` en el resto del sistema. Sin esto, el weaning por TQT a HME
+       descartaba el HME que el paciente tiene puesto. */
+    DISP_HME_FECHA: (humidFinal || (dejaVM && ifazFin !== 'HME' && modoFin !== 'HME')) ? '' : val(evo.DISP_HME_FECHA, cama.DISP_HME_FECHA),
     DISP_HEPA_FECHA: dejaVM ? '' : val(evo.DISP_HEPA_FECHA, cama.DISP_HEPA_FECHA),
     DISP_TC_FECHA: (dejaVM && vaNew !== 'TOT' && vaNew !== 'TQT') ? '' : val(evo.VENT_FECHA_SONDA, cama.DISP_TC_FECHA),
     DISP_HUMID_FECHA: humidFinal,

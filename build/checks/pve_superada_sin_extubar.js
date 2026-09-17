@@ -47,7 +47,8 @@ si('…van juntas y en ese orden',
 si('★ …y entraron DESPUÉS de ANOTACIONES_JSON, no al medio',
   iCol('PVE_SUP_SIN_EXT') > iCol('ANOTACIONES_JSON'));
 // 🗂️ 397 desde el 16-sep-2026: entró VENT_INTERFAZ (los tres ejes).
-si('testEsquema exige el total al día', /TOTAL_COLS\.EVOLUCIONES !== 397/.test(esq));
+// 🗂️ 17-sep-2026 · 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
+si('testEsquema exige el total al día', /TOTAL_COLS\.EVOLUCIONES !== 401/.test(esq));
 
 /* ══ 2 · SERVIDOR: texto, validación, estadística, entrega ══════════════ */
 console.log('\n2 · Servidor');

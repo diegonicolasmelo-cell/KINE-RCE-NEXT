@@ -1048,3 +1048,73 @@ siguen exigiendo exactamente lo mismo —que la columna exista, con su tipo y en
 lugar— y no se aflojó nada.
 
 **Batería: 166 verdes, 0 rojas.**
+
+---
+
+## 17-sep-2026 · El tercer eje también después del evento
+
+Las dos puntas sueltas que quedaron de los tres ejes, aprobadas por Diego.
+
+### 1 · Los paneles «queda con» no tenían dónde anotar el dispositivo
+
+Intubación, reintubación y traqueostomía preguntaban **soporte y modo, nada
+más**. Un paciente que se traqueostomiza y queda en oxigenoterapia no tenía
+dónde anotar si quedó con **HME, tubo en T, CTAF, CNAF o válvula de fonación**:
+el dato se perdía en el mismo turno en que se generaba.
+
+Ahora los tres ofrecen el eje que faltaba, y **del mismo catálogo que el bloque
+del turno** (`VMAPS`) — un segundo catálogo haría que un dispositivo nuevo
+aparezca arriba y no después del evento, que es cómo nacen las listas que se
+contradicen. Cada eje se esconde cuando no tiene nada que ofrecer: con VM
+invasiva la vía aérea ya dice cuál es la interfaz.
+
+De paso, las tres funciones que dibujaban esos paneles eran **la misma con otro
+prefijo**. Ahora es una (`_quedaConEjes`).
+
+### 2 · El estado final del turno tampoco tenía columna de interfaz
+
+Cuatro columnas nuevas (401): `INTUB_INTERFAZ_POST`, `REINTUB_INTERFAZ_POST`,
+`TQT_INTERFAZ_POST` y `VENT_INTERFAZ_FINAL`.
+
+Sin ellas el dispositivo terminaba escrito en `VENT_MODO_FINAL` — la forma vieja
+que los tres ejes vinieron a corregir. Una naricera no es un modo ventilatorio.
+`_soloModo` y `_soloInterfaz` reparten cada valor a su columna con el mismo
+reconocedor que usa el resto (`esInterfaz`), no con una lista aparte.
+
+### 🔴 Y al arreglarlo apareció un modo fantasma que cruzaba el turno
+
+Con el dispositivo fuera del modo, el modo final queda **vacío** en
+oxigenoterapia y en aire ambiente — que es lo correcto. Pero el sincronizador de
+la cama hacía `MODO: val(modoFin, cama.MODO)`: con el modo final vacío **se
+quedaba con el anterior**.
+
+O sea: un paciente extubado a naricera heredaba el «CPAP/PS» de cuando estaba en
+VM, y **el colega del turno siguiente abría el formulario con ese modo puesto**.
+Es la misma trampa del respaldo de `cascadeSop` del día anterior, pero esta
+cruzaba el cambio de turno. Ahora, si el turno declaró un soporte sin modo, el
+vacío ES el dato.
+
+La cama también arrastra el dispositivo (`CAMAS_ESTADO.INTERFAZ`, que existía
+desde ayer y **nadie escribía**).
+
+### La regla del HME, que se preguntaba al campo equivocado
+
+El weaning por traqueostomía conserva el HME si el paciente **respira POR él**.
+Esa regla preguntaba `modoFin !== 'HME'`, y con el HME mudado a la interfaz
+empezó a descartar el filtro que el paciente tiene puesto. Lo cazó
+`dispositivos_reglas.js`. Ahora mira los dos campos, y la guardia comprueba el
+mismo weaning **por los dos caminos**: con el HME en el modo (una evolución
+guardada antes) y con el HME en su campo (como se escribe hoy). Si alguien vuelve
+a atar la regla a uno solo, uno de los dos bloques cae.
+
+### Ocho guardias rojas, todas por su razón escrita
+
+Cinco por el total de columnas (397 → 401). `desvinculacion` porque la ventana de
+su expresión regular quedó corta al crecer la cascada del estado final — lo que
+exige no cambió. `dispositivos_reglas` era un bug de verdad, arriba.
+Y `extubacion_una_ruta`, mía de ayer, pedía el dispositivo en `VENT_MODO_FINAL`:
+ese es justo el cambio deliberado de hoy, así que ahora pide el dispositivo en su
+columna **y el modo vacío**.
+
+**Batería: 167 verdes, 0 rojas.** Comprobado además en pantalla de teléfono: los
+tres paneles muestran y esconden cada eje como corresponde, sin desborde.

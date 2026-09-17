@@ -64,7 +64,10 @@ eq('…y lo marca como registro anterior', /\(registro anterior\)/.test(idx), tr
 
 /* ══ 3 · LA CASCADA Y LA PODA ═══════════════════════════════════════════ */
 console.log('\n3 · La desvinculación entra donde se decide el estado final');
-const casc = (idx.match(/VENT_SOPORTE_FINAL:[\s\S]{0,600}?VENT_MODO_FINAL:[\s\S]{0,600}?,\n/) || [''])[0];
+// 🗂️ 17-sep-2026 · La ventana se amplió de 600 a 2000: la cascada del estado
+// final ganó VENT_INTERFAZ_FINAL y su comentario, y `_desvincQueda().modo`
+// quedaba fuera del trozo que se miraba. Lo que se exige no cambió.
+const casc = (idx.match(/VENT_SOPORTE_FINAL:[\s\S]{0,2000}?VENT_MODO_FINAL:[\s\S]{0,2000}?\n    \/\* Y el tercer eje/) || [''])[0];
 eq('el soporte final consulta la desvinculación', /_desvincQueda\(\)\.sop/.test(casc), true);
 eq('el modo final también', /_desvincQueda\(\)\.modo/.test(casc), true);
 // La vía aérea NO cambia: el paciente sigue traqueostomizado.

@@ -302,7 +302,19 @@ const _COLS_EVOLUCIONES = [
   // 🪤 Va aquí y no junto a los otros VENT_: se agregó DESPUÉS del congelamiento,
   // y meterla al medio desplaza los índices de todo lo ya escrito en la planilla.
   // Lo cazó guardado_viajes.js, que compara fila a fila contra el árbol congelado.
-  ['VENT_INTERFAZ','texto','Interfaz (mascarilla, naricera…)']
+  ['VENT_INTERFAZ','texto','Interfaz (mascarilla, naricera…)'],
+  /* 🫁 EL TERCER EJE TAMBIÉN DESPUÉS DEL EVENTO (17-sep-2026, aprobado por
+     Diego). Los paneles «queda con» preguntaban soporte y modo, nada más: un
+     paciente que se traqueostomiza y queda en oxigenoterapia no tenía dónde
+     anotar si quedó con HME, tubo en T, CTAF, CNAF o válvula de fonación, y el
+     dato se perdía. Ahora cada evento guarda su dispositivo, y
+     VENT_INTERFAZ_FINAL cierra el turno igual que VENT_MODO_FINAL cierra el
+     modo — antes el dispositivo terminaba escrito EN el modo final, que es
+     justo la forma vieja que los tres ejes vinieron a corregir. — AL FINAL */
+  ['INTUB_INTERFAZ_POST','texto','Tras intubar: interfaz'],
+  ['REINTUB_INTERFAZ_POST','texto','Tras reintubar: interfaz'],
+  ['TQT_INTERFAZ_POST','texto','Tras la TQT: interfaz'],
+  ['VENT_INTERFAZ_FINAL','texto','Al cierre del turno: interfaz']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1041,12 +1053,13 @@ function testEsquema() {
     if (new Set(rots).size !== rots.length) errs.push(hoja + ': rótulos repetidos');
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
-  // y HAY QUE SUBIRLO al agregar una (397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
+  // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // y VENT_INTERFAZ_FINAL, 17-sep-2026; 397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
   // y NEURO_PIC_CAPTOR, ago-2026; antes 390 = 387 + SED_SAS_META, SED_VIGIL y
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 397) errs.push("EVOLUCIONES != 397 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 401) errs.push("EVOLUCIONES != 401 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

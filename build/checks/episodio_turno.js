@@ -44,7 +44,8 @@ const si = (l, g) => eq(l, !!g, 'true');
   // 🗂️ 396 → 397 el 16-sep-2026: entró VENT_INTERFAZ con los tres ejes del
   // respiratorio. Esta línea sigue protegiendo lo mismo: que la rama
   // episodio/turno no haya tocado las columnas del turno.
-  si('★ EVOLUCIONES sigue con su total declarado a mano', /TOTAL_COLS\.EVOLUCIONES !== 397/.test(esq));
+  // 🗂️ 17-sep-2026 · 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
+  si('★ EVOLUCIONES sigue con su total declarado a mano', /TOTAL_COLS\.EVOLUCIONES !== 401/.test(esq));
   si('la entrega imprime la firma junto a la fecha', /ULT_MRC_FIRMA/.test(fs.readFileSync(path.join(V2, 'svc_entrega.gs'), 'utf8')));
 
   console.log('\n2 · Servidor (simulador con hojas en memoria)');

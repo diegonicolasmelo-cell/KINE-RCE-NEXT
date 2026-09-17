@@ -3614,7 +3614,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                         <select id="poTqtSop" onchange="renderParamsTqt()" style="height:28px;font-size:.78rem;">
                           <option value="VM">VM</option><option value="Oxigenoterapia/OAF">Oxigenoterapia/OAF</option><option value="Ambiente">Ambiente</option>
                         </select></div>
-                      <div class="col wa"><label style="font-size:.66rem;">Modo</label>
+                      <div class="col wa" id="wTqtInterfaz"><label style="font-size:.66rem;">Interfaz</label>
+                        <select id="poTqtInterfaz" onchange="renderParamsTqt()" style="height:28px;font-size:.78rem;"></select></div>
+                      <div class="col wa" id="wTqtModo"><label style="font-size:.66rem;">Modo</label>
                         <select id="poTqtModo" onchange="renderParams({P:'pt_',L:'ptl_',box:'paramsBoxTqt'})" style="height:28px;font-size:.78rem;"></select></div>
                     </div>
                     <div id="paramsBoxTqt"></div>
@@ -4069,7 +4071,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <select id="poReintubSop" onchange="renderParamsReintub()" style="height:28px;font-size:.78rem;">
                       <option value="VM">VM</option><option value="Oxigenoterapia/OAF">Oxigenoterapia/OAF</option>
                     </select></div>
-                  <div class="col wa"><label style="font-size:.66rem;">Modo</label>
+                  <div class="col wa" id="wReintubInterfaz"><label style="font-size:.66rem;">Interfaz</label>
+                    <select id="poReintubInterfaz" onchange="renderParamsReintub()" style="height:28px;font-size:.78rem;"></select></div>
+                  <div class="col wa" id="wReintubModo"><label style="font-size:.66rem;">Modo</label>
                     <select id="poReintubModo" onchange="renderParams({P:'pr_',L:'prl_',box:'paramsBoxReintub'})" style="height:28px;font-size:.78rem;"></select></div>
                 </div>
                 <div id="paramsBoxReintub"></div>
@@ -4154,7 +4158,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                         <select id="poIntubSop" onchange="renderParamsIntub();_gateDispositivos()" style="height:28px;font-size:.78rem;">
                           <option value="VM">VM</option><option value="Oxigenoterapia/OAF">Oxigenoterapia/OAF</option>
                         </select></div>
-                      <div class="col wa"><label style="font-size:.66rem;">Modo</label>
+                      <div class="col wa" id="wIntubInterfaz"><label style="font-size:.66rem;">Interfaz</label>
+                        <select id="poIntubInterfaz" onchange="renderParamsIntub()" style="height:28px;font-size:.78rem;"></select></div>
+                      <div class="col wa" id="wIntubModo"><label style="font-size:.66rem;">Modo</label>
                         <select id="poIntubModo" onchange="renderParams({P:'pi_',L:'pl_',box:'paramsBoxIntub'})" style="height:28px;font-size:.78rem;"></select></div>
                     </div>
                     <!-- Módulo ventilatorio COMPLETO del estado posterior: las
@@ -7590,13 +7596,13 @@ function _podarEventosPayload(p){
   // también se acepta TQT (paciente que ya llegó traqueostomizado y se recanula).
   const tqtActivo=(va==='TOT'||va==='TQT') && !!$('cTqtO')?.checked;
   if(!tqtActivo) del(['TQT_OCURRIO','TQT_HORA','TQT_TECNICA','TQT_DET']);
-  if(!$('cIntubO')?.checked) del(['INTUB_OCURRIO','INTUB_HORA','INTUB_DET','INTUB_SOP_PREVIO','INTUB_VA_PREVIA','INTUB_MODO_PREVIO','INTUB_VA_POST','INTUB_SOP_POST','INTUB_MODO_POST','INTUB_TOT_N','INTUB_TOT_CM','INTUB_VT','INTUB_FR','INTUB_PEEP','INTUB_FIO2','INTUB_SPO2']);
-  if(!$('cTqtO')?.checked) del(['TQT_SOP_POST','TQT_MODO_POST','TQT_PARAMS','TQT_VT','TQT_FR','TQT_PEEP','TQT_FIO2','TQT_SPO2','TQT_PMAX','TQT_PPL','TQT_PS','TQT_PAFI']);
+  if(!$('cIntubO')?.checked) del(['INTUB_OCURRIO','INTUB_HORA','INTUB_DET','INTUB_SOP_PREVIO','INTUB_VA_PREVIA','INTUB_MODO_PREVIO','INTUB_VA_POST','INTUB_SOP_POST','INTUB_MODO_POST','INTUB_INTERFAZ_POST','INTUB_TOT_N','INTUB_TOT_CM','INTUB_VT','INTUB_FR','INTUB_PEEP','INTUB_FIO2','INTUB_SPO2']);
+  if(!$('cTqtO')?.checked) del(['TQT_SOP_POST','TQT_MODO_POST','TQT_INTERFAZ_POST','TQT_PARAMS','TQT_VT','TQT_FR','TQT_PEEP','TQT_FIO2','TQT_SPO2','TQT_PMAX','TQT_PPL','TQT_PS','TQT_PAFI']);
   // EXT_REINTUB va con el grupo reintubación (la ruta standalone ocurre con VA
   // no invasiva, donde el grupo PVE está inactivo — el servidor gatilla el
   // registro de reintubación con esta clave).
   if(!($('cReintubT')?.checked||$('cReintub')?.checked))
-    del(['REINTUB_TOT_N','REINTUB_TOT_CM','REINTUB_MODO','REINTUB_PARAMS','REINTUB_HORA','REINTUB_SOP_PREV','EXT_REINTUB','EXT_REINTUB_RAZ','REINTUB_SOP_POST','REINTUB_VT','REINTUB_FR','REINTUB_PEEP','REINTUB_FIO2','REINTUB_SPO2','REINTUB_PMAX','REINTUB_PPL','REINTUB_AUTOPEEP','REINTUB_PS','REINTUB_PAFI']);
+    del(['REINTUB_TOT_N','REINTUB_TOT_CM','REINTUB_MODO','REINTUB_PARAMS','REINTUB_HORA','REINTUB_SOP_PREV','EXT_REINTUB','EXT_REINTUB_RAZ','REINTUB_SOP_POST','REINTUB_INTERFAZ_POST','REINTUB_VT','REINTUB_FR','REINTUB_PEEP','REINTUB_FIO2','REINTUB_SPO2','REINTUB_PMAX','REINTUB_PPL','REINTUB_AUTOPEEP','REINTUB_PS','REINTUB_PAFI']);
   if(!$('cDesvinc')?.checked) del(['DESVINC_OCURRIO','DESVINC_HORA','DESVINC_A','DESVINC_MOTIVO','DESVINC_RECONEXION','DESVINC_HORA_RECON','DESVINC_HORAS','DESVINC_DET']);
   if(!$('cCambioTOT')?.checked) del(['TOT_CAMBIO','TOT_CAMBIO_MOTIVO']);
   if(!$('cCambioTQT')?.checked) del(['TQT_CAMBIO','TQT_CAMBIO_MOTIVO']);
@@ -8372,6 +8378,7 @@ function guardar() {
     REINTUB_TOT_CM: _rSuf()?v('poReintubTotCm'):'',
     REINTUB_MODO:   _rSuf()?v('poReintubModo'):'',
     REINTUB_SOP_POST:_rSuf()?v('poReintubSop'):'',
+    REINTUB_INTERFAZ_POST:_rSuf()?v('poReintubInterfaz'):'',
     REINTUB_PARAMS: _rSuf()?_paramsTxt('pr_','prl_'):'',
     REINTUB_VT:_rSuf()?n(v('pr_vt')):'', REINTUB_FR:_rSuf()?n(v('pr_fr')):'',
     REINTUB_PEEP:_rSuf()?n(v('pr_peep')):'', REINTUB_FIO2:_rSuf()?n(v('pr_fio2')):'',
@@ -8543,15 +8550,34 @@ function guardar() {
                         : (_extOcurrio() && !_extReintub()) ? peSopext()
                         : ($('cDecanOcurrio')?.checked && !$('cRecanul')?.checked) ? 'Oxigenoterapia/OAF'
                         : (_desvincQueda() ? _desvincQueda().sop : v('fSop')),
+    /* 🫁 EL MODO FINAL ES UN MODO, NO UN DISPOSITIVO (17-sep-2026). La
+       extubación y la decanulación preguntan «con qué queda» en UN campo que a
+       veces trae un modo de VNI (S/T, AVAPS, CPAP) y casi siempre un dispositivo
+       (naricera, Venturi, CNAF, ambiente). El dispositivo caía acá, en el modo
+       final, que es la forma vieja que los tres ejes vinieron a corregir; ahora
+       se desvía a VENT_INTERFAZ_FINAL y el modo queda vacío, como corresponde a
+       una oxigenoterapia. `_soloModo` hace ese filtro con el mismo reconocedor
+       que usa el resto (`esInterfaz`), no con una lista aparte. */
     VENT_MODO_FINAL:      $('cIntubO')?.checked ? (v('poIntubModo')||'')
                         : $('cTqtO')?.checked ? (v('poTqtModo')||'')
-                        : (_extOcurrio() && !_extReintub()) ? (_extPeModo()||'')
-                        : ($('cDecanOcurrio')?.checked && !$('cRecanul')?.checked) ? (v('fDecanQueda')||'')
-                        : (_desvincQueda() ? _desvincQueda().modo : v('fModo')),
+                        : (_extOcurrio() && !_extReintub()) ? _soloModo(_extPeModo())
+                        : ($('cDecanOcurrio')?.checked && !$('cRecanul')?.checked) ? _soloModo(v('fDecanQueda'))
+                        : (_desvincQueda() ? _soloModo(_desvincQueda().modo) : v('fModo')),
+    /* Y el tercer eje al cierre del turno: con qué DISPOSITIVO queda. Misma
+       cascada que la vía aérea y el soporte, en el mismo orden, para que los
+       tres digan siempre lo mismo del mismo momento. */
+    VENT_INTERFAZ_FINAL:  $('cIntubO')?.checked ? (v('poIntubInterfaz')||'')
+                        : $('cTqtO')?.checked ? (v('poTqtInterfaz')||'')
+                        : (_extOcurrio() && _extReintub()) ? (v('poReintubInterfaz')||'')
+                        : (_extOcurrio() && !_extReintub()) ? _soloInterfaz(_extPeModo())
+                        : ($('cDecanOcurrio')?.checked && !$('cRecanul')?.checked) ? _soloInterfaz(v('fDecanQueda'))
+                        : $('cReintubT')?.checked ? (v('poReintubInterfaz')||'')
+                        : (_desvincQueda() ? _soloInterfaz(_desvincQueda().modo) : v('fInterfaz')),
     // Estado POSTERIOR del evento de vía aérea (el previo vive en VENT_*)
     INTUB_VA_POST:   bv('cIntubO') ? (v('poIntubVA')||'TOT') : '',
     INTUB_SOP_POST:  bv('cIntubO') ? (v('poIntubSop')||'VM') : '',
     INTUB_MODO_POST: bv('cIntubO') ? v('poIntubModo') : '',
+    INTUB_INTERFAZ_POST: bv('cIntubO') ? v('poIntubInterfaz') : '',
     INTUB_TOT_N:     bv('cIntubO') ? v('poIntubTotN') : '',
     INTUB_TOT_CM:    bv('cIntubO') ? v('poIntubTotCm') : '',
     INTUB_VT:        bv('cIntubO') ? n(v('pi_vt')) : '',
@@ -8570,6 +8596,7 @@ function guardar() {
     INTUB_PAFI:      bv('cIntubO') ? n(v('pi_pafi')) : '',
     TQT_SOP_POST:    bv('cTqtO') ? (v('poTqtSop')||'') : '',
     TQT_MODO_POST:   bv('cTqtO') ? v('poTqtModo') : '',
+    TQT_INTERFAZ_POST: bv('cTqtO') ? v('poTqtInterfaz') : '',
     TQT_PARAMS:      bv('cTqtO') ? _paramsTxt('pt_','ptl_') : '',
     TQT_VT:bv('cTqtO')?n(v('pt_vt')):'', TQT_FR:bv('cTqtO')?n(v('pt_fr')):'',
     TQT_PEEP:bv('cTqtO')?n(v('pt_peep')):'', TQT_FIO2:bv('cTqtO')?n(v('pt_fio2')):'',
@@ -13234,6 +13261,12 @@ function dispositivoActual(){ return v('fInterfaz') || v('fModo') || ''; }
  *  🪤 «OAF/CTAF» pasó a «CTAF» en ago-2026 y cuatro listas se quedaron con el
  *  nombre viejo, así que el paciente en CTAF no tenía dónde anotar el flujo. */
 function esAltoFlujo(x){ return ['CNAF','CTAF','OAF/CTAF'].indexOf(String(x||'').trim()) !== -1; }
+/** De un «queda con» que mezcla las dos cosas, saca SOLO el modo ventilatorio.
+ *  Un dispositivo (naricera, Venturi, CNAF, tubo en T…) no es un modo: devuelve
+ *  vacío, y el dispositivo lo recoge `_soloInterfaz`. */
+function _soloModo(x){ const t=String(x||'').trim(); return (!t || t==='Ambiente' || esInterfaz(t)) ? '' : t; }
+/** El reverso: saca SOLO el dispositivo. Un modo ventilatorio no lo es. */
+function _soloInterfaz(x){ const t=String(x||'').trim(); return esInterfaz(t) ? t : ''; }
 /** La vía aérea de una fila, ya traducida: la máscara vieja pasa a Natural. */
 function _vaCompat(x){
   const va = String(x || '').trim();
@@ -13686,12 +13719,37 @@ function _pintarPrevios(){
   const h=$('fIntubSopPrevio'); if(h) h.value=_sopPrevioAuto();
 }
 // Modos disponibles en el panel «queda con» (mismo catálogo que la matriz VMAPS)
+/* 🫁 LOS TRES EJES TAMBIÉN EN EL PANEL «QUEDA CON» (17-sep-2026, aprobado por
+   Diego). Los tres paneles —intubación, reintubación, traqueostomía— repetían
+   la misma función cambiando el prefijo. Ahora es UNA, y de paso reparte el
+   tercer eje que les faltaba: con la traqueostomía y oxigenoterapia el paciente
+   puede quedar con HME, tubo en T, CTAF, CNAF o válvula de fonación, y hasta
+   hoy no había dónde anotarlo.
+   🔴 EL CATÁLOGO ES EL MISMO DE ARRIBA (VMAPS). Un segundo catálogo haría que
+   un dispositivo nuevo aparezca en el turno y no tras el evento — que es cómo
+   nacen las listas que se contradicen.
+   Cada eje se esconde cuando no tiene nada que ofrecer, igual que en el bloque
+   del turno: con VM invasiva la vía aérea ya dice cuál es la interfaz, y con
+   aire ambiente no hay modo. */
+function _quedaConEjes(va, sop, ids){
+  const r=VMAPS[va]||VMAPS[''];
+  const modos=(r.modos&&r.modos[sop])||[];
+  const interfaces=(r.interfaces&&r.interfaces[sop])||[];
+  const llenar=(id,lista)=>{
+    const sel=$(id); if(!sel) return;
+    const prev=sel.value;
+    sel.innerHTML=lista.map(m=>`<option${m===prev?' selected':''}>${m}</option>`).join('');
+  };
+  llenar(ids.modo, modos);
+  llenar(ids.interfaz, interfaces);
+  const ver=(id,hay)=>{ const c=$(id); if(c) c.style.display = hay ? '' : 'none'; };
+  ver(ids.wModo, modos.length && modos[0]!=='Sin soporte');
+  ver(ids.wInterfaz, interfaces.length);
+}
 function renderParamsIntub(){
   const va=v('poIntubVA')||'TOT', sop=v('poIntubSop')||'VM';
-  const modos=((VMAPS[va]||{}).modos||{})[sop]||[];
-  const sel=$('poIntubModo'); if(!sel) return;
-  const prev=sel.value;
-  sel.innerHTML=modos.map(m=>`<option${m===prev?' selected':''}>${m}</option>`).join('');
+  if(!$('poIntubModo')) return;
+  _quedaConEjes(va, sop, {modo:'poIntubModo', interfaz:'poIntubInterfaz', wModo:'wIntubModo', wInterfaz:'wIntubInterfaz'});
   // Módulo ventilatorio COMPLETO del estado posterior (mismas variables que arriba)
   renderParams({P:'pi_',L:'pl_',box:'paramsBoxIntub'});
   // Los dispositivos reaparecen si queda en VM — sin tocar el bloque de arriba
@@ -13703,21 +13761,15 @@ function renderParamsIntub(){
   if(cajaCm) cajaCm.style.display = va==='TOT' ? '' : 'none';
 }
 function renderParamsTqt(){
-  const sop=v('poTqtSop')||'VM';
-  const modos=((VMAPS['TQT']||{}).modos||{})[sop]||[];
-  const sel=$('poTqtModo'); if(!sel) return;
-  const prev=sel.value;
-  sel.innerHTML=modos.map(m=>`<option${m===prev?' selected':''}>${m}</option>`).join('');
+  if(!$('poTqtModo')) return;
+  _quedaConEjes('TQT', v('poTqtSop')||'VM', {modo:'poTqtModo', interfaz:'poTqtInterfaz', wModo:'wTqtModo', wInterfaz:'wTqtInterfaz'});
   renderParams({P:'pt_',L:'ptl_',box:'paramsBoxTqt'});
   _gateDispositivos();
 }
 // Reintubación: mismo patrón, con el panel movido a la rama activa
 function renderParamsReintub(){
-  const sop=v('poReintubSop')||'VM';
-  const modos=((VMAPS['TOT']||{}).modos||{})[sop]||[];
-  const sel=$('poReintubModo'); if(!sel) return;
-  const prev=sel.value;
-  sel.innerHTML=modos.map(m=>`<option${m===prev?' selected':''}>${m}</option>`).join('');
+  if(!$('poReintubModo')) return;
+  _quedaConEjes('TOT', v('poReintubSop')||'VM', {modo:'poReintubModo', interfaz:'poReintubInterfaz', wModo:'wReintubModo', wInterfaz:'wReintubInterfaz'});
   renderParams({P:'pr_',L:'prl_',box:'paramsBoxReintub'});
 }
 /* El panel del POST-EXTUBACIÓN es UNO solo (16-sep-2026): con qué queda el

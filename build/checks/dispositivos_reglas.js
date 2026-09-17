@@ -216,6 +216,25 @@ eq('★ weaning TQT a HME · el Trach Care sobrevive', cama0().DISP_TC_FECHA, '2
 eq('★ weaning TQT a HME · el HME sobrevive', cama0().DISP_HME_FECHA, '2026-08-13');
 eq('★ weaning TQT a HME · el HEPA se descarta (era del ventilador)', cama0().DISP_HEPA_FECHA, '');
 
+/* 🗂️ 17-sep-2026 · EL MISMO WEANING, ESCRITO COMO SE ESCRIBE HOY. El caso de
+   arriba manda el HME en VENT_MODO_FINAL, que es la forma de las evoluciones
+   guardadas ANTES de los tres ejes — y se deja tal cual, porque seguir leyendo
+   esas filas es parte del trato. Desde hoy el dispositivo viaja en
+   VENT_INTERFAZ_FINAL y el modo va vacío (la oxigenoterapia no tiene modo), así
+   que la regla tiene que dar lo mismo por los dos caminos: si alguien la ata
+   otra vez solo al modo, este bloque cae y aquel no. */
+DB.EVOLUCIONES = []; DB.TIMELINE = [];
+DB.CAMAS_ESTADO = [{ ID_CAMA: '3', OCUPADA: 'TRUE', PATIENT_ID: 'pW2', NOMBRE: 'Weaning TQT tres ejes',
+  FECHA_INGRESO: '2026-08-10', FECHA_INICIO_VA: '2026-08-10', FECHA_INICIO_SOPORTE: '2026-08-10',
+  VIA_AEREA: 'TQT', SOPORTE: 'VM',
+  DISP_HME_FECHA: '2026-08-13', DISP_HEPA_FECHA: '2026-08-12', DISP_TC_FECHA: '2026-08-13' }];
+r = guardar('3', '2026-08-14-Dia', { VENT_VIA_AEREA: 'TQT', VENT_SOPORTE: 'VM',
+  VENT_SOPORTE_FINAL: 'Oxigenoterapia/OAF', VENT_MODO_FINAL: '', VENT_INTERFAZ_FINAL: 'HME' });
+eq('★★ con el HME en su campo propio · el HME sobrevive igual', cama0().DISP_HME_FECHA, '2026-08-13');
+eq('★★ …y el Trach Care también', cama0().DISP_TC_FECHA, '2026-08-13');
+eq('★★ …y el HEPA se descarta igual', cama0().DISP_HEPA_FECHA, '');
+eq('★★ …y la cama guarda el dispositivo', cama0().INTERFAZ, 'HME');
+
 /* ══ 5 · LA ENTREGA DE TURNO DICE LO MISMO ══════════════════════════════ */
 console.log('\n5 · La entrega: por dispositivo, no «solo VM»');
 DB.EVOLUCIONES = []; DB.TIMELINE = []; DB.PROCEDIMIENTOS = []; DB.ENTREGAS_TURNO = [];

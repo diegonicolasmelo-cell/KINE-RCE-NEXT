@@ -46,7 +46,8 @@ const DUPLICADOS = ['peModoNo', 'peParamsBoxNo', 'fPostExtDetNo', 'cReintubNo',
 // Lo que llega a la planilla. Los dos caminos tienen que coincidir en TODO esto.
 const CONTRATO = ['EXT_OCURRIO', 'EXT_HORA', 'EXT_PE_VA', 'EXT_PE_SOP', 'EXT_PE_MODO',
                   'EXT_POST_DET', 'EXT_REINTUB', 'EXT_REINTUB_RAZ', 'REINTUB_HORA',
-                  'VENT_VIA_AEREA_FINAL', 'VENT_SOPORTE_FINAL', 'VENT_MODO_FINAL'];
+                  'VENT_VIA_AEREA_FINAL', 'VENT_SOPORTE_FINAL', 'VENT_MODO_FINAL',
+                  'VENT_INTERFAZ_FINAL'];
 
 (async () => {
   const fails = [];
@@ -153,7 +154,15 @@ const CONTRATO = ['EXT_OCURRIO', 'EXT_HORA', 'EXT_PE_VA', 'EXT_PE_SOP', 'EXT_PE_
   eq('  ★★ …y no coinciden en vacío: EXT_PE_MODO', (A.d || {}).EXT_PE_MODO, 'NRC');
   eq('  ★★ …EXT_PE_SOP', (A.d || {}).EXT_PE_SOP, 'Oxigenoterapia/OAF');
   eq('  ★★ …EXT_POST_DET', (A.d || {}).EXT_POST_DET, 'tolera bien');
-  eq('  ★★ …y el estado final del turno', (A.d || {}).VENT_MODO_FINAL, 'NRC');
+  /* 🗂️ 17-sep-2026 · EL DISPOSITIVO YA NO VIAJA EN EL MODO FINAL. Esta línea
+     pedía `VENT_MODO_FINAL === 'NRC'`, que era la forma vieja: una naricera no
+     es un modo ventilatorio, y con los tres ejes el dispositivo tiene su propia
+     columna. El cambio es deliberado (aprobado por Diego) y lo cuida
+     `interfaz_estado_final.js`; acá se mide que el turno cierre con el
+     dispositivo donde va Y con el modo vacío, que es lo que evita que la cama
+     del turno siguiente herede un «CPAP/PS» fantasma. */
+  eq('  ★★ …y el estado final del turno lleva el dispositivo', (A.d || {}).VENT_INTERFAZ_FINAL, 'NRC');
+  eq('  ★★ …con el modo final VACÍO (la oxigenoterapia no tiene modo)', (A.d || {}).VENT_MODO_FINAL || '', '');
 
   /* ══ 4 · LA REINTUBACIÓN, TAMBIÉN UNA SOLA ═══════════════════════════════ */
   console.log('\n4 · La reintubación desde la extubación: una hora y una razón');

@@ -45,7 +45,7 @@ const cols = (ce.match(/\['([A-Z0-9_]+)'/g) || []).map(x => x.slice(2, -1));
 si('★ …y entró AL FINAL, no al medio',
    cols.indexOf('PENDIENTES_JSON') > cols.indexOf('UPOT_FECHA'));
 si('★ EVOLUCIONES sigue intacta en su total declarado',
-   /TOTAL_COLS\.EVOLUCIONES !== 39\d/.test(esq));
+   /TOTAL_COLS\.EVOLUCIONES !== \d{3}/.test(esq));
 si('★ PLAN_PENDIENTES del turno sigue existiendo (el REM no cambia de fuente)',
    // 🗂️ 16-sep-2026 · LA TUPLA DEL ESQUEMA AHORA TRAE TRES ELEMENTOS.
    // Cada columna es ['NOMBRE','tipo','Rótulo legible'] desde que la planilla
