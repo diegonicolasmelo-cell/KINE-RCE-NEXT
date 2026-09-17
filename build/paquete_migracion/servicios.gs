@@ -2577,8 +2577,9 @@ function _entFicha(id, c, e, episodio, cultivo, fecha, fechaEf, turno, ePrev) {
     // 🪤 Llevaba 🩻 (2021), que la fuente del Chrome del hospital (Windows 10)
     // no trae: salía un cuadrado. Diego lo vio el 6-sep. En la pantalla el
     // ícono ya se había cambiado por un SVG propio; acá, que es texto plano
-    // de la entrega, va un emoji anterior a 2019.
-    if (esVerdadero(ev.PROC_IMAGEN)) otro('📷 Traslado a imagenología ' + f);
+    // de la entrega, va el MISMO que el formulario ya usa para esa casilla:
+    // 🖼️ (2010). Que los dos digan lo mismo importa: es el mismo evento.
+    if (esVerdadero(ev.PROC_IMAGEN)) otro('🖼️ Traslado a imagenología ' + f);
     if (esVerdadero(ev.DESVINC_OCURRIO)) {
       const hrs = String(ev.DESVINC_HORAS || '').replace('.', ',');
       hito('<b>🔌 Desvinculación de VM ' + f + (ev.DESVINC_HORA ? ' ' + ev.DESVINC_HORA : '') +

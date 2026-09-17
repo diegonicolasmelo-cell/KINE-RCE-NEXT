@@ -129,7 +129,12 @@ const { chromium } = require('playwright-core');
 
     // ── El formulario muestra la norma de fijación ──
     r.labelArcada = /arcada dental/i.test($('fTOTcm').closest('.col')?.textContent || '');
-    r.fijHidden = $('fTOTfij')?.type === 'hidden' && $('fTOTfij')?.value === 'Arcada dental';
+    // 🗂️ 17-sep-2026 · El campo escondido `fTOTfij` se BORRÓ: era un fantasma
+    // (se cargaba al abrir y al guardar se escribía la constante ignorándolo).
+    // Lo que esta guardia protege no cambió —que la norma de la unidad siga
+    // siendo arcada dental y se guarde así— pero ahora se mide donde de verdad
+    // ocurre: en el payload, no en un input que ya no existe.
+    r.fijNoEsFantasma = !$('fTOTfij');
 
     // ── 🌙 Cambios de esta noche: botón + render ──
     r.botonCn = !!document.querySelector('button[onclick="cnAbrir()"]');
@@ -179,7 +184,10 @@ const { chromium } = require('playwright-core');
 
   console.log('\n── Formulario y Cambios de esta noche ──');
   eq('la etiqueta del campo dice «arcada dental»', R.labelArcada, true);
-  eq('el punto de fijación quedó fijo (hidden = Arcada dental)', R.fijHidden, true);
+  eq('ya no hay campo fantasma de fijación', R.fijNoEsFantasma, true);
+  eq('★ y el guardado sigue escribiendo la norma de la unidad',
+     /TOT_FIJACION:\s*'Arcada dental'/.test(require('fs').readFileSync(
+       require('path').join(__dirname, '..', '..', 'v2', 'index.html'), 'utf8')), true);
   eq('está el botón 🌙 en el Registro Diario', R.botonCn, true);
   eq('el modal lista el cambio de esta noche con su etiqueta', R.cnEstaNoche, true);
   eq('…y el vencido con la fecha que se saltó', R.cnVencido, true);

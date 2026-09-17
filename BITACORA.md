@@ -1392,3 +1392,65 @@ es que los circuitos se cambian en el turno **Noche**, así que el colega de dí
 que lo mira y lo ve bien está diciendo la verdad. Vencido es otra cosa.
 
 **170 guardias · 170 verdes.**
+
+---
+
+## 17-sep-2026 · El tubo se muda a Respiratorio, y dos fantasmas más
+
+Tercera tanda: §3.1 y §3.9 del PRD.
+
+### El orden del formulario ya era el correcto, salvo por una cosa
+
+Al listar «📊 General» campo por campo apareció que el formulario **ya sigue el
+orden en que Diego narra** —día y motivo, sedación, hemodinamia, auscultación,
+respiratorio—, y que lo único que lo rompía eran los datos del TUBO, que
+estaban en General, **tres secciones antes de donde se usan**. Se mudaron
+enteros (número, cm de arcada dental, tipo de cánula, cambio de tubo y de
+cánula) al principio del bloque respiratorio: primero con qué respira, después
+cómo se ventila.
+
+### 🪤 La fijación era un campo fantasma
+
+`fTOTfij` estaba escondido, se cargaba al abrir desde la evolución anterior… y
+al guardar se escribía la **constante** `'Arcada dental'` ignorando lo cargado.
+Leía un dato, lo guardaba en una variable y no lo usaba nunca. La norma de la
+unidad es arcada dental, el guardado la sigue escribiendo y la etiqueta del
+campo de los cm ya lo dice. El campo se borró entero.
+
+### Fuera el contador que repetía
+
+Diego: *«tubo y TQT son vía aérea artificial, eso se repite»*. Ahora con tubo se
+ven los días de tubo, con TQT los de TQT, con VNI los de VNI, y los de VM
+siempre. El valor de días de vía aérea se sigue calculando —el relato dice «(día
+N)»— pero ya no ocupa una casilla al lado de la que dice lo mismo.
+
+### 🪤 Y un tercer residuo, éste con efecto clínico
+
+`const esVNI = va==='Full Face' || va==='Oronasal'` aparecía **dos veces**, y
+nunca era cierto: con el modelo de tres ejes el selector de vía aérea solo
+admite Natural, TOT y TQT — «Full Face» y «Oronasal» pasaron a ser INTERFACES.
+Era residuo del modelo viejo, y el efecto es que **el contador de días de VNI no
+aparecía en el primer turno de VNI**: solo salía cuando ya había días
+acumulados. La VNI es un soporte, y así se pregunta ahora.
+
+Este apareció porque la guardia montó el escenario con la forma vieja y no
+calzó. Vale la pena anotarlo: una guardia que pide un escenario imposible no
+prueba nada, y el intento de montarlo fue lo que destapó el bug.
+
+### §3.9 · El paro que no se veía
+
+🔴 **El RCP se narraba SOLO en el servidor.** El colega marcaba «🚨 RCP», leía su
+evolución sin una palabra del paro, la guardaba, y el texto aparecía después en
+la entrega de turno. Es el hecho más grave que puede ocurrir en un turno y era
+justamente el que no se veía en la pantalla donde se registra.
+
+Y **los tres traslados** (imagenología, pabellón, asistencia médica) no se
+narraban en **ninguno** de los dos motores: solo llegaban a la entrega. Un
+traslado a pabellón es justo lo que explica por qué no hubo kinesiterapia.
+Ahora los dos motores cuentan las dos cosas.
+
+El emoji de la entrega quedó en **🖼️**, que es el que el formulario ya usa para
+esa misma casilla — no 📷, como había puesto en la tanda anterior. Que los dos
+digan lo mismo importa: es el mismo evento.
+
+**171 guardias · 171 verdes.** Nueva: `via_aerea_en_respiratorio.js`.

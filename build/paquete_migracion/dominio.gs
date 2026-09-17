@@ -762,6 +762,16 @@ function generarTextoEvolucion(d) {
     const ciclos = v('PROC_RCP_CICLOS'), hr = v('PROC_RCP_HORA'), det = v('PROC_RCP_DET');
     txt.push(`Se realiza reanimación cardiopulmonar${hr ? ' a las ' + hr + ' hrs' : ''}${ciclos ? `, ${ciclos} ciclo${ciclos === '1' ? '' : 's'}` : ''}${det ? '. ' + det : ''}.`);
   }
+  /* Traslados del turno: no se narraban en ninguno de los dos motores, solo
+     llegaban a la entrega. Un traslado a pabellón explica por qué no hubo
+     kinesiterapia (Diego, 17-sep-2026). Espejo del cliente (genTexto). */
+  {
+    const tr = [];
+    if (esVerdadero(d.PROC_IMAGEN))    tr.push('imagenología');
+    if (esVerdadero(d.PROC_PABELLON))  tr.push('pabellón');
+    if (esVerdadero(d.PROC_ASIST_MED)) tr.push('asistencia médica');
+    if (tr.length) txt.push(`Se traslada a ${tr.join(', ')}.`);
+  }
   // Desvinculación de VM (TQT) — paridad con el preview del cliente
   if (esVerdadero(d.DESVINC_OCURRIO)) {
     const dh = v('DESVINC_HORA'), da = v('DESVINC_A'), dm = v('DESVINC_MOTIVO');

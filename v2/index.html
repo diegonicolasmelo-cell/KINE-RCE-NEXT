@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.4-vigente">
+<meta name="rce-version" content="NEXT-1.5-respiratorio">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3313,7 +3313,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
             </div>
             <!-- Vía Aérea + contadores -->
             <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;">
-              <div style="display:flex;flex-direction:column;">
+              <div id="colDiasVM" style="display:flex;flex-direction:column;">
                 <label id="lblDiasVM" style="font-size:.72rem;color:var(--muted);">Días VM</label>
                 <input type="text" id="fDiasVM" class="tc" disabled style="height:34px;width:72px;border:1px solid #cbd5e1;border-radius:5px;text-align:center;">
               </div>
@@ -3340,75 +3340,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <label style="font-size:.72rem;color:#0891b2;">Días VNI</label>
                 <input type="text" id="fDiasVNI" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #a5f3fc;border-radius:5px;text-align:center;color:#0891b2;">
               </div>
-              <div id="colDiasVAA" class="hidden" style="display:none;flex-direction:column;">
-                <label style="font-size:.72rem;color:var(--primary);">Días VAA</label>
-                <div style="display:flex;align-items:center;gap:4px;">
-                  <input type="text" id="fDiasVAA" class="tc bold" disabled style="height:34px;width:52px;border:1px solid #bfdbfe;border-radius:5px;text-align:center;color:var(--primary);">
-                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:.7rem;color:var(--muted);white-space:nowrap;">
-                    <input type="checkbox" id="cVAExtPrev" onchange="hVAExtPrev()" style="margin:0;">+prev
-                  </label>
-                  <input type="number" id="fVAExtDias" min="0" value="0" oninput="actualizarDiasVA()" style="height:34px;width:52px;display:none;border:1px solid #bfdbfe;border-radius:5px;text-align:center;font-size:.85rem;">
-                </div>
-              </div>
+<!-- 🗂️ 17-sep-2026 · FUERA el contador de «Días VAA». Diego: «tubo y TQT
+                   son vía aérea artificial, eso se repite». Con tubo se ven los
+                   días de tubo, con TQT los de TQT, con VNI los de VNI, y los de
+                   VM siempre. El VALOR se sigue calculando —el relato dice «(día
+                   N)»— pero ya no ocupa una casilla que repetía lo de al lado.
+                   Los días previos de vía aérea siguen viajando, escondidos: son
+                   un dato real del episodio que se arrastra entre turnos. -->
+              <input type="hidden" id="fDiasVAA">
+              <input type="hidden" id="fVAExtDias" value="0">
             </div>
             <!-- compat oculto -->
             <input type="hidden" id="fDiasVA">
-            <div id="dVADet" class="hidden fade" style="background:#eff6ff;padding:8px;border-radius:6px;border:1px solid #bfdbfe;margin-top:4px;">
-              <!-- TOT -->
-              <div id="dTOT" class="row hidden" style="margin-bottom:6px;align-items:flex-end;">
-                <div class="col wa"><label>TOT N°</label>
-                  <select id="fTOTn" class="bold tc" style="height:34px;"><option value="">--</option><option>6.0</option><option>6.5</option><option>7.0</option><option>7.5</option><option>8.0</option><option>8.5</option></select></div>
-                <div class="col wf"><label>Fijación · cm de <b>arcada dental</b></label><input type="number" id="fTOTcm" class="tc bold" placeholder="22" style="height:34px;" title="Norma de la unidad: la fijación se mide en cm de arcada dental. Se puede ajustar en cualquier turno (reposicionamiento del tubo), sin declarar cambio de tubo."></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cCambioTOT" onchange="toggleCambioTOT()"><label for="cCambioTOT" style="font-weight:700;color:#1d4ed8;">🔄 Cambio de tubo</label></div>
-                <div class="col wa hidden" id="dCambioTOTmot"><label>Motivo del cambio</label>
-                  <select id="fCambioTOTmot" onchange="if(this.value==='Otro')show('dCambioTOTdet');else{hide('dCambioTOTdet');const e=$('fCambioTOTdet');if(e)e.value='';}" style="min-width:200px;">
-                    <option value="">-- motivo --</option>
-                    <option>Cuff disfuncional</option>
-                    <option>TOT roto</option>
-                    <option>Para disminuir resistencia de la vía aérea</option>
-                    <option>Otro</option>
-                  </select></div>
-                <div class="col wa hidden" id="dCambioTOTdet"><label>Detalle</label>
-                  <input type="text" id="fCambioTOTdet" placeholder="Motivo..." style="min-width:160px;"></div>
-                <!-- Punto de fijación ESTANDARIZADO (ago-2026, Diego): la unidad
-                     mide SIEMPRE en arcada dental — dejó de ser una elección.
-                     El hidden conserva el ID para fillForm/payload. -->
-                <input type="hidden" id="fTOTfij" value="Arcada dental">
-              </div>
-              <!-- Aviso TQT con modo VNI -->
-              <div id="dTQTVNIWarn" class="hidden" style="font-size:.7rem;background:#fef3c7;border:1px solid #fde68a;border-radius:5px;padding:5px 8px;margin-bottom:6px;color:#92400e;">
-                ⚠️ Modo S/T o CPAP por TQT — se contabiliza como <b>VMI</b>. Considerar registro separado para indicadores de VNI.
-              </div>
-              <!-- TQT -->
-              <div id="dTQT" class="row hidden" style="margin-bottom:6px;align-items:flex-end;">
-                <div class="col wa"><label>Calibre</label>
-                  <select id="fTQTn" class="bold tc" style="height:34px;"><option value="">--</option><option>6.0</option><option>6.5</option><option>7.0</option><option>7.5</option><option>8.0</option><option>8.5</option></select></div>
-                <div class="col grow"><label>Tipo</label>
-                  <select id="fTQTt" style="height:34px;">
-                    <option value="">-- seleccionar --</option>
-                    <option>Convencional</option>
-                    <option>Con puerto subglótico</option>
-                    <option>XL distal</option>
-                    <option>XL proximal</option>
-                    <option>Ajustable</option>
-                  </select></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cCambioTQT" onchange="toggleCambioTQT()"><label for="cCambioTQT" style="font-weight:700;color:#1d4ed8;">🔄 Cambio de cánula</label></div>
-                <div class="col wa hidden" id="dCambioTQTmot"><label>Motivo del cambio</label>
-                  <select id="fCambioTQTmot" onchange="if(this.value==='Otro')show('dCambioTQTdet');else{hide('dCambioTQTdet');const e=$('fCambioTQTdet');if(e)e.value='';}" style="min-width:200px;">
-                    <option value="">-- motivo --</option>
-                    <option>Cuff disfuncional</option>
-                    <option>Por cánula corta</option>
-                    <option>Para favorecer rehabilitación</option>
-                    <option>Por presiones de vía aérea altas</option>
-                    <option>Otro</option>
-                  </select></div>
-                <div class="col wa hidden" id="dCambioTQTdet"><label>Detalle</label>
-                  <input type="text" id="fCambioTQTdet" placeholder="Motivo..." style="min-width:160px;"></div>
-              </div>
-              <!-- 🗂️ El CUFF se mudó al paso 1 (Prevención de NAVM) el
-                   17-sep-2026. Conserva sus ids: setCuff() y cuffGate() siguen
-                   funcionando igual, y el guardado no cambió. -->
-            </div>
+
           </div>
         </div>
 
@@ -3659,6 +3603,73 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="fcard-hdr"><span class="fcard-title">🫁 Respiratorio — 💨 Terapia Ventilatoria</span></div>
           <div class="fcard-body">
             <div id="evStrip" class="hidden" style="margin:10px 16px 0;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;font-size:.78rem;line-height:1.9;"></div>
+
+            <!-- ▌ EL TUBO Y LA CÁNULA — mudados desde «📊 General» el 17-sep-2026.
+                 Estaban TRES SECCIONES antes de donde se usan. Al listar el
+                 formulario campo por campo apareció que su orden ya seguía el
+                 orden en que Diego narra —día y motivo, sedación, hemodinamia,
+                 auscultación, respiratorio—, y que lo único que lo rompía era
+                 esto. Diego: «podría quizás juntarse todo en un bloque de
+                 respiratorio… yo creo que podría moverse». Van al PRINCIPIO
+                 del bloque: primero con qué respira, después cómo se ventila. -->
+<div id="dVADet" class="hidden fade" style="background:#eff6ff;padding:8px;border-radius:6px;border:1px solid #bfdbfe;margin-top:4px;">
+              <!-- TOT -->
+              <div id="dTOT" class="row hidden" style="margin-bottom:6px;align-items:flex-end;">
+                <div class="col wa"><label>TOT N°</label>
+                  <select id="fTOTn" class="bold tc" style="height:34px;"><option value="">--</option><option>6.0</option><option>6.5</option><option>7.0</option><option>7.5</option><option>8.0</option><option>8.5</option></select></div>
+                <div class="col wf"><label>Fijación · cm de <b>arcada dental</b></label><input type="number" id="fTOTcm" class="tc bold" placeholder="22" style="height:34px;" title="Norma de la unidad: la fijación se mide en cm de arcada dental. Se puede ajustar en cualquier turno (reposicionamiento del tubo), sin declarar cambio de tubo."></div>
+                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cCambioTOT" onchange="toggleCambioTOT()"><label for="cCambioTOT" style="font-weight:700;color:#1d4ed8;">🔄 Cambio de tubo</label></div>
+                <div class="col wa hidden" id="dCambioTOTmot"><label>Motivo del cambio</label>
+                  <select id="fCambioTOTmot" onchange="if(this.value==='Otro')show('dCambioTOTdet');else{hide('dCambioTOTdet');const e=$('fCambioTOTdet');if(e)e.value='';}" style="min-width:200px;">
+                    <option value="">-- motivo --</option>
+                    <option>Cuff disfuncional</option>
+                    <option>TOT roto</option>
+                    <option>Para disminuir resistencia de la vía aérea</option>
+                    <option>Otro</option>
+                  </select></div>
+                <div class="col wa hidden" id="dCambioTOTdet"><label>Detalle</label>
+                  <input type="text" id="fCambioTOTdet" placeholder="Motivo..." style="min-width:160px;"></div>
+                <!-- 🪤 17-sep-2026 · Acá vivía `fTOTfij`, un campo FANTASMA: estaba
+                     escondido, se cargaba al abrir desde la evolución anterior… y al
+                     guardar se escribía la CONSTANTE 'Arcada dental' ignorando lo
+                     cargado. Leía un dato, lo guardaba en una variable y no lo usaba
+                     nunca. La norma de la unidad es arcada dental, el guardado la
+                     sigue escribiendo y la etiqueta del campo de al lado ya lo dice. -->
+              </div>
+              <!-- Aviso TQT con modo VNI -->
+              <div id="dTQTVNIWarn" class="hidden" style="font-size:.7rem;background:#fef3c7;border:1px solid #fde68a;border-radius:5px;padding:5px 8px;margin-bottom:6px;color:#92400e;">
+                ⚠️ Modo S/T o CPAP por TQT — se contabiliza como <b>VMI</b>. Considerar registro separado para indicadores de VNI.
+              </div>
+              <!-- TQT -->
+              <div id="dTQT" class="row hidden" style="margin-bottom:6px;align-items:flex-end;">
+                <div class="col wa"><label>Calibre</label>
+                  <select id="fTQTn" class="bold tc" style="height:34px;"><option value="">--</option><option>6.0</option><option>6.5</option><option>7.0</option><option>7.5</option><option>8.0</option><option>8.5</option></select></div>
+                <div class="col grow"><label>Tipo</label>
+                  <select id="fTQTt" style="height:34px;">
+                    <option value="">-- seleccionar --</option>
+                    <option>Convencional</option>
+                    <option>Con puerto subglótico</option>
+                    <option>XL distal</option>
+                    <option>XL proximal</option>
+                    <option>Ajustable</option>
+                  </select></div>
+                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cCambioTQT" onchange="toggleCambioTQT()"><label for="cCambioTQT" style="font-weight:700;color:#1d4ed8;">🔄 Cambio de cánula</label></div>
+                <div class="col wa hidden" id="dCambioTQTmot"><label>Motivo del cambio</label>
+                  <select id="fCambioTQTmot" onchange="if(this.value==='Otro')show('dCambioTQTdet');else{hide('dCambioTQTdet');const e=$('fCambioTQTdet');if(e)e.value='';}" style="min-width:200px;">
+                    <option value="">-- motivo --</option>
+                    <option>Cuff disfuncional</option>
+                    <option>Por cánula corta</option>
+                    <option>Para favorecer rehabilitación</option>
+                    <option>Por presiones de vía aérea altas</option>
+                    <option>Otro</option>
+                  </select></div>
+                <div class="col wa hidden" id="dCambioTQTdet"><label>Detalle</label>
+                  <input type="text" id="fCambioTQTdet" placeholder="Motivo..." style="min-width:160px;"></div>
+              </div>
+              <!-- 🗂️ El CUFF se mudó al paso 1 (Prevención de NAVM) el
+                   17-sep-2026. Conserva sus ids: setCuff() y cuffGate() siguen
+                   funcionando igual, y el guardado no cambió. -->
+            </div>
 
             <!-- Terapia ventilatoria -->
             <div class="sub-sec" style="border-top:none;padding-top:0;">
@@ -7544,7 +7555,7 @@ function fillForm(s) {
   chk('cAisl',_ex.PAC_AISLAMIENTO); hAisl();
   setAislTags(_ex.PAC_AISL_MICRO||_ex.PAC_AISL_LISTA||'');
   // VA externo + TOT fijación
-  set('fTQTn',_ex.VENT_TQT_CALIBRE); set('fTOTfij',_ex.TOT_FIJACION);
+  set('fTQTn',_ex.VENT_TQT_CALIBRE);
   const _fR=v('gDate')||hoy();
   // Restaurar FECHA_INICIO_TQT
   if(_ex.FECHA_INICIO_TQT){
@@ -7752,7 +7763,6 @@ function fillFormReplica(s) {
   _nReintub       = parseInt(s.N_REINTUB)        || 0;
   actualizarContadores();
   set('fTOTn',s.VENT_TOT_NUM); set('fTOTcm',s.VENT_TOT_CM);
-  set('fTOTfij',s.TOT_FIJACION); // posición/fijación del TOT: persiste turno a turno
   set('fTQTn',s.VENT_TQT_CALIBRE); set('fTQTt',s.VENT_TQT_TIPO);
   chk('cHAct',s.VENT_H_ACTIVA);
   _fillParamsVent(s);
@@ -11588,6 +11598,28 @@ function genTexto() {
       L.push(_q+(_tp?`. ${_tp}`:'')+'.');
     }
   }
+  /* 🔴 17-sep-2026 · EL PARO SE NARRA EN LA PANTALLA. Hasta hoy el RCP solo
+     lo contaba el servidor: el colega marcaba «🚨 RCP», leía su evolución sin
+     una palabra del paro, la guardaba, y el texto aparecía después en la
+     entrega de turno. Es el hecho más grave que puede ocurrir en un turno y
+     era justamente el que no se veía. Espejo de dominio_texto.gs. */
+  _B('rcp');
+  if($('cProcRCP')?.checked){
+    const _rc=v('fRCPciclos'), _rh=v('fRCPhora'), _rd=v('fRCPdet');
+    L.push(`Se realiza reanimación cardiopulmonar${_rh?' a las '+_rh+' hrs':''}`+
+           `${_rc?`, ${_rc} ciclo${_rc==='1'?'':'s'}`:''}${_rd?'. '+_rd:''}.`);
+  }
+  /* Los tres traslados: no se narraban en NINGUNO de los dos motores, solo
+     llegaban a la entrega. Un traslado a pabellón es justo lo que explica por
+     qué no hubo kinesiterapia en el turno (Diego, 17-sep-2026). */
+  _B('traslados');
+  {
+    const _tr=[];
+    if($('cProcImagen')?.checked)   _tr.push('imagenología');
+    if($('cProcPabellon')?.checked) _tr.push('pabellón');
+    if($('cProcAsistMed')?.checked) _tr.push('asistencia médica');
+    if(_tr.length) L.push(`Se traslada a ${_tr.join(', ')}.`);
+  }
   // Desvinculación de VM (TQT): ventana del turno con su delta de horas
   _B('desvinc');
   if(v('fVA')==='TQT' && $('cDesvinc')?.checked){
@@ -12340,7 +12372,14 @@ function updateVAUI() {
   })();
   const va=v('fVA');
   const esInv=va==='TOT'||va==='TQT';
-  const esVNI=va==='Full Face'||va==='Oronasal';
+  /* 🪤 17-sep-2026 · Decía `va==='Full Face'||va==='Oronasal'`, y eso NUNCA
+     era cierto: con el modelo de tres ejes (vía aérea · soporte · interfaz)
+     el selector de vía aérea solo admite Natural, TOT y TQT — «Full Face» y
+     «Oronasal» pasaron a ser INTERFACES. Era residuo del modelo viejo, y el
+     efecto es que el contador de días de VNI no aparecía en el primer turno
+     de VNI: solo salía cuando ya había días acumulados de antes. La VNI es
+     un SOPORTE, y así se pregunta. */
+  const esVNI=v('fSop')==='VNI';
   if(va==='TOT'){
     show('dVADet');show('dTOT');hide('dTQT');show('dExtSec');hide('dDecanSec');show('dTqtSec');
     _showCol('colDiasTOT'); _hideCol('colDiasTQT'); _showCol('colDiasVAA');
@@ -13695,7 +13734,14 @@ function actualizarContadores(){
   // VAA
   const va=v('fVA');
   const esInv=va==='TOT'||va==='TQT';
-  const esVNI=va==='Full Face'||va==='Oronasal';
+  /* 🪤 17-sep-2026 · Decía `va==='Full Face'||va==='Oronasal'`, y eso NUNCA
+     era cierto: con el modelo de tres ejes (vía aérea · soporte · interfaz)
+     el selector de vía aérea solo admite Natural, TOT y TQT — «Full Face» y
+     «Oronasal» pasaron a ser INTERFACES. Era residuo del modelo viejo, y el
+     efecto es que el contador de días de VNI no aparecía en el primer turno
+     de VNI: solo salía cuando ya había días acumulados de antes. La VNI es
+     un SOPORTE, y así se pregunta. */
+  const esVNI=v('fSop')==='VNI';
   // Mostrar 0 cuando el contador está activo (VA seleccionado), vacío si no aplica
   const elTOT=$('fDiasTOT'); if(elTOT) elTOT.value=esInv?tot:(tot||'');
   const elTQT=$('fDiasTQT'); if(elTQT) elTQT.value=(va==='TQT')?tqt:(tqt||'');

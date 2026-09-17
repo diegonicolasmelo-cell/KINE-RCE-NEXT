@@ -191,6 +191,40 @@ const { chromium } = require('playwright-core');
   no('★ …ni en la pantalla', enCadena(idx));
   si('   control · el comentario que explica por qué no se usa sigue ahí', /🩻/.test(idx));
 
+  /* ══ 8 · Los procedimientos del turno, en los dos lados ══════════════
+     🔴 El RCP se narraba SOLO en el servidor. Un paro cardiorrespiratorio no
+     salía en la evolución que el colega lee y guarda, y aparecía después en la
+     entrega de turno. Es el hecho más grave que puede ocurrir en el turno.
+     Y los tres traslados (imagenología, pabellón, asistencia médica) no se
+     narraban en NINGUNO de los dos: solo llegaban a la entrega. Un traslado a
+     pabellón es justo lo que explica por qué no hubo kinesiterapia. */
+  console.log('\n8 · ★★ El paro y los traslados se cuentan en los dos lados');
+  const P = await p.evaluate(async () => {
+    const marcar = (id) => { const e = $(id); if (e) { e.checked = true; e.dispatchEvent(new Event('change')); } };
+    marcar('cProcRCP');
+    const set = (id, val) => { const e = $(id); if (e) { e.value = val; e.dispatchEvent(new Event('change')); } };
+    set('fRCPciclos', '3'); set('fRCPhora', '14:20');
+    marcar('cProcImagen'); marcar('cProcPabellon'); marcar('cProcAsistMed');
+    const txt = (typeof genTexto === 'function') ? String(genTexto() || '') : '';
+    window._ll.length = 0;
+    if (typeof guardar === 'function') { try { guardar(); } catch (e) {} }
+    await new Promise(r => setTimeout(r, 400));
+    const env = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
+    return { txt: txt, payload: env ? env.d : null };
+  });
+  si('el escenario marcó el RCP y los tres traslados',
+     !!P.payload && P.payload.PROC_RCP === true && P.payload.PROC_PABELLON === true);
+  const PS = String(generarTextoEvolucion(P.payload || {}) || '');
+  si('★★ la PANTALLA narra el paro (acá se rompía)', /reanimación cardiopulmonar/i.test(P.txt));
+  si('★ …con la hora y los ciclos', /14:20/.test(P.txt) && /3 ciclos/.test(P.txt));
+  si('★★ …y el servidor dice lo mismo', /reanimación cardiopulmonar/i.test(PS) && /14:20/.test(PS));
+  si('★★ la pantalla narra el traslado a pabellón', /pabell[óo]n/i.test(P.txt));
+  si('★★ …y el servidor también', /pabell[óo]n/i.test(PS));
+  si('★ la pantalla narra el traslado a imagenología', /imagenolog/i.test(P.txt));
+  si('★★ …y el servidor también', /imagenolog/i.test(PS));
+  si('★ la pantalla narra la asistencia médica', /asistencia m[ée]dica/i.test(P.txt));
+  si('★★ …y el servidor también', /asistencia m[ée]dica/i.test(PS));
+
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
 
   await b.close();
