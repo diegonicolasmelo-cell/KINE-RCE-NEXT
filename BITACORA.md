@@ -1901,3 +1901,38 @@ gobierna el resto del sistema. Está escrito en la guardia con el ejemplo y con
 la línea exacta que habría que tocar si prefiere la otra.
 
 **177 guardias · 177 verdes.** Nueva: `sedacion_la_dice_el_sas.js`.
+
+---
+
+## 17-sep-2026 · El estado de vigilia, donde el SAS no llega
+
+Diego: *«luego vamos con el B»*.
+
+Su pedido original era un campo de estado de vigilia —*«sopor superficial, sopor
+profundo, somnoliento, vigil y cooperador»*— al lado del nivel de conciencia. Al
+ponerlo junto al SAS él mismo lo desarmó: *«esta vigilia casi te discuto, se
+pisa casi entero con un SAS»*. Y lo acotó: *«que solo aparezca en pacientes sin
+sedación el campo propio, acotado; selección única, no múltiple; donde ya no se
+usa el SAS»*.
+
+**Y ahí sí había un hueco.** Cuando el escalón es «Sin sedación» el formulario
+esconde el SAS —es una escala de sedación-agitación— y el paciente se quedaba
+**sin ningún registro de cuán despierto estaba**. El Glasgow no lo reemplaza: en
+un traqueostomizado somnoliento que obedece órdenes, el Glasgow sale alto y
+nadie anotó que estaba somnoliento.
+
+El campo aparece **solo** sin sedación, en el mismo lugar donde vive el SAS.
+Selección única, con las cinco palabras suyas. Al sedar desaparece **y se
+borra**: si no, un «vigil y cooperador» anotado antes se guardaría junto al
+escalón 6, dos respuestas distintas a la misma pregunta en la misma evolución.
+
+El relato lo escribe igual en los dos motores: «Sin sedoanalgesia, somnoliento.»
+
+🪤 **Y se arrastró el mismo cuidado de las plantillas.** «somnoliento» entra como
+comodín `{vigilia}`; si no, una plantilla creada desde esa frase se lo quedaría
+escrito a mano y lo repetiría en un paciente despierto.
+
+Columna nueva `SED_VIGILIA`, **al final** (408). Hay que correr
+`crearORepararEstructura()`.
+
+**178 guardias · 178 verdes.** Nueva: `vigilia_sin_sedacion.js`.

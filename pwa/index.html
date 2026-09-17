@@ -3326,6 +3326,18 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <select id="fSAS" onchange="autoCoopera()"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
               <div id="gSASmeta" class="col wa hidden"><label>Meta SAS</label>
                 <select id="fSASmeta"><option value="">-</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+              <!-- 🗂️ 17-sep-2026 · ESTADO DE VIGILIA, y SOLO sin sedación. El SAS es
+                   una escala de sedación-agitación y acá arriba se esconde cuando
+                   el escalón es «Sin sedación»: el paciente se quedaba sin ningún
+                   registro de cuán despierto estaba. El Glasgow no lo reemplaza —en
+                   un traqueostomizado somnoliento que obedece órdenes da alto—.
+                   🪤 Y SOLO ahí. Diego pidió el campo y él mismo lo acotó al verlo
+                   al lado del SAS: «esta vigilia casi te discuto, se pisa casi
+                   entero con un SAS… que solo aparezca en pacientes sin sedación el
+                   campo propio, acotado; selección única, no múltiple; donde ya no
+                   se usa el SAS». Las cinco palabras son suyas. -->
+              <div id="gVigilia" class="col wa hidden"><label>Estado de vigilia</label>
+                <select id="fVigilia"><option value="">-</option><option>Vigil y cooperador</option><option>Somnoliento</option><option>Sopor superficial</option><option>Sopor profundo</option><option>Sin respuesta</option></select></div>
             </div>
             <!-- Sedación que NO es profunda + qué fármacos están puestos.
                  Nace del caso de Diego: un paciente agitado con precedex para
@@ -7568,6 +7580,7 @@ function fillForm(s) {
   if(s.DIAS_VNI!==''&&s.DIAS_VNI!=null) _diasVNISellado=s.DIAS_VNI;
   if(s.VA_EXTERNO_DIAS!==undefined){ set('fVAExtDias',s.VA_EXTERNO_DIAS||0); actualizarDiasVA(); }
   set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
+  set('fVigilia',s.SED_VIGILIA);
   set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
   set('fGCSO',s.SED_GCS_O); set('fGCSV',s.SED_GCS_V); set('fGCSM',s.SED_GCS_M);
@@ -7804,6 +7817,7 @@ function fillFormReplica(s) {
 
   // Sedación / neurológico
   set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
+  set('fVigilia',s.SED_VIGILIA);
   set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
   set('fGCSO',s.SED_GCS_O); set('fGCSV',s.SED_GCS_V); set('fGCSM',s.SED_GCS_M);
@@ -8432,7 +8446,7 @@ function _validarRangosCliente(){
 // reconstruye el campo (cambio de modo = el kine ya está editando ese módulo).
 // Los campos de ESTADO (vía aérea, soporte, modo, fase, dx) no se marcan:
 // son hechos que persisten entre turnos, no mediciones.
-const _HER_CAMPOS=['fSed','fSAS','fSASmeta','fS5Q','fCoop','fGCSO','fGCSV','fGCSM',   // sedación / conciencia
+const _HER_CAMPOS=['fSed','fSAS','fSASmeta','fVigilia','fS5Q','fCoop','fGCSO','fGCSV','fGCSM',   // sedación / conciencia
   'fHEst','fDVA','fDVAcnt','fHTT',                                          // hemodinamia
   'fDVEalt',                                                                // altura de la DVE (prescripción que persiste)
   'fMPVal','fRuidosVal','fRuidosLoc',                                       // auscultación
@@ -8832,6 +8846,7 @@ function guardar() {
     AET_ACTIVA:        $('cAET')?.checked||false,
     AET_NIVEL:         v('fAETnivel')||'',
     SED_TIPO:v('fSed'), SED_SAS:v('fSAS'), SED_S5Q:v('fS5Q'), SED_COOPERACION:v('fCoop'),
+    SED_VIGILIA:v('fVigilia'),   // solo sin sedación; hSed() lo borra al sedar
     // `SED_SAS` es el ACTUAL; la meta viaja aparte (ago-2026, ver PRD_SAS_REAL.md)
     SED_SAS_META:v('fSASmeta'),
     // 🗂️ 17-sep-2026 · SED_VIGIL se dejó de escribir: la profundidad la dice
@@ -11539,7 +11554,11 @@ function genTexto() {
   const _farmTxt=_farm.length?` con ${_farm.map(x=>x.toLowerCase()).join(', ')}`:'';
   let s;
   if($('cBNM')?.checked) s=`Sedado${_escTxt?' '+_escTxt:''}+BNM${_sasTxt||' para meta SAS 1'}${_farmTxt}.`;
-  else if(sed==='Sin sedación') s='Sin sedoanalgesia.';
+  /* 🗂️ 17-sep-2026 · Sin sedación, la frase lleva el estado de vigilia si
+     alguien lo anotó: «Sin sedoanalgesia, somnoliento.». Espejo del servidor
+     (dominio_texto.gs). Con sedación NO se narra: ahí manda el SAS, y decir
+     las dos cosas en la misma frase sería contradecirse. */
+  else if(sed==='Sin sedación'){ const _vg=gv('fVigilia'); s='Sin sedoanalgesia'+(_vg?', '+_vg.toLowerCase():'')+'.'; }
   else s=`Sedado${_vigilTxt} ${_escTxt}${_sasTxt}${_farmTxt}.`;
   // GCS: en intubado el total ("11T") y la verbal ("1T") ya vienen con "T"
   // desde calcGCS; el sufijo /15 solo aplica a paciente sin vía aérea artificial.
@@ -12882,12 +12901,21 @@ function _sasEnPalabras(sas){
 function hSed(){
   const s=v('fSed');
   const sedado = s!=='Sin sedación';
-  if(sedado){show('gSAS');show('gSASmeta');show('gSedFarmacos');}
+  /* 🔴 UNO U OTRO, NUNCA LOS DOS. Con sedación manda el SAS; sin sedación, el
+     estado de vigilia. Que aparecieran juntos es exactamente el pisón que Diego
+     detectó, y además dejaría dos respuestas distintas a la misma pregunta en
+     la misma evolución. El campo que se esconde se BORRA: si no, un «vigil y
+     cooperador» anotado antes de sedar se guardaría junto al escalón 6. */
+  if(sedado){
+    show('gSAS');show('gSASmeta');show('gSedFarmacos');
+    const vg=$('fVigilia');if(vg)vg.value='';hide('gVigilia');
+  }
   else{
     const el=$('fSAS');if(el)el.value='';hide('gSAS');
     // Sin sedación no hay meta que perseguir ni sedantes que declarar.
     const m=$('fSASmeta');if(m)m.value='';hide('gSASmeta');
     _sedFarmSet([]); hide('gSedFarmacos');
+    show('gVigilia');
   }
   autoCoopera();
   aplicarGatesNeuro();
@@ -15381,6 +15409,7 @@ const PLANT_DATOS={
      en un paciente agitado: el número cambiando y las palabras mintiendo. */
   sas_palabras:{ v:()=>_SAS_PALABRAS[String(v('fSAS')||'').trim()]||'', pre:'\\(', post:'\\)' },
   gcs:{ v:()=>{ const t=$('lblGCS')?.textContent||''; return t==='?'?'':t; }, pre:'GCS ' },
+  vigilia:{ v:()=>v('fVigilia')||'' },
   cooperacion:{ v:()=>v('fCoop')||'' },
   hdn:{ v:()=>v('fHEst')||'', pre:'HDN ' }, dva:{ v:()=>v('fDVA')||'' },
   secr_tipo:{ v:()=>String(v('fSecrCar')||'').toLowerCase(), pre:'Secreciones ' },
@@ -15429,7 +15458,7 @@ const PLANT_COMODINES=['encabezado','dia','fase','via_aerea','soporte','parametr
   'aet','reingreso','upot',
   'dia_estadia','diagnostico','edad','via_aerea_tipo','tot_numero','tot_cm','tqt_numero','dias_vm','dias_va','soporte_tipo','modo',
   'vt','fr','ti','pmax','pmedia','peep','ppl','autopeep','ps','fio2','spo2','pafi',
-  'sedacion_escalon','sas','sas_meta','sas_palabras','gcs','cooperacion','hdn','dva','secr_tipo','secr_cantidad',
+  'sedacion_escalon','sas','sas_meta','sas_palabras','gcs','vigilia','cooperacion','hdn','dva','secr_tipo','secr_cantidad',
   'gcs_o','gcs_v','gcs_m','s5q','camicu','mp','ruidos',
   'ph','paco2','pao2','hco3','eb','lactato','sato2','mrc','fss','pimax',
   'dias_tot','dias_tqt','dva_n','ipap','epap','flujo','litros','uma'];

@@ -118,11 +118,16 @@ function generarTextoEvolucion(d) {
      casilla: la casilla salió y el SAS ya lo dice con todas sus letras —«SAS 4
      (vigil, tranquilo y cooperador)»—. Espejo del cliente. */
   const vigilTxt = '';
+  /* 🗂️ 17-sep-2026 · El ESTADO DE VIGILIA solo existe sin sedación —el SAS es
+     escala de sedación-agitación y ahí no se pide—. Con sedación puesta no se
+     narra aunque la fila lo traiga: decir «SAS 4 (vigil…)» y «somnoliento» en
+     la misma frase sería contradecirse. Espejo del cliente. */
+  const vigilia = (sed === 'Sin sedación') ? String(d.SED_VIGILIA || '') : '';
   let farm = [];
   try { farm = JSON.parse(d.SED_FARMACOS || '[]') || []; } catch (e) { farm = []; }
   const farmTxt = farm.length ? ` con ${farm.map(function (x) { return String(x).toLowerCase(); }).join(', ')}` : '';
   let sedStr = bnm ? `Sedado${escTxt ? ' ' + escTxt : ''}+BNM${sasTxt || ' para meta SAS 1'}${farmTxt}.`
-             : (sed === 'Sin sedación') ? 'Sin sedoanalgesia.'
+             : (sed === 'Sin sedación') ? ('Sin sedoanalgesia' + (vigilia ? ', ' + vigilia.toLowerCase() : '') + '.')
              : `Sedado${vigilTxt} ${escTxt}${sasTxt}${farmTxt}.`;
   // GCS: el total (SED_GCS_TOT="11T") y la verbal (SED_GCS_V="1T") ya vienen con
   // "T" desde el cliente en intubado; /15 solo para paciente sin VA artificial.

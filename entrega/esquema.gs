@@ -347,7 +347,18 @@ const _COLS_EVOLUCIONES = [
      los indicadores de atenciones, la entrega, la cama y la categorización
      SOCHIMI. Nada de eso se toca. Y las filas ya escritas —meses de turnos—
      siguen leyéndose por esas mismas columnas. */
-  ['KTM_SESIONES_JSON','json','Detalle de cada sesión de KTM']
+  ['KTM_SESIONES_JSON','json','Detalle de cada sesión de KTM'],
+  /* 🗂️ 17-sep-2026 · CUÁN DESPIERTO ESTÁ EL PACIENTE CUANDO NO HAY SEDACIÓN.
+     El SAS es una escala de sedación-agitación y el formulario lo esconde
+     cuando el escalón es «Sin sedación»: ahí el paciente se quedaba sin
+     ningún registro de vigilia. Lo único que quedaba era el Glasgow, que
+     mide otra cosa —en un traqueostomizado somnoliento que obedece órdenes
+     el Glasgow es alto y nadie anotó que estaba somnoliento—.
+     🪤 Y SOLO ahí: con sedación puesta el SAS ya lo dice con todas sus
+     letras y preguntarlo dos veces fue lo que Diego desarmó —«esta vigilia
+     casi te discuto, se pisa casi entero con un SAS»—. Las palabras son las
+     suyas. Lo fija vigilia_sin_sedacion.js. */
+  ['SED_VIGILIA','texto','Estado de vigilia (sin sedación)']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1087,6 +1098,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación, 17-sep-2026);
   // 407 = 406 + KTM_SESIONES_JSON (cada sesión lleva lo suyo, 17-sep-2026);
   // 406 = 405 + HEMO_PAM_MED (la PPC se calcula, 17-sep-2026);
   // 405 = 401 + NAVM_HME, NAVM_HEPA, NAVM_TC, NAVM_RAZON (paso de prevención, 17-sep-2026);
@@ -1095,7 +1107,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 407) errs.push("EVOLUCIONES != 407 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 408) errs.push("EVOLUCIONES != 408 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }
