@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.9-sin-riel">
+<meta name="rce-version" content="NEXT-2.0-humid">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3553,48 +3553,28 @@ document.documentElement.setAttribute('data-piel', 'inst');
         </div>
 
         <!-- DISPOSITIVOS — circuito VM (solo visible con soporte VM) -->
-        <div class="fcard fc-r hidden" id="fcDisp">
-          <div class="fcard-hdr"><span class="fcard-title">🧰 Humidificación</span></div>
-          <div class="fcard-body">
-            <!-- 🗂️ 17-sep-2026 · LOS TRES CALENDARIOS SE ESCONDIERON. El HME, el
-                 HEPA y el Trach Care se revisan ahora en el paso 1 (Prevención
-                 de NAVM), que no escribe fechas: marca el cambio y el servidor
-                 reinicia el reloj. Dejarlos VISIBLES aquí sería peor que
-                 quitarlos: un colega llenaría la fecha creyendo que registra el
-                 cambio de filtro, y no registraría nada — el turno dejó de
-                 mandar esas claves. Se conservan como campos ocultos porque
-                 calcInsumosDias(), autoFechasDispositivos() y _dispSnapshot
-                 siguen leyéndolos para el arrastre entre turnos.
-                 ⏳ PENDIENTE: sacarlos del todo cuando esas cuatro funciones se
-                 muden a leer el reloj de la cama. Mientras tanto no se ven, no
-                 se llenan y no mienten. Lo fija prevencion_navm.js (G1-G3). -->
-            <div class="row hidden" style="align-items:flex-end;">
-              <div class="col wa"><label>HME</label><input type="date" id="fFecHME" onchange="calcInsumosDias()"></div>
-              <span id="sHMEDias" class="disp-chip disp-none">—</span>
-              <div class="col wa"><label>HEPA</label><input type="date" id="fFecHEPA" onchange="calcInsumosDias()"></div>
-              <span id="sHEPADias" class="disp-chip disp-none">—</span>
-              <div class="col wa"><label>Trach Care</label><input type="date" id="fFecSonda" onchange="calcInsumosDias()"></div>
-              <span id="sSondaDias" class="disp-chip disp-none">—</span>
-            </div>
-            <!-- 🪤 17-sep-2026 · SALIÓ EL AVISO «Dispositivos asumidos instalados
-                 al conectar a VM — corrobora: [Aceptar] o ajusta las fechas de
-                 arriba y guarda». Al esconder los tres calendarios, ese texto
-                 quedó mandando a buscar unas fechas que ya no están arriba — ni
-                 en ninguna parte de esta tarjeta. La corroboración se hace ahora
-                 en el paso 1, tocando cada dispositivo: es el mismo gesto y con
-                 el reloj a la vista.
-                 Se descubrió MIRANDO LA PANTALLA, no con una prueba de valores:
-                 ningún dato estaba mal, solo el texto sobraba. Por eso la
-                 guardia G5 de prevencion_navm.js lee lo que dice el aviso, no lo
-                 que guarda. La acción CONFIRMAR_DISPOSITIVOS del servidor no se
-                 tocó: sigue ahí para quien la llame. -->
-            <div class="row" style="align-items:flex-end;">
-              <div class="check cr wa"><input type="checkbox" id="cHAct" onchange="syncHumidFecha(this.checked)"><label for="cHAct">🌡️ Humidificación Activa</label></div>
-              <div class="col wa"><label>Desde</label><input type="date" id="fFecHumid" onchange="humidFechaManual(this.value)"></div>
-              <span id="sHumidDias" class="disp-chip disp-none" style="align-self:flex-end;margin-bottom:8px;">—</span>
-            </div>
-            <div style="font-size:.68rem;color:var(--muted);">Excluyente con el filtro HME: al activarla se retira. No vence.</div>
-          </div>
+        <!-- ▌ 🗂️ 17-sep-2026 · LA TARJETA DE HUMIDIFICACIÓN SALIÓ DEL TURNO.
+             Diego: «saca la humidificación activa del turno, ya que eso ya está
+             declarado al comienzo». Tenía su casilla y su fecha acá, y a la vez
+             el selector del paso 1 (Filtro HME ↔ Humidificación activa): dos
+             sitios para decir el mismo hecho clínico, y el que llenara el
+             segundo pisaba al primero sin avisar.
+             Ahora lo declara el paso 1 y punto. Los campos siguen en el DOM,
+             ocultos, porque son la ÚNICA representación del dato que el resto
+             del código consulta: syncHumidFecha(), calcInsumosDias(),
+             autoFechasDispositivos() y el payload leen `cHAct` y `fFecHumid`.
+             El selector del paso 1 los escribe — no hay una segunda verdad.
+             ⏳ PENDIENTE: sacarlos del todo cuando esas funciones lean el
+             estado de la cama. Mientras tanto no se ven y no se pueden tocar
+             más que desde el paso 1. Lo fija prevencion_navm.js (H1-H7). -->
+        <div class="hidden" id="fcDispOcultos">
+          <input type="checkbox" id="cHAct" onchange="syncHumidFecha(this.checked)">
+          <input type="date" id="fFecHumid" onchange="humidFechaManual(this.value)">
+          <span id="sHumidDias"></span>
+          <input type="date" id="fFecHME" onchange="calcInsumosDias()">
+          <input type="date" id="fFecHEPA" onchange="calcInsumosDias()">
+          <input type="date" id="fFecSonda" onchange="calcInsumosDias()">
+          <span id="sHMEDias"></span><span id="sHEPADias"></span><span id="sSondaDias"></span>
         </div>
 
         </div><!-- /sp-col izquierda -->
@@ -6307,11 +6287,49 @@ function prevToca(k, val){
   prevPintar(); prevAvanceUI();
 }
 
-/** El selector HME ↔ humidificación activa: son excluyentes. */
+/**
+ * El selector HME ↔ humidificación activa: son excluyentes (pasiva vs activa).
+ *
+ * 🔴 ES EL ÚNICO SITIO donde se declara la humidificación activa desde el
+ * 17-sep-2026 (Diego: «saca la humidificación activa del turno, ya que eso ya
+ * está declarado al comienzo»). Antes tenía además una tarjeta propia en el
+ * turno, con su casilla y su fecha: dos sitios para el mismo hecho clínico.
+ *
+ * Escribe la casilla y la fecha que el resto del código ya consultaba
+ * —syncHumidFecha() se encarga de fechar y de retirar el HME—, así que no hay
+ * una segunda verdad: hay un solo mando y los mismos campos debajo.
+ */
 function prevHumid(activa){
   _PREV.humid = !!activa;
   if (activa) _PREV.hme = '';        // su reloj queda en pausa: no hay qué cambiar
+  const c = $('cHAct');
+  if (c && c.checked !== !!activa){
+    c.checked = !!activa;
+    if (typeof syncHumidFecha === 'function') syncHumidFecha(!!activa);
+  }
   prevPintar(); prevAvanceUI();
+}
+
+/**
+ * Siembra el paso desde la cama al abrirla.
+ * 🔴 Una cama que YA viene con humidificación activa tiene que abrir en esa
+ * posición: si el selector arrancara siempre en «Filtro HME», el paso pediría
+ * cambiar un filtro que está retirado — y bloquearía el avance por él.
+ */
+function prevSembrar(){
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  _PREV = { hme:'', hepa:'', tc:'', cab:'', humid: !!String(c.DISP_HUMID_FECHA || '').trim() };
+  const h = $('cHAct'); if (h) h.checked = _PREV.humid;
+  /* 🪤 La casilla y la fecha son el MISMO hecho clínico y tienen que quedar
+     coherentes acá mismo, sin depender de que fillForm haya corrido antes: si
+     el sembrado marcara la casilla y dejara la fecha vacía, el siguiente
+     syncHumidFecha() la fecharía HOY y una humidificación que lleva tres días
+     pasaría a figurar como empezada en este turno. */
+  const fh = $('fFecHumid');
+  if (fh && _PREV.humid && !fh.value) fh.value = _isoDia(c.DISP_HUMID_FECHA) || '';
+  if (fh && !_PREV.humid) fh.value = '';
+  const r = $('fPrevRazon'); if (r) r.value = '';
+  const fc = $('fCabRss'); if (fc) fc.value = '';
 }
 
 function prevNoPude(){
@@ -6830,6 +6848,7 @@ function abrirPanel(id, esIng, verFicha) {
   // paciente sin vía aérea artificial ni ventilación no se le muestra un paso
   // vacío que además le bloquearía el avance: la pestaña se esconde y el
   // camino arranca en el turno.
+  prevSembrar();
   prevGateTab();
   pasoIr(prevAplicaAlgo() ? 1 : 2);
 }

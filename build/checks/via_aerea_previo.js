@@ -180,7 +180,22 @@ const { chromium } = require('playwright-core');
     r.calcPrincipalIntacto = ($('l_vm')?.textContent || '--');
     // los dispositivos del circuito reaparecen al quedar en VM
     renderParams();
-    r.dispositivos = !$('fcDisp').classList.contains('hidden');
+    // 🗂️ 17-sep-2026 · La tarjeta de dispositivos SALIÓ del turno: los tres
+    // filtros y la humidificación se revisan en el paso 1 (Prevención de
+    // NAVM). Lo que esta guardia protege NO cambió —que al quedar en VM el
+    // circuito vuelva a pedirse— pero se mide donde ahora ocurre: en las
+    // filas del paso 1, que es quien decide qué dispositivo corresponde.
+    // 🪤 …y con el estado FINAL, no con los campos de arriba: en este escenario
+    // el paciente se intuba POR EVENTO, así que la vía aérea y el soporte de
+    // arriba siguen siendo el estado PREVIO con el que llegó (Natural +
+    // oxigenoterapia) — que es precisamente la regla del modelo de tres ejes
+    // que esta guardia protege. El paso 1 mira el estado con el que el turno
+    // TERMINA, que es el del panel «queda con».
+    r.dispositivos = typeof prevFilas === 'function' &&
+      prevFilas({ va: v('poIntubVA') || 'TOT', sop: v('poIntubSop') || 'VM',
+                  modo: v('poIntubModo'), humid: false, vmTag: 'Vela 1',
+                  fechas: { hme: '2026-07-09' }, ref: '2026-07-10' })
+        .some(f => f.pide);
     r.texto = genTexto();
     r.autoProc = _autoProcs().indexOf('INTUBACIÓN') !== -1;
     // desmarcar deja todo limpio y el previo intacto
@@ -213,7 +228,7 @@ const { chromium } = require('playwright-core');
   eq('los derivados del panel se calculan solos (VM 7,6 L/m · DP 14 = Ppl − PEEP total)',
      /7\.6 L\/m/.test(I.calcPost.vm) && /DP: 14/.test(I.calcPost.dp), true);
   eq('…sin contaminar los derivados del bloque de arriba', I.calcPrincipalIntacto, '--');
-  eq('los dispositivos del circuito reaparecen al quedar en VM', I.dispositivos, true);
+  eq('el circuito vuelve a pedirse al quedar en VM (ahora en el paso 1)', I.dispositivos, true);
   eq('genera el procedimiento INTUBACIÓN (→ hito)', I.autoProc, true);
   eq('desmarcar limpia el evento sin tocar el estado previo',
      I.trasDesmarcar.va === 'Natural' && I.trasDesmarcar.sop === 'Oxigenoterapia/OAF' &&
@@ -342,14 +357,29 @@ const { chromium } = require('playwright-core');
     $('pt_vt').value = '420'; $('pt_fr').value = '16'; $('pt_peep').value = '6'; $('pt_fio2').value = '35';
     calcResp({ id: 'pt_vt' });
     r.previoIntacto = { modo: v('fModo'), ps: v('r_ps') };
-    r.dispositivos = !$('fcDisp').classList.contains('hidden');
+    // 🗂️ 17-sep-2026 · La tarjeta de dispositivos SALIÓ del turno: los tres
+    // filtros y la humidificación se revisan en el paso 1 (Prevención de
+    // NAVM). Lo que esta guardia protege NO cambió —que al quedar en VM el
+    // circuito vuelva a pedirse— pero se mide donde ahora ocurre: en las
+    // filas del paso 1, que es quien decide qué dispositivo corresponde.
+    // 🪤 …y con el estado FINAL, no con los campos de arriba: en este escenario
+    // el paciente se intuba POR EVENTO, así que la vía aérea y el soporte de
+    // arriba siguen siendo el estado PREVIO con el que llegó (Natural +
+    // oxigenoterapia) — que es precisamente la regla del modelo de tres ejes
+    // que esta guardia protege. El paso 1 mira el estado con el que el turno
+    // TERMINA, que es el del panel «queda con».
+    r.dispositivos = typeof prevFilas === 'function' &&
+      prevFilas({ va: v('poIntubVA') || 'TOT', sop: v('poIntubSop') || 'VM',
+                  modo: v('poIntubModo'), humid: false, vmTag: 'Vela 1',
+                  fechas: { hme: '2026-07-09' }, ref: '2026-07-10' })
+        .some(f => f.pide);
     return r;
   });
   eq('TQT · el campo de parámetros en texto libre desapareció', TQ.paramsViejos, false);
   eq('TQT · panel «queda con» con módulo completo', TQ.modulo, true);
   eq('TQT · el estado previo (CPAP/PS con PS 10) no se toca',
      TQ.previoIntacto.modo === 'CPAP/PS' && TQ.previoIntacto.ps === '10', true);
-  eq('TQT · los dispositivos siguen visibles al quedar en VM', TQ.dispositivos, true);
+  eq('TQT · el circuito sigue pidiéndose al quedar en VM', TQ.dispositivos, true);
 
   // FilmArray disponible como técnica de cultivo
   const FA = await p.evaluate(() => !!document.querySelector('input[name="mtest"][value="FilmArray"]'));

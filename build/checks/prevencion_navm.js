@@ -290,53 +290,110 @@ const { chromium } = require('playwright-core');
     eq('S2 · …y «ok» deja pasar lo que ya había', /: actual/.test(cuerpo), true);
   }
 
-  /* ══ G · Ningún campo visible sin destino ════════════════════════════
-     🔴 Al cortar la segunda puerta, los tres calendarios de «Dispositivos»
-     quedaron en pantalla SIN guardar nada. Un campo que se ve, se llena y no
-     va a ninguna parte es peor que no tenerlo: el colega cree que registró el
-     cambio de filtro y no registró nada. Se esconden. */
+  /* ══ G · Ningún campo de fecha visible en el turno ═══════════════════
+     🔴 Al cortar la segunda puerta, los tres calendarios quedaron en pantalla
+     SIN guardar nada. Un campo que se ve, se llena y no va a ninguna parte es
+     peor que no tenerlo: el colega cree que registró el cambio de filtro y no
+     registró nada.
+     🗂️ 17-sep-2026 · La tarjeta que los alojaba SALIÓ ENTERA del turno junto
+     con la humidificación activa (Diego: «eso ya está declarado al comienzo»).
+     Los campos siguen en el DOM, en un contenedor oculto, porque son la única
+     representación que el resto del código consulta — pero no se ven, y el
+     único mando es el paso 1. */
   const V = await p.evaluate(() => {
-    // 🪤 Hay que PARARSE EN EL PASO 2 antes de medir. Midiendo desde el paso 1
-    // los tres calendarios salen invisibles porque la tarjeta entera del turno
-    // está oculta: la comprobación daba verde sin haber recortado nada.
-    // 🪤 …y con el paciente EN VM. La tarjeta «Dispositivos» solo se muestra
-    // con soporte VM (_gateDispositivos), así que midiendo con el formulario
-    // en blanco los tres calendarios salían invisibles por partida doble y la
-    // comprobación daba verde sin haber recortado nada. El escenario tiene que
-    // ser el caso en que el campo SÍ se vería.
     pasoIr(2);
-    $('fVA').value = 'TOT'; cascadeVA();
-    $('fSop').value = 'VM'; cascadeSop();
-    if (typeof _gateDispositivos === 'function') _gateDispositivos();
     const vis = (id) => { const e = $(id); return !!e && !!e.offsetParent; };
     const r = { hme: vis('fFecHME'), hepa: vis('fFecHEPA'), tc: vis('fFecSonda'),
-                humid: !!$('cHAct'), enPaso: PASO_ACTUAL,
-                tarjetaVisible: !!$('fcDisp') && !!$('fcDisp').offsetParent };
+                humid: vis('fFecHumid'), casilla: vis('cHAct'),
+                existen: !!$('fFecHME') && !!$('cHAct'), enPaso: PASO_ACTUAL };
     pasoIr(1);
     return r;
   });
-  eq('G0a · …parada en el paso 2', V.enPaso, 2);
-  eq('G0b · …y con el paciente en VM, que es cuando la tarjeta SE VE', V.tarjetaVisible, true);
-  eq('G1 · el calendario del HME ya no se ve (no guarda nada)', V.hme, false);
+  eq('G0 · la medición se hizo parada en el paso del turno', V.enPaso, 2);
+  eq('G1 · el calendario del HME no se ve', V.hme, false);
   eq('G2 · ni el del HEPA', V.hepa, false);
   eq('G3 · ni el del Trach Care', V.tc, false);
-  eq('G4 · la humidificación activa SÍ sigue: es estado del episodio, no reloj', V.humid, true);
+  eq('G4 · ni la fecha de la humidificación', V.humid, false);
+  eq('G5 · ni su casilla: el único mando es el selector del paso 1', V.casilla, false);
+  eq('G6 · …pero los campos SIGUEN existiendo (el resto del código los lee)',
+     V.existen, true);
 
-  /* 🪤 G5 · NINGÚN TEXTO QUE MANDE A LO QUE YA NO ESTÁ. Al esconder los tres
-     calendarios quedó vivo el aviso azul «Dispositivos asumidos instalados al
-     conectar a VM — corrobora: [Aceptar] o ajusta las fechas de arriba y
-     guarda». Arriba ya no hay fechas: manda a buscar algo que no existe, y la
-     corroboración se hace ahora tocando cada fila en el paso 1. Se ve en la
-     pantalla y no lo caza ninguna prueba de valores. */
-  const W = await p.evaluate(() => {
-    pasoIr(2);
-    const a = document.getElementById('dispConfirm');
-    const r = { existe: !!a, texto: a ? a.textContent : '' };
+  /* ══ H · La humidificación activa se declara UNA vez ══════════════════
+     Diego: «saca la humidificación activa del turno, ya que eso ya está
+     declarado al comienzo». Tenía una tarjeta propia en el paso del turno —con
+     su casilla y su fecha— y a la vez el selector del paso 1. Dos sitios para
+     decir el mismo hecho clínico: el que llenara el segundo pisaba al primero,
+     y ninguno de los dos avisaba.
+     🔴 Sacar la tarjeta NO puede hacer que el dato deje de guardarse: el
+     selector del paso 1 es ahora quien lo escribe. */
+  const H = await p.evaluate(async () => {
+    const out = {};
+    out.tarjetaEnTurno = !!document.getElementById('fcDisp');
     pasoIr(1);
-    return r;
+    // Al elegir humidificación activa, se fecha (es estado del episodio).
+    prevHumid(true);
+    await new Promise(r => setTimeout(r, 60));
+    out.trasActivar = { fecha: v('fFecHumid'), casilla: !!$('cHAct') && $('cHAct').checked };
+    // Y al volver al HME se suelta: el filtro vuelve a correr.
+    prevHumid(false);
+    await new Promise(r => setTimeout(r, 60));
+    out.trasSoltar = { fecha: v('fFecHumid'), casilla: !!$('cHAct') && $('cHAct').checked };
+    return out;
   });
-  eq('G5 · 🪤 ya no hay aviso que mande a «las fechas de arriba»',
-     W.existe && /fechas de arriba/.test(W.texto), false);
+  eq('H1 · ★ la tarjeta de humidificación salió del turno', H.tarjetaEnTurno, false);
+  // 🪤 La fecha es la EFECTIVA del turno, no «hoy» a secas: en turno Día es el
+  // mismo día; en Noche, el siguiente, porque la noche transcurre casi entera
+  // en él. Es el mismo criterio del evento ➕ y de autoFechasDispositivos, y
+  // este escenario es de día.
+  eq('H2 · ★★ elegir «humidificación activa» en el paso 1 la fecha',
+     H.trasActivar.fecha, '2026-09-17');
+  eq('H3 · …y deja marcada la casilla que el resto del código consulta',
+     H.trasActivar.casilla, true);
+  eq('H4 · ★ volver al filtro HME la suelta', H.trasSoltar.fecha, '');
+  eq('H5 · …y desmarca la casilla', H.trasSoltar.casilla, false);
+
+  /* 🔴 Y una cama que YA viene con humidificación activa abre en esa posición:
+     si el selector arrancara siempre en «Filtro HME», el paso pediría cambiar
+     un filtro que se retiró. */
+  const H2 = await p.evaluate(async () => {
+    DB = [{ ID_CAMA: '3', VIA_AEREA: 'TOT', SOPORTE: 'VM', VM_TAG: 'Vela 1',
+            DISP_HUMID_FECHA: '2026-09-14', DISP_HEPA_FECHA: '2026-09-16',
+            DISP_TC_FECHA: '2026-09-16' }];
+    if (typeof prevSembrar === 'function') prevSembrar();
+    prevPintar();
+    return { humid: prevEstado().humid,
+             hayFilaHme: !!document.getElementById('pvf_hme') };
+  });
+  eq('H6 · 🔴 una cama con humidificación activa abre en esa posición', H2.humid, true);
+  eq('H7 · …y no se pide el filtro HME, que está retirado', H2.hayFilaHme, false);
+
+  /* 🔴 Una humidificación que YA estaba activa conserva su fecha de inicio: es
+     desde cuándo la lleva el paciente, no desde cuándo se abrió el formulario.
+     🪤 Esto casi me hace «arreglar» algo que estaba bien: el escenario de
+     arriba dejó puesta una cama con humidificación del 14, y la prueba del
+     turno noche devolvía esa fecha en vez del día siguiente. No era un fallo
+     del código — era el código haciendo lo correcto con la cama equivocada. */
+  const H3 = await p.evaluate(async () => {
+    prevHumid(true);
+    await new Promise(r => setTimeout(r, 60));
+    return v('fFecHumid');
+  });
+  eq('H8 · 🔴 la que ya venía activa conserva su fecha de inicio', H3, '2026-09-14');
+
+  // 🪤 Y una NUEVA en turno Noche se fecha el día siguiente: la noche
+  // transcurre casi entera en él. Es la regla de la unidad.
+  const H4 = await p.evaluate(async () => {
+    DB = [{ ID_CAMA: '3', VIA_AEREA: 'TOT', SOPORTE: 'VM', VM_TAG: 'Vela 1' }];
+    prevSembrar();
+    const antes = (typeof SHIFT !== 'undefined') ? SHIFT : 'Dia';
+    SHIFT = 'Noche';
+    prevHumid(true);
+    await new Promise(r => setTimeout(r, 60));
+    const f = v('fFecHumid');
+    SHIFT = antes; prevHumid(false);
+    return f;
+  });
+  eq('H9 · 🪤 una nueva, en turno Noche, se fecha el día siguiente', H4, '2026-09-18');
 
   eq('F1 · la pantalla no tira errores', errs.join(' | ') || '(ninguno)', '(ninguno)');
 

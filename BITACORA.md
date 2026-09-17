@@ -1715,3 +1715,58 @@ que las guardias no**. Las guardias verifican que los datos estén bien; que un
 texto siga teniendo sentido después de mover lo que lo rodeaba, no.
 
 **175 guardias · 175 verdes.** Nueva: `sin_riel.js`.
+
+---
+
+## 17-sep-2026 · La humidificación activa se declara una sola vez
+
+Diego, mirando las capturas: *«saca la humidificación activa del turno, ya que
+eso ya está declarado al comienzo»*.
+
+Tenía razón y era peor de lo que parecía: la humidificación activa se podía
+declarar en **dos** sitios —el selector del paso 1 (Filtro HME ↔ Humidificación
+activa) y una tarjeta propia en el turno, con su casilla y su fecha— y el que
+llenara el segundo pisaba al primero sin que nada avisara. Es exactamente la
+misma forma de la segunda puerta que este proyecto ya cerró tres veces.
+
+La tarjeta salió entera del turno. El selector del paso 1 es ahora el único
+mando, y **escribe los mismos campos que el resto del código ya consultaba**
+(`cHAct` y `fFecHumid`): no hay una segunda verdad, hay un solo mando y los
+mismos campos debajo, escondidos. ⏳ Sacarlos del todo queda pendiente para
+cuando `syncHumidFecha()`, `calcInsumosDias()` y `autoFechasDispositivos()` lean
+el estado de la cama.
+
+### Lo que hubo que cuidar
+
+🔴 **Sacar la tarjeta no podía hacer que el dato dejara de guardarse.** Siete
+comprobaciones nuevas cubren el circuito completo: al elegir humidificación
+activa se fecha y se marca la casilla; al volver al filtro HME se suelta; y una
+cama que YA viene con humidificación activa **abre en esa posición** — si el
+selector arrancara siempre en «Filtro HME», el paso pediría cambiar un filtro
+que está retirado, y bloquearía el avance por él.
+
+🪤 **La casilla y la fecha son el mismo hecho clínico** y tienen que quedar
+coherentes en el sembrado, sin depender de que `fillForm` haya corrido antes: si
+se marcara la casilla dejando la fecha vacía, el siguiente `syncHumidFecha()` la
+fecharía HOY y una humidificación que lleva tres días pasaría a figurar como
+empezada en este turno.
+
+🪤 **Y una que casi «arreglo» estando bien.** La prueba del turno noche devolvía
+la fecha de la cama en vez del día siguiente. No era un fallo: era el código
+haciendo lo correcto —una humidificación ya activa conserva su fecha de inicio—
+con la cama equivocada, que mi escenario anterior había dejado puesta. Quedaron
+las dos conductas fijadas por separado.
+
+### Tres guardias medían la tarjeta que ya no está
+
+`via_aerea_previo`, `interfaz_un_lector` y `prevencion_navm` comprobaban que «la
+tarjeta de dispositivos reaparece al quedar en VM». Lo que protegen no cambió
+—que al quedar en VM el circuito vuelva a pedirse— y se mide donde ahora ocurre:
+en las filas del paso 1.
+
+🪤 En `via_aerea_previo` eso obligó a medir con el estado **final**, no con los
+campos de arriba: en ese escenario el paciente se intuba POR EVENTO, así que la
+vía aérea de arriba sigue siendo el estado previo con el que llegó — que es
+precisamente la regla de los tres ejes que esa guardia protege.
+
+**175 guardias · 175 verdes.**

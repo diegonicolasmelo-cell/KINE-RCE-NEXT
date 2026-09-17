@@ -53,7 +53,15 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
     return {
       interfaz: v('fInterfaz'), modo: v('fModo'), campos,
       irox: txt('l_irox'), fio2nrc: txt('l_fio2nrc'),
-      dispVisible: $('fcDisp') ? !$('fcDisp').classList.contains('hidden') : null,
+      // 🗂️ 17-sep-2026 · La tarjeta de dispositivos SALIÓ del turno: los tres
+    // filtros y la humidificación se revisan en el paso 1 (Prevención de
+    // NAVM). Lo que esta guardia protege NO cambió —que al quedar en VM el
+    // circuito vuelva a pedirse— pero se mide donde ahora ocurre: en las
+    // filas del paso 1, que es quien decide qué dispositivo corresponde.
+      dispVisible: typeof prevFilas === 'function' &&
+        prevFilas({ va: v('fVA'), sop: v('fSop'), modo: v('fModo'), humid: false,
+                    vmTag: 'Vela 1', fechas: { hme: '2026-07-09' }, ref: '2026-07-10' })
+          .some(f => f.pide),
       sinKTR: $('dSinKTR') ? !$('dSinKTR').classList.contains('hidden') : null,
     };
   }, [va, sop, iface, params]);
@@ -98,7 +106,7 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
   console.log('\n3 · Los gates de pantalla');
   {
     const r = await montar('TOT', 'Oxigenoterapia/OAF', 'HME', {});
-    si('  con TOT la tarjeta de dispositivos está (vía artificial)', r.dispVisible);
+    si('  con TOT el circuito se pide (vía artificial)', r.dispVisible);
   }
   {
     // El caso que el gate del HME existe para cubrir: sin vía artificial.
