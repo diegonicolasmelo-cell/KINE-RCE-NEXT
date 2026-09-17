@@ -107,3 +107,57 @@ function ktmSesiones(d) {
     minutos: minutos
   };
 }
+
+/**
+ * El SAS en palabras. Escala de Riker (SAS 1-7), con la redacción que usa la
+ * unidad — contrastada con la literatura y con Diego el 17-sep-2026.
+ *
+ * POR QUÉ EXISTE. Diego quería un campo aparte para el estado de vigilia
+ * («sopor superficial, sopor profundo, somnoliento, vigil y cooperador»), y al
+ * ponerlo al lado del SAS apareció que era casi una traducción uno a uno: un
+ * segundo campo diciendo lo mismo, que es la forma de error que este proyecto
+ * ya pagó tres veces. La decisión fue que el sistema TRADUZCA en vez de
+ * preguntar otra vez: el relato dice la palabra y el número se conserva.
+ *
+ * 🔴 ES EL ÚNICO diccionario: lo usan el relato del servidor y el de la
+ * pantalla. Si cambia una redacción, cambia en los dos a la vez.
+ */
+var SAS_PALABRAS = {
+  '1': 'sin respuesta a estímulos',
+  '2': 'sopor profundo, responde al estímulo físico sin comunicarse',
+  '3': 'somnoliento, despierta al llamado y se vuelve a dormir',
+  '4': 'vigil, tranquilo y cooperador',
+  '5': 'agitado, se calma a la contención verbal',
+  '6': 'muy agitado, no se calma con instrucciones',
+  '7': 'agitación peligrosa'
+};
+
+/** El SAS narrado: «SAS 4 (vigil, tranquilo y cooperador)». */
+function sasEnPalabras(sas) {
+  const k = String(sas == null ? '' : sas).trim();
+  if (!k) return '';
+  const t = SAS_PALABRAS[k];
+  return t ? ('SAS ' + k + ' (' + t + ')') : ('SAS ' + k);
+}
+
+/**
+ * ¿Este turno tuvo SEDACIÓN PROFUNDA? La define el SAS, no el fármaco.
+ *
+ * 🪤 Diego corrigió una propuesta mía de decidirlo por una lista de hipnóticos:
+ * «hemos tenido pacientes con fentanilo y propofol en dosis altas pero con un
+ * SAS 3-4, por lo tanto han estado sedados vigil; depende más de eso que del
+ * tipo de fármaco». Tenía razón: el fármaco es la dosis, el SAS es la
+ * profundidad — lo mismo que ya pasaba con el escalón.
+ *
+ * 🔴 COMPATIBLE HACIA ATRÁS: las filas escritas antes del 17-sep-2026 traen la
+ * casilla SED_VIGIL y pueden no traer SAS. Esas se leen por la casilla, que es
+ * como se han leído hasta hoy.
+ */
+function sedacionProfunda(d) {
+  const f = d || {};
+  const tipo = String(f.SED_TIPO || '');
+  if (!tipo || tipo === 'Sin sedación') return false;
+  const sas = parseInt(f.SED_SAS, 10);
+  if (!isNaN(sas)) return sas <= 2;
+  return !(f.SED_VIGIL === true || f.SED_VIGIL === 'TRUE' || f.SED_VIGIL === 'true');
+}

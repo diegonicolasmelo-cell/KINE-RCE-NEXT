@@ -103,10 +103,21 @@ function generarTextoEvolucion(d) {
   // cliente — si se cambia uno hay que cambiar el otro (lección de las
   // secreciones), y la guardia lo comprueba leyendo los dos fuentes.
   const meta = v('SED_SAS_META');
-  const sasTxt = sas ? ` con SAS ${sas}${meta ? ` (meta ${meta})` : ''}` : (meta ? ` para meta SAS ${meta}` : '');
+  /* 🗂️ 17-sep-2026 · El SAS se narra EN PALABRAS, con el número. Diego quería
+     un campo aparte para el estado de vigilia («sopor superficial, sopor
+     profundo, somnoliento, vigil»), y al ponerlo al lado del SAS apareció que
+     era casi una traducción uno a uno. En vez de preguntar dos veces lo mismo,
+     el sistema traduce. El diccionario está en dominio_calculos.gs y lo
+     comparten los dos motores. */
+  // 🪤 La meta va con coma, no en un segundo paréntesis: con el SAS en palabras
+  // la forma vieja daba «SAS 4 (vigil, tranquilo y cooperador) (meta 1)».
+  const sasTxt = sas ? ` con ${sasEnPalabras(sas)}${meta ? `, meta SAS ${meta}` : ''}`
+                     : (meta ? ` para meta SAS ${meta}` : '');
   const escTxt = (sed && sed !== 'Sin sedación') ? (sed === 'Fuera de escalón' ? 'fuera de escalón' : `en ${sed.toLowerCase()}`) : '';
-  // La sedación vigil se nombra: es la que NO cuenta como sedación profunda.
-  const vigilTxt = esVerdadero(d.SED_VIGIL) ? ' vigil (control de agitación)' : '';
+  /* 🗂️ 17-sep-2026 · Se dejó de narrar « vigil (control de agitación)» desde la
+     casilla: la casilla salió y el SAS ya lo dice con todas sus letras —«SAS 4
+     (vigil, tranquilo y cooperador)»—. Espejo del cliente. */
+  const vigilTxt = '';
   let farm = [];
   try { farm = JSON.parse(d.SED_FARMACOS || '[]') || []; } catch (e) { farm = []; }
   const farmTxt = farm.length ? ` con ${farm.map(function (x) { return String(x).toLowerCase(); }).join(', ')}` : '';

@@ -72,12 +72,22 @@ eq('★ y van DESPUÉS de la última columna anterior (RESP_SNT)',
 console.log('\n2 · Formulario: actual, meta, vigil y sedantes');
 eq('el casillero de siempre pasó a decir «SAS actual»', /<label>SAS actual<\/label>/.test(idx), true);
 eq('hay un casillero para la meta', /id="fSASmeta"/.test(idx), true);
-eq('hay casilla de sedación vigil', /id="cSedVigil"/.test(idx), true);
-['Fentanyl', 'Propofol', 'Midazolam', 'Ketamina', 'Precedex'].forEach(f =>
+// 🗂️ 17-sep-2026 · La casilla de sedación vigil SALIÓ y el SAS se narra en
+// palabras. Diego: «si está en escalón 6 con Precedex y tiene un SAS 4, yo sé
+// que está sedado y que está vigil; ya sería rellenar algo de más». La
+// profundidad la decide el SAS (1-2 profunda), que es el mismo corte de los
+// gates: una sola definición. Lo fija sedacion_la_dice_el_sas.js.
+eq('la casilla de sedación vigil YA NO está', /id="cSedVigil"/.test(idx), false);
+// «Fentanyl» pasó a «Fentanilo» (castellano) y entró Lorazepam, que se usa
+// en continuo con abuso de sustancias.
+['Fentanilo', 'Propofol', 'Midazolam', 'Ketamina', 'Precedex', 'Lorazepam'].forEach(f =>
   eq('  sedante ' + f, new RegExp('data-f="' + f + '"').test(idx), true));
-eq('los tres viajan en el guardado',
-  /SED_SAS_META:v\('fSASmeta'\)/.test(idx) && /SED_VIGIL:bv\('cSedVigil'\)/.test(idx) &&
+eq('la meta y los sedantes viajan en el guardado',
+  /SED_SAS_META:v\('fSASmeta'\)/.test(idx) &&
   /SED_FARMACOS:JSON\.stringify\(_sedFarmLista\(\)\)/.test(idx), true);
+// 🔴 La columna SED_VIGIL se conserva —las posiciones del esquema son fijas y
+// las filas ya escritas la usan— pero se dejó de escribir desde el turno.
+eq('…y SED_VIGIL se dejó de escribir', /SED_VIGIL:bv\(/.test(idx), false);
 // Sin sedación no hay meta ni sedantes que declarar.
 eq('«Sin sedación» limpia y esconde el bloque',
   /const m=\$\('fSASmeta'\);if\(m\)m\.value='';hide\('gSASmeta'\);/.test(idx), true);
@@ -95,11 +105,27 @@ eq('★ y NINGUNA lee la meta', /parseInt\(v\('fSASmeta'\)\)/.test(idx), false);
 console.log('\n3 · Cliente y servidor dicen lo mismo');
 // Es el patrón de las secreciones: dos generadores de la misma frase que se
 // separan. Se comprueba leyendo los dos fuentes, no un texto.
-[['cliente', idx], ['servidor', dom]].forEach(([quien, src]) => {
-  eq('  ' + quien + ': narra el SAS actual con la meta al lado',
-    /con SAS \$\{(sas|_?meta|[a-z]+)\}\$\{\s*_?meta \?/.test(src) ||
-    /con SAS \$\{sas\}\$\{_meta\?/.test(src), true);
-  eq('  ' + quien + ': nombra la sedación vigil', /vigil \(control de agitación\)/.test(src), true);
+/* 🪤 17-sep-2026 · SE MIDE EL CÓDIGO, NO SU DOCUMENTACIÓN. Esta guardia se
+   puso roja sola al escribir el comentario que explica el cambio: la nota de
+   dominio_texto.gs dice que ya no se narra la casilla, y el grep la encontraba
+   ahí. Es la tercera vez que pasa (ver relato_espejo.js y glasgow_medido.js).
+   Se quitan antes de buscar los bloques de comentario y las líneas que
+   EMPIEZAN con dos barras; las de media línea se dejan, porque cortarlas se
+   llevaría por delante URLs y código real. */
+const sinNotas = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+[['cliente', sinNotas(idx)], ['servidor', sinNotas(dom)]].forEach(([quien, src]) => {
+  // 🗂️ 17-sep-2026 · El SAS se narra EN PALABRAS y la meta con coma:
+  // «con SAS 4 (vigil, tranquilo y cooperador), meta SAS 1». Lo que esta
+  // sección protege no cambió —que el SAS ACTUAL y la META no se confundan,
+  // que es por lo que se separaron en dos campos— y se sigue leyendo en los
+  // dos fuentes. La «sedación vigil» ya no se nombra aparte: el propio SAS lo
+  // dice, y la casilla salió.
+  eq('  ' + quien + ': narra el SAS en palabras',
+    /_?sasEnPalabras\(sas\)/.test(src), true);
+  eq('  ' + quien + ': …con la meta separada, no en otro paréntesis',
+    /meta SAS \$\{_?meta\}/.test(src), true);
+  eq('  ' + quien + ': y ya no nombra la casilla de sedación vigil',
+    /vigil \(control de agitación\)/.test(src), false);
   eq('  ' + quien + ': lista los sedantes', /farmTxt|_farmTxt/.test(src), true);
 });
 
@@ -130,7 +156,12 @@ global.ok = d => ({ ok: true, data: d });
 global.err = (m, c) => ({ ok: false, error: m, codigo: c });
 global.ERR = { VALIDACION: 'V', INTERNO: 'I' };
 global._statISO = f => String(f || '').slice(0, 10);
-eval(['infra_fechas.gs', 'svc_eventos.gs', 'svc_stats.gs', 'svc_entrega.gs']
+// 🗂️ 17-sep-2026 · `dominio_calculos.gs` entra al arnés: svc_entrega.gs
+// pasó a usar sedacionProfunda() de ahí, en vez de reimplementar la regla.
+// En Apps Script todos los .gs comparten ámbito global y esto no hace
+// falta; el arnés carga solo lo que se le nombra, y sin el dominio la
+// llamada reventaba por dentro y la entrega volvía vacía.
+eval(['infra_fechas.gs', 'svc_eventos.gs', 'svc_stats.gs', 'dominio_calculos.gs', 'svc_entrega.gs']
   .map(f => fs.readFileSync(path.join(v2, f), 'utf8')).join('\n;\n'));
 
 const ficha = (evos) => {
@@ -138,8 +169,9 @@ const ficha = (evos) => {
   return obtenerEntregaTurno(['12'], evos[evos.length - 1].TURNO_KEY.slice(0, 10), 'Dia').data.fichas[0];
 };
 
-// Sedado profundo del 01 al 03, sin sedación el 04, y del 05 al 08 con
-// PRECEDEX para controlar la agitación: SAS 6 con meta 4.
+// Sedado profundo el 01 y el 02 (SAS 2); el 03 baja a escalón 2 y despierta a
+// SAS 3; el 04 sin sedación; y del 05 al 08 con PRECEDEX para controlar la
+// agitación: SAS 6 con meta 4. Ése es, entero, el caso que contó Diego.
 const historia = [
   evo(1, { SED_TIPO: 'Escalón 3', SED_SAS: '2', SED_SAS_META: '2' }),
   evo(2, { SED_TIPO: 'Escalón 3', SED_SAS: '2', SED_SAS_META: '2' }),
@@ -153,22 +185,46 @@ for (let d = 5; d <= 8; d++) {
   }));
 }
 const f1 = ficha(historia);
-eq('★ la fecha de suspensión sobrevive a la sedación vigil', f1.sedSusp, '04-08');
+/* 🗂️ 17-sep-2026 · LA FECHA SE ADELANTÓ DEL 04 AL 03, y no es un ajuste de
+   la guardia para que pase: es la consecuencia directa de que la profundidad
+   la diga el SAS. El día 3 el paciente todavía tiene el escalón 2 puesto, pero
+   con SAS 3 —«somnoliento, despierta al llamado y se vuelve a dormir»— ya no
+   está profundo. Antes la casilla «sedación vigil» quedaba sin marcar y la regla
+   lo contaba como profundo un día de más.
+   🔴 ESTO ESPERA UNA PALABRA DE DIEGO. Él dijo las dos cosas: «el SAS es lo
+   que define si finalmente es sedación profunda o no» y, sobre esta fecha,
+   «¿cuándo se suspendió? cuando realmente no tenga puestos los fármacos». Con
+   el escalón puesto y SAS 3 las dos lecturas caen en días distintos. Manda la
+   primera, que es la que gobierna el resto del sistema —los gates de
+   cooperación, S5Q y CAM-ICU cortan en ese mismo 3— y la que él aprobó como
+   principio. Si prefiere la segunda: sedacionProfunda() suma «hay fármacos
+   puestos» a la condición y esta fecha vuelve al 04. */
+eq('★ la fecha de suspensión sobrevive al precedex de la agitación', f1.sedSusp, '03-08');
 eq('la entrega muestra el SAS ACTUAL', f1.sas, '6');
 eq('…y la meta al lado', f1.sasMeta, '4');
-eq('…y marca que es vigil', f1.sedVigil, true);
+eq('…y las filas ya escritas conservan su marca SED_VIGIL', f1.sedVigil, true);
 eq('…y qué sedante tiene puesto', (f1.sedFarmacos || []).join(','), 'Precedex');
 
-// ★ CONTROL NEGATIVO: el mismo episodio, pero la sedación del 05 es PROFUNDA
-// (nadie marcó la casilla). Ahí la fecha SÍ tiene que borrarse — si no, la
-// guardia estaría pasando por no mirar nada.
-const control = historia.map(e => Object.assign({}, e, e.SED_VIGIL ? { SED_VIGIL: '' } : {}));
-eq('★ control: con sedación profunda al día 5, la fecha SÍ se borra',
+// ★ EL PAR QUE LO DEMUESTRA: la misma historia con SAS 2 el día 3. Sigue
+// profundo, y la fecha se corre sola al 04. Manda el SAS, no el calendario.
+const sigueProfundo = historia.map(e => e.FECHA === '2026-08-03'
+  ? Object.assign({}, e, { SED_SAS: '2', SED_SAS_META: '2' }) : e);
+eq('★ con SAS 2 el día 3, la fecha se corre al 04', ficha(sigueProfundo).sedSusp, '04-08');
+
+// ★ CONTROL NEGATIVO: el mismo episodio, pero el precedex del 05 viene con un
+// SAS 2 —volvió a estar profundo—. Ahí la fecha SÍ tiene que borrarse; si no,
+// la guardia estaría pasando por no mirar nada.
+// 🪤 Antes este control se hacía BORRANDO la casilla SED_VIGIL, y desde que
+// la casilla no decide nada eso ya no cambiaba el resultado: el control
+// pasaba a estar apagado sin avisar.
+const control = historia.map(e => e.SED_SAS === '6'
+  ? Object.assign({}, e, { SED_SAS: '2', SED_SAS_META: '2' }) : e);
+eq('★ control: si el día 5 vuelve a SAS 2, la fecha SÍ se borra',
   ficha(control).sedSusp, '');
 
 // Y el caso de siempre: nunca volvió a sedarse ⇒ la fecha se mantiene.
 eq('sin volver a sedar, la fecha se mantiene',
-  ficha(historia.slice(0, 4)).sedSusp, '04-08');
+  ficha(historia.slice(0, 4)).sedSusp, '03-08');
 
 // Un episodio que pasa de profunda DIRECTO a vigil, sin «Sin sedación» de por
 // medio: la suspensión de la profunda es ese mismo día.

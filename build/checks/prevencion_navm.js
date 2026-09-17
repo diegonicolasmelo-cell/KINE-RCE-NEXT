@@ -328,6 +328,13 @@ const { chromium } = require('playwright-core');
      selector del paso 1 es ahora quien lo escribe. */
   const H = await p.evaluate(async () => {
     const out = {};
+    /* 🪤 SHIFT SE CONGELA. La fecha efectiva de la humidificación depende del
+       turno —en Noche se fecha el día siguiente— y SHIFT se deduce de la HORA
+       REAL al abrir el panel. Esta comprobación pasaba de día y fallaba de
+       tarde: exactamente la trampa que ya costó tres sesiones en este proyecto
+       (el hoyISO sombreado, el arranque de los 30 minutos previos al cambio de
+       turno, y tutorial.js del 16 al 20 de septiembre). El turno se declara. */
+    SHIFT = 'Dia';
     out.tarjetaEnTurno = !!document.getElementById('fcDisp');
     pasoIr(1);
     // Al elegir humidificación activa, se fecha (es estado del episodio).

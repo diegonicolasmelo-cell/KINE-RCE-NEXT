@@ -258,7 +258,12 @@ const HACE3 = hace(3), HACE1 = hace(1);
   si('el ➕ abre el editor con la fila «por dato / por bloque»', R5.abierto && R5.modoRow);
   si('★ por DATO: «Vti 500 ml» pasó a «Vti {vt} ml» (des-rellenado con contexto)', /Vti \{vt\} ml/.test(R5.porDato) && /FR \{fr\} rpm/.test(R5.porDato) && /PEEP \{peep\}/.test(R5.porDato));
   si('…el diagnóstico y el día también', /en contexto de \{diagnostico\}/.test(R5.porDato) && /en \{dia_estadia\} día/.test(R5.porDato));
-  si('…SAS 1 y meta 1 no se confunden', /SAS \{sas\} \(meta \{sas_meta\}\)/.test(R5.porDato));
+  // 🗂️ 17-sep-2026 · La frase pasó a ser «SAS 1 (sin respuesta a estímulos),
+  // meta SAS 1». Lo que se protege es lo mismo —que el SAS del paciente y la
+  // META, que son el mismo «1», no se confundan— más una tercera pieza: las
+  // PALABRAS también salen como dato, para que la plantilla no las congele.
+  si('…SAS 1, sus palabras y la meta 1 no se confunden',
+    /SAS \{sas\} \(\{sas_palabras\}\), meta SAS \{sas_meta\}/.test(R5.porDato));
   si('★ decisión ④ · la frase escrita a mano queda FIJA y se avisa en ámbar', /Se conversa con familia/.test(R5.porDato) && /Frases fijas/.test(R5.fijas) && /Se conversa con familia/.test(R5.fijas));
   si('la vista previa devuelve el texto de este paciente (sin llaves)', !/\{/.test(R5.prevDato) && /Vti 500 ml/.test(R5.prevDato));
   si('★ por BLOQUE: las mismas frases pasan a {dia} {via_aerea} {soporte} {parametros}', /\{dia\}/.test(R5.porBloque) && /\{parametros\}/.test(R5.porBloque) && !/\{vt\}/.test(R5.porBloque));

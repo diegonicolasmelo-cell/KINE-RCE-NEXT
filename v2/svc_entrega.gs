@@ -325,11 +325,13 @@ function _entFicha(id, c, e, episodio, cultivo, fecha, fechaEf, turno, ePrev) {
   // desaparecía de la entrega. Y esa fecha es justamente el antes y el después
   // para evaluar la respuesta a la suspensión de hipnóticos y para interpretar
   // el GCS. Una sedación declarada como VIGIL ya no la toca.
-  const _profunda = function (ev) {
-    const tipo = String(ev.SED_TIPO || '');
-    if (!tipo || tipo === 'Sin sedación') return false;
-    return !esVerdadero(ev.SED_VIGIL);
-  };
+  /* 🗂️ 17-sep-2026 · LA DECIDE EL SAS, y por eso esta función se mudó al
+     dominio puro (sedacionProfunda, dominio_calculos.gs): del mismo corte
+     comen ahora el relato y los gates de cooperación de la pantalla, así que
+     hay UNA sola definición de «sedación profunda» en toda la app.
+     La casilla SED_VIGIL —el parche de agosto— salió del formulario, y las
+     filas escritas antes de hoy se siguen leyendo por ella. */
+  const _profunda = function (ev) { return sedacionProfunda(ev); };
   let sedSusp = '', bnmSusp = '', _sedAntes = false, _bnmAntes = false;
   episodio.forEach(function (ev) {
     const tipo = String(ev.SED_TIPO || '');

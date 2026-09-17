@@ -1817,3 +1817,87 @@ valores lo cazaba porque el valor «No cooperador» es perfectamente válido; lo
 que estaba mal era que nadie lo había escrito.
 
 **176 guardias · 176 verdes.** Nueva: `general_solo_lo_suyo.js`.
+
+---
+
+## 17-sep-2026 · La profundidad de la sedación la dice el SAS
+
+Diego, mirando la captura del panel de Sedación y conciencia: *«ese cuadrito
+"sedación vigil / control de agitación" — sacar eso, esa premisa, sacarla de
+lleno, y solamente registrar qué sedantes están en uso»*. Su razón, textual:
+*«si un paciente está en escalón 6 con Precedex y tiene un SAS 4, yo sé que está
+sedado porque tiene Precedex y que está vigil porque está en SAS 4»*. Era un
+campo que había que rellenar para decir algo que los otros tres ya decían.
+
+**La casilla salió.** Lo que colgaba de ella —la fecha de suspensión de la
+sedación profunda en la entrega de turno, que es el antes y el después para
+interpretar el Glasgow— lo decide ahora el SAS: **1 o 2 es profunda, 3 o más
+no**. Es el mismo corte que ya gobernaba los gates de cooperación, S5Q y
+CAM-ICU, así que el sistema pasa a tener **una sola definición** de «profundo»
+en vez de dos que podían contradecirse.
+
+🪤 **Y NO la define el fármaco.** Se propuso decidirlo por una lista de
+hipnóticos y Diego lo corrigió: *«hemos tenido pacientes que se daban fentanilo
+y propofol en dosis altas pero con un SAS 3, 4, por lo tanto han estado sedados
+vigil; yo creo que depende más de eso que del tipo de fármaco»*. La regla quedó
+donde él la puso.
+
+La columna `SED_VIGIL` **se conserva** y se deja de escribir: las filas ya
+escritas siguen leyéndose igual.
+
+### Lorazepam entra a la lista
+
+*«Utilizamos en ocasiones benzodiazepinas continuas como lorazepam, en pacientes
+que tienen algún abuso de sustancias»*. Midazolam ya es una benzodiazepina, pero
+nombrar el fármaco sirve más que nombrar la familia. De paso, `Fentanyl` pasó a
+escribirse **Fentanilo**.
+
+### El SAS se escribe en palabras
+
+Diego pedía un campo aparte para el estado de vigilia —*«sopor superficial,
+sopor profundo, somnoliento, vigil y cooperador»*—. Al ponerlo al lado del SAS
+apareció que era casi una traducción uno a uno, y él mismo lo vio: *«esta vigilia
+casi te discuto, se pisa casi entero con un SAS»*. En vez de preguntar dos veces
+lo mismo, **el sistema traduce**: la evolución escribe «SAS 4 (vigil, tranquilo
+y cooperador)». El número, que es lo que se mide, se conserva.
+
+El diccionario está **una sola vez** en `dominio_calculos.gs` y lo comparten los
+dos motores de texto, el del navegador y el del servidor.
+
+### 🪤 Y la traducción destapó un bug en las plantillas
+
+Las plantillas se pueden crear seleccionando frases del texto: el sistema
+reconoce los valores del paciente y los cambia por comodines. Con la frase nueva
+aparecieron dos problemas que no se ven a ojo:
+
+1. La meta pasó a escribirse «meta **SAS** 1» y el reconocedor buscaba «meta 1».
+   Dejaba de encontrarla, y la plantilla nacía con el **1 de ese paciente
+   congelado adentro** — un número que después se repetiría en todos los demás.
+2. Las palabras quedaban escritas a mano. Una plantilla creada desde un paciente
+   en SAS 1 habría repetido «(sin respuesta a estímulos)» en un paciente
+   agitado: el número cambiando y las palabras mintiendo.
+
+Se arregló el contexto de la meta y las palabras pasaron a ser un dato propio,
+`{sas_palabras}`.
+
+### 🪤 La guardia se puso roja por su propia documentación
+
+Por tercera vez. `sas_real.js` comprobaba que el texto «vigil (control de
+agitación)» ya no estuviera en el fuente, y lo encontraba **en el comentario que
+explicaba que se había sacado**. Ahora quita los comentarios antes de buscar:
+mide el código, no su documentación.
+
+### 🔴 Lo que queda esperando una palabra de Diego
+
+Un paciente en **escalón 2, con los fármacos puestos y SAS 3**: ¿la sedación
+profunda se considera suspendida **ese** día, o el día siguiente, cuando se
+retiran los fármacos? Él dijo las dos cosas —*«el SAS es lo que define si
+finalmente es sedación profunda»* y, sobre esta fecha, *«cuándo se suspendió:
+cuando realmente no tenga puestos los fármacos»*—, y con el escalón puesto y SAS
+3 las dos lecturas caen en días distintos.
+
+Quedó mandando la primera, que es la que él aprobó como principio y la que
+gobierna el resto del sistema. Está escrito en la guardia con el ejemplo y con
+la línea exacta que habría que tocar si prefiere la otra.
+
+**177 guardias · 177 verdes.** Nueva: `sedacion_la_dice_el_sas.js`.

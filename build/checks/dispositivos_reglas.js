@@ -80,7 +80,12 @@ global.ERR = { VALIDACION: 'V', INTERNO: 'I', NO_ENCONTRADO: 'NE' };
 // _ventNombreDeCama (la regla real la vigila equipos_categoria.js).
 global._vmCategoria = x => String(x.CATEGORIA || 'VM').trim().toUpperCase();
 global._vmEsDeCama = c => String(c) === 'VM';
-eval(['infra_fechas.gs', 'dominio_texto.gs', 'svc_stats.gs', 'svc_camas.gs', 'svc_coordinacion.gs', 'svc_evoluciones.gs', 'svc_eventos.gs', 'svc_entrega.gs', 'mantenimiento_manuel.gs']
+// 🗂️ 17-sep-2026 · `dominio_calculos.gs` entra al arnés: svc_entrega.gs
+// pasó a usar sedacionProfunda() de ahí, en vez de reimplementar la regla.
+// En Apps Script todos los .gs comparten ámbito global y esto no hace
+// falta; el arnés carga solo lo que se le nombra, y sin el dominio la
+// llamada reventaba por dentro y la entrega volvía vacía.
+eval(['infra_fechas.gs', 'dominio_texto.gs', 'svc_stats.gs', 'svc_camas.gs', 'svc_coordinacion.gs', 'svc_evoluciones.gs', 'svc_eventos.gs', 'dominio_calculos.gs', 'svc_entrega.gs', 'mantenimiento_manuel.gs']
   .map(f => fs.readFileSync(path.join(v2, f), 'utf8')).join('\n;\n'));
 
 // Inventario con los nombres REALES del hospital (mantenimiento.gs): un PB

@@ -254,7 +254,12 @@ global.hoyISO = () => '2026-08-13';
 // 🪤 Aquí NO se re-stubea `Utilities`: el stub de arriba formatea de verdad y
 // pisarlo con uno que devuelve una fecha fija rompe `_restarDias` —y con él el
 // corrimiento del turno Noche— tres bloques más abajo. Costó una vuelta.
-(0, eval)(['svc_eventos.gs', 'svc_stats.gs', 'svc_entrega.gs']
+// 🗂️ 17-sep-2026 · `dominio_calculos.gs` entra al arnés: svc_entrega.gs
+// pasó a usar sedacionProfunda() de ahí, en vez de reimplementar la regla.
+// En Apps Script todos los .gs comparten ámbito global y esto no hace
+// falta; el arnés carga solo lo que se le nombra, y sin el dominio la
+// llamada reventaba por dentro y la entrega volvía vacía.
+(0, eval)(['svc_eventos.gs', 'svc_stats.gs', 'dominio_calculos.gs', 'svc_entrega.gs']
   .map(f => fs.readFileSync(path.join(v2, f), 'utf8')).join('\n;\n'));
 
 const ficha = obtenerEntregaTurno(['7'], '2026-08-13', 'Dia').data.fichas[0];

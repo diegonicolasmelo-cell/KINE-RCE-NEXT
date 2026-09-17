@@ -63,7 +63,11 @@ const { chromium } = require('playwright-core');
     // vigila NO es la redacción sino que el escalón salga JUNTO a su SAS
     // aunque haya BNM — la rama del bloqueo se comía el escalón (reporte de
     // Álvaro vía Diego). Aquí `fSAS`=3 es ahora el SAS actual y no hay meta.
-    r.sedEscalonConBNM = /Sedado en escalón 2\+BNM con SAS 3\./.test(txt);
+    // 🗂️ 17-sep-2026 · El SAS se narra en palabras: «con SAS 3 (somnoliento,
+    // despierta al llamado y se vuelve a dormir)». Lo que esta línea protege
+    // no cambió —que el escalón salga JUNTO a su SAS aunque haya BNM, que era
+    // el reporte de Álvaro— y el número sigue estando.
+    r.sedEscalonConBNM = /Sedado en escalón 2\+BNM con SAS 3 \(somnoliento/.test(txt);
     r.hdnMetaPam = /HDN estable c\/DVA en dosis bajas para meta PAM 65 mmHg\./.test(txt);
     r.totArcada = /TOT N° 8\.0 a 22 cm de arcada dental/.test(txt);
     r.sinFijado = !/fijado a/.test(txt);

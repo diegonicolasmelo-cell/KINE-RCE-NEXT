@@ -3332,18 +3332,34 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  controlar la agitación. Anotarlo como sedación contaba como
                  volver a sedación profunda y borraba la fecha de suspensión,
                  que es lo que marca el antes y el después del despertar. -->
-            <div id="gSedVigil" class="hidden" style="margin:2px 0 6px;">
-              <div class="check wa" style="margin-bottom:5px;">
-                <input type="checkbox" id="cSedVigil" onchange="hSedVigil()">
-                <label for="cSedVigil" style="font-weight:700;color:var(--neuro);">😌 Sedación vigil / control de agitación <span style="font-weight:400;color:var(--muted);font-size:.72rem;">— no es sedación profunda</span></label>
-              </div>
+            <div id="gSedFarmacos" class="hidden" style="margin:2px 0 6px;">
+              <!-- 🗂️ 17-sep-2026 · SALIÓ la casilla «😌 Sedación vigil / control de
+                   agitación». Era un campo que había que rellenar para decir algo
+                   que los otros tres ya decían. Diego: «si un paciente está en
+                   escalón 6 con Precedex y tiene un SAS 4, yo sé que está sedado
+                   porque tiene Precedex y que está vigil porque está en SAS 4; ya
+                   sería rellenar algo de más».
+                   🔴 Lo que dependía de ella —la FECHA DE SUSPENSIÓN de la
+                   sedación profunda en la entrega— lo decide ahora el SAS: 1-2 es
+                   profunda, 3 o más no. Es el mismo corte que gobierna los gates
+                   de cooperación, S5Q y CAM-ICU, así que queda UNA definición.
+                   🪤 Y NO la define el fármaco: Diego, corrigiendo una propuesta
+                   mía de listar hipnóticos, «hemos tenido pacientes con fentanilo
+                   y propofol en dosis altas pero con un SAS 3-4, por lo tanto han
+                   estado sedados vigil; depende más de eso que del tipo de
+                   fármaco». La columna SED_VIGIL se conserva para las filas ya
+                   escritas y se deja de escribir. -->
               <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:3px;">Sedantes en uso</div>
               <div id="sedFarmacos" style="display:flex;flex-wrap:wrap;gap:5px;">
-                <button type="button" class="sedf-btn" data-f="Fentanyl"  onclick="sedFarmToggle(this)">Fentanyl</button>
+                <button type="button" class="sedf-btn" data-f="Fentanilo" onclick="sedFarmToggle(this)">Fentanilo</button>
                 <button type="button" class="sedf-btn" data-f="Propofol"  onclick="sedFarmToggle(this)">Propofol</button>
                 <button type="button" class="sedf-btn" data-f="Midazolam" onclick="sedFarmToggle(this)">Midazolam</button>
                 <button type="button" class="sedf-btn" data-f="Ketamina"  onclick="sedFarmToggle(this)">Ketamina</button>
                 <button type="button" class="sedf-btn" data-f="Precedex"  onclick="sedFarmToggle(this)">Precedex</button>
+                <!-- 🗂️ 17-sep-2026 · Lorazepam, que se usa en continuo para
+                     pacientes con abuso de sustancias (Diego). Midazolam ya es
+                     una benzodiazepina, pero nombrar el fármaco sirve más. -->
+                <button type="button" class="sedf-btn" data-f="Lorazepam" onclick="sedFarmToggle(this)">Lorazepam</button>
               </div>
             </div>
             <!-- Fila 2: GCS -->
@@ -7552,7 +7568,7 @@ function fillForm(s) {
   if(s.DIAS_VNI!==''&&s.DIAS_VNI!=null) _diasVNISellado=s.DIAS_VNI;
   if(s.VA_EXTERNO_DIAS!==undefined){ set('fVAExtDias',s.VA_EXTERNO_DIAS||0); actualizarDiasVA(); }
   set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
-  set('fSASmeta',s.SED_SAS_META); chk('cSedVigil',s.SED_VIGIL);
+  set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
   set('fGCSO',s.SED_GCS_O); set('fGCSV',s.SED_GCS_V); set('fGCSM',s.SED_GCS_M);
   chk('cBNM',s.SED_BNM);
@@ -7788,7 +7804,7 @@ function fillFormReplica(s) {
 
   // Sedación / neurológico
   set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
-  set('fSASmeta',s.SED_SAS_META); chk('cSedVigil',s.SED_VIGIL);
+  set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
   set('fGCSO',s.SED_GCS_O); set('fGCSV',s.SED_GCS_V); set('fGCSM',s.SED_GCS_M);
   chk('cBNM',s.SED_BNM);
@@ -8818,7 +8834,9 @@ function guardar() {
     SED_TIPO:v('fSed'), SED_SAS:v('fSAS'), SED_S5Q:v('fS5Q'), SED_COOPERACION:v('fCoop'),
     // `SED_SAS` es el ACTUAL; la meta viaja aparte (ago-2026, ver PRD_SAS_REAL.md)
     SED_SAS_META:v('fSASmeta'),
-    SED_VIGIL:bv('cSedVigil'),
+    // 🗂️ 17-sep-2026 · SED_VIGIL se dejó de escribir: la profundidad la dice
+    // el SAS. La columna se conserva porque las filas ya escritas la usan.
+    SED_VIGIL:false,
     SED_FARMACOS:JSON.stringify(_sedFarmLista()),
     SED_CAM_ICU:       v('fCAMICU'),
     SED_GCS_O:v('fGCSO'), SED_GCS_V:v('fGCSV'), SED_GCS_M:v('fGCSM'),
@@ -11507,10 +11525,16 @@ function genTexto() {
   // un solo número y se narraba como meta, así que con un paciente en SAS 6 y
   // meta 4 no había forma de escribir la verdad.
   const _meta=gv('fSASmeta');
-  const _sasTxt=sas?` con SAS ${sas}${_meta?` (meta ${_meta})`:''}`:(_meta?` para meta SAS ${_meta}`:'');
+  /* 🗂️ 17-sep-2026 · El SAS se narra EN PALABRAS, con el número. Espejo del
+     servidor (dominio_texto.gs); el diccionario es el MISMO, copiado abajo
+     porque el dominio del servidor no vive en el navegador — lo fija
+     sedacion_la_dice_el_sas.js, que compara las siete redacciones. */
+  // 🪤 La meta va con coma, no en un segundo paréntesis (ver dominio_texto.gs).
+  const _sasTxt=sas?` con ${_sasEnPalabras(sas)}${_meta?`, meta SAS ${_meta}`:''}`:(_meta?` para meta SAS ${_meta}`:'');
   const _escTxt=(sed&&sed!=='Sin sedación')?(sed==='Fuera de escalón'?'fuera de escalón':`en ${sed.toLowerCase()}`):'';
   // La sedación vigil se nombra: es la que NO cuenta como sedación profunda.
-  const _vigilTxt=$('cSedVigil')?.checked?' vigil (control de agitación)':'';
+  // 🗂️ 17-sep-2026 · La casilla salió: el SAS ya lo dice con todas sus letras.
+  const _vigilTxt='';
   const _farm=_sedFarmLista();
   const _farmTxt=_farm.length?` con ${_farm.map(x=>x.toLowerCase()).join(', ')}`:'';
   let s;
@@ -12828,16 +12852,42 @@ function renderParams(o) {
 }
 
 //  HANDLERS UI
+/* ── El SAS en palabras (17-sep-2026) ────────────────────────────────────
+   🔴 ESPEJO de SAS_PALABRAS / sasEnPalabras (dominio_calculos.gs). El dominio
+   del servidor no vive en el navegador, así que la tabla está en los dos
+   lados. Si cambias una redacción, cámbiala en los dos: la guardia
+   sedacion_la_dice_el_sas.js compara las siete, una por una.
+
+   POR QUÉ el sistema traduce en vez de preguntar: Diego quería un campo aparte
+   para el estado de vigilia («sopor superficial, sopor profundo, somnoliento,
+   vigil y cooperador»), y al ponerlo al lado del SAS apareció que era casi una
+   traducción uno a uno — un segundo campo diciendo lo mismo. El número se
+   conserva, que es lo que se mide. */
+const _SAS_PALABRAS={
+  '1':'sin respuesta a estímulos',
+  '2':'sopor profundo, responde al estímulo físico sin comunicarse',
+  '3':'somnoliento, despierta al llamado y se vuelve a dormir',
+  '4':'vigil, tranquilo y cooperador',
+  '5':'agitado, se calma a la contención verbal',
+  '6':'muy agitado, no se calma con instrucciones',
+  '7':'agitación peligrosa'
+};
+function _sasEnPalabras(sas){
+  const k=String(sas==null?'':sas).trim();
+  if(!k) return '';
+  const t=_SAS_PALABRAS[k];
+  return t?('SAS '+k+' ('+t+')'):('SAS '+k);
+}
+
 function hSed(){
   const s=v('fSed');
   const sedado = s!=='Sin sedación';
-  if(sedado){show('gSAS');show('gSASmeta');show('gSedVigil');}
+  if(sedado){show('gSAS');show('gSASmeta');show('gSedFarmacos');}
   else{
     const el=$('fSAS');if(el)el.value='';hide('gSAS');
     // Sin sedación no hay meta que perseguir ni sedantes que declarar.
     const m=$('fSASmeta');if(m)m.value='';hide('gSASmeta');
-    const cv=$('cSedVigil');if(cv)cv.checked=false;
-    _sedFarmSet([]); hide('gSedVigil');
+    _sedFarmSet([]); hide('gSedFarmacos');
   }
   autoCoopera();
   aplicarGatesNeuro();
@@ -12851,7 +12901,6 @@ function _sedFarmSet(arr){
   const on=new Set(arr||[]);
   document.querySelectorAll('#sedFarmacos .sedf-btn').forEach(b=>b.classList.toggle('on', on.has(b.dataset.f)));
 }
-function hSedVigil(){ _formDirty=true; if(typeof _rtxtLive==='function') _rtxtLive(); }
 
 /* Dispositivos de neuromonitoreo (ago-2026, pedido de Manuel desde el turno).
    La DVE abre su altura; el captor de PIC abre PIC y PPC juntas — sin captor no
@@ -15320,7 +15369,17 @@ const PLANT_DATOS={
   ps:{ v:()=>_pn('r_ps'), pre:'PS ' }, fio2:{ v:()=>_pn('r_fio2'), pre:'FiO2 ', post:'%' },
   spo2:{ v:()=>_pn('r_spo2'), pre:'SpO2 ', post:'%' }, pafi:{ v:()=>_pn('r_pafi'), pre:'PaFiO2 ' },
   sedacion_escalon:{ v:()=>{ const m=String(v('fSed')||'').match(/(\d+)/); return m?m[1]:''; }, pre:'escalón ' },
-  sas:{ v:()=>v('fSAS')||'', pre:'SAS ' }, sas_meta:{ v:()=>v('fSASmeta')||'', pre:'meta ' },
+  sas:{ v:()=>v('fSAS')||'', pre:'SAS ' },
+  /* 🪤 17-sep-2026 · «meta SAS 1», no «meta 1»: al narrar el SAS en palabras la
+     meta se pasó a escribir con su sigla. Con el contexto viejo («meta ») el
+     des-rellenado dejaba de reconocerla y la plantilla nacía con el 1 del
+     paciente de ese turno CONGELADO adentro. */
+  sas_meta:{ v:()=>v('fSASmeta')||'', pre:'meta SAS ' },
+  /* 🗂️ 17-sep-2026 · La traducción del SAS a palabras también es un DATO. Si no
+     lo fuera, una plantilla creada desde el texto de un paciente en SAS 1 se
+     quedaría con «(sin respuesta a estímulos)» escrito a mano y lo repetiría
+     en un paciente agitado: el número cambiando y las palabras mintiendo. */
+  sas_palabras:{ v:()=>_SAS_PALABRAS[String(v('fSAS')||'').trim()]||'', pre:'\\(', post:'\\)' },
   gcs:{ v:()=>{ const t=$('lblGCS')?.textContent||''; return t==='?'?'':t; }, pre:'GCS ' },
   cooperacion:{ v:()=>v('fCoop')||'' },
   hdn:{ v:()=>v('fHEst')||'', pre:'HDN ' }, dva:{ v:()=>v('fDVA')||'' },
@@ -15370,7 +15429,7 @@ const PLANT_COMODINES=['encabezado','dia','fase','via_aerea','soporte','parametr
   'aet','reingreso','upot',
   'dia_estadia','diagnostico','edad','via_aerea_tipo','tot_numero','tot_cm','tqt_numero','dias_vm','dias_va','soporte_tipo','modo',
   'vt','fr','ti','pmax','pmedia','peep','ppl','autopeep','ps','fio2','spo2','pafi',
-  'sedacion_escalon','sas','sas_meta','gcs','cooperacion','hdn','dva','secr_tipo','secr_cantidad',
+  'sedacion_escalon','sas','sas_meta','sas_palabras','gcs','cooperacion','hdn','dva','secr_tipo','secr_cantidad',
   'gcs_o','gcs_v','gcs_m','s5q','camicu','mp','ruidos',
   'ph','paco2','pao2','hco3','eb','lactato','sato2','mrc','fss','pimax',
   'dias_tot','dias_tqt','dva_n','ipap','epap','flujo','litros','uma'];

@@ -119,6 +119,60 @@ function ktmSesiones(d) {
   };
 }
 
+/**
+ * El SAS en palabras. Escala de Riker (SAS 1-7), con la redacción que usa la
+ * unidad — contrastada con la literatura y con Diego el 17-sep-2026.
+ *
+ * POR QUÉ EXISTE. Diego quería un campo aparte para el estado de vigilia
+ * («sopor superficial, sopor profundo, somnoliento, vigil y cooperador»), y al
+ * ponerlo al lado del SAS apareció que era casi una traducción uno a uno: un
+ * segundo campo diciendo lo mismo, que es la forma de error que este proyecto
+ * ya pagó tres veces. La decisión fue que el sistema TRADUZCA en vez de
+ * preguntar otra vez: el relato dice la palabra y el número se conserva.
+ *
+ * 🔴 ES EL ÚNICO diccionario: lo usan el relato del servidor y el de la
+ * pantalla. Si cambia una redacción, cambia en los dos a la vez.
+ */
+var SAS_PALABRAS = {
+  '1': 'sin respuesta a estímulos',
+  '2': 'sopor profundo, responde al estímulo físico sin comunicarse',
+  '3': 'somnoliento, despierta al llamado y se vuelve a dormir',
+  '4': 'vigil, tranquilo y cooperador',
+  '5': 'agitado, se calma a la contención verbal',
+  '6': 'muy agitado, no se calma con instrucciones',
+  '7': 'agitación peligrosa'
+};
+
+/** El SAS narrado: «SAS 4 (vigil, tranquilo y cooperador)». */
+function sasEnPalabras(sas) {
+  const k = String(sas == null ? '' : sas).trim();
+  if (!k) return '';
+  const t = SAS_PALABRAS[k];
+  return t ? ('SAS ' + k + ' (' + t + ')') : ('SAS ' + k);
+}
+
+/**
+ * ¿Este turno tuvo SEDACIÓN PROFUNDA? La define el SAS, no el fármaco.
+ *
+ * 🪤 Diego corrigió una propuesta mía de decidirlo por una lista de hipnóticos:
+ * «hemos tenido pacientes con fentanilo y propofol en dosis altas pero con un
+ * SAS 3-4, por lo tanto han estado sedados vigil; depende más de eso que del
+ * tipo de fármaco». Tenía razón: el fármaco es la dosis, el SAS es la
+ * profundidad — lo mismo que ya pasaba con el escalón.
+ *
+ * 🔴 COMPATIBLE HACIA ATRÁS: las filas escritas antes del 17-sep-2026 traen la
+ * casilla SED_VIGIL y pueden no traer SAS. Esas se leen por la casilla, que es
+ * como se han leído hasta hoy.
+ */
+function sedacionProfunda(d) {
+  const f = d || {};
+  const tipo = String(f.SED_TIPO || '');
+  if (!tipo || tipo === 'Sin sedación') return false;
+  const sas = parseInt(f.SED_SAS, 10);
+  if (!isNaN(sas)) return sas <= 2;
+  return !(f.SED_VIGIL === true || f.SED_VIGIL === 'TRUE' || f.SED_VIGIL === 'true');
+}
+
 
 // ════════════════════════════════════════════════════════════════════
 // ── dominio_validacion.gs ──
@@ -530,10 +584,21 @@ function generarTextoEvolucion(d) {
   // cliente — si se cambia uno hay que cambiar el otro (lección de las
   // secreciones), y la guardia lo comprueba leyendo los dos fuentes.
   const meta = v('SED_SAS_META');
-  const sasTxt = sas ? ` con SAS ${sas}${meta ? ` (meta ${meta})` : ''}` : (meta ? ` para meta SAS ${meta}` : '');
+  /* 🗂️ 17-sep-2026 · El SAS se narra EN PALABRAS, con el número. Diego quería
+     un campo aparte para el estado de vigilia («sopor superficial, sopor
+     profundo, somnoliento, vigil»), y al ponerlo al lado del SAS apareció que
+     era casi una traducción uno a uno. En vez de preguntar dos veces lo mismo,
+     el sistema traduce. El diccionario está en dominio_calculos.gs y lo
+     comparten los dos motores. */
+  // 🪤 La meta va con coma, no en un segundo paréntesis: con el SAS en palabras
+  // la forma vieja daba «SAS 4 (vigil, tranquilo y cooperador) (meta 1)».
+  const sasTxt = sas ? ` con ${sasEnPalabras(sas)}${meta ? `, meta SAS ${meta}` : ''}`
+                     : (meta ? ` para meta SAS ${meta}` : '');
   const escTxt = (sed && sed !== 'Sin sedación') ? (sed === 'Fuera de escalón' ? 'fuera de escalón' : `en ${sed.toLowerCase()}`) : '';
-  // La sedación vigil se nombra: es la que NO cuenta como sedación profunda.
-  const vigilTxt = esVerdadero(d.SED_VIGIL) ? ' vigil (control de agitación)' : '';
+  /* 🗂️ 17-sep-2026 · Se dejó de narrar « vigil (control de agitación)» desde la
+     casilla: la casilla salió y el SAS ya lo dice con todas sus letras —«SAS 4
+     (vigil, tranquilo y cooperador)»—. Espejo del cliente. */
+  const vigilTxt = '';
   let farm = [];
   try { farm = JSON.parse(d.SED_FARMACOS || '[]') || []; } catch (e) { farm = []; }
   const farmTxt = farm.length ? ` con ${farm.map(function (x) { return String(x).toLowerCase(); }).join(', ')}` : '';
