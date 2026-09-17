@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.6-sedacion">
+<meta name="rce-version" content="NEXT-1.7-ktm">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -4528,8 +4528,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
                       </div>
                     </div>
                     <div>
-                      <label style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:5px;" title="Cantidad de atenciones KTM del turno (para el REM). El nivel no es cantidad.">N° sesiones</label>
-                      <input type="number" id="fKtmCant" min="1" max="9" step="1" value="1" style="width:64px;height:30px;text-align:center;font-size:.85rem;border:1px solid #e2e8f0;border-radius:6px;">
+                      <!-- 🔴 17-sep-2026 · El N° de sesiones se DERIVA de la lista, ya no
+                           se escribe a mano. Antes eran dos datos que podían contradecirse:
+                           el contador decía «2» y los campos de arriba guardaban UNA sola
+                           sesión, la última que se llenó encima de la anterior. Diego:
+                           «2 KTM, una nivel 2 y otra nivel 3, y pueden rendir de forma
+                           diferente». Sigue viajando KTM_CANT para el REM y los
+                           indicadores: sale de contar la lista. -->
+                      <label style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:5px;">Sesiones</label>
+                      <button type="button" id="btnKtmSesion" data-nodirty onclick="ktmAgregarSesion()"
+                        style="height:30px;padding:0 12px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;font-family:inherit;font-size:.78rem;font-weight:700;color:var(--kine);cursor:pointer;white-space:nowrap;"
+                        title="Agrega lo escrito arriba como una sesión y deja los campos listos para la siguiente">+ Agregar</button>
+                      <input type="hidden" id="fKtmCant" value="1">
+                      <input type="hidden" id="fKtmSesiones">
                     </div>
                     <div style="position:relative;">
                       <label style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:5px;">🦵 IMS — Escala de Movilidad UCI</label>
@@ -4565,6 +4576,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <label style="font-size:.72rem;font-weight:700;white-space:nowrap;margin-left:8px;">Borg (0-10)</label>
                   <input type="number" id="fBorg" min="0" max="10" style="width:60px;height:30px;border:1px solid #e2e8f0;border-radius:6px;padding:0 8px;font-size:.82rem;">
                 </div>
+
+                <!-- Las sesiones ya agregadas, cada una con lo suyo. -->
+                <div id="ktmListaSes" style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px;"></div>
 
                 <!-- Suspendida por alerta -->
                 <div style="padding:8px 10px;background:#fff8ed;border:1px solid #fde68a;border-radius:6px;">
@@ -7527,6 +7541,11 @@ function fillForm(s) {
 
   chk('cKTMr',s.KTM_REALIZADA); chk('cKTMs',s.KTM_SUSPENDIDA);
   set('fKtmCant', s.KTM_CANT||'1'); chk('cEduReal', s.EDU_REALIZADA);
+  // La lista de sesiones vuelve tal como se guardó. 🔴 Una evolución VIEJA
+  // no la trae, y ahí no se pinta nada: sus datos siguen en los campos de
+  // siempre y se leen por ellos, que es como se han leído hasta hoy.
+  set('fKtmSesiones', s.KTM_SESIONES_JSON||'');
+  if(typeof ktmPintarSesiones==='function') ktmPintarSesiones();
   set('fKTMct',s.KTM_CONTRA_TIPO); set('fKTMraz',s.KTM_CONTRA_RAZON); set('fKTMman',s.KTM_CONTRA_MANUAL);
   _ktmContraSel(s.KTM_CONTRA_RAZON);
 
@@ -7826,7 +7845,9 @@ function fillFormReplica(s) {
   if(_tf.KTM_NIVEL_KTR) setKTMniv(String(_tf.KTM_NIVEL_KTR));
   if(_tf.KTM_ASISTENCIA) setKTMasis(_tf.KTM_ASISTENCIA);
   // REM: sesiones y educación son ACCIÓN DIARIA — no se heredan del turno previo
-  set('fKtmCant','1'); chk('cEduReal',false);
+  set('fKtmCant','1'); set('fKtmSesiones','');
+  if(typeof ktmPintarSesiones==='function') ktmPintarSesiones();
+  chk('cEduReal',false);
   set('fKTMt',_tf.KTM_TIEMPO_MIN);
   chk('cIMT',_tf.KTM_IMT); if(_tf.KTM_IMT===true||_tf.KTM_IMT==='TRUE') show('dIMT'); else hide('dIMT');
   chk('cEMS',_tf.KTM_EMS); if(_tf.KTM_EMS===true||_tf.KTM_EMS==='TRUE') show('dEMS'); else hide('dEMS');
@@ -8800,9 +8821,15 @@ function guardar() {
     KTM_REALIZADA:bv('cKTMr'), KTM_SUSPENDIDA:bv('cKTMs'),
     KTM_CONTRA_TIPO:v('fKTMct'), KTM_CONTRA_CAT:v('fKTMcat'),
     KTM_CONTRA_RAZON:v('fKTMraz'), KTM_CONTRA_MANUAL:v('fKTMman'),
-    KTM_NIVEL_KTR:v('fKTMniv'), KTM_ASISTENCIA:v('fKTMasis'), KTM_TIEMPO_MIN:v('fKTMt'),
+    // 🔴 El nivel que viaja es el MÁS ALTO de las sesiones —es el que marca la
+    // progresión y del que comen la entrega, la cama y la categorización
+    // SOCHIMI—, derivado de la lista por el único lector (ktmSesiones).
+    KTM_NIVEL_KTR:_ktmDeriva().nivel, KTM_ASISTENCIA:v('fKTMasis'), KTM_TIEMPO_MIN:v('fKTMt'),
+    KTM_SESIONES_JSON: bv('cKTMr') ? (v('fKtmSesiones') || '') : '',
     KTM_BORG:v('fBorg'),
-    KTM_CANT: bv('cKTMr') ? String(Math.min(9,Math.max(1,parseInt(v('fKtmCant'))||1))) : '',
+    // Se DERIVA de la lista: el REM (sesiones = KTR + KTM) y los indicadores de
+    // atenciones siguen leyendo esta columna y no se tocan.
+    KTM_CANT: bv('cKTMr') ? String(_ktmDeriva().cant || 1) : '',
     EDU_REALIZADA: bv('cEduReal'),
     KTM_IMT:bv('cIMT'), KTM_IMT_FREQ:v('fIMTfreq'), KTM_IMT_INT:v('fIMTint'), KTM_IMT_T:v('fIMTt'), KTM_IMT_DES:v('fIMTdes'),
     KTM_EMS:bv('cEMS'),
@@ -11792,16 +11819,38 @@ function genTexto() {
   // ── KTM (después de KTR) ──
   const kR=$('bKTMr')?.classList.contains('on'), kS=$('bKTMs')?.classList.contains('on'), kN=$('bKTMn')?.classList.contains('on');
   if(kR){
-    const _niv=gv('fKTMniv'), _asis=gv('fKTMasis'), _t=gv('fKTMt');
-    const _kcant=Math.min(9,Math.max(1,parseInt(gv('fKtmCant'))||1));
-    const _nivTxt=_niv?` nivel ${_niv}`:'';
-    let k=_kcant>1?`Se realizan ${_kcant} sesiones de KTM${_nivTxt}`:`Se realiza KTM${_nivTxt}`;
-    if(_asis) k+=` con asistencia ${_asis.toLowerCase()}`;
-    // 🗂️ 17-sep-2026 · Decía « (20 min)» y el servidor « durante 20 minutos»:
-    // el mismo turno se leía distinto en la pantalla y en la hoja impresa.
-    // Se unificó hacia la forma del servidor, que es la que se lee como
-    // frase. Lo fija relato_espejo.js, que da el mismo dato a los dos.
-    if(_t) k+=` durante ${_t} minutos`;
+    /* 🔴 17-sep-2026 · CADA SESIÓN LLEVA LO SUYO. Espejo exacto del servidor
+       (dominio_texto.gs): el lector de la lista es el MISMO (ktmSesiones), y
+       las sesiones se narran individualizadas a propósito, para que el colega
+       pueda editar el relato y describir más si quiere. */
+    const _ses=(typeof _ktmDeriva==='function')?_ktmDeriva():{lista:[],cant:0};
+    const _ORD=['Primera','Segunda','Tercera','Cuarta','Quinta','Sexta','Séptima','Octava','Novena'];
+    const _det=(x)=>{
+      let t='';
+      if(x.niv)  t+=`nivel ${x.niv}`;
+      if(x.asis) t+=`${t?' ':''}con asistencia ${String(x.asis).toLowerCase()}`;
+      if(x.min)  t+=`${t?' ':''}durante ${x.min} minutos`;
+      if(x.borg) t+=`${t?', ':''}Borg ${x.borg}`;
+      return t;
+    };
+    let k;
+    if(_ses.lista.length>1){
+      k='Se realiza KTM. '+_ses.lista.map((x,i)=>`${_ORD[i]||((i+1)+'ª')} sesión: ${_det(x)}`).join('. ');
+    } else {
+      // Una sesión sola no se numera: «Primera sesión» sobra si no hay segunda.
+      const _u=_ses.lista[0]||{};
+      const _niv=_u.niv||gv('fKTMniv'), _asis=_u.asis||gv('fKTMasis'), _t=_u.min||gv('fKTMt');
+      const _kcant=Math.min(9,Math.max(1,_ses.cant||1));
+      const _nivTxt=_niv?` nivel ${_niv}`:'';
+      k=_kcant>1?`Se realizan ${_kcant} sesiones de KTM${_nivTxt}`:`Se realiza KTM${_nivTxt}`;
+      if(_asis) k+=` con asistencia ${String(_asis).toLowerCase()}`;
+      // 🗂️ 17-sep-2026 · Decía « (20 min)» y el servidor « durante 20 minutos»:
+      // el mismo turno se leía distinto en la pantalla y en la hoja impresa.
+      if(_t) k+=` durante ${_t} minutos`;
+      // El Borg se guardaba y nadie lo leía: un solo uso fuera del esquema.
+      const _bg=_u.borg||gv('fBorg');
+      if(_bg) k+=`, Borg ${_bg}`;
+    }
     _B('ktm'); L.push(k+'.');
     _B('imt');
     if($('cIMT')?.checked){
@@ -14544,6 +14593,105 @@ function setKTMniv(n){
   const d=$('ktmNivDesc'); if(d) d.textContent=KTM_NIV_DESC[n]||'';
   show('dKTMasis');
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   LAS SESIONES DE KTM (17-sep-2026)
+
+   Diego: «2 KTM, una nivel 2 y otra nivel 3, y pueden rendir de forma
+   diferente». Antes la KTM del turno era UN juego de datos más un contador
+   aparte, y la segunda sesión desaparecía: el contador decía «2» y el relato
+   narraba una sola, con los datos de la última escritos encima de la anterior.
+
+   🔴 LA CANTIDAD Y EL NIVEL SE DERIVAN, no se escriben. De la cantidad comen
+   el REM (sesiones = KTR + KTM) y los indicadores de atenciones; del nivel, la
+   entrega, la cama y la categorización SOCHIMI. Las dos columnas se siguen
+   guardando exactamente igual — lo que cambió es de dónde salen.
+
+   🔴 El lector es `ktmSesiones` y es el MISMO del servidor
+   (dominio_calculos.gs, cargado también acá): una sola verdad del dato.
+
+   Diego avisó que este diseño «no me gusta mucho, lo modificaré cuando lo vea
+   en vivo». Está construido para retocarlo con la pantalla delante.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Lo que hay escrito ahora mismo en los campos, como una sesión. */
+function _ktmSesionActual(){
+  return { niv:v('fKTMniv'), asis:v('fKTMasis'),
+           min:parseInt(v('fKTMt'))||0, borg:v('fBorg') };
+}
+function _ktmLista(){
+  try{ return JSON.parse(v('fKtmSesiones')||'[]')||[]; }catch(e){ return []; }
+}
+/**
+ * Cantidad y nivel derivados. Si no se agregó ninguna sesión a la lista, cuenta
+ * lo que está escrito en los campos: el caso normal es una sola KTM y no tiene
+ * por qué obligar a apretar «Agregar».
+ *
+ * 🔴 ESPEJO de ktmSesiones (dominio_calculos.gs) — el servidor no vive acá, así
+ * que la derivación está escrita en los dos lados. Si cambias la regla, en los
+ * dos: ktm_sesiones.js le da el MISMO JSON a las dos funciones y exige que
+ * devuelvan lo mismo. 🪤 Antes esto llamaba a ktmSesiones() «si existía», y
+ * como en el navegador nunca existe, caía siempre en un fallback que devolvía
+ * nivel vacío: el nivel que manda no llegaba a la cama ni a SOCHIMI, en
+ * silencio.
+ */
+function _ktmDeriva(){
+  let lista=_ktmLista();
+  if(!lista.length){
+    const a=_ktmSesionActual();
+    if(a.niv||a.min||a.asis) lista=[a];
+  }
+  const niveles=lista.map(x=>parseInt(x&&x.niv,10)).filter(n=>!isNaN(n));
+  return {
+    lista:lista,
+    cant:lista.length,
+    nivel:niveles.length?String(Math.max.apply(null,niveles)):'',
+    minutos:lista.reduce((a,x)=>a+(parseInt(x&&x.min,10)||0),0)
+  };
+}
+function ktmAgregarSesion(){
+  const a=_ktmSesionActual();
+  if(!a.niv && !a.min){ toast('⚠️ Elige al menos el nivel o los minutos de la sesión.'); return; }
+  const lista=_ktmLista(); lista.push(a);
+  if(lista.length>9){ toast('⚠️ Son demasiadas sesiones para un turno.'); return; }
+  const e=$('fKtmSesiones'); if(e) e.value=JSON.stringify(lista);
+  // Los campos quedan listos para la siguiente: se limpia lo que cambia de una
+  // sesión a otra, no el estado de la KTM.
+  if(typeof setKTMniv==='function') setKTMniv('');
+  if(typeof setKTMasis==='function') setKTMasis('');
+  const t=$('fKTMt'); if(t) t.value='';
+  const bg=$('fBorg'); if(bg) bg.value='';
+  ktmPintarSesiones();
+}
+function ktmQuitarSesion(i){
+  const lista=_ktmLista(); lista.splice(i,1);
+  const e=$('fKtmSesiones'); if(e) e.value=lista.length?JSON.stringify(lista):'';
+  ktmPintarSesiones();
+}
+function ktmPintarSesiones(){
+  const caja=$('ktmListaSes'); if(!caja) return;
+  const lista=_ktmLista();
+  const der=_ktmDeriva();
+  const c=$('fKtmCant'); if(c) c.value=String(der.cant||1);
+  if(!lista.length){ caja.innerHTML=''; if(typeof _rtxtLive==='function') _rtxtLive(); return; }
+  const ORD=['Primera','Segunda','Tercera','Cuarta','Quinta','Sexta','Séptima','Octava','Novena'];
+  caja.innerHTML=lista.map((x,i)=>{
+    const partes=[];
+    if(x.niv)  partes.push('nivel '+x.niv);
+    if(x.asis) partes.push('asistencia '+String(x.asis).toLowerCase());
+    if(x.min)  partes.push(x.min+' min');
+    if(x.borg) partes.push('Borg '+x.borg);
+    return '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);'+
+      'border-radius:8px;padding:6px 10px;font-size:.8rem;">'+
+      '<b style="color:var(--kine);white-space:nowrap;">'+escapeHtml(ORD[i]||((i+1)+'ª'))+' sesión</b>'+
+      '<span style="color:var(--muted);">'+escapeHtml(partes.join(' · ')||'sin detalle')+'</span>'+
+      '<span style="flex-grow:1;"></span>'+
+      '<button type="button" data-nodirty onclick="ktmQuitarSesion('+i+')" aria-label="Quitar esta sesión" '+
+      'style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;">✕</button>'+
+      '</div>';
+  }).join('');
+  if(typeof _rtxtLive==='function') _rtxtLive();
+}
+
 function setKTMasis(a){
   document.querySelectorAll('.ktm-asis-btn').forEach(b=>b.classList.toggle('on', b.dataset.asis===a));
   const h=$('fKTMasis'); if(h) h.value=a;

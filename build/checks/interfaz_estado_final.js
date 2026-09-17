@@ -49,7 +49,7 @@ const si = (l, c) => eq(l, !!c, true);
      i('REINTUB_INTERFAZ_POST') > i('VENT_INTERFAZ') &&
      i('TQT_INTERFAZ_POST') > i('VENT_INTERFAZ') &&
      i('VENT_INTERFAZ_FINAL') > i('VENT_INTERFAZ'));
-  si('  ★ y el total declarado está al día', /TOTAL_COLS\.EVOLUCIONES !== 406/.test(esq));
+  si('  ★ y el total declarado está al día', /TOTAL_COLS\.EVOLUCIONES !== 407/.test(esq));
   si('  ★ las cuatro traen su rótulo legible',
      ['INTUB_INTERFAZ_POST', 'REINTUB_INTERFAZ_POST', 'TQT_INTERFAZ_POST', 'VENT_INTERFAZ_FINAL']
        .every(n => new RegExp("\\['" + n + "','texto','[^']+'\\]").test(esq)));

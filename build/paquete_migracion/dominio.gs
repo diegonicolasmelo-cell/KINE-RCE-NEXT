@@ -69,6 +69,56 @@ function calcularRespiratorio(evo) {
   return calc;
 }
 
+/**
+ * Las sesiones de KTM de un turno, leídas de UN SOLO lugar.
+ *
+ * 🔴 ES EL ÚNICO LECTOR de KTM_SESIONES_JSON. La cantidad y el nivel se
+ * DERIVAN de acá y de ningún otro lado: si mañana el REM contara por su
+ * cuenta y la entrega por la suya, volveríamos a tener dos verdades del mismo
+ * dato — que es lo que este proyecto ya pagó tres veces.
+ *
+ * 🔴 COMPATIBLE HACIA ATRÁS, y eso no es opcional: hay meses de turnos escritos
+ * con el modelo viejo (un nivel suelto, una asistencia, unos minutos y un
+ * contador). Una fila así se lee igual que siempre.
+ *
+ * Devuelve { lista, cant, nivel, minutos }:
+ *   · cant    — cuántas sesiones (el REM y los indicadores de atenciones);
+ *   · nivel   — el MÁS ALTO, que es el que marca la progresión (Diego: «manda
+ *               el nivel más alto») y el que va a la entrega, la cama y la
+ *               categorización SOCHIMI;
+ *   · minutos — la suma.
+ */
+function ktmSesiones(d) {
+  const f = d || {};
+  let lista = [];
+  try {
+    const crudo = f.KTM_SESIONES_JSON;
+    if (crudo) lista = (typeof crudo === 'string' ? JSON.parse(crudo) : crudo) || [];
+  } catch (e) { lista = []; }
+  if (!Array.isArray(lista)) lista = [];
+
+  if (!lista.length) {
+    // Modelo viejo: el contador dice cuántas, y todas comparten los mismos
+    // datos porque era lo único que se guardaba.
+    const cant = parseInt(f.KTM_CANT, 10) || 0;
+    const niv = String(f.KTM_NIVEL_KTR || '').trim();
+    if (!cant && !niv) return { lista: [], cant: 0, nivel: '', minutos: 0 };
+    const una = { niv: niv, asis: String(f.KTM_ASISTENCIA || ''),
+                  min: parseInt(f.KTM_TIEMPO_MIN, 10) || 0, borg: String(f.KTM_BORG || '') };
+    return { lista: [una], cant: cant || 1, nivel: niv,
+             minutos: parseInt(f.KTM_TIEMPO_MIN, 10) || 0 };
+  }
+
+  const niveles = lista.map(x => parseInt(x && x.niv, 10)).filter(n => !isNaN(n));
+  const minutos = lista.reduce((a, x) => a + (parseInt(x && x.min, 10) || 0), 0);
+  return {
+    lista: lista,
+    cant: lista.length,
+    nivel: niveles.length ? String(Math.max.apply(null, niveles)) : '',
+    minutos: minutos
+  };
+}
+
 
 // ════════════════════════════════════════════════════════════════════
 // ── dominio_validacion.gs ──
@@ -937,13 +987,45 @@ function generarTextoEvolucion(d) {
   const nivel = v('KTM_NIVEL_KTR'), tiempo = v('KTM_TIEMPO_MIN');
   const uma = v('KTM_UMA');
   if (ktmR) {
-    const ktmCant = Math.min(9, Math.max(1, parseInt(v('KTM_CANT')) || 1));
-    const nivTxt = nivel ? ` nivel ${nivel}` : '';
-    let ktmStr = ktmCant > 1 ? `Se realizan ${ktmCant} sesiones de KTM${nivTxt}` : `Se realiza KTM${nivTxt}`;
-    if (v('KTM_ASISTENCIA')) ktmStr += ` con asistencia ${v('KTM_ASISTENCIA').toLowerCase()}`;
-    if (tiempo) ktmStr += ` durante ${tiempo} minutos`;
-    if (uma) ktmStr += `. UMA ${uma}`;
-    txt.push(ktmStr + '.');
+    /* 🔴 17-sep-2026 · CADA SESIÓN LLEVA LO SUYO. Diego: «2 KTM, una nivel 2 y
+       otra nivel 3, y pueden rendir de forma diferente». Con el modelo viejo la
+       segunda desaparecía: el contador decía «2» y esta frase narraba una sola,
+       con los datos de la última escritos encima de la anterior.
+       Se narran INDIVIDUALIZADAS a propósito, para que el colega pueda editar
+       el relato y describir más si quiere (Diego, 17-sep-2026).
+       El lector es ktmSesiones() (dominio_calculos.gs) y es UNO SOLO: una fila
+       vieja —un nivel suelto y un contador— vuelve por ahí como una sesión, y
+       se sigue narrando como antes. Espejo del cliente (genTexto). */
+    const ses = (typeof ktmSesiones === 'function') ? ktmSesiones(d) : { lista: [], cant: 0 };
+    const ORD = ['Primera', 'Segunda', 'Tercera', 'Cuarta', 'Quinta',
+                 'Sexta', 'Séptima', 'Octava', 'Novena'];
+    const detalle = (x) => {
+      let t = '';
+      if (x.niv) t += `nivel ${x.niv}`;
+      if (x.asis) t += `${t ? ' ' : ''}con asistencia ${String(x.asis).toLowerCase()}`;
+      if (x.min) t += `${t ? ' ' : ''}durante ${x.min} minutos`;
+      if (x.borg) t += `${t ? ', ' : ''}Borg ${x.borg}`;
+      return t;
+    };
+    if (ses.lista.length > 1) {
+      txt.push('Se realiza KTM. ' + ses.lista.map((x, i) =>
+        `${ORD[i] || (i + 1) + 'ª'} sesión: ${detalle(x)}`).join('. ') + '.');
+    } else {
+      // Una sesión sola no se numera: «Primera sesión» sobra cuando no hay segunda.
+      const una = ses.lista[0] || {};
+      const ktmCant = Math.min(9, Math.max(1, ses.cant || parseInt(v('KTM_CANT')) || 1));
+      const nivTxt = (una.niv || nivel) ? ` nivel ${una.niv || nivel}` : '';
+      let ktmStr = ktmCant > 1 ? `Se realizan ${ktmCant} sesiones de KTM${nivTxt}` : `Se realiza KTM${nivTxt}`;
+      const asis = una.asis || v('KTM_ASISTENCIA');
+      if (asis) ktmStr += ` con asistencia ${String(asis).toLowerCase()}`;
+      const min = una.min || tiempo;
+      if (min) ktmStr += ` durante ${min} minutos`;
+      // El Borg se guardaba y nadie lo leía: un solo uso fuera del esquema.
+      const borg = una.borg || v('KTM_BORG');
+      if (borg) ktmStr += `, Borg ${borg}`;
+      if (uma) ktmStr += `. UMA ${uma}`;
+      txt.push(ktmStr + '.');
+    }
   } else if (ktmS) {
     // Espejo del cliente (genTexto). El ítem del catálogo y la observación son
     // DOS datos: estaban unidos por un `||` y la observación se perdía en

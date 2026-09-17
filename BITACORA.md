@@ -1534,3 +1534,75 @@ medida ni la casilla del captor—. `neuro_dve_pic.js` existe exactamente para
 eso. El mecanismo de no pisar lo histórico ya estaba y es el que manda.
 
 **172 guardias · 172 verdes.** Nueva: `sedacion_prono_ppc.js`.
+
+---
+
+## 17-sep-2026 · Cada sesión de KTM lleva lo suyo
+
+Quinta tanda: §3.8 del PRD. El único cambio de modelo de datos de toda la
+revisión.
+
+### El problema
+
+La KTM del turno se guardaba como **un** juego de datos —un nivel, una
+asistencia, unos minutos, un Borg— más un contador aparte. Diego: *«2 KTM, una
+nivel 2 y otra nivel 3, y pueden rendir de forma diferente»*. Con ese modelo la
+segunda sesión desaparecía: el contador decía «2» y el relato narraba una sola,
+con los datos de la última escritos encima de la anterior.
+
+### El diseño
+
+Una columna con la **lista** (`KTM_SESIONES_JSON`, total 407), cada elemento con
+su nivel, asistencia, minutos y Borg. Y de ahí se **derivan** las dos cosas que
+ya consumía el resto del sistema:
+
+| Dato | Quién lo usa | De dónde sale ahora |
+|---|---|---|
+| **Cantidad** | el REM (sesiones = KTR + KTM) y los indicadores de atenciones | contar la lista |
+| **Nivel** | la entrega, la cama, la categorización SOCHIMI | el **más alto** de la lista |
+
+Las dos columnas viejas se siguen escribiendo exactamente igual: lo que cambió
+es de dónde salen sus valores. Nada del REM ni de los indicadores se tocó.
+
+El relato las narra **individualizadas**, a propósito, para que el colega pueda
+editarlo y describir más: *«Se realiza KTM. Primera sesión: nivel 2 con
+asistencia mínima durante 20 minutos. Segunda sesión: nivel 3 con asistencia
+supervisado durante 15 minutos.»* Con una sola no se numera — «Primera sesión»
+sobra cuando no hay segunda.
+
+**El Borg entró al relato.** Se guardaba desde hacía tiempo y no lo leía nadie:
+era un dato con un solo uso, fuera del esquema.
+
+### 🔴 Compatible hacia atrás, y eso no era opcional
+
+Hay meses de turnos escritos con el modelo viejo. `ktmSesiones()` es el **único
+lector** y devuelve una fila vieja como una sesión, con su contador y su nivel
+intactos: se lee y se narra igual que siempre. Tres comprobaciones de la guardia
+existen solo para eso.
+
+### 🪤 Un fallback silencioso que no llegaba a fallar nunca
+
+El cliente derivaba llamando a `ktmSesiones()` «si existía»… y en el navegador
+**nunca existe**: esa función vive en el dominio del servidor. O sea que caía
+siempre en el camino de respaldo, que devolvía nivel vacío — y el nivel que
+manda no llegaba ni a la cama ni a la categorización SOCHIMI, sin que nada
+avisara. Ahora la derivación está escrita en los dos lados, como espejo
+declarado, y la guardia le da **el mismo JSON a las dos funciones** y exige que
+devuelvan lo mismo en cuatro casos.
+
+Es la misma clase de trampa que las `const` que no cuelgan de globalThis: un
+`typeof x === 'function'` que resulta ser siempre falso no da error, da un
+resultado equivocado.
+
+### 🪤 Y los rótulos legibles pelearon dos veces
+
+`rotulos_legibles.js` rechazó primero el rótulo por largo (48 > 42) y después
+por repetido: «Sesiones de KTM del turno» chocaba con el de `KTM_CANT`.
+Quedaron **«Cuántas sesiones de KTM»** y **«Detalle de cada sesión de KTM»**,
+que es exactamente la distinción que hay que poder ver de un vistazo en la
+planilla.
+
+Diego avisó que este diseño *«no me gusta mucho, lo modificaré cuando lo vea en
+vivo»*. Está construido para retocarlo con la pantalla delante.
+
+**173 guardias · 173 verdes.** Nueva: `ktm_sesiones.js`.

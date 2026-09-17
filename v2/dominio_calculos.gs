@@ -57,3 +57,53 @@ function calcularRespiratorio(evo) {
   }
   return calc;
 }
+
+/**
+ * Las sesiones de KTM de un turno, leídas de UN SOLO lugar.
+ *
+ * 🔴 ES EL ÚNICO LECTOR de KTM_SESIONES_JSON. La cantidad y el nivel se
+ * DERIVAN de acá y de ningún otro lado: si mañana el REM contara por su
+ * cuenta y la entrega por la suya, volveríamos a tener dos verdades del mismo
+ * dato — que es lo que este proyecto ya pagó tres veces.
+ *
+ * 🔴 COMPATIBLE HACIA ATRÁS, y eso no es opcional: hay meses de turnos escritos
+ * con el modelo viejo (un nivel suelto, una asistencia, unos minutos y un
+ * contador). Una fila así se lee igual que siempre.
+ *
+ * Devuelve { lista, cant, nivel, minutos }:
+ *   · cant    — cuántas sesiones (el REM y los indicadores de atenciones);
+ *   · nivel   — el MÁS ALTO, que es el que marca la progresión (Diego: «manda
+ *               el nivel más alto») y el que va a la entrega, la cama y la
+ *               categorización SOCHIMI;
+ *   · minutos — la suma.
+ */
+function ktmSesiones(d) {
+  const f = d || {};
+  let lista = [];
+  try {
+    const crudo = f.KTM_SESIONES_JSON;
+    if (crudo) lista = (typeof crudo === 'string' ? JSON.parse(crudo) : crudo) || [];
+  } catch (e) { lista = []; }
+  if (!Array.isArray(lista)) lista = [];
+
+  if (!lista.length) {
+    // Modelo viejo: el contador dice cuántas, y todas comparten los mismos
+    // datos porque era lo único que se guardaba.
+    const cant = parseInt(f.KTM_CANT, 10) || 0;
+    const niv = String(f.KTM_NIVEL_KTR || '').trim();
+    if (!cant && !niv) return { lista: [], cant: 0, nivel: '', minutos: 0 };
+    const una = { niv: niv, asis: String(f.KTM_ASISTENCIA || ''),
+                  min: parseInt(f.KTM_TIEMPO_MIN, 10) || 0, borg: String(f.KTM_BORG || '') };
+    return { lista: [una], cant: cant || 1, nivel: niv,
+             minutos: parseInt(f.KTM_TIEMPO_MIN, 10) || 0 };
+  }
+
+  const niveles = lista.map(x => parseInt(x && x.niv, 10)).filter(n => !isNaN(n));
+  const minutos = lista.reduce((a, x) => a + (parseInt(x && x.min, 10) || 0), 0);
+  return {
+    lista: lista,
+    cant: lista.length,
+    nivel: niveles.length ? String(Math.max.apply(null, niveles)) : '',
+    minutos: minutos
+  };
+}

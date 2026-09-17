@@ -183,7 +183,7 @@ const _COLS_EVOLUCIONES = [
   ['EVAL_IMS','texto','IMS (escala de movilidad en UCI)'],
   ['VENT_PAFI','decimal','PaFiO₂'],  // PaFiO2 (PaO2/FiO2) del turno
   // REM 28 (jul-2026): sesiones individuales y educación
-  ['KTM_CANT','entero','Sesiones de KTM del turno'],    // N° de sesiones KTM del turno (REM B.4; por defecto 1 si KTM realizada)
+  ['KTM_CANT','entero','Cuántas sesiones de KTM'],    // N° de sesiones KTM del turno (REM B.4; por defecto 1 si KTM realizada)
   ['EDU_REALIZADA','bool','Educación al paciente o familia'], // educación a usuario/cuidador/familia (REM B.6; cuenta 1 por turno)
   // Presión de cuff — verificación 1 vez por turno (protocolo de la unidad).
   // Medida del paquete de prevención de NAVM: bajo el mínimo hay microaspiración
@@ -333,7 +333,21 @@ const _COLS_EVOLUCIONES = [
      que existía era HEMO_PAM, que es la META del bloque hemodinámico — otra
      cosa. Esta es la medida, se pide solo con captor de PIC, y de ella sale
      la PPC, que pasó a ser de solo lectura. */
-  ['HEMO_PAM_MED','decimal','PAM medida (con captor de PIC)']
+  ['HEMO_PAM_MED','decimal','PAM medida (con captor de PIC)'],
+  /* 🏃 SESIONES DE KTM (17-sep-2026) — AL FINAL, como todas.
+     Diego: «2 KTM, una nivel 2 y otra nivel 3, y pueden rendir de forma
+     diferente». Antes la KTM del turno era UN juego de datos —un nivel, una
+     asistencia, unos minutos, un Borg— más un contador aparte: la segunda
+     sesión desaparecía, el contador decía «2» y el relato narraba una sola,
+     con los datos de la última escritos encima de la anterior.
+     Cada elemento: {niv, asis, min, borg}.
+     🔴 Las columnas VIEJAS no se borran ni se dejan de escribir: la CANTIDAD
+     (KTM_CANT) y el NIVEL (KTM_NIVEL_KTR) se DERIVAN de esta lista y se
+     siguen guardando, porque de ellas comen el REM (sesiones = KTR + KTM),
+     los indicadores de atenciones, la entrega, la cama y la categorización
+     SOCHIMI. Nada de eso se toca. Y las filas ya escritas —meses de turnos—
+     siguen leyéndose por esas mismas columnas. */
+  ['KTM_SESIONES_JSON','json','Detalle de cada sesión de KTM']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1073,6 +1087,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 407 = 406 + KTM_SESIONES_JSON (cada sesión lleva lo suyo, 17-sep-2026);
   // 406 = 405 + HEMO_PAM_MED (la PPC se calcula, 17-sep-2026);
   // 405 = 401 + NAVM_HME, NAVM_HEPA, NAVM_TC, NAVM_RAZON (paso de prevención, 17-sep-2026);
   // 401 = 397 + los tres «tras el evento» y VENT_INTERFAZ_FINAL, 17-sep-2026; 397 = 396 + VENT_INTERFAZ, 16-sep-2026; 396 = 394 + PVE_SUP_SIN_EXT, PVE_SUP_SIN_EXT_RAZ, sep-2026; antes 394 = 393 + ANOTACIONES_JSON; antes 393 = 390 + NEURO_DVE, NEURO_DVE_ALTURA
@@ -1080,7 +1095,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 406) errs.push("EVOLUCIONES != 405 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 407) errs.push("EVOLUCIONES != 407 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }
