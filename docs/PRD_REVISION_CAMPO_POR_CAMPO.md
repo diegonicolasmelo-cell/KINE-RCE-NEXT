@@ -255,7 +255,7 @@ Acá los dos textos —pantalla y servidor— **ya dicen lo mismo**. Cambios:
 
 | Decisión | Detalle |
 |---|---|
-| **El número de sesiones de KTR NO va al relato** | Diego: *«esto es solo texto narrativo, no se dice cuántas veces se atendió, solo que se hizo»*. El número se sigue guardando para el REM. |
+| **El número de sesiones de KTR NO va al relato** | Diego: *«esto es solo texto narrativo, no se dice cuántas veces se atendió, solo que se hizo»*. El número se sigue guardando para el REM. **No es contradicción con la KTM** (§3.8): en el KTR se narra qué se hizo («KTR + SET»), en la KTM cada sesión tiene su nivel y su rendimiento, así que van individualizadas. |
 | **La cantidad de secreciones sí va al relato** | Hoy se piden tres cosas y el texto dice dos. |
 | **El orden**: «secreciones **mucopurulentas ligosas**» | Característica antes que reología. |
 | **El decúbito lateral se narra**; **el sedente se saca** | |
@@ -320,8 +320,11 @@ diferente»*.
   contando igual, sin tocarlos.
 - **Manda el nivel más alto** para la entrega, la cama y la categorización: es el
   que marca la progresión.
-- El relato: «Se realizan 2 sesiones de KTM: una a nivel 2 con asistencia mínima
-  durante 20 minutos, y otra a nivel 3 con supervisión durante 15 minutos.»
+- El relato las narra **individualizadas**, para que el colega pueda editarlas y
+  describir más si quiere (Diego, 17-sep):
+
+  > Se realiza KTM. Primera sesión: nivel 2 con asistencia mínima durante 20
+  > minutos. Segunda sesión: nivel 3 con supervisión durante 15 minutos.
 
 Diego avisó que este diseño *«no me gusta mucho, lo modificaré cuando lo vea en
 vivo»*. Se construye así y se retoca con la pantalla delante.
@@ -330,6 +333,30 @@ vivo»*. Se construye así y se retoca con la pantalla delante.
 abren cada uno solo lo suyo; de noche la tarjeta desaparece entera; la válvula de
 fonación, la educación y el IMS se narran; los nueve campos escondidos son
 portadores de chips, no fantasmas.
+
+### 3.8 bis · Los paneles «queda con» se llaman por su nombre
+
+Diego (17-sep): *«"queda con" no me suena muy bien… "soporte post-extubación"
+suena mucho más profesional»*. El título dice qué es; el verbo vive en el texto.
+
+| Hoy | Queda |
+|---|---|
+| «Soporte PE» | **Soporte post-extubación** ← además muere una sigla que nadie entiende |
+| «Queda con (post-intubación)» | **Soporte post-intubación** |
+| «Queda con (post-reintubación)» | **Soporte post-reintubación** |
+| «Queda con (post-traqueostomía)» | **Soporte post-traqueostomía** |
+| «Queda con» *(decanulación)* | **Soporte post-decanulación** |
+| «Queda con» *(desvinculación)* | **Soporte post-desvinculación** |
+
+**En el relato**: «queda **con**» para el dispositivo, «queda **en**» para el
+soporte sin dispositivo.
+
+> Post extubación **queda con** naricera a 3 L/min.
+> Post desvinculación **queda en** aire ambiente.
+
+**Medido**: el motor ya usa las dos formas sin criterio — «Queda en
+oxigenoterapia» (desvinculación), «queda con …» (post-extubación). Acá se fija.
+Se descartó «se apoya con» porque se rompe con el aire ambiente.
 
 ### 3.9 · 🔧 Procedimientos del turno
 
