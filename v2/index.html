@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.7-ktm">
+<meta name="rce-version" content="NEXT-1.8-chips">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -6536,8 +6536,24 @@ const _PASO_SERIE = [
   { k:'mrc',    lbl:'MRC-ss',    col:'ULT_MRC',    fec:'ULT_MRC_FECHA', fir:'ULT_MRC_FIRMA', modal:true,  tip:'MRC sum-score (0-60)' },
   { k:'fss',    lbl:'FSS-ICU',   col:'ULT_FSS',    fec:'ULT_FSS_FECHA', fir:'ULT_FSS_FIRMA', modal:true,  tip:'FSS-ICU (0-35)' },
   { k:'cpax',   lbl:'CPAx',      col:'',           fec:'',              fir:'',              modal:true,  tip:'Chelsea Critical Care Physical Assessment' },
-  { k:'pim',    lbl:'Pimáx',     col:'ULT_PIM',    fec:'ULT_PIM_FECHA', fir:'ULT_PIM_FIRMA', campo:'fPIM',      tip:'Presión inspiratoria máxima' },
+  { k:'pim',    lbl:'Pimáx',     col:'ULT_PIM',    fec:'ULT_PIM_FECHA', fir:'ULT_PIM_FIRMA', campo:'fPIM',      abre:'dxFzaResp', tip:'Presión inspiratoria máxima' },
   { k:'dinamo', lbl:'Dinamom.',  col:'ULT_DINAMO', fec:'',              fir:'',              campo:'fPrension', tip:'Dinamometría de prensión (kg)' },
+  /* 🔴 17-sep-2026 · Las demás escalas pasan a tener su propio chip. Antes, al
+     entrar a «registrar una medición», se desplegaban DIECISIETE campos de
+     golpe, casi todos de escalas que ese turno no se iban a medir. Diego:
+     «que se abran solas de forma individual y no que aparezcan todas de
+     golpe… esto hace que cada uno seleccione de forma dirigida lo que quiere
+     medir y registrar, ya que no siempre se registra todo».
+     Los agrupamientos los dio él y no son arbitrarios — se juntan las que de
+     verdad se miden juntas: la ECOGRAFÍA es un solo examen con el transductor
+     en la mano, y la PROTECCIÓN DE VÍA AÉREA responde una sola pregunta
+     clínica («deglución y test de azul… lo englobaría en protección de vía
+     aérea»). `abre` es el desplegable que destapa el chip. */
+  { k:'pem',    lbl:'PEmáx',     col:'',           fec:'',              fir:'',              campo:'fPEM',       abre:'dxFzaResp', tip:'Presión espiratoria máxima' },
+  { k:'fem',    lbl:'FEmáx',     col:'',           fec:'',              fir:'',              campo:'fFEM',       abre:'dxTos',     tip:'Flujo espiratorio máximo de la tos' },
+  { k:'ims',    lbl:'IMS',       col:'',           fec:'',              fir:'',              campo:'fIMS',       tip:'Escala de Movilidad UCI' },
+  { k:'eco',    lbl:'Ecografía', col:'',           fec:'',              fir:'',              campo:'fCuadD',     abre:'dxEco',     tip:'Ecografía muscular y diafragmática' },
+  { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglucion', abre:'dxTos',     tip:'Deglución y test de azul' },
 ];
 
 function pasoEvalPintar(){
@@ -6555,7 +6571,7 @@ function pasoEvalPintar(){
     const tit = pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
                      : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo';
     return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') + '" style="cursor:pointer;"' +
-      ' data-esc="' + escapeHtml(e.k) + '" title="' + escapeHtml(tit) + '"' +
+      ' data-esc="' + escapeHtml(e.k) + '" data-evk="' + escapeHtml(e.k) + '" title="' + escapeHtml(tit) + '"' +
       ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)">' +
       escapeHtml(e.lbl) + (pend ? ' sin medir' : ' ' + escapeHtml(detalle)) + '</span>';
   }).join('');
@@ -6570,10 +6586,20 @@ function pasoEvalPintar(){
     (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
 }
 
-/** Un chip del paso 2: abre su calculadora, o lleva al campo si no tiene. */
+/**
+ * Un chip de las evaluaciones: abre su calculadora, o destapa SOLO su
+ * desplegable y lleva al campo.
+ *
+ * 🔴 Cierra los demás a propósito. La gracia de los chips es que el colega vea
+ * una escala a la vez: si cada toque fuera dejando desplegables abiertos,
+ * después de tres chips volveríamos a los diecisiete campos de golpe que esto
+ * vino a cortar.
+ */
 function pasoEvalMedir(kind){
   const e = _PASO_SERIE.filter(x => x.k === kind)[0]; if(!e) return;
   if(e.modal && typeof abrirEvalModal === 'function'){ abrirEvalModal(kind); return; }
+  const cajones = _PASO_SERIE.map(x => x.abre).filter(Boolean);
+  cajones.forEach(id => { const d = $(id); if(d) d.open = (id === e.abre); });
   const el = $(e.campo);
   if(el){ el.scrollIntoView({ block:'center' }); el.focus(); }
 }

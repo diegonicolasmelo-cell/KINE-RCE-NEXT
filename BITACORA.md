@@ -1606,3 +1606,63 @@ Diego avisó que este diseño *«no me gusta mucho, lo modificaré cuando lo vea
 vivo»*. Está construido para retocarlo con la pantalla delante.
 
 **173 guardias · 173 verdes.** Nueva: `ktm_sesiones.js`.
+
+---
+
+## 17-sep-2026 · Una escala, un chip
+
+Sexta y última tanda del PRD de la revisión: §4.
+
+Los chips del paso de evaluaciones ya funcionaban bien —se abre una escala a la
+vez, mostrando lo que el episodio lleva medido con su fecha y quién midió—, pero
+debajo quedaba una puerta vieja: al entrar a «registrar una medición» se
+desplegaban **diecisiete campos de golpe**, casi todos de escalas que ese turno
+no se iban a medir.
+
+Diego: *«las demás escalas también pásalas a un chip que se abran solas de forma
+individual y no que aparezcan todas de golpe… esto hace que cada uno seleccione
+de forma dirigida lo que quiere medir y registrar, ya que no siempre se registra
+todo»*.
+
+Los chips pasaron de cinco a **diez**: MRC-ss, FSS-ICU, CPAx, Pimáx, PEmáx,
+FEmáx, dinamometría, IMS, ecografía y protección de vía aérea.
+
+**Los agrupamientos los dio él, y no son arbitrarios**: se juntan las que de
+verdad se miden juntas.
+
+- **Ecografía** (grosor diafragmático, cuádriceps D/I, Heckmatt, engrosamiento
+  D/I, excursión D/I): *«el grosor diafragmático, cuádriceps y todo eso debería
+  entrar en ecografía y de ahí desplegar el resto»*. Es un solo examen con el
+  transductor en la mano.
+- **Protección de vía aérea** (deglución + test de azul): *«deglución y test de
+  azul aparte… lo englobaría en protección de vía aérea»*. Las dos responden la
+  misma pregunta clínica.
+
+**Tocar un chip cierra los demás.** No es un detalle: si cada toque fuera
+dejando desplegables abiertos, después de tres chips volveríamos a los
+diecisiete campos de golpe que esto vino a cortar.
+
+Y la presión de cuff ya no está en esa tarjeta: se fue al paso 1 con el resto
+del paquete de prevención. Medido en su momento: ahí **no llegaba a verse
+nunca**.
+
+🔴 **Las evaluaciones sí se pueden omitir** — *«no podemos obligar a los colegas
+a que evalúen el MRC»*—, a diferencia de los filtros del paso 1, que sí son
+obligables porque son medida de IAS y están a cargo de kinesiología. La salida
+«no medí nada este turno» sigue a la vista, que es donde tiene que estar.
+
+**174 guardias · 174 verdes.** Nueva: `chips_evaluaciones.js`.
+
+---
+
+### Cierre de la revisión campo por campo
+
+Las seis tandas del PRD están programadas y en verde. En un día el proyecto pasó
+de 167 a 174 guardias, con siete nuevas que son la memoria de lo que se arregló:
+`prevencion_navm`, `relato_espejo`, `glasgow_medido`,
+`via_aerea_en_respiratorio`, `sedacion_prono_ppc`, `ktm_sesiones` y
+`chips_evaluaciones`. El esquema pasó de 401 a 407 columnas, todas aditivas y al
+final.
+
+Falta pegarlo en Apps Script: Diego lo hará cuando esté frente al computador, y
+ahí hay que correr `crearORepararEstructura()` porque entraron seis columnas.
