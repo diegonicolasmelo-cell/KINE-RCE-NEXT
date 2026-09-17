@@ -9,8 +9,9 @@
 //   · Fases: «En proceso de weaning», «A la espera de second look».
 //   · TOT: «N° 8.0 a 22 cm de arcada dental» — la fijación es norma, no opción.
 //   · La FIRMA y el bloque «Posicionamiento:» salieron del texto generado.
-//   · Prono/supino viven JUNTO a la TQT (no dentro del colapsable 📐) y se
-//     narran solos, con hora.
+//   · Prono/supino están A LA VISTA (no dentro del colapsable 📐) y se narran
+//     solos, con hora. 🗂️ 17-sep-2026: en SECCIÓN PROPIA, ya no junto a la
+//     TQT — no tienen relación (ver la nota en la comprobación).
 //   · Con TOT es OBLIGATORIO declarar la PVE (sí/no); si la KTM no se realiza
 //     o está contraindicada, la razón es OBLIGATORIA.
 // Uso: node build/checks/reporte_colega.js
@@ -166,10 +167,18 @@ const { chromium } = require('playwright-core');
   eq('el turno que solo continúa narra el estado', R.continuaProno, true);
   eq('…sin inventar un evento de prono', R.continuaNoEvento, true);
 
-  console.log('\n── Franja de prono junto a la TQT ──');
+  console.log('\n── Franja de prono, en sección propia ──');
   eq('existe la franja 🔃', R.stripExiste, true);
   eq('vive FUERA del colapsable 📐', R.stripFueraDelColapsable, true);
-  eq('en la misma sección que la TQT', R.stripJuntoATqt, true);
+  // 🗂️ 17-sep-2026 · Acá se exigía lo CONTRARIO: que el prono viviera en la
+  // misma sección que la traqueostomía. La convención cambió de verdad, no se
+  // ablandó la guardia. Diego, revisando la pantalla: «prono y supino viven
+  // junto a TQT; eso es un procedimiento en caso de falla respiratoria
+  // catastrófica y es un evento aparte, no relacionado con TQT». Lo que esta
+  // guardia protege sigue en pie —que el prono esté A LA VISTA y no enterrado
+  // en el colapsable de posicionamiento, que es lo que reportó Álvaro— pero
+  // ahora tiene sección propia.
+  eq('★ y YA NO comparte sección con la traqueostomía', R.stripJuntoATqt, false);
   eq('el colapsable ya no tiene la casilla de prono', R.pronoYaNoEnPos, true);
 
   console.log('\n── Obligatorias nuevas del guardado ──');

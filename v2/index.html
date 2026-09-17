@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.5-respiratorio">
+<meta name="rce-version" content="NEXT-1.6-sedacion">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3420,7 +3420,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <option value="lt3">&lt;3</option>
                   <option value="gte3">≥3</option>
                 </select></div>
-              <div class="col wa"><label>Interpretación</label>
+              <div class="col wa" id="gCoopw"><label>Interpretación</label>
                 <select id="fCoop" onchange="aplicarGatesEval()"><option value="">-</option><option>Cooperador</option><option>No cooperador</option><option>No evaluable</option></select></div>
               <div class="col wa" id="gCAMw"><label>CAM-ICU</label>
                 <select id="fCAMICU"><option value="">-</option><option value="pos">Positivo (+)</option><option value="neg">Negativo (−)</option><option value="ne">No evaluable</option></select></div>
@@ -3498,8 +3498,15 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div class="check cr wa"><input type="checkbox" id="cDVE" onchange="hNeuroDisp()"><label for="cDVE">DVE</label></div>
               <div class="col hidden" id="gDVEalt" style="width:128px;flex-grow:0;"><label>Altura cmH₂O</label><input type="number" id="fDVEalt" min="0" max="40" step="0.5" style="width:84px;"></div>
               <div class="check cr wa"><input type="checkbox" id="cPICcaptor" onchange="hNeuroDisp()"><label for="cPICcaptor">Captor de PIC</label></div>
-              <div class="col ws hidden" id="gPIC"><label>PIC</label><input type="number" id="fPIC" style="width:70px;"></div>
-              <div class="col ws hidden" id="gPPC"><label>PPC</label><input type="number" id="fPPC" style="width:70px;"></div>
+              <div class="col ws hidden" id="gPAMmed"><label>PAM</label><input type="number" id="fPAMmed" style="width:70px;" oninput="calcPPC()"></div>
+              <div class="col ws hidden" id="gPIC"><label>PIC</label><input type="number" id="fPIC" style="width:70px;" oninput="calcPPC()"></div>
+              <!-- 🔴 17-sep-2026 · LA PPC SE CALCULA, NO SE ESCRIBE. Es PAM − PIC.
+                   Eran tres números independientes en la misma fila y se podía
+                   anotar una presión de perfusión que no cuadraba con los otros
+                   dos, sin que nada lo notara. Y faltaba la PAM MEDIDA: la que
+                   existía era la META de PAM del bloque hemodinámico, que es
+                   otra cosa. Con captor, la PAM se pide siempre. -->
+              <div class="col ws hidden" id="gPPC"><label>PPC</label><input type="number" id="fPPC" readonly tabindex="-1" title="PAM − PIC. Se calcula sola." style="width:70px;background:#f7f6f3;color:var(--muted);"></div>
             </div>
           </div>
         </div>
@@ -3732,38 +3739,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 💨 Terapia ventilatoria — <b>ya registrada arriba</b> en «Queda con (post-traqueostomía)». El estado previo del turno se guarda igual.
               </div>
 
-              <!-- 🔃 PRONO / SUPINO — al inicio de la terapia ventilatoria, junto a la
-                   TQT (pedido de Diego, ago-2026): la posición se declara donde la vista
-                   ya está, con su hora. Mismos IDs de v5.32 ⇒ fillForm, payload y los
-                   globitos ⏱ siguen intactos; solo se movió el marcado. -->
-              <div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                  <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
-                  <div class="check wa"><input type="checkbox" id="cProno" onchange="hPosEspecial('prono')"><label for="cProno">Prono</label></div>
-                  <div id="dPronoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
-                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
-                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
-                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
-                    <!-- ESTADO vs EVENTO (v5.32): la casilla de arriba dice cómo está
-                         el paciente; esta dice que la pronación se hizo ESTE turno y
-                         es la única que registra el procedimiento. -->
-                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
-                      <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
-                      <label for="cPronoEv" title="Marca solo el turno en que se realiza la pronación">Se prona este turno</label>
-                    </span>
-                  </div>
-                  <div class="check wa"><input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')"><label for="cSupino">Supino</label></div>
-                  <div id="dSupinoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
-                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
-                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
-                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
-                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
-                      <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
-                      <label for="cSupinoEv" title="Marca solo el turno en que se supina al paciente">Se supina este turno</label>
-                    </span>
-                  </div>
-                </div>
-              </div>
+
 
               <div id="dVentBloque">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
@@ -4276,6 +4252,52 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
             </div>
 
+            <!-- ▌ 🔃 PRONO / SUPINO — SECCIÓN PROPIA desde el 17-sep-2026.
+                 Vivía pegado a la traqueostomía y no tienen ninguna relación.
+                 Diego: «prono y supino viven junto a TQT; eso es un
+                 procedimiento en caso de falla respiratoria catastrófica y es
+                 un evento aparte, no relacionado con TQT».
+                 Los tres posicionamientos son cosas distintas y por eso viven
+                 separados: el decúbito LATERAL es técnica del turno (favorecer
+                 un pulmón, atelectasia) y se queda en terapia respiratoria; la
+                 CABECERA 30-45° es prevención de NAVM y se fue al paso 1; el
+                 PRONO trasciende el turno y es un evento en sí mismo — «el
+                 supino se entiende como el término del prono; lo importante es
+                 el prono».
+                 Mismos IDs: fillForm, el payload y los globitos ⏱ siguen
+                 intactos; solo cambió dónde está. -->
+            <div class="sub-sec">
+<div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                  <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
+                  <div class="check wa"><input type="checkbox" id="cProno" onchange="hPosEspecial('prono')"><label for="cProno">Prono</label></div>
+                  <div id="dPronoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
+                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
+                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
+                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
+                    <!-- ESTADO vs EVENTO (v5.32): la casilla de arriba dice cómo está
+                         el paciente; esta dice que la pronación se hizo ESTE turno y
+                         es la única que registra el procedimiento. -->
+                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
+                      <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
+                      <label for="cPronoEv" title="Marca solo el turno en que se realiza la pronación">Se prona este turno</label>
+                    </span>
+                  </div>
+                  <div class="check wa"><input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')"><label for="cSupino">Supino</label></div>
+                  <div id="dSupinoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
+                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
+                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
+                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
+                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
+                      <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
+                      <label for="cSupinoEv" title="Marca solo el turno en que se supina al paciente">Se supina este turno</label>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
             <!-- Manejo respiratorio -->
             <div class="sub-sec">
               <div class="sub-sec-title" style="color:var(--resp);margin-bottom:8px;">🫁 Manejo Respiratorio</div>
@@ -4412,7 +4434,15 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 </button>
                 <div id="dPosBody" class="hidden" style="padding:8px 10px;background:#fff;">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    <div class="check wa"><input type="checkbox" id="cPosSed" onchange="hPos()"><label for="cPosSed">Sedente &gt;45°</label></div>
+                    <!-- 🗂️ 17-sep-2026 · SALIÓ «Sedente >45°». Medido antes de
+                         cortar: RESP_POS_SED no alimenta ningún indicador ni el
+                         REM; solo aparecía en la hoja diaria y en el resumen de
+                         la entrega. Y se confundía con la cabecera 30-45°, que
+                         es prevención de NAVM y se fue al paso 1: son cosas
+                         distintas con objetivos distintos. Lo que queda acá es
+                         el decúbito LATERAL, que sí es técnica del turno para
+                         favorecer un pulmón. La columna no se borra —las
+                         posiciones del esquema son fijas—, se deja de escribir. -->
                     <div class="check wa"><input type="checkbox" id="cPosDCLD" onchange="hPos()"><label for="cPosDCLD">DCL D</label></div>
                     <div class="check wa"><input type="checkbox" id="cPosDCLI" onchange="hPos()"><label for="cPosDCLI">DCL I</label></div>
                     <!-- Prono/supino viven arriba, junto a la TQT (ago-2026). -->
@@ -7429,7 +7459,7 @@ function fillForm(s) {
      posición registrada. Se restaura el estado, el evento del turno, las horas
      y los timestamps (sin reiniciarlos: el reloj de horas en prono es del
      episodio, no de esta apertura del panel). */
-  chk('cPosSed',s.RESP_POS_SED); chk('cPosDCLD',s.RESP_POS_DCLD); chk('cPosDCLI',s.RESP_POS_DCLI);
+  chk('cPosDCLD',s.RESP_POS_DCLD); chk('cPosDCLI',s.RESP_POS_DCLI);
   chk('cProno',s.RESP_POS_PRONO); chk('cSupino',s.RESP_POS_SUPINO);
   chk('cPronoEv',s.RESP_PRONO_EVENTO); chk('cSupinoEv',s.RESP_SUPINO_EVENTO);
   set('fPronoHora',s.RESP_PRONO_HORA); set('fSupinoHora',s.RESP_SUPINO_HORA);
@@ -8717,6 +8747,9 @@ function guardar() {
     NEURO_DVE:bv('cDVE'), NEURO_DVE_ALTURA:n(v('fDVEalt')), NEURO_PIC_CAPTOR:bv('cPICcaptor'),
     HEMO_ARRITMIA:bv('cArritmia'), HEMO_ARRITMIA_TIPO:bv('cArritmia')?v('fArritmiaTipo'):'',
     HEMO_META_PAM:bv('cMetaPAM'), HEMO_PAM:bv('cMetaPAM')?n(v('fPAM')):'',
+    // 🗂️ 17-sep-2026 · La PAM MEDIDA, que es otra cosa que la META de arriba.
+    // Se pide solo con captor de PIC y es la que calcula la PPC.
+    HEMO_PAM_MED: n(v('fPAMmed')),
     EX_MP:     v('fMPVal'),
     EX_RUIDOS: v('fRuidosVal'), EX_RUIDOS_LOC: v('fRuidosLoc'),
     EX_CULT_RESULTADO: v('fCultVal'),
@@ -8796,7 +8829,7 @@ function guardar() {
     RESP_SECR_REOL: v('fSecrReol'),
     RESP_SECR_CAR:  v('fSecrCar'),
     RESP_SECR_QTY:  v('fSecrQty'),
-    RESP_POS_SED:   bv('cPosSed'),
+    RESP_POS_SED:   false,   // 🗂️ 17-sep-2026 · se dejó de escribir (ver el formulario)
     RESP_POS_DCLD:  bv('cPosDCLD'),
     RESP_POS_DCLI:  bv('cPosDCLI'),
     RESP_POS_PRONO: bv('cProno'),
@@ -12008,7 +12041,15 @@ function calcGCS() {
   // se vacía: el que evalúe, que lo escriba.
   else{if(vSel){if(vSel.value==='1T')vSel.value='';vSel.disabled=false;}}
   const o=parseInt(v('fGCSO'))||0, m=parseInt(v('fGCSM'))||0, vv=parseInt(v('fGCSV'))||1;
-  $('lblGCS').textContent=(va==='TOT'||va==='TQT')?`${o+vv+m}T`:(o+vv+m);
+  /* 🪤 17-sep-2026 · Sin medición no hay total. Desde que el Glasgow arranca
+     vacío, la suma de tres campos en blanco daba «1T» —la verbal automática
+     del intubado más dos ceros—, y ese 1 se leía como Glasgow 1 en los gates
+     de sedación: con SAS 4 se escondían la cooperación, el S5Q y el CAM-ICU
+     porque el sistema creía que el paciente estaba en coma. Lo que evalúa
+     alguien es la ocular y la motora; sin ninguna de las dos, no hay puntaje. */
+  const medido = !!(v('fGCSO') || v('fGCSM'));
+  $('lblGCS').textContent = !medido ? '--'
+    : ((va==='TOT'||va==='TQT') ? `${o+vv+m}T` : String(o+vv+m));
 }
 // calcResp(el) — sirve al bloque principal (ids r_*/l_*) y al panel «Queda con»
 // de la intubación (ids pi_*/pl_*): el prefijo se deduce del input que dispara.
@@ -12044,18 +12085,34 @@ function calcResp(el) {
   if(modo==='NRC'&&lit>0) set(L+'fio2nrc',`~${Math.min(100,21+4*lit)}%`);
 }
 function autoCoopera(){
+  // El gate de cooperación/delirium depende del SAS y del Glasgow, y los dos
+  // llegan acá: se recalcula al final (ver aplicarGatesNeuro).
   const bnm=$('cBNM')?.checked;
   const sas=parseInt(v('fSAS'))||0;
   const va=v('fVA');
   const intub=va==='TOT'||va==='TQT';
 
-  // Auto-GCS 3 si BNM o SAS=1
-  if(bnm||(sas===1)){
+  // Auto-GCS 3 si BNM o SAS=1. Validado por Diego: en SAS 1 el paciente no
+  // responde a nada, y esa evaluación da el puntaje mínimo, que son 3 puntos.
+  const auto3 = bnm || (sas === 1);
+  if(auto3){
     const o=$('fGCSO'), vv=$('fGCSV'), m=$('fGCSM');
     if(o){ o.value='1'; }
     if(vv){ vv.value=intub?'1T':'1'; }
     if(m){ m.value='1'; }
     setTimeout(calcGCS, 0);
+  } else {
+    /* 🪤 17-sep-2026 · …y al dejar de aplicar, se SUELTA. El automatismo
+       escribía 1/1T/1 en SAS 1 y ahí se quedaba: al subir a SAS 4 el paciente
+       seguía con un Glasgow 3 que nadie había medido, y los gates lo leían
+       como coma —se escondían la cooperación, el S5Q y el CAM-ICU justo en el
+       rango donde sí se piden—. Solo se borra lo que puso el automatismo (el
+       1/1T/1 exacto): un Glasgow 3 escrito a mano por alguien que de verdad
+       evaluó no se toca. */
+    const o=$('fGCSO'), vv=$('fGCSV'), m=$('fGCSM');
+    const loPusoElAuto = o && m && o.value === '1' && m.value === '1' &&
+                         vv && (vv.value === '1T' || vv.value === '1');
+    if(loPusoElAuto){ o.value=''; m.value=''; if(!intub) vv.value=''; setTimeout(calcGCS, 0); }
   }
 
   // Auto S5Q y Cooperación
@@ -12071,6 +12128,10 @@ function autoCoopera(){
     else if(s5v==='gte3'){const e=$('fCoop');if(e)e.value='Cooperador';}
   }
   aplicarGatesEval();
+  // El SAS y el Glasgow llegan los dos por acá, y son justo los que deciden si
+  // se pide cooperación, S5Q y CAM-ICU: los gates se dejan al día en el mismo
+  // gesto. Sin esto, cambiar el SAS movía los valores pero no la pantalla.
+  if(typeof aplicarGatesNeuro==='function') aplicarGatesNeuro();
 }
 
 //  CASCADAS VENTILATORIAS
@@ -12688,15 +12749,30 @@ function hNeuroDisp(limpiar){
   const verAlt = dve || (!limpiar && conValor('fDVEalt'));
   const verPic = cap || (!limpiar && (conValor('fPIC')||conValor('fPPC')));
   const gA=$('gDVEalt'); if(gA) gA.classList.toggle('hidden', !verAlt);
-  ['gPIC','gPPC'].forEach(id=>{ const e=$(id); if(e) e.classList.toggle('hidden', !verPic); });
+  ['gPAMmed','gPIC','gPPC'].forEach(id=>{ const e=$(id); if(e) e.classList.toggle('hidden', !verPic); });
+  /* 🪤 17-sep-2026 · Acá había puesto una limpieza propia («si no se ve, se
+     vacía») y un calcPPC() incondicional. Las dos cosas BORRABAN el dato de
+     una evolución ANTERIOR a esta versión: esas filas traen PIC y PPC pero no
+     traen PAM medida ni la casilla del captor, así que el recálculo las dejaba
+     en blanco y la limpieza remataba. Lo cazó neuro_dve_pic.js, que existe
+     justamente para eso. El mecanismo de no pisar lo histórico ya estaba
+     —`limpiar=false` al rellenar desde la planilla—, y es el que manda. */
+  if(v('fPAMmed')) calcPPC();
   if(limpiar){
     if(!dve){ const a=$('fDVEalt'); if(a) a.value=''; }
-    if(!cap){ ['fPIC','fPPC'].forEach(id=>{ const e=$(id); if(e) e.value=''; }); }
+    if(!cap){ ['fPAMmed','fPIC','fPPC'].forEach(id=>{ const e=$(id); if(e) e.value=''; }); }
   }
   if(typeof _rtxtLive==='function') _rtxtLive();
 }
 function hHTrend(){if($('cHTrend')?.checked)show('gHTT');else hide('gHTT');}
 function hArritmia(){ if($('cArritmia')?.checked) show('gArritmiaTipo'); else { hide('gArritmiaTipo'); const e=$('fArritmiaTipo'); if(e) e.value=''; } }
+/** PPC = PAM − PIC. Los dos números ya la determinan: no se escribe a mano. */
+function calcPPC(){
+  const e=$('fPPC'); if(!e) return;
+  const pam=parseFloat(v('fPAMmed')), pic=parseFloat(v('fPIC'));
+  e.value = (isNaN(pam)||isNaN(pic)) ? '' : String(Math.round(pam-pic));
+}
+
 function hMetaPAM(){ if($('cMetaPAM')?.checked) show('gPAM'); else { hide('gPAM'); const e=$('fPAM'); if(e) e.value=''; } }
 function loadMP(str){
   if($('fMPVal')) $('fMPVal').value=str||'';
@@ -13502,10 +13578,19 @@ function _mPacBar(){
  * El envoltorio también deja intactos los gates: ellos esconden el bloque de
  * adentro (`dVentBloque`), el plegado esconde el de afuera. No se pisan.
  */
+/* 🪤 17-sep-2026 · `sub` ERA UN ÍNDICE, y el comentario de abajo decía que los
+   cortes se declaran «por ID y no por posición». Solo era verdad a medias: el
+   `desde` sí es un id, pero la SUB-SECCIÓN que lo aloja se elegía por número
+   de orden. Al darle al prono su propia sección —una más en el mismo cuerpo—
+   todos los números se corrieron: el chip «⏱ 20,3 h en prono» quedó metido en
+   el grupo equivocado y en el celular salía con ancho cero, o sea invisible,
+   en la pantalla donde se hace la ronda.
+   Ahora la sub-sección se identifica por un id que VIVE dentro de ella. Se
+   puede agregar, quitar o reordenar secciones sin tocar esta tabla. */
 const M_SUBS=[
-  {id:'msVent', t:'💨 Ventilación',                 sub:0, desde:'dTqtSec',     abierto:true},
-  {id:'msEvt',  t:'✂️ Eventos de vía aérea',        sub:0, desde:'dDesvincSec', abierto:false},
-  {id:'msMan',  t:'🫁 Manejo respiratorio',         sub:1, desde:null,          abierto:false},
+  {id:'msVent', t:'💨 Ventilación',          en:'dTqtSec',     desde:'dTqtSec',     abierto:true},
+  {id:'msEvt',  t:'✂️ Eventos de vía aérea', en:'dTqtSec',     desde:'dDesvincSec', abierto:false},
+  {id:'msMan',  t:'🫁 Manejo respiratorio',  en:'dPosBody',    desde:null,          abierto:false},
 ];
 function _mSubBloques(){
   const anc=$('fSop'); if(!anc) return;
@@ -13517,12 +13602,16 @@ function _mSubBloques(){
   // Los cortes se declaran por ID y no por posición: si mañana se agrega un
   // bloque dentro de un rango, cae solo en el grupo que le toca.
   M_SUBS.forEach(cfg=>{
-    const host=subs[cfg.sub]; if(!host) return;
+    // La sub-sección se busca por un id que vive DENTRO de ella, nunca por su
+    // número de orden: agregar una sección más no debe mover los cortes.
+    const marca=$(cfg.en);
+    const host=marca ? subs.find(x=>x.contains(marca)) : null;
+    if(!host) return;
     const hijos=[...host.children].filter(x=>!x.classList.contains('msub'));
     let ini=0;
     if(cfg.desde){ const i=hijos.findIndex(x=>x.id===cfg.desde); if(i===-1) return; ini=i; }
     // hasta el próximo corte declarado en la MISMA sub-sección
-    const cortes=M_SUBS.filter(o=>o.sub===cfg.sub && o.desde).map(o=>o.desde);
+    const cortes=M_SUBS.filter(o=>o.en===cfg.en && o.desde).map(o=>o.desde);
     let fin=hijos.length;
     for(let k=ini+1;k<hijos.length;k++){ if(cortes.indexOf(hijos[k].id)!==-1){ fin=k; break; } }
     const trozo=hijos.slice(ini,fin);
@@ -15913,10 +16002,35 @@ function hKTMnoRaz(){
 function aplicarGatesNeuro(){
   const sas=parseInt(v('fSAS'));
   const gcs=parseInt($('lblGCS')?.textContent)||15;
-  // S5Q y CAM-ICU: requieren SAS 3-4 (o sin sedación) y GCS ≥ 8
-  const ocultarS5Q=(!isNaN(sas)&&sas<3)||gcs<8;
-  ['gS5Qw','gCAMw'].forEach(id=>{ const e=$(id); if(e) e.classList.toggle('hidden', ocultarS5Q); });
-  if(ocultarS5Q){ const c=$('fCAMICU'); if(c) c.value=''; }
+  /* 🔴 17-sep-2026 · LOS GATES POR LOS DOS EXTREMOS, Y EL CAM APARTE.
+     Antes una sola condición escondía el S5Q Y el CAM-ICU, y solo miraba el
+     extremo bajo. Diego, revisando la escala de Riker campo por campo:
+
+       · SAS 1-2 — el paciente no responde o no despierta al estímulo: no hay
+         cooperación que evaluar, y tampoco delirium que buscar.
+       · SAS 3-4-5 — despierta, obedece, se calma a la contención verbal: los
+         tres se piden. «En SAS 5 también hay un grado de cooperación».
+       · SAS 6-7 — «son agitaciones que no se logran calmar, muerde el tubo»:
+         NO hay cooperación evaluable…
+
+     …🔴 pero el CAM-ICU SÍ SE PIDE, y ese es el punto que faltaba. El CAM-ICU
+     tiene PISO (no se aplica con sedación profunda) pero NO TIENE TECHO, y la
+     agitación de un SAS 6-7 es justamente donde vive el DELIRIUM HIPERACTIVO
+     —el más frecuente en UCI y el que más impacta al equipo—. Esconderlo ahí
+     era perder el diagnóstico justo donde salta a la vista.
+
+     El Glasgow no entra en ninguno de estos gates: se puede medir siempre.
+     En un SAS 1 da 3 puntos, y eso es un dato. */
+  // 🪤 El Glasgow solo pesa si alguien lo MIDIÓ: un formulario en blanco no
+  // es un paciente en coma. Sin medición, quien decide es el SAS.
+  const gcsMedido = !!(v('fGCSO') || v('fGCSM'));
+  const sedProfunda = (!isNaN(sas) && sas <= 2) || (gcsMedido && gcs < 8);
+  const agitado     = !isNaN(sas) && sas >= 6;
+  const sinCooperacion = sedProfunda || agitado;
+  ['gS5Qw','gCoopw'].forEach(id=>{ const e=$(id); if(e) e.classList.toggle('hidden', sinCooperacion); });
+  const eCam=$('gCAMw'); if(eCam) eCam.classList.toggle('hidden', sedProfunda);
+  if(sinCooperacion){ const s5=$('fS5Q'); if(s5 && !sedProfunda) s5.value=''; }
+  if(sedProfunda){ const c=$('fCAMICU'); if(c) c.value=''; }
   // UPOT: (TOT|TQT) + GCS ≤ 7 + sin sedación
   const va=v('fVA');
   const upotVisible=(va==='TOT'||va==='TQT') && gcs<=7 && v('fSed')==='Sin sedación';

@@ -120,7 +120,7 @@ const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk 
     $('cPronoEv').checked = true;
     r.conEvento = _autoProcs().filter(x => /PRONO/.test(x));
     const guardado = { RESP_POS_PRONO: true, RESP_PRONO_EVENTO: true, RESP_PRONO_HORA: '19:00',
-                       RESP_POS_SED: true, RESP_POS_LIBRE: 'almohadas bajo tórax',
+                       RESP_POS_DCLD: true, RESP_POS_LIBRE: 'almohadas bajo tórax',
                        RESP_PRONO_TS: '1754000000000' };
 
     // Turno de Mauricio: replica y describe que SIGUE en prono
@@ -137,7 +137,12 @@ const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk 
     r.reedProno = !!$('cProno').checked;
     r.reedEvento = !!$('cPronoEv').checked;
     r.reedHora = $('fPronoHora').value;
-    r.reedSed = !!$('cPosSed').checked;
+    // 🗂️ 17-sep-2026 · «Sedente >45°» salió del formulario: medido antes de
+    // cortar, RESP_POS_SED no alimenta ningún indicador ni el REM, y se
+    // confundía con la cabecera 30-45°, que es prevención de NAVM y se fue al
+    // paso 1. Lo que esta guardia protege —que re-editar conserve el resto del
+    // posicionamiento— se mide ahora con el decúbito lateral, que sí se queda.
+    r.reedSed = !!$('cPosDCLD').checked;
     r.reedLibre = $('fPosLibre').value;
     r.reedProcs = _autoProcs().filter(x => /PRONO/.test(x));
 
@@ -176,7 +181,7 @@ const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk 
   eq('re-editar conserva la posición', R.reedProno, true);
   eq('re-editar conserva el evento declarado', R.reedEvento, true);
   eq('re-editar conserva la hora', R.reedHora, '19:00');
-  eq('re-editar conserva el resto del posicionamiento', R.reedSed, true);
+  eq('re-editar conserva el resto del posicionamiento (decúbito lateral)', R.reedSed, true);
   eq('re-editar conserva el texto libre', R.reedLibre, 'almohadas bajo tórax');
   eq('re-editar NO duplica ni pierde el procedimiento', R.reedProcs.join('|'), 'PRONO 19:00 HRS');
   eq('quitar la posición apaga el evento', R.apagaEvento, true);

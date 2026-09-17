@@ -1454,3 +1454,83 @@ esa misma casilla — no 📷, como había puesto en la tanda anterior. Que los 
 digan lo mismo importa: es el mismo evento.
 
 **171 guardias · 171 verdes.** Nueva: `via_aerea_en_respiratorio.js`.
+
+---
+
+## 17-sep-2026 · El prono se separa de la TQT, los gates por los dos extremos, y la PPC se calcula
+
+Cuarta tanda: §3.2, §3.4 y §3.7 del PRD.
+
+### El prono no es asunto de la traqueostomía
+
+Vivían pegados en la misma sección y no tienen ninguna relación. Diego: *«prono
+y supino viven junto a TQT; eso es un procedimiento en caso de falla
+respiratoria catastrófica y es un evento aparte»*. Los tres posicionamientos son
+cosas distintas y ahora viven separados:
+
+- **Decúbito lateral** → técnica del turno (favorecer un pulmón, atelectasia).
+  Se queda en terapia respiratoria.
+- **Cabecera 30-45°** → prevención de NAVM. Se fue al paso 1.
+- **Prono / supino** → evento que trasciende el turno, en sección propia.
+
+**«Sedente >45°» salió.** Medido antes de cortar: `RESP_POS_SED` no alimenta
+ningún indicador ni el REM, solo aparecía en la hoja diaria y en el resumen de
+la entrega. Y se confundía con la cabecera, que es otra cosa con otro objetivo.
+
+### 🪤 Mover una sección destapó un corte por posición
+
+`M_SUBS` —los sub-bloques plegables del celular— decía en su propio comentario
+que los cortes «se declaran por ID y no por posición». Era verdad a medias: el
+`desde` sí era un id, pero la sub-sección que lo aloja se elegía **por número de
+orden**. Al darle al prono su propia sección, todos los números se corrieron y
+el chip «⏱ 20,3 h en prono» quedó en el grupo equivocado, con ancho cero — o
+sea invisible, en la pantalla donde se hace la ronda. Ahora la sub-sección se
+identifica por un id que vive dentro de ella.
+
+### Los gates de sedación, por los dos extremos
+
+El extremo bajo ya funcionaba. Faltaba el alto, y sobre todo faltaba **separar
+el CAM-ICU de la cooperación**:
+
+| | SAS 1-2 | SAS 3-4-5 | SAS 6-7 |
+|---|---|---|---|
+| Cooperación y S5Q | no | sí | **no** |
+| CAM-ICU | no | sí | **sí** |
+
+🔴 El CAM-ICU tiene **piso pero no techo**: se esconde con sedación profunda,
+nunca por agitación. La agitación de un SAS 6-7 es justamente donde vive el
+delirium hiperactivo —el más frecuente en UCI y el que más impacta al equipo—,
+así que esconderlo ahí era perder el diagnóstico donde salta a la vista.
+
+El Glasgow no entra en ningún gate: se puede medir siempre.
+
+### 🪤 Dos efectos cruzados con la tanda del Glasgow
+
+1. **El total inventaba un número.** Desde que el Glasgow arranca vacío, la suma
+   de tres campos en blanco daba «1T» —la verbal automática del intubado más dos
+   ceros— y ese 1 se leía como Glasgow 1 en los gates: con SAS 4 se escondían la
+   cooperación, el S5Q y el CAM-ICU porque el sistema creía que el paciente
+   estaba en coma. Sin medición no hay total: el rótulo dice «--».
+
+2. **El Glasgow automático quedaba pegado.** El automatismo escribe 1/1T/1 en
+   SAS 1 —validado por Diego, es correcto: en SAS 1 la evaluación da 3 puntos—
+   pero al subir a SAS 4 el paciente seguía con un Glasgow 3 que nadie había
+   medido. Ahora se suelta, y solo se borra lo que puso el automatismo: un
+   Glasgow 3 escrito a mano por alguien que de verdad evaluó no se toca.
+
+### La PPC se calcula
+
+Es PAM − PIC. Eran tres números independientes en la misma fila y se podía
+anotar una presión de perfusión que no cuadraba con los otros dos. Faltaba
+además la **PAM medida**: la única PAM que existía era `HEMO_PAM`, que es la
+*meta* del bloque hemodinámico — otra cosa. Columna nueva al final
+(`HEMO_PAM_MED`, total 406), se pide solo con captor, y la PPC pasó a ser de
+solo lectura.
+
+🪤 **Y una guardia cazó un bug que introduje al hacerlo**: mi limpieza «si no se
+ve, se vacía» más un recálculo incondicional **borraban la PIC y la PPC de una
+evolución anterior a esta versión** —esas filas traen PIC y PPC pero no PAM
+medida ni la casilla del captor—. `neuro_dve_pic.js` existe exactamente para
+eso. El mecanismo de no pisar lo histórico ya estaba y es el que manda.
+
+**172 guardias · 172 verdes.** Nueva: `sedacion_prono_ppc.js`.

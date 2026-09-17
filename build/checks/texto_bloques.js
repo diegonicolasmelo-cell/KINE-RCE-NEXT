@@ -48,7 +48,10 @@ const { chromium } = require('playwright-core');
     $('r_fio2').value = '35'; $('r_spo2').value = '98';
     calcResp($('r_ppl'));
     $('cInhalo').checked = true;
-    $('cPosSed').checked = true;
+    // 🗂️ 17-sep-2026 · «Sedente >45°» salió del formulario (no alimentaba
+    // indicador ni REM, y se confundía con la cabecera de prevención de
+    // NAVM). El posicionamiento del turno que sí se queda es el lateral.
+    $('cPosDCLD').checked = true;
     $('cEduReal').checked = true;
     $('fMRC').value = '46';
     $('fPlanes').value = 'Continuar KTR según necesidad';

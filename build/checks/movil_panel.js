@@ -205,8 +205,12 @@ const MONTAR = () => {
   eq('son tres sub-bloques', R5.n, 3);
   eq('…con los nombres de la ronda', R5.titulos,
     '💨 Ventilación | ✂️ Eventos de vía aérea | 🫁 Manejo respiratorio');
+  // 🗂️ 17-sep-2026 · `dPronoStrip` salió de esta secuencia: el prono dejó de
+  // vivir pegado a la traqueostomía y tiene sección propia (no tienen ninguna
+  // relación — un prono es una falla respiratoria catastrófica). Lo que esta
+  // línea protege no cambió: que agrupar en sub-bloques NO reordene la sábana.
   eq('★ el orden de la sábana NO cambió',
-    R5.orden.indexOf('dTqtSec,avisoVentTqt,dPronoStrip,dVentBloque'), 0);
+    R5.orden.indexOf('dTqtSec,avisoVentTqt,dVentBloque'), 0);
   eq('…y los eventos van después, como estaban',
     /dDesvincSec,dDecanSec,dExtSec/.test(R5.orden), true);
   eq('Ventilación arranca abierta', R5.ventAbierto, true);
