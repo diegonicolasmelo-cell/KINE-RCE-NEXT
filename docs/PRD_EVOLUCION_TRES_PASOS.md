@@ -1,6 +1,9 @@
 # PRD · La evolución en tres pasos — el rediseño de NEXT
 
-**Estado**: las cuatro tandas construidas y verdes (16-sep-2026); falta la revisión campo por campo con Diego. **Dueño**: Diego Melo Villagrán.
+**Estado**: las cuatro tandas construidas y verdes (16-sep-2026). La revisión
+campo por campo YA SE HIZO (16 y 17-sep) y sus decisiones viven en
+`PRD_REVISION_CAMPO_POR_CAMPO.md`, que además convierte el camino de TRES
+pasos en uno de CUATRO (la prevención de NAVM entra al inicio). **Dueño**: Diego Melo Villagrán.
 **Escribe**: Claude, 16-sep-2026.
 **Alcance**: el camino de registro de un turno. **Fuera**: el modelo de datos de
 la rama episodio/turno (ya está y no se toca), la PWA y el login (hechos), la
