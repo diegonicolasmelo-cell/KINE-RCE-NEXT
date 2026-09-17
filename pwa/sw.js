@@ -18,7 +18,7 @@
  * archivo y no cambió nada», que es el peor rato de depuración que hay porque
  * el código nuevo SÍ está.
  */
-const CACHE = 'rce-armazon-NEXT-1.2-navm';
+const CACHE = 'rce-armazon-NEXT-1.3-bugs';
 const ARMAZON = ['.', 'index.html', 'manifest.webmanifest',
   'iconos/icono-192.png', 'iconos/icono-512.png', 'iconos/icono-apple-180.png'];
 

@@ -2574,7 +2574,11 @@ function _entFicha(id, c, e, episodio, cultivo, fecha, fechaEf, turno, ePrev) {
         (ev.PROC_RCP_DET ? ' — ' + ev.PROC_RCP_DET : ''));
     }
     if (esVerdadero(ev.PROC_PABELLON)) otro('🏥 Traslado a pabellón ' + f);
-    if (esVerdadero(ev.PROC_IMAGEN)) otro('🩻 Traslado a imagenología ' + f);
+    // 🪤 Llevaba 🩻 (2021), que la fuente del Chrome del hospital (Windows 10)
+    // no trae: salía un cuadrado. Diego lo vio el 6-sep. En la pantalla el
+    // ícono ya se había cambiado por un SVG propio; acá, que es texto plano
+    // de la entrega, va un emoji anterior a 2019.
+    if (esVerdadero(ev.PROC_IMAGEN)) otro('📷 Traslado a imagenología ' + f);
     if (esVerdadero(ev.DESVINC_OCURRIO)) {
       const hrs = String(ev.DESVINC_HORAS || '').replace('.', ',');
       hito('<b>🔌 Desvinculación de VM ' + f + (ev.DESVINC_HORA ? ' ' + ev.DESVINC_HORA : '') +
@@ -2888,8 +2892,8 @@ function _entFicha(id, c, e, episodio, cultivo, fecha, fechaEf, turno, ePrev) {
 
 /**
  * ¿Este turno cumplía el tamizaje de candidato a PVE sin registrar PVE?
- * MISMOS criterios que _syncCamaDesdeEvolucion (svc_evoluciones.gs): FiO₂ ≤50,
- * PEEP ≤8, SpO₂ ≥90, HDN estable sin DVA altas, sin BNM, en VM. Sirve para
+ * MISMOS criterios que _syncCamaDesdeEvolucion (svc_evoluciones.gs): FiO2 ≤50,
+ * PEEP ≤8, SpO2 ≥90, HDN estable sin DVA altas, sin BNM, en VM. Sirve para
  * derivar la racha de turnos candidato sin PVE desde el episodio.
  */
 function _turnoCandidatoPve(e) {
@@ -2936,12 +2940,12 @@ function _entParams(e) {
     const x = e[key];
     if (x !== '' && x !== null && x !== undefined) out.push(lbl + ' ' + x);
   };
-  push('FiO₂', 'VENT_FIO2'); push('PEEP', 'VENT_PEEP'); push('PS', 'VENT_PS');
+  push('FiO2', 'VENT_FIO2'); push('PEEP', 'VENT_PEEP'); push('PS', 'VENT_PS');
   push('IPAP', 'VENT_IPAP'); push('EPAP', 'VENT_EPAP');
-  push('VT', 'VENT_VT'); push('FR', 'VENT_FR'); push('SpO₂', 'VENT_SPO2');
+  push('VT', 'VENT_VT'); push('FR', 'VENT_FR'); push('SpO2', 'VENT_SPO2');
   // Litros y flujo POR SOPORTE (decisión de Diego, ago-2026): los litros solo
   // aportan con naricera o mascarilla simple, el flujo solo con CNAF, y la
-  // Venturi (MMV) va SOLO con su FiO₂. En VM ninguno de los dos dice nada y
+  // Venturi (MMV) va SOLO con su FiO2. En VM ninguno de los dos dice nada y
   // arrastrarlos ensuciaba la línea con restos del soporte anterior.
   const sop = String(e.VENT_SOPORTE || ''), modo = String(e.VENT_MODO || '');
   const esCNAF = sop === 'CNAF' || /^(CNAF|OAF\/CTAF)$/i.test(modo);

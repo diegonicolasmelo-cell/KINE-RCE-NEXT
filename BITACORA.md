@@ -1240,3 +1240,102 @@ escrita, ninguna con una excepción.
 **168 guardias · 168 verdes.** `prevencion_navm.js` es la nueva (32
 comprobaciones en siete secciones), y se vio roja con 14 fallos antes de
 escribir una línea de código.
+
+---
+
+## 17-sep-2026 · Los dos motores del relato contaban distinto
+
+Segunda tanda del PRD de la revisión campo por campo: los bugs medidos.
+
+### El hallazgo de fondo
+
+El relato se arma en **dos lados**: el navegador lo muestra en vivo mientras se
+llena el formulario, y el servidor lo **regenera** para la entrega de turno y la
+hoja impresa. Son dos motores sobre los mismos datos, y se fueron separando sin
+que nadie lo notara, porque nadie mira las dos salidas a la vez.
+
+La guardia nueva `relato_espejo.js` arma **un solo juego de datos**, se lo da a
+los dos motores y exige que digan lo mismo. Es la guardia de raíz: la próxima
+divergencia sale el día que se escribe, no seis meses después.
+
+### 🔴 «(día ?)» en toda evolución con vía aérea artificial
+
+El navegador calculaba los días de tubo o traqueostomía, los mostraba en su
+recuadro y los narraba —«VAA mediante TOT N° 7.5 a 22 cm de arcada dental (día
+6)»— pero **nunca los mandaba en el guardado**. El servidor leía la columna
+vacía y escribía «(día ?)». O sea que toda evolución con vía aérea artificial
+salía impresa con un signo de pregunta donde iba el día, mientras en pantalla se
+veía bien. Una línea de payload: `DIAS_VA: v('fDiasVA')`.
+
+### 🔴 El Glasgow venía puesto de fábrica
+
+Los tres desplegables nacían con `selected`: O:4, V:5, M:6. Toda evolución abría
+con **GCS 15 ya escrito** y se guardaba así aunque nadie hubiera evaluado al
+paciente. Un 15 de fábrica en la ficha de uno sedado no es un dato faltante: es
+un dato **falso**, y se lee igual que uno medido.
+
+Ahora arrancan vacíos y el relato solo lo nombra si alguien lo midió, en los dos
+motores. Se hereda del turno anterior — ya estaba en `_HER_CAMPOS`.
+
+**Dos cosas que aparecieron al arreglarlo:**
+
+- **La verbal automática no es una medición.** Con vía aérea artificial el
+  formulario pone V=1T y la bloquea, y eso está bien: un paciente intubado no
+  puede emitir respuesta verbal. Pero entonces lo que alguien *evalúa* es la
+  ocular y la motora, y la condición para narrar es esa, no las tres.
+- 🪤 **Un segundo valor de fábrica, escondido en el automatismo.** Al dejar de
+  estar intubado, `calcGCS` ponía la verbal en **5** («orientado»), que es el
+  mejor puntaje posible y nadie lo había evaluado. Era el mismo bug que se
+  acababa de sacar de los desplegables, una capa más abajo.
+
+🔴 Lo que **no** se hizo, porque Diego lo corrigió expresamente: el Glasgow no
+se esconde nunca por sedación profunda. *«El Glasgow igual uno lo puede evaluar
+en caso de que un paciente esté profundamente sedado, ya que la evaluación ahí
+me va a dar el puntaje mínimo, que son tres puntos… podría ser SAS 1 Glasgow
+3»*. La guardia lo fija.
+
+### Los subíndices
+
+El motor de texto usaba las **dos formas**: la misma evolución decía «FiO2 40%»
+en una línea y «FiO₂ 40%» en otra. Veinticinco apariciones en `dominio_texto.gs`
+y `svc_entrega.gs` pasaron a la forma llana, que es la decisión de Diego: todo
+llano en el texto clínico. Las **etiquetas de la pantalla** no se tocaron: en un
+`<label>` el subíndice se ve bien y no es lo que él reportó.
+
+### UPOT no afirma sola
+
+Decía «Paciente en seguimiento por UPOT, **con sospecha de muerte cerebral**».
+Es una afirmación clínica fuerte y la escribía sola la casilla: el colega
+marcaba «seguimiento por UPOT» y la evolución afirmaba una sospecha diagnóstica
+que él no había escrito. Ahora dice solo lo que es.
+
+### El 🩻 de la entrega impresa
+
+En la pantalla el ícono ya se había cambiado por un SVG propio el 6-sep, cuando
+Diego lo vio salir como un cuadrado. En `svc_entrega.gs` —texto plano— seguía
+puesto. Pasó a 📷 (2010). Los **comentarios** que recuerdan por qué no se usa se
+quedan: son la memoria del bug.
+
+### Lo que NO había que arreglar
+
+El PRD anotaba que el IMT y la EMS divergían entre los dos motores (en pantalla
+sin parámetros, en el servidor con todos). **Al medirlo hoy con la guardia
+nueva, los dos coinciden**: ambos narran las series, el porcentaje de PiMáx, los
+minutos, el descanso, los Hz, los mA y el ancho de pulso. Esa divergencia ya no
+existe, y tampoco la de «con asistencia asistencia mínima». Sí quedaba viva la
+de los minutos: «(20 min)» en pantalla contra «durante 20 minutos» en el
+servidor. Se unificó hacia la del servidor, que es la que se lee como frase.
+
+### 🪤 La trampa de la guardia que se pone roja por su propia documentación
+
+Dos comprobaciones buscaban «sospecha de muerte cerebral» y «🩻» **grepeando el
+fuente entero**. Después de arreglar el código seguían rojas: los comentarios
+que explican el arreglo contienen la frase y el emoji. Se reescribieron para
+medir lo que los motores **escriben**, y en el caso del emoji, solo las cadenas
+literales — con un control que exige que el comentario siga ahí.
+
+### La batería
+
+**170 guardias · 170 verdes.** Dos nuevas: `relato_espejo.js` (27
+comprobaciones) y `glasgow_medido.js` (18). `afinado.js` se actualizó a la forma
+llana con su razón escrita.

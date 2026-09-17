@@ -115,7 +115,15 @@ function generarTextoEvolucion(d) {
              : `Sedado${vigilTxt} ${escTxt}${sasTxt}${farmTxt}.`;
   // GCS: el total (SED_GCS_TOT="11T") y la verbal (SED_GCS_V="1T") ya vienen con
   // "T" desde el cliente en intubado; /15 solo para paciente sin VA artificial.
-  sedStr += ` GCS ${gcsTot}${intubado ? '' : '/15'} (O:${gcsO}, V:${gcsV}, M:${gcsM})`;
+  /* 🔴 17-sep-2026 · Solo si alguien lo MIDIÓ. Ver la nota del cliente
+     (index.html, genTexto): el Glasgow venía puesto de fábrica en 15. Acá
+     el efecto era todavía más feo, porque sin medición los valores llegan
+     vacíos y el relato escribía «GCS ? (O:?, V:?, M:?)». Espejo del cliente. */
+  // La verbal NO cuenta como medición: en un paciente con vía aérea
+  // artificial la pone el propio formulario en 1T (no puede emitir
+  // respuesta verbal). Lo que alguien evalúa es la ocular y la motora.
+  if (v('SED_GCS_O') || v('SED_GCS_M'))
+    sedStr += ` GCS ${gcsTot}${intubado ? '' : '/15'} (O:${gcsO}, V:${gcsV}, M:${gcsM})`;
   const s5qTxt = s5q === 'lt3' ? '<3' : (s5q === 'gte3' ? '≥3' : s5q);
   if (s5q)  sedStr += `, S5Q ${s5qTxt}/5`;
   // Cooperación: solo si NO está profundamente sedado (SAS ≠ 1-2 o GCS > 7).
@@ -229,8 +237,8 @@ function generarTextoEvolucion(d) {
     const j = a => a.filter(Boolean).join(', ');
     const l1 = j([
       vt > 0 ? `Vti ${vt} ml${mlkg > 0 ? ` (${mlkg} ml/kg PI)` : ''}` : null,
-      ps > 0 ? `PS ${ps} cmH₂O` : null,
-      pinsp > 0 ? `Pinsp ${pinsp} cmH₂O` : null,
+      ps > 0 ? `PS ${ps} cmH2O` : null,
+      pinsp > 0 ? `Pinsp ${pinsp} cmH2O` : null,
       fr > 0 ? `FR ${fr} rpm` : null,
       vm > 0 ? `VM ${vm} L/min` : null,
       flujo > 0 ? `Flujo ${flujo} L/min` : null,
@@ -239,19 +247,19 @@ function generarTextoEvolucion(d) {
       tobin > 0 ? `Índice de Tobin ${tobin}` : null,
     ]);
     const l2 = j([
-      pmax > 0 ? `Pmax ${pmax} cmH₂O` : null,
-      pmedia > 0 ? `Pmedia ${pmedia} cmH₂O` : null,
-      peep > 0 ? `PEEP ${peep} cmH₂O` : null,
-      ppl > 0 ? `Ppl ${ppl} cmH₂O` : null,
-      autopeep > 0 ? `AutoPEEP ${autopeep} cmH₂O` : null,
-      dp > 0 ? `DP ${dp} cmH₂O` : null,
-      cesr > 0 ? `Cesr ${cesr} ml/cmH₂O` : null,
+      pmax > 0 ? `Pmax ${pmax} cmH2O` : null,
+      pmedia > 0 ? `Pmedia ${pmedia} cmH2O` : null,
+      peep > 0 ? `PEEP ${peep} cmH2O` : null,
+      ppl > 0 ? `Ppl ${ppl} cmH2O` : null,
+      autopeep > 0 ? `AutoPEEP ${autopeep} cmH2O` : null,
+      dp > 0 ? `DP ${dp} cmH2O` : null,
+      cesr > 0 ? `Cesr ${cesr} ml/cmH2O` : null,
     ]);
     const umaVM = v('KTM_UMA');
     const l3 = j([
-      fio2 > 0 ? `FiO₂ ${fio2}%` : null,
-      spo2 > 0 ? `SpO₂ ${spo2}%` : null,
-      pafi > 0 ? `PaFiO₂ ${pafi}` : null,
+      fio2 > 0 ? `FiO2 ${fio2}%` : null,
+      spo2 > 0 ? `SpO2 ${spo2}%` : null,
+      pafi > 0 ? `PaFiO2 ${pafi}` : null,
       umaVM ? `UMA ${umaVM}` : null,
     ]);
     if (l1) txt.push(`Parámetros: ${l1}.`);
@@ -260,13 +268,13 @@ function generarTextoEvolucion(d) {
   } else if (sop === 'VNI') {
     const ipapMax = vn('VENT_IPAP_MAX');
     // Modo CPAP: la presión única viaja en la columna del PEEP — narrar
-    // IPAP/EPAP dejaba «IPAP ?/? cmH₂O» (reporte de Diego, ago-2026).
-    if (modo === 'CPAP') ventStr = `En VNI modo CPAP, CPAP ${peep > 0 ? peep : '?'} cmH₂O`;
-    else ventStr = `En VNI modo ${modo}, IPAP ${ipap > 0 ? ipap : '?'}${ipapMax > 0 ? '–' + ipapMax : ''}/${epap > 0 ? epap : '?'} cmH₂O`;
+    // IPAP/EPAP dejaba «IPAP ?/? cmH2O» (reporte de Diego, ago-2026).
+    if (modo === 'CPAP') ventStr = `En VNI modo CPAP, CPAP ${peep > 0 ? peep : '?'} cmH2O`;
+    else ventStr = `En VNI modo ${modo}, IPAP ${ipap > 0 ? ipap : '?'}${ipapMax > 0 ? '–' + ipapMax : ''}/${epap > 0 ? epap : '?'} cmH2O`;
     if (vt > 0) ventStr += `, VT ${vt} ml`;
-    if (fio2 > 0) ventStr += `, FiO₂ ${fio2}%`;
-    if (spo2 > 0) ventStr += `, SpO₂ ${spo2}%`;
-    if (pafi > 0) ventStr += `, PaFiO₂ ${pafi}`;
+    if (fio2 > 0) ventStr += `, FiO2 ${fio2}%`;
+    if (spo2 > 0) ventStr += `, SpO2 ${spo2}%`;
+    if (pafi > 0) ventStr += `, PaFiO2 ${pafi}`;
     txt.push(ventStr + '.');
   // 🪤 Y «CTAF» —el alto flujo por traqueostomía desde ago-2026— faltaba acá:
   // se narraba con el párrafo genérico, sin flujo, sin T° y sin ROX.
@@ -611,8 +619,8 @@ function generarTextoEvolucion(d) {
     if (v('EVAL_T_DINAMO')) ev.push(`Dinamometría ${v('EVAL_T_DINAMO')} kg`);
     if (v('EVAL_T_FSS')) ev.push(`FSS-ICU ${v('EVAL_T_FSS')}/35`);
     if (v('CPAX_TOTAL')) ev.push(`CPAx ${v('CPAX_TOTAL')}/50`);
-    if (v('EVAL_T_PIM')) ev.push(`PIM ${v('EVAL_T_PIM')} cmH₂O`);
-    if (v('EVAL_T_PEM')) ev.push(`PEM ${v('EVAL_T_PEM')} cmH₂O`);
+    if (v('EVAL_T_PIM')) ev.push(`PIM ${v('EVAL_T_PIM')} cmH2O`);
+    if (v('EVAL_T_PEM')) ev.push(`PEM ${v('EVAL_T_PEM')} cmH2O`);
     if (v('EVAL_T_FEM')) ev.push(`FEM ${v('EVAL_T_FEM')} L/min`);
     if (v('EVAL_T_GROSOR')) ev.push(`Grosor diafragmático ${v('EVAL_T_GROSOR')} mm`);
     if (v('EVAL_T_HALLAZGOS')) ev.push(`Ecografía: ${v('EVAL_T_HALLAZGOS')}`);
@@ -625,7 +633,11 @@ function generarTextoEvolucion(d) {
 
   // UPOT (procuramiento)
   if (esVerdadero(d.UPOT_ACTIVO)) {
-    let u = 'Paciente en seguimiento por UPOT, con sospecha de muerte cerebral';
+    /* 🔴 17-sep-2026 · Decía «, con sospecha de muerte cerebral». Es una
+       afirmación clínica fuerte y la escribía SOLA la casilla de UPOT: el
+       colega marcaba «seguimiento por UPOT» y la evolución afirmaba una
+       sospecha diagnóstica que él no había escrito. Espejo del cliente. */
+    let u = 'Paciente en seguimiento por UPOT';
     const ap = v('APNEA_TEST');
     if (ap) u += `. Test de apnea ${ap.toLowerCase()}`;
     if (esVerdadero(d.UPOT_MEDIDAS)) u += '. Se mantienen medidas de protección de órganos';

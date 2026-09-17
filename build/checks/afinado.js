@@ -58,12 +58,16 @@ eq('…y los litros no', /L 3/.test(fx['2'].params), false);
 eq('Naricera: los litros SÍ van', /L 3/.test(fx['3'].params), true);
 eq('…y el flujo no', /Flujo 50/.test(fx['3'].params), false);
 eq('Venturi (MMV): solo FiO₂ — ni litros ni flujo', /L 3|Flujo 50/.test(fx['4'].params), false);
-eq('…pero la FiO₂ sí está', /FiO₂ 40/.test(fx['4'].params), true);
+// 🗂️ 17-sep-2026 · SUBÍNDICES FUERA DEL TEXTO CLÍNICO (decisión de Diego en
+// la revisión campo por campo). El motor usaba las DOS formas y la misma
+// evolución decía «FiO2 40%» en una línea y «FiO₂ 40%» en otra. Ahora todo
+// llano, en los dos motores. Lo fija relato_espejo.js.
+eq('…pero la FiO2 sí está', /FiO2 40/.test(fx['4'].params), true);
 
 // — Motor de texto del servidor —
 const gen = d => generarTextoEvolucion(Object.assign({ TURNO: 'Dia', PLAN_FIRMA_KINE: 'K' }, d));
 const tCpap = gen({ VENT_SOPORTE: 'VNI', VENT_MODO: 'CPAP', VENT_PEEP: 8, VENT_FIO2: 40 });
-eq('CPAP narra su presión única', /En VNI modo CPAP, CPAP 8 cmH₂O/.test(tCpap), true);
+eq('CPAP narra su presión única', /En VNI modo CPAP, CPAP 8 cmH2O/.test(tCpap), true);
 eq('…sin el «IPAP ?/?» de antes', /IPAP \?/.test(tCpap), false);
 const tAusc = gen({ EX_MP: 'Presente Bilateral', EX_RUIDOS: 'Sin ruidos agregados' });
 eq('auscultación sin oxímoron', /con Sin ruidos agregados/i.test(tAusc), false);

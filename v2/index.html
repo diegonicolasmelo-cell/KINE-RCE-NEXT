@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.2-navm">
+<meta name="rce-version" content="NEXT-1.3-bugs">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3460,11 +3460,11 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--neuro);margin:4px 0 6px;">GCS</div>
             <div class="row" style="align-items:flex-end;">
               <div class="col ws"><label>O</label>
-                <select id="fGCSO" onchange="calcGCS();autoCoopera()"><option>1</option><option>2</option><option>3</option><option selected>4</option></select></div>
+                <select id="fGCSO" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
               <div class="col ws"><label>V</label>
-                <select id="fGCSV" onchange="calcGCS();autoCoopera()"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option><option value="1T">1T</option></select></div>
+                <select id="fGCSV" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option value="1T">1T</option></select></div>
               <div class="col ws"><label>M</label>
-                <select id="fGCSM" onchange="calcGCS();autoCoopera()"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option></select></div>
+                <select id="fGCSM" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
               <div class="mon" style="height:38px;"><span style="font-size:.58rem;color:var(--muted);">GCS</span><span id="lblGCS" class="bold">15</span></div>
             </div>
             <!-- Fila 3: Nivel de cooperación y delirium -->
@@ -8618,6 +8618,16 @@ function guardar() {
     VA_EXTERNO_DIAS:   $('cVAExtPrev')?.checked ? (v('fVAExtDias')||0) : 0,
     TOT_FIJACION:      'Arcada dental',   // estandarizado (ago-2026): norma de la unidad
     FECHA_INICIO_TQT:  _fechaInicioTQT||'',
+    /* 🔴 17-sep-2026 · LOS DÍAS DE VÍA AÉREA ARTIFICIAL, QUE NO VIAJABAN.
+       La pantalla los calculaba (actualizarContadores), los mostraba en el
+       recuadro y los narraba —«VAA mediante TOT N° 7.5 a 22 cm de arcada
+       dental (día 6)»— pero NUNCA los mandaba en el guardado. El servidor
+       regenera ese mismo relato para la entrega de turno y la hoja impresa, y
+       al leer la columna vacía escribía «(día ?)». O sea que TODA evolución
+       con tubo o traqueostomía salía impresa con un signo de pregunta donde
+       iba el día, mientras en el navegador se veía bien.
+       Lo caza relato_espejo.js, que le da el mismo dato a los dos motores. */
+    DIAS_VA:           v('fDiasVA'),
     // Contadores VM
     // Si el paciente queda extubado/decanulado (sin re-), los días del episodio
     // se pliegan a "previos": el historial de VM persiste turno a turno y es lo
@@ -11311,7 +11321,9 @@ function genTexto() {
   // UPOT / procuramiento
   _B('upot');
   if($('cUPOT')?.checked){
-    let _u='Paciente en seguimiento por UPOT, con sospecha de muerte cerebral';
+    /* 🔴 17-sep-2026 · Fuera «con sospecha de muerte cerebral»: la afirmaba
+       sola la casilla de UPOT. Espejo del servidor (dominio_texto.gs). */
+    let _u='Paciente en seguimiento por UPOT';
     const _ap=v('fApneaTest');
     if(_ap) _u+=`. Test de apnea ${_ap.toLowerCase()}`;
     if($('cUPOTmed')?.checked) _u+='. Se mantienen medidas de protección de órganos';
@@ -11356,7 +11368,13 @@ function genTexto() {
   else s=`Sedado${_vigilTxt} ${_escTxt}${_sasTxt}${_farmTxt}.`;
   // GCS: en intubado el total ("11T") y la verbal ("1T") ya vienen con "T"
   // desde calcGCS; el sufijo /15 solo aplica a paciente sin vía aérea artificial.
-  s+=` GCS ${gcsT}${intub?'':'/15'} (O:${gv('fGCSO')||'?'}, V:${gv('fGCSV')||'?'}, M:${gv('fGCSM')||'?'})`;
+  /* 🔴 17-sep-2026 · Solo se narra si alguien lo MIDIÓ. Los tres selectores
+     nacían con 4/5/6 puestos, así que toda evolución salía con «GCS 15»
+     aunque nadie hubiera evaluado al paciente: un 15 de fábrica en la ficha
+     de uno sedado no es un dato faltante, es un dato falso, y se lee igual
+     que uno medido. Espejo del servidor (dominio_texto.gs). */
+  if(gv('fGCSO')||gv('fGCSM'))
+    s+=` GCS ${gcsT}${intub?'':'/15'} (O:${gv('fGCSO')||'?'}, V:${gv('fGCSV')||'?'}, M:${gv('fGCSM')||'?'})`;
   // Cooperación: solo se informa si el paciente NO está profundamente sedado
   // (SAS distinto de 1-2, o GCS total > 7). En sedación profunda no aplica.
   { const _sasN=parseInt(sas,10), _gcsN=parseInt(gcsT,10);
@@ -11694,7 +11712,11 @@ function genTexto() {
     const _nivTxt=_niv?` nivel ${_niv}`:'';
     let k=_kcant>1?`Se realizan ${_kcant} sesiones de KTM${_nivTxt}`:`Se realiza KTM${_nivTxt}`;
     if(_asis) k+=` con asistencia ${_asis.toLowerCase()}`;
-    if(_t) k+=` (${_t} min)`;
+    // 🗂️ 17-sep-2026 · Decía « (20 min)» y el servidor « durante 20 minutos»:
+    // el mismo turno se leía distinto en la pantalla y en la hoja impresa.
+    // Se unificó hacia la forma del servidor, que es la que se lee como
+    // frase. Lo fija relato_espejo.js, que da el mismo dato a los dos.
+    if(_t) k+=` durante ${_t} minutos`;
     _B('ktm'); L.push(k+'.');
     _B('imt');
     if($('cIMT')?.checked){
@@ -11927,7 +11949,12 @@ function updEcfLbl(selId,lblId){
 function calcGCS() {
   const va=v('fVA'), vSel=$('fGCSV');
   if(va==='TOT'||va==='TQT'){if(vSel){vSel.value='1T';vSel.disabled=true;}}
-  else{if(vSel){if(vSel.value==='1T')vSel.value='5';vSel.disabled=false;}}
+  // 🪤 17-sep-2026 · Acá decía `vSel.value='5'`: al dejar de estar intubado,
+  // la verbal saltaba sola a «orientado», que es el mejor puntaje posible y
+  // nadie lo había evaluado. Era el mismo valor de fábrica que se acababa de
+  // sacar de los tres desplegables, escondido dentro del automatismo. Ahora
+  // se vacía: el que evalúe, que lo escriba.
+  else{if(vSel){if(vSel.value==='1T')vSel.value='';vSel.disabled=false;}}
   const o=parseInt(v('fGCSO'))||0, m=parseInt(v('fGCSM'))||0, vv=parseInt(v('fGCSV'))||1;
   $('lblGCS').textContent=(va==='TOT'||va==='TQT')?`${o+vv+m}T`:(o+vv+m);
 }
