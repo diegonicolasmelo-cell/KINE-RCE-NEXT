@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.3-bugs">
+<meta name="rce-version" content="NEXT-1.4-vigente">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -6217,8 +6217,18 @@ function prevFilas(ctx){
     else if (rest === 1){ chip = 'vence mañana'; tono = 'pv-ambar'; }
     else if (rest === 0){ chip = 'vence hoy'; tono = 'pv-rojo'; }
     else               { chip = 'venció ' + (rest === -1 ? 'ayer' : 'hace ' + (-rest) + ' días'); tono = 'pv-rojo'; }
+    /* 🔴 17-sep-2026 · «Vigente» NO se ofrece en un filtro VENCIDO (Diego, al
+       mirar la pantalla). Decir que está vigente algo que venció ayer es una
+       contradicción escrita en la ficha de un paciente, y además «cumpliría»
+       la medida de IAS sin que nadie haya tocado el filtro. Lo que queda es
+       cambiarlo, o dejar la razón escrita de por qué no se pudo.
+       🪤 «Vence hoy» SÍ admite vigente: la regla de la unidad es que los
+       circuitos se cambian en el turno NOCHE, así que el colega de día que lo
+       mira y lo ve bien está diciendo la verdad. Vencido es otra cosa. */
+    const vencido = rest !== null && rest < 0;
     return { k:d.k, nombre:d.nombre, frec:d.frec, fecha:d.fecha, aplica:d.aplica,
-             conReloj:conReloj, fija:fija, pide:d.aplica && !fija, chip:chip, tono:tono, rest:rest };
+             conReloj:conReloj, fija:fija, pide:d.aplica && !fija, chip:chip, tono:tono,
+             rest:rest, vencido:vencido, admiteVigente:!vencido };
   });
 }
 
@@ -6274,6 +6284,14 @@ function prevPintar(){
     caja.innerHTML = filas.map(f => {
       const marca = _PREV[f.k] || '';
       const urge = (f.tono === 'pv-rojo' && !marca) ? ' pv-urge' : '';
+      /* 🔴 El reloj dice lo que la MARCA dice, y las dos marcas dicen cosas
+         distintas (Diego, 17-sep-2026: «si vence mañana y uno aprieta vigente,
+         quiere decir que vence mañana, o sea que todavía está vigente; no es
+         que lo cambié»). Con «vigente» el chip NO se mueve —el filtro es el
+         mismo y vence cuando vencía—; con «lo cambié» sí, porque hay uno
+         nuevo y su reloj arranca de cero al guardar. */
+      const chipTxt = (marca === 'chg') ? 'cambiado en este turno' : f.chip;
+      const chipTono = (marca === 'chg') ? '' : f.tono;
       const sub = f.fija ? 'del equipo, desde el ' + _ddmm(f.fecha)
                 : (f.fecha ? 'puesto el ' + _ddmm(f.fecha) : 'sin fecha registrada');
       // El nombre del HME es un selector: humidificación pasiva y activa son
@@ -6290,8 +6308,10 @@ function prevPintar(){
       // El HEPA fijo (PB/Avea) se MUESTRA —su fecha es la referencia de
       // instalación— pero no pide toque: no se cambia, así que no se pregunta.
       const botones = f.pide
-        ? '<button type="button" class="pv-b' + (marca === 'ok' ? ' on' : '') + '" id="pvb_' + f.k + '_ok" data-nodirty' +
-            ' onclick="prevToca(&quot;' + escapeJs(f.k) + '&quot;,&quot;ok&quot;)">Vigente</button>' +
+        ? (f.admiteVigente
+            ? '<button type="button" class="pv-b' + (marca === 'ok' ? ' on' : '') + '" id="pvb_' + f.k + '_ok" data-nodirty' +
+              ' onclick="prevToca(&quot;' + escapeJs(f.k) + '&quot;,&quot;ok&quot;)">Vigente</button>'
+            : '') +
           '<button type="button" class="pv-b pv-w' + (marca === 'chg' ? ' on' : '') + '" id="pvb_' + f.k + '_chg" data-nodirty' +
             ' onclick="prevToca(&quot;' + escapeJs(f.k) + '&quot;,&quot;chg&quot;)">Lo cambié</button>'
         : '';
@@ -6299,7 +6319,7 @@ function prevPintar(){
         '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + (f.pide ? '#2a6395' : '#787066') +
           '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + _PV_ICO[f.k] + '</svg>' +
         nombre +
-        (f.chip ? '<span class="pv-chip ' + f.tono + '" id="pvc_' + f.k + '">' + escapeHtml(f.chip) + '</span>' : '') +
+        (chipTxt ? '<span class="pv-chip ' + chipTono + '" id="pvc_' + f.k + '">' + escapeHtml(chipTxt) + '</span>' : '') +
         '<span class="pv-esp"></span>' + botones +
       '</div>';
     }).join('');

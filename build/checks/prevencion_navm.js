@@ -181,10 +181,15 @@ const { chromium } = require('playwright-core');
     prevPintar();
     out.filas = [...document.querySelectorAll('#pvLista [id^="pvf_"]')].map(e => e.id).join('|');
     out.alInicio = prevListo();
-    ['hme', 'hepa', 'tc'].forEach(k => { const b = $('pvb_' + k + '_ok'); if (b) b.click(); });
+    // 🗂️ 17-sep-2026 · El HME de este escenario está VENCIDO, y desde hoy un
+    // filtro vencido no ofrece «vigente»: decir que está vigente algo que
+    // venció es una contradicción escrita en la ficha. Se resuelve con «lo
+    // cambié», que es lo que de verdad corresponde hacer.
+    const tocar = (k, cual) => { const b = $('pvb_' + k + '_' + cual); if (b) b.click(); };
+    tocar('hme', 'chg'); tocar('hepa', 'ok'); tocar('tc', 'ok');
     out.trasTocarLosTres = prevListo();
     // se sueltan los tres y se pasa con razón escrita
-    ['hme', 'hepa', 'tc'].forEach(k => { const b = $('pvb_' + k + '_ok'); if (b) b.click(); });
+    tocar('hme', 'chg'); tocar('hepa', 'ok'); tocar('tc', 'ok');
     out.trasSoltar = prevListo();
     if ($('pvNoPude')) $('pvNoPude').click();
     if ($('fPrevRazon')) {
@@ -232,6 +237,58 @@ const { chromium } = require('playwright-core');
   if (E.sinTarjeta) eq('E1 · existe la tarjeta #fcPrevNavm', false, true);
   else eq('E1 · 🔴 el paso no trae párrafos explicativos (hoy Dispositivos tiene 534 caracteres)',
           E.caracteresDeParrafo <= 120, true);
+
+  /* ══ V · «Vigente» y «lo cambié» NO son lo mismo ═════════════════════
+     Diego, 17-sep-2026: «si vence mañana y uno aprieta vigente, quiere decir
+     que vence mañana, o sea que todavía está vigente; no es que lo cambié».
+     Son dos hechos distintos y el reloj tiene que reflejarlo:
+       · «vigente»   → lo miré, está bien. El reloj NO se toca.
+       · «lo cambié» → hay dispositivo nuevo. El reloj se reinicia.
+     Si los dos se leyeran igual, el indicador de NAVM contaría como cambio un
+     filtro que nadie tocó, y el reloj del siguiente vencimiento saldría
+     corrido. 🔴 Y «vigente» no puede ofrecerse en un filtro VENCIDO: decir que
+     está vigente algo que venció es una contradicción escrita en la ficha. */
+  const V2 = await p.evaluate(() => {
+    const leer = (k) => {
+      const c = document.getElementById('pvc_' + k);
+      const f = document.getElementById('pvf_' + k);
+      return { chip: c ? c.textContent : '(sin chip)',
+               ok: !!document.getElementById('pvb_' + k + '_ok'),
+               chg: !!document.getElementById('pvb_' + k + '_chg'),
+               urge: !!f && f.className.indexOf('pv-urge') !== -1 };
+    };
+    // La cama del escenario: HME etiquetado el 15 con frecuencia 2 y fecha de
+    // turno el 17 ⇒ venció. El HEPA y el Trach Care vencen mañana.
+    prevPintar();
+    const out = { hepaAntes: leer('hepa'), hmeAntes: leer('hme') };
+    // «Vigente» en el que vence MAÑANA: el reloj no se mueve.
+    const b = document.getElementById('pvb_hepa_ok'); if (b) b.click();
+    out.hepaTrasVigente = leer('hepa');
+    out.marcaHepa = prevEstado().hepa;
+    // «Lo cambié» en el mismo: ahí sí queda dicho que hay uno nuevo.
+    const c = document.getElementById('pvb_hepa_chg'); if (c) c.click();
+    out.hepaTrasCambio = leer('hepa');
+    out.marcaHepaChg = prevEstado().hepa;
+    return out;
+  });
+  eq('V1 · el HEPA vence mañana', V2.hepaAntes.chip, 'vence mañana');
+  eq('V2 · ★ tocando «vigente», el reloj NO se mueve: sigue venciendo mañana',
+     V2.hepaTrasVigente.chip, 'vence mañana');
+  eq('V3 · …y la marca dice «vigente», no «cambiado»', V2.marcaHepa, 'ok');
+  eq('V4 · ★★ tocando «lo cambié», el reloj sí lo dice', V2.hepaTrasCambio.chip, 'cambiado en este turno');
+  eq('V5 · …y la marca lo distingue', V2.marcaHepaChg, 'chg');
+  eq('V6 · 🔴 en un filtro VENCIDO no se ofrece decir que está vigente',
+     V2.hmeAntes.ok, false);
+  eq('V7 · …pero sí «lo cambié»', V2.hmeAntes.chg, true);
+
+  /* ══ S · Y el servidor hace la misma distinción ═══════════════════════ */
+  {
+    const sync = fs.readFileSync(path.join(v2, 'svc_evoluciones.gs'), 'utf8');
+    const cuerpo = (sync.match(/const _navm = [\s\S]{0,220}/) || [''])[0];
+    eq('S1 · ★ solo la marca «chg» reinicia el reloj en la cama',
+       /=== 'chg'/.test(cuerpo), true);
+    eq('S2 · …y «ok» deja pasar lo que ya había', /: actual/.test(cuerpo), true);
+  }
 
   /* ══ G · Ningún campo visible sin destino ════════════════════════════
      🔴 Al cortar la segunda puerta, los tres calendarios de «Dispositivos»

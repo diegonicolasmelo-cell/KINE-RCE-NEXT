@@ -1339,3 +1339,56 @@ literales — con un control que exige que el comentario siga ahí.
 **170 guardias · 170 verdes.** Dos nuevas: `relato_espejo.js` (27
 comprobaciones) y `glasgow_medido.js` (18). `afinado.js` se actualizó a la forma
 llana con su razón escrita.
+
+---
+
+## 17-sep-2026 · «Vigente» y «lo cambié» dicen cosas distintas
+
+Diego, mirando la pantalla: *«si vence mañana y uno aprieta vigente, quiere
+decir que vence mañana, o sea que todavía está vigente; no es que lo cambié»*.
+
+Tenía razón, y al medirlo aparecieron dos cosas separadas.
+
+### Lo que ya estaba bien
+
+En el código real la distinción ya existía donde más importa: el servidor
+reinicia el reloj **solo** con la marca `'chg'`, y `'ok'` deja pasar la fecha
+que la cama ya tenía. El chip de la fila tampoco se movía al marcar «vigente».
+Se ancló con cinco comprobaciones nuevas para que nadie lo funda por
+simplificar.
+
+### Lo que sí estaba mal: el mockup
+
+El artefacto que Diego estaba mirando leía **cualquier** marca como «cambiado
+hoy» — apretar «vigente» en un filtro que vencía mañana decía que se había
+cambiado. Era justo lo que él señaló, y estaba solo ahí. Corregido en los tres
+tableros.
+
+🪤 **Un mockup que miente sobre el comportamiento es peor que no tenerlo**: se
+revisa como si fuera el producto y las decisiones se toman sobre él. Vale la
+misma regla que para el código: si el tablero dice algo, tiene que ser lo que
+el código hace.
+
+### Lo que faltaba en el código: el otro lado del mismo asunto
+
+Marcar «lo cambié» dejaba el chip diciendo «vence hoy». El colega registraba el
+cambio y la pantalla seguía avisando de él. Ahora el reloj sigue a la marca:
+
+- **«vigente»** → el chip no se mueve. El filtro es el mismo y vence cuando
+  vencía.
+- **«lo cambié»** → «cambiado en este turno». Hay uno nuevo y su reloj arranca
+  de cero al guardar.
+
+### 🔴 Y un hueco que salió de camino
+
+En un filtro **vencido** se podía apretar «vigente». Decir que está vigente algo
+que venció ayer es una contradicción escrita en la ficha de un paciente, y
+además «cumplía» la medida de IAS sin que nadie hubiera tocado el filtro. Ahora
+un filtro vencido no ofrece esa opción: queda cambiarlo, o dejar la razón
+escrita de por qué no se pudo.
+
+🪤 **«Vence hoy» sí admite «vigente»**, y no es lo mismo: la regla de la unidad
+es que los circuitos se cambian en el turno **Noche**, así que el colega de día
+que lo mira y lo ve bien está diciendo la verdad. Vencido es otra cosa.
+
+**170 guardias · 170 verdes.**
