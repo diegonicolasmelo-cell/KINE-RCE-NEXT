@@ -1666,3 +1666,52 @@ final.
 
 Falta pegarlo en Apps Script: Diego lo hará cuando esté frente al computador, y
 ahí hay que correr `crearORepararEstructura()` porque entraron seis columnas.
+
+---
+
+## 17-sep-2026 · Fuera el índice lateral, y dos textos huérfanos
+
+Diego, mirando las capturas de la app ya armada: *«siento que la barra lateral
+ya no aplicaría en la sección turno»*.
+
+### El riel salió
+
+Existía porque el panel era un muro de 225 campos en una sola pantalla y hacía
+falta algo que dijera qué había más abajo. El muro ya no existe: el camino de
+cuatro pasos lo partió y cada tarjeta lleva su encabezado a la vista. En el paso
+de prevención listaba **una** entrada — un índice de un solo ítem — y en el
+turno repetía los títulos que están tres centímetros a la derecha.
+
+Los 196 px se los lleva el formulario, que es lo que se está llenando. En un
+portátil de 1366 del hospital eso es una columna entera de respiro.
+
+🔴 **Lo que NO se perdió**: en el celular el acordeón sigue diciendo qué hay
+dentro de cada sección plegada, con su ✓ y su resumen. Ahí sí hace falta, porque
+las secciones están cerradas. El riel nunca se mostró en el teléfono (solo sobre
+740 px), así que la ronda no perdió nada.
+
+🪤 **Y un cable que casi se corta sin ruido**: `rielRender()` arrancaba con
+`const nav=$('spRiel'); if(!nav) return;`, pero la función hace mucho más que
+pintar el índice — calcula **todos los obligatorios** y los reparte entre la
+línea de aviso del escritorio y los encabezados del celular. Al borrar el
+elemento, la función entera se habría cortado en esa línea, llevándose el aviso
+de «Falta: firma y vía aérea» **y** el acordeón, sin un solo error en la
+consola. Se quitó solo la cola que pintaba el riel.
+
+### Dos textos que mandaban a lo que ya no está
+
+Las capturas destaparon algo que ninguna prueba de valores podía cazar, porque
+ningún dato estaba mal: **sobraba el texto**.
+
+En el bloque de humidificación seguía vivo el aviso «Dispositivos **asumidos
+instalados** al conectar a VM — corrobora: [Aceptar] *o ajusta las fechas de
+arriba y guarda*». Arriba ya no hay fechas: se escondieron con la tanda de
+prevención. Mandaba a buscar algo que no existe. Salió, con su botón y sus dos
+funciones de cliente. 🔴 La acción `CONFIRMAR_DISPOSITIVOS` del servidor no se
+tocó: sigue publicada en el dispatcher.
+
+Vale la pena anotarlo como método: **mirar la pantalla armada encuentra cosas
+que las guardias no**. Las guardias verifican que los datos estén bien; que un
+texto siga teniendo sentido después de mover lo que lo rodeaba, no.
+
+**175 guardias · 175 verdes.** Nueva: `sin_riel.js`.

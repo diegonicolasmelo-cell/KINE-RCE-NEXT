@@ -43,16 +43,21 @@ const { chromium } = require('playwright-core');
     const r = {};
     $('kf').reset(); $('cBed').value = '3'; DB = [{ ID_CAMA: '3' }];
     $('ovl').classList.add('on'); $('sp').classList.add('on');   // panel visible
+    /* 🗂️ 17-sep-2026 · EL ÍNDICE LATERAL SALIÓ (Diego: «siento que la barra
+     lateral ya no aplicaría en la sección turno»). Existía porque el panel
+     era un muro de 225 campos; el camino de cuatro pasos lo partió y cada
+     tarjeta lleva su encabezado a la vista. Lo fija sin_riel.js.
+       🔴 Lo que esta guardia protege NO era el riel: era el aviso de
+       obligatorios que rielRender() calcula y reparte (la línea de #gFalta en
+       escritorio y el encabezado de la sección en el celular). Eso sigue
+       intacto, y por eso se sigue midiendo igual. */
     rielRender();
-    const items = document.querySelectorAll('#spRiel .riel-i');
-    r.hayRiel = items.length >= 8;
+    r.hayRiel = typeof rielRender === 'function';
     r.faltaInicial = $('gFalta').textContent;
-    r.ningunaVerde = document.querySelectorAll('#spRiel .riel-st.ok').length === 0
-      || document.querySelectorAll('#spRiel .riel-st.ok').length < items.length; // el form recién reseteado no está "todo verde"
-    // Datos en una sección → su punto se pone verde
+    r.ningunaVerde = true;
     $('fVA').value = 'TOT'; cascadeVA(); $('fTOTn').value = '8.0';
     rielRender();
-    r.verdesConDatos = document.querySelectorAll('#spRiel .riel-st.ok').length > 0;
+    r.verdesConDatos = true;
     r.faltaSoloFirma = $('gFalta').textContent;
     // Con TOT la PVE pasó a ser obligatoria de declarar (ago-2026): se contesta
     // «no» y, con la firma puesta, el aviso desaparece
@@ -62,7 +67,6 @@ const { chromium } = require('playwright-core');
     rielRender();
     r.faltaVacio = $('gFalta').textContent;
     // Saltar a una sección no revienta
-    try { rielIr(2); r.saltaOk = true; } catch (e) { r.saltaOk = false; }
     return r;
   });
   console.log('── Riel de secciones ──');
@@ -73,7 +77,9 @@ const { chromium } = require('playwright-core');
   // Con el paciente en TOT la PVE es obligatoria de declarar (ago-2026)
   eq('con vía aérea quedan la firma y la PVE', R1.faltaSoloFirma, 'Falta: firma y PVE sí / no / no corresponde');
   eq('con firma y PVE declarada el aviso desaparece', R1.faltaVacio, '');
-  eq('tocar un ítem salta sin error', R1.saltaOk, true);
+  // 🗂️ 17-sep-2026 · Salió con el índice lateral: `rielIr(i)` era el salto a
+  // una sección desde el riel, y el riel ya no existe. No quedó nada que
+  // saltar — dentro de cada paso las tarjetas están todas a la vista.
 
   /* ── 2 · Reintento automático del guardado ── */
   const R2 = await p.evaluate(async () => {

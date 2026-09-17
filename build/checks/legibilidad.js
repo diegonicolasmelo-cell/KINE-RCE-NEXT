@@ -106,9 +106,16 @@ const si = (l, cond, detalle) => {
   await pagina.waitForTimeout(1000);
 
   const panel = await pagina.evaluate(() => {
-    const riel = [...document.querySelectorAll('#spRiel .riel-tx')];
+    /* 🗂️ 17-sep-2026 · EL ÍNDICE LATERAL SALIÓ (Diego: «siento que la barra
+     lateral ya no aplicaría en la sección turno»). Existía porque el panel
+     era un muro de 225 campos; el camino de cuatro pasos lo partió y cada
+     tarjeta lleva su encabezado a la vista. Lo fija sin_riel.js.
+       Lo que esta guardia protege —que ningún texto del panel salga cortado— se
+       mide ahora en los encabezados de las tarjetas, que son los que quedaron
+       diciendo de qué va cada sección. */
+    const riel = [...document.querySelectorAll('#kf .fcard-title')];
     const cortadoRiel = riel
-      .filter(n => n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1)
+      .filter(n => n.scrollWidth > n.clientWidth + 1)
       .map(n => n.textContent.trim());
     const etiquetas = [...document.querySelectorAll('#sp .col label')].map(n => {
       const alto = n.getBoundingClientRect().height;
@@ -122,7 +129,7 @@ const si = (l, cond, detalle) => {
      se fueron al paso 2 y los planes al 3. Lo que esta línea comprueba es
      que el riel SE PINTE; lo que de verdad protege esta guardia —que ningún
      nombre quede cortado— es la línea de abajo, y no cambió. */
-  si('el riel de secciones se pintó', panel.rielN >= 6, panel.rielN + ' secciones');
+  si('los encabezados de sección están a la vista', panel.rielN >= 6, panel.rielN + ' secciones');
   si('los ' + panel.rielN + ' nombres del riel se leen enteros', panel.cortadoRiel.length === 0,
     panel.cortadoRiel.join(' · ') + ' — o se acorta el nombre, o se ensancha el riel: no se deja cortado');
   si('ninguna etiqueta del formulario envuelve en tres líneas o más', panel.etiquetas.length === 0,

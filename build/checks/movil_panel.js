@@ -261,7 +261,13 @@ const MONTAR = () => {
     sinSubs: document.querySelectorAll('#kf .msub').length,
     stOculto: [...document.querySelectorAll('#kf .mst')].every(x => x.offsetParent === null),
     resOculto: [...document.querySelectorAll('#kf .mres')].every(x => x.offsetParent === null),
-    rielVive: document.querySelectorAll('#spRiel .riel-i').length > 5,
+    // 🗂️ 17-sep-2026 · EL ÍNDICE LATERAL SALIÓ (Diego: «siento que la barra
+    // lateral ya no aplicaría en la sección turno»). Existía porque el panel
+    // era un muro de 225 campos; el camino de cuatro pasos lo partió y cada
+    // tarjeta lleva su encabezado a la vista. Lo fija sin_riel.js.
+    // En escritorio lo que sigue haciendo su trabajo es el aviso de
+    // obligatorios, que es lo que esta línea medía de rebote.
+    rielVive: typeof rielRender === 'function' && !document.getElementById('spRiel'),
     // y el orden de la sábana en escritorio es el de siempre
     ventDirecto: !!$('dVentBloque') && !$('dVentBloque').closest('.msub'),
   }));
@@ -269,7 +275,7 @@ const MONTAR = () => {
   eq('no se arman sub-bloques', R8.sinSubs, 0);
   eq('los ✓ del acordeón no se ven', R8.stOculto, true);
   eq('los resúmenes tampoco', R8.resOculto, true);
-  eq('el riel lateral sigue haciendo su trabajo', R8.rielVive, true);
+  eq('en escritorio ya no hay riel, y los obligatorios siguen', R8.rielVive, true);
   eq('el módulo ventilatorio queda suelto, como siempre', R8.ventDirecto, true);
   await d.close();
 

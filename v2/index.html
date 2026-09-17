@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-1.8-chips">
+<meta name="rce-version" content="NEXT-1.9-sin-riel">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1209,28 +1209,6 @@ table.rhb2 .rl{width:128px;text-align:left;}
 #pasoEvalNada small{display:block;font-weight:400;font-size:.76rem;color:var(--muted);margin-top:3px;}
 #epBannerCaja:empty,#epBannerCaja:has(.hidden){display:none;}
 #epBannerCaja{padding:10px 14px 0;background:var(--card);}
-#spRiel{display:none;}
-@media(min-width:1100px){
-  #sp .pcontent{display:flex;gap:14px;align-items:flex-start;}
-  #spRiel{display:block;position:sticky;top:6px;width:196px;flex-shrink:0;max-height:calc(100dvh - 130px);overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 6px;}
-  #sp .pcontent>form{flex:1;min-width:0;}
-}
-.riel-t{font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;padding:2px 8px 6px;}
-.riel-i{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:7px;font-size:.76rem;cursor:pointer;color:#334155;font-weight:600;line-height:1.25;}
-/* El nombre de la sección se lee entero. Antes iba en una línea con puntos
-   suspensivos y en un riel de 196 px eso dejaba CUATRO de las diez secciones
-   ilegibles: «Sedación y Concie…», «Respiratorio — 💨 …», «IMT / ⚡ EMS —
-   En…», «Procedimientos de…». Un índice que no dice a dónde lleva no es un
-   índice. Ahora envuelve y recién corta a las tres líneas, que es lo que
-   necesita el nombre más largo que hay hoy («IMT / EMS — Entrenamiento
-   muscular», 39 caracteres). El título completo va además en el globo de
-   ayuda, por si alguna vez nace uno más largo. */
-.riel-i .riel-tx{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
-.riel-i:hover{background:#eef2f7;}
-.riel-st{width:16px;height:16px;border-radius:50%;border:1.5px solid #c7cdd6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.58rem;flex-shrink:0;font-weight:800;}
-.riel-st.ok{background:#16a34a;border-color:#16a34a;}
-.riel-i.req .riel-st{border-color:#dc2626;}
-.riel-i.req{color:#b91c1c;}
 #gFalta{text-align:right;font-size:.75rem;font-weight:800;color:#b45309;min-height:15px;padding:0 4px;}
 .act-bar .btn{height:46px;border-radius:12px;}
 /* El botón de guardar GRANDE (Diego, 15-ago-2026): es la acción del panel. */
@@ -3045,7 +3023,17 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <span class="paso-n">4</span><span class="paso-et">Relato</span></button>
   </div>
   <div class="pcontent">
-    <nav id="spRiel" aria-label="Secciones de la evolución"></nav>
+    <!-- 🗂️ 17-sep-2026 · SALIÓ EL ÍNDICE LATERAL DE SECCIONES. Existía porque
+         el panel era un muro de 225 campos en una sola pantalla y hacía falta
+         algo que dijera qué había más abajo. El muro ya no existe: el camino de
+         cuatro pasos lo partió y cada tarjeta lleva su encabezado a la vista.
+         Diego, mirando la pantalla armada: «siento que la barra lateral ya no
+         aplicaría en la sección turno». En los otros pasos era peor que inútil
+         —en el de prevención listaba UNA entrada— y en el turno repetía los
+         títulos que están tres centímetros a la derecha.
+         Los 196 px se los lleva el formulario, que es lo que se está llenando.
+         🔴 El acordeón del CELULAR no se tocó: ahí las secciones van plegadas y
+         su encabezado sí tiene que decir qué llevan dentro. Lo fija sin_riel.js. -->
     <form id="kf" onsubmit="return false;" autocomplete="off">
       <input type="hidden" id="cBed">
       <!-- 📌 Lo que te dejaron encargado: se pinta desde la CAMA (episodio),
@@ -3588,11 +3576,18 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div class="col wa"><label>Trach Care</label><input type="date" id="fFecSonda" onchange="calcInsumosDias()"></div>
               <span id="sSondaDias" class="disp-chip disp-none">—</span>
             </div>
-            <div id="dispConfirm" class="hidden" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:7px 11px;margin-bottom:8px;font-size:.76rem;">
-              <span>🔧 Dispositivos <b>asumidos instalados</b> al conectar a VM — corrobora:</span>
-              <button type="button" onclick="dispAceptar()" style="padding:4px 13px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-weight:800;font-size:.72rem;cursor:pointer;">✓ Aceptar</button>
-              <span style="color:var(--muted);font-size:.68rem;">o ajusta las fechas de arriba y guarda</span>
-            </div>
+            <!-- 🪤 17-sep-2026 · SALIÓ EL AVISO «Dispositivos asumidos instalados
+                 al conectar a VM — corrobora: [Aceptar] o ajusta las fechas de
+                 arriba y guarda». Al esconder los tres calendarios, ese texto
+                 quedó mandando a buscar unas fechas que ya no están arriba — ni
+                 en ninguna parte de esta tarjeta. La corroboración se hace ahora
+                 en el paso 1, tocando cada dispositivo: es el mismo gesto y con
+                 el reloj a la vista.
+                 Se descubrió MIRANDO LA PANTALLA, no con una prueba de valores:
+                 ningún dato estaba mal, solo el texto sobraba. Por eso la
+                 guardia G5 de prevencion_navm.js lee lo que dice el aviso, no lo
+                 que guarda. La acción CONFIRMAR_DISPOSITIVOS del servidor no se
+                 tocó: sigue ahí para quien la llame. -->
             <div class="row" style="align-items:flex-end;">
               <div class="check cr wa"><input type="checkbox" id="cHAct" onchange="syncHumidFecha(this.checked)"><label for="cHAct">🌡️ Humidificación Activa</label></div>
               <div class="col wa"><label>Desde</label><input type="date" id="fFecHumid" onchange="humidFechaManual(this.value)"></div>
@@ -6036,8 +6031,21 @@ function _resetHiddenYEventos(){
 // que además se anuncian en #gFalta antes de apretar Guardar).
 let _rielT=null;
 function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
+/**
+ * Lo que falta para poder guardar, en los dos sitios donde se anuncia: la línea
+ * de #gFalta (escritorio) y el encabezado de la sección que lo contiene
+ * (celular, donde una línea al final queda fuera de la pantalla).
+ *
+ * 🗂️ 17-sep-2026 · Se llamaba así porque además pintaba el índice lateral, que
+ * salió. 🪤 El nombre se conserva a propósito: lo llaman ocho sitios y el
+ * riesgo de renombrarlo era mayor que el de un nombre que ya no describe del
+ * todo. Lo que hace hoy es calcular los obligatorios y repartirlos.
+ * 🔴 Y arrancaba con `const nav=$('spRiel'); if(!nav) return;` — al borrar el
+ * elemento, la función entera se habría cortado en esa línea y con ella el
+ * aviso de obligatorios Y el acordeón del celular, sin un solo error en la
+ * consola.
+ */
 function rielRender(){
-  const nav=$('spRiel'); if(!nav) return;
   const faltas=[];
   if(!v('fFirma')) faltas.push('firma');
   if(!v('fVA')) faltas.push('vía aérea');
@@ -6072,30 +6080,12 @@ function rielRender(){
   if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) faltaEls.push(_rh); }
   _mPintarSecciones(faltaEls);
   _mPacBar();
-  const cards=Array.from(document.querySelectorAll('#kf .fcard')).filter(c=>c.offsetParent!==null);
-  if(!cards.length){ nav.innerHTML=''; return; }
-  nav.innerHTML='<div class="riel-t">Secciones</div>'+cards.map((c,i)=>{
-    c.dataset.riel=i;
-    const t=(c.querySelector('.fcard-title')?.textContent||'Sección').trim();
-    let lleno=0;
-    c.querySelectorAll('input:not([type=hidden]),select,textarea').forEach(el=>{
-      if(el.offsetParent===null||el.disabled) return;
-      if(el.type==='checkbox'||el.type==='radio'){ if(el.checked) lleno++; }
-      else if(String(el.value||'').trim()!=='') lleno++;
-    });
-    const req=(faltas.indexOf('firma')!==-1 && /Planes/i.test(t)) ||
-              (faltas.indexOf('vía aérea')!==-1 && /Ventilatoria/i.test(t));
-    return `<div class="riel-i${req?' req':''}" onclick="rielIr(${i})">`+
-      `<span class="riel-st${lleno?' ok':''}">${lleno?'✓':''}</span>`+
-      `<span class="riel-tx" title="${escapeHtml(t)}">${escapeHtml(t)}</span></div>`;
-  }).join('');
 }
-function rielIr(i){
-  const c=document.querySelector(`#kf .fcard[data-riel="${i}"]`);
-  if(c) c.scrollIntoView({behavior:'smooth',block:'start'});
-}
-// Cualquier tecleo o cambio dentro del formulario refresca el riel (delegado
-// al documento: sobrevive a los innerHTML que reconstruyen los módulos).
+/* 🗂️ 17-sep-2026 · Acá vivía `rielIr(i)`, el salto a una sección desde el
+   índice lateral. Salió con él: era su único punto de entrada. */
+// Cualquier tecleo o cambio dentro del formulario recalcula los obligatorios
+// (delegado al documento: sobrevive a los innerHTML que reconstruyen los
+// módulos).
 document.addEventListener('input', e=>{ if(e.target && e.target.closest && e.target.closest('#kf')) _rielDeb(); });
 document.addEventListener('change', e=>{ if(e.target && e.target.closest && e.target.closest('#kf')) _rielDeb(); });
 
@@ -6814,7 +6804,6 @@ function abrirPanel(id, esIng, verFicha) {
   $('ovl').classList.add('on');
   $('sp').classList.add('on');
   mAcordeonInit();
-  dispConfirmRender();
   // Riel: dos pasadas — una apenas abre y otra cuando la réplica/carga
   // asíncrona ya llenó el formulario (los .value programáticos no disparan
   // eventos, así que el listener delegado no los ve).
@@ -13453,21 +13442,15 @@ function anexoBorrar(btn){
 }
 
 /* ── Confirmación de instalación de dispositivos (chip «Aceptar») ── */
-function dispConfirmRender(){
-  const d=$('dispConfirm'); if(!d) return;
-  const c=typeof _camaPanel==='function' ? (_camaPanel()||{}) : {};
-  const enVM=String(c.SOPORTE)==='VM';
-  const tiene=!!(c.DISP_HME_FECHA||c.DISP_HEPA_FECHA||c.DISP_TC_FECHA);
-  const conf=(c.DISP_CONFIRMADO===true||c.DISP_CONFIRMADO==='TRUE');
-  d.classList.toggle('hidden', !(enVM&&tiene&&!conf));
-}
-function dispAceptar(){
-  gs('CONFIRMAR_DISPOSITIVOS',{idCama:v('cBed')}, ()=>{
-    hide('dispConfirm'); toast('✅ Dispositivos confirmados');
-    const c=typeof _camaPanel==='function' ? _camaPanel() : null; if(c) c.DISP_CONFIRMADO=true;
-  }, e=>toast('❌ '+e));
-}
-
+/* 🗂️ 17-sep-2026 · Acá vivían `dispConfirmRender()` y `dispAceptar()`, que
+   pintaban y resolvían el aviso «Dispositivos asumidos instalados al conectar a
+   VM — corrobora». El aviso salió con los tres calendarios: mandaba a ajustar
+   «las fechas de arriba» y arriba ya no hay fechas. La corroboración se hace en
+   el paso 1, tocando cada dispositivo con su reloj a la vista, que es el mismo
+   gesto y en el sitio donde se mira al paciente.
+   🔴 La acción CONFIRMAR_DISPOSITIVOS del SERVIDOR no se tocó: sigue publicada
+   en el dispatcher para quien la llame. Lo que se borró es el botón que ya no
+   tenía dónde vivir. */
 /* ── Versión móvil: hoja «Más» y acordeón de módulos ── */
 const esMovil=()=>window.matchMedia('(max-width:740px)').matches;
 function mSheet(abrir){

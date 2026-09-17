@@ -100,27 +100,26 @@ const path = require('path');
   eq('payload firma y hallazgo', PAY.d && PAY.d.firmaKine === 'DMV' && PAY.d.cultHallazgo === 'BLEE+' && PAY.d.hora === '16:30', true);
   eq('popover se cierra tras guardar', PAY.cerrado, true);
 
-  // ── Franja «Aceptar» de dispositivos en el panel ──
-  const DC = await p.evaluate(async () => {
-    DB = [{ ID_CAMA: '3', OCUPADA: true, SOPORTE: 'VM', DISP_HME_FECHA: '2026-07-26', DISP_CONFIRMADO: false }];
-    $('cBed').value = '3';
-    dispConfirmRender();
-    const visible = !$('dispConfirm').classList.contains('hidden');
-    dispAceptar();
-    await new Promise(r => setTimeout(r, 60));
-    const call = _ll.filter(x => x.a === 'CONFIRMAR_DISPOSITIVOS').pop();
-    const oculto = $('dispConfirm').classList.contains('hidden');
-    DB[0].DISP_CONFIRMADO = true; dispConfirmRender();
-    const sigueOculto = $('dispConfirm').classList.contains('hidden');
-    DB = [{ ID_CAMA: '3', OCUPADA: true, SOPORTE: 'CNAF', DISP_HME_FECHA: '2026-07-26', DISP_CONFIRMADO: false }];
-    dispConfirmRender();
-    const sinVM = $('dispConfirm').classList.contains('hidden');
-    return { visible, call: call ? call.d.idCama : null, oculto, sigueOculto, sinVM };
-  });
-  eq('franja visible: VM + fecha + sin confirmar', DC.visible, true);
-  eq('Aceptar llama CONFIRMAR_DISPOSITIVOS con la cama', DC.call, '3');
-  eq('franja se oculta tras aceptar', DC.oculto && DC.sigueOculto, true);
-  eq('sin VM la franja no aparece', DC.sinVM, true);
+  /* ── 🗂️ 17-sep-2026 · La franja «Aceptar» de dispositivos SALIÓ ──────────
+     Acá se probaba el aviso «Dispositivos asumidos instalados al conectar a VM
+     — corrobora: [Aceptar] o ajusta las fechas de arriba y guarda». Salió junto
+     con los tres calendarios del turno: mandaba a ajustar unas fechas que ya no
+     están, y la corroboración se hace ahora en el paso 1 tocando cada
+     dispositivo, con su reloj a la vista.
+     🔴 Lo que esta guardia protege SIGUE EN PIE y se mide igual: que la acción
+     CONFIRMAR_DISPOSITIVOS siga publicada en el servidor. Borrar un botón no
+     puede llevarse por delante una acción del dispatcher, que es de donde comen
+     también la hoja de control de filtros y cualquier automatismo futuro. */
+  {
+    const fs = require('fs');
+    const api = fs.readFileSync(path.join(__dirname, '..', '..', 'v2', 'api.gs'), 'utf8');
+    eq('★ CONFIRMAR_DISPOSITIVOS sigue publicada en el dispatcher',
+       /CONFIRMAR_DISPOSITIVOS/.test(api), true);
+    const idx2 = fs.readFileSync(path.join(__dirname, '..', '..', 'v2', 'index.html'), 'utf8');
+    eq('★ …y el aviso ya no está en la pantalla del turno',
+       /id="dispConfirm"/.test(idx2), false);
+  }
+
 
   // ── Estadísticas: centinelas protagonistas, auto-cálculo al entrar ──
   const IND = await p.evaluate(async () => {

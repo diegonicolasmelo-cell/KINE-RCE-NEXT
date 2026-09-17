@@ -322,6 +322,22 @@ const { chromium } = require('playwright-core');
   eq('G3 · ni el del Trach Care', V.tc, false);
   eq('G4 · la humidificación activa SÍ sigue: es estado del episodio, no reloj', V.humid, true);
 
+  /* 🪤 G5 · NINGÚN TEXTO QUE MANDE A LO QUE YA NO ESTÁ. Al esconder los tres
+     calendarios quedó vivo el aviso azul «Dispositivos asumidos instalados al
+     conectar a VM — corrobora: [Aceptar] o ajusta las fechas de arriba y
+     guarda». Arriba ya no hay fechas: manda a buscar algo que no existe, y la
+     corroboración se hace ahora tocando cada fila en el paso 1. Se ve en la
+     pantalla y no lo caza ninguna prueba de valores. */
+  const W = await p.evaluate(() => {
+    pasoIr(2);
+    const a = document.getElementById('dispConfirm');
+    const r = { existe: !!a, texto: a ? a.textContent : '' };
+    pasoIr(1);
+    return r;
+  });
+  eq('G5 · 🪤 ya no hay aviso que mande a «las fechas de arriba»',
+     W.existe && /fechas de arriba/.test(W.texto), false);
+
   eq('F1 · la pantalla no tira errores', errs.join(' | ') || '(ninguno)', '(ninguno)');
 
   await b.close();
