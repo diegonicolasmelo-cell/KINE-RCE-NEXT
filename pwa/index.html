@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.0-humid">
+<meta name="rce-version" content="NEXT-2.2-coopera">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3288,65 +3288,17 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <input type="hidden" id="fAislMicroVal">
               </div>
             </div>
-            <!-- 🗂️ ¿QUÉ PASÓ HOY CON LA VÍA AÉREA? (rama episodio/turno, Diego
-                 11-sep: «el panel mejor que anuncie a la entrada para evitar
-                 problemas»). El evento se declara PRIMERO; él abre su bloque y
-                 fija la vía aérea. El select de abajo deja de ser libre (línea
-                 fina): sin evento declarado, no se cambia a mano. -->
-            <div id="evVAfila" class="hidden" style="margin-top:8px;padding:8px 10px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;">
-              <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#1d4ed8;margin-bottom:6px;">¿Qué pasó hoy con la vía aérea?</div>
-              <div id="evVAbtns" style="display:flex;gap:5px;flex-wrap:wrap;">
-                <button type="button" class="hbtn ev-va" data-ev="nada"   onclick="setEventoVA('nada')">Nada</button>
-                <button type="button" class="hbtn ev-va" data-ev="intub"  onclick="setEventoVA('intub')">🫁 Intubación</button>
-                <button type="button" class="hbtn ev-va" data-ev="ext"    onclick="setEventoVA('ext')">✂️ Extubación</button>
-                <button type="button" class="hbtn ev-va" data-ev="reintub" onclick="setEventoVA('reintub')">↩️ Reintubación</button>
-                <button type="button" class="hbtn ev-va" data-ev="tqt"    onclick="setEventoVA('tqt')">🔪 TQT</button>
-                <button type="button" class="hbtn ev-va" data-ev="decan"  onclick="setEventoVA('decan')">🔓 Decanulación</button>
-              </div>
-              <div id="evVAhint" style="font-size:.74rem;color:#475569;margin-top:6px;"></div>
-            </div>
-            <!-- Vía Aérea + contadores -->
-            <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;">
-              <div id="colDiasVM" style="display:flex;flex-direction:column;">
-                <label id="lblDiasVM" style="font-size:.72rem;color:var(--muted);">Días VM</label>
-                <input type="text" id="fDiasVM" class="tc" disabled style="height:34px;width:72px;border:1px solid #cbd5e1;border-radius:5px;text-align:center;">
-              </div>
-              <div id="colReintub" class="hidden" style="display:none;flex-direction:column;">
-                <label style="font-size:.72rem;color:var(--danger);">Reint. N°</label>
-                <input type="text" id="fReintub" class="tc bold" disabled style="height:34px;width:54px;border:1px solid #fecaca;border-radius:5px;text-align:center;color:var(--danger);">
-              </div>
-              <div style="display:flex;flex-direction:column;min-width:80px;">
-                <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Vía Aérea</label>
-                <select id="fVA" class="bold" onchange="cascadeVA()" style="height:38px;">
-                  <option value="">-</option>
-                  <option>Natural</option><option>TOT</option><option>TQT</option>
-                </select>
-              </div>
-              <div id="colDiasTOT" class="hidden" style="display:none;flex-direction:column;">
-                <label style="font-size:.72rem;color:var(--muted);">Días TOT</label>
-                <input type="text" id="fDiasTOT" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #bfdbfe;border-radius:5px;text-align:center;">
-              </div>
-              <div id="colDiasTQT" class="hidden" style="display:none;flex-direction:column;">
-                <label style="font-size:.72rem;color:var(--resp);">Días TQT</label>
-                <input type="text" id="fDiasTQT" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #bfdbfe;border-radius:5px;text-align:center;color:var(--resp);">
-              </div>
-              <div id="colDiasVNI" class="hidden" style="display:none;flex-direction:column;">
-                <label style="font-size:.72rem;color:#0891b2;">Días VNI</label>
-                <input type="text" id="fDiasVNI" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #a5f3fc;border-radius:5px;text-align:center;color:#0891b2;">
-              </div>
-<!-- 🗂️ 17-sep-2026 · FUERA el contador de «Días VAA». Diego: «tubo y TQT
-                   son vía aérea artificial, eso se repite». Con tubo se ven los
-                   días de tubo, con TQT los de TQT, con VNI los de VNI, y los de
-                   VM siempre. El VALOR se sigue calculando —el relato dice «(día
-                   N)»— pero ya no ocupa una casilla que repetía lo de al lado.
-                   Los días previos de vía aérea siguen viajando, escondidos: son
-                   un dato real del episodio que se arrastra entre turnos. -->
-              <input type="hidden" id="fDiasVAA">
-              <input type="hidden" id="fVAExtDias" value="0">
-            </div>
-            <!-- compat oculto -->
-            <input type="hidden" id="fDiasVA">
-
+            <!-- 🗂️ 17-sep-2026 · TODA LA VÍA AÉREA SE MUDÓ A RESPIRATORIO.
+                 Se fueron el selector, la máquina de eventos («¿qué pasó hoy
+                 con la vía aérea?») y los cuatro contadores de días. Vivían
+                 TRES SECCIONES antes de donde se usan, y eran más de la mitad
+                 de los 36 campos que esta tarjeta llegó a tener siendo la de
+                 datos «generales». Diego: «podría quizás juntarse todo en un
+                 bloque de respiratorio… yo creo que podría moverse».
+                 Acá queda lo que de verdad es del paciente y no del turno: el
+                 día de estadía, la ficha previa a la UCI, la adecuación del
+                 esfuerzo terapéutico, la fase clínica, el reingreso y el
+                 aislamiento. -->
           </div>
         </div>
 
@@ -3591,6 +3543,75 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="fcard-hdr"><span class="fcard-title">🫁 Respiratorio — 💨 Terapia Ventilatoria</span></div>
           <div class="fcard-body">
             <div id="evStrip" class="hidden" style="margin:10px 16px 0;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;font-size:.78rem;line-height:1.9;"></div>
+
+            <!-- ▌ LA VÍA AÉREA — mudada desde «📊 General» el 17-sep-2026, junto
+                 con el tubo. Va PRIMERO en el bloque respiratorio porque es lo
+                 primero que se mira: qué pasó hoy con la vía aérea, con qué
+                 respira y cuántos días lleva. Después el tubo, después cómo se
+                 ventila.
+                 🔴 Mover el marcado NO tocó la máquina de eventos: los ids son
+                 los mismos y las funciones no cambiaron. Lo fija
+                 general_solo_lo_suyo.js, que declara los cinco eventos uno por
+                 uno para probarlo. -->
+            <!-- 🗂️ ¿QUÉ PASÓ HOY CON LA VÍA AÉREA? (rama episodio/turno, Diego
+                 11-sep: «el panel mejor que anuncie a la entrada para evitar
+                 problemas»). El evento se declara PRIMERO; él abre su bloque y
+                 fija la vía aérea. El select de abajo deja de ser libre (línea
+                 fina): sin evento declarado, no se cambia a mano. -->
+            <div id="evVAfila" class="hidden" style="margin-top:8px;padding:8px 10px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;">
+              <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#1d4ed8;margin-bottom:6px;">¿Qué pasó hoy con la vía aérea?</div>
+              <div id="evVAbtns" style="display:flex;gap:5px;flex-wrap:wrap;">
+                <button type="button" class="hbtn ev-va" data-ev="nada"   onclick="setEventoVA('nada')">Nada</button>
+                <button type="button" class="hbtn ev-va" data-ev="intub"  onclick="setEventoVA('intub')">🫁 Intubación</button>
+                <button type="button" class="hbtn ev-va" data-ev="ext"    onclick="setEventoVA('ext')">✂️ Extubación</button>
+                <button type="button" class="hbtn ev-va" data-ev="reintub" onclick="setEventoVA('reintub')">↩️ Reintubación</button>
+                <button type="button" class="hbtn ev-va" data-ev="tqt"    onclick="setEventoVA('tqt')">🔪 TQT</button>
+                <button type="button" class="hbtn ev-va" data-ev="decan"  onclick="setEventoVA('decan')">🔓 Decanulación</button>
+              </div>
+              <div id="evVAhint" style="font-size:.74rem;color:#475569;margin-top:6px;"></div>
+            </div>
+            <!-- Vía Aérea + contadores -->
+            <div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;">
+              <div id="colDiasVM" style="display:flex;flex-direction:column;">
+                <label id="lblDiasVM" style="font-size:.72rem;color:var(--muted);">Días VM</label>
+                <input type="text" id="fDiasVM" class="tc" disabled style="height:34px;width:72px;border:1px solid #cbd5e1;border-radius:5px;text-align:center;">
+              </div>
+              <div id="colReintub" class="hidden" style="display:none;flex-direction:column;">
+                <label style="font-size:.72rem;color:var(--danger);">Reint. N°</label>
+                <input type="text" id="fReintub" class="tc bold" disabled style="height:34px;width:54px;border:1px solid #fecaca;border-radius:5px;text-align:center;color:var(--danger);">
+              </div>
+              <div style="display:flex;flex-direction:column;min-width:80px;">
+                <label style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Vía Aérea</label>
+                <select id="fVA" class="bold" onchange="cascadeVA()" style="height:38px;">
+                  <option value="">-</option>
+                  <option>Natural</option><option>TOT</option><option>TQT</option>
+                </select>
+              </div>
+              <div id="colDiasTOT" class="hidden" style="display:none;flex-direction:column;">
+                <label style="font-size:.72rem;color:var(--muted);">Días TOT</label>
+                <input type="text" id="fDiasTOT" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #bfdbfe;border-radius:5px;text-align:center;">
+              </div>
+              <div id="colDiasTQT" class="hidden" style="display:none;flex-direction:column;">
+                <label style="font-size:.72rem;color:var(--resp);">Días TQT</label>
+                <input type="text" id="fDiasTQT" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #bfdbfe;border-radius:5px;text-align:center;color:var(--resp);">
+              </div>
+              <div id="colDiasVNI" class="hidden" style="display:none;flex-direction:column;">
+                <label style="font-size:.72rem;color:#0891b2;">Días VNI</label>
+                <input type="text" id="fDiasVNI" class="tc bold" disabled style="height:34px;width:62px;border:1px solid #a5f3fc;border-radius:5px;text-align:center;color:#0891b2;">
+              </div>
+<!-- 🗂️ 17-sep-2026 · FUERA el contador de «Días VAA». Diego: «tubo y TQT
+                   son vía aérea artificial, eso se repite». Con tubo se ven los
+                   días de tubo, con TQT los de TQT, con VNI los de VNI, y los de
+                   VM siempre. El VALOR se sigue calculando —el relato dice «(día
+                   N)»— pero ya no ocupa una casilla que repetía lo de al lado.
+                   Los días previos de vía aérea siguen viajando, escondidos: son
+                   un dato real del episodio que se arrastra entre turnos. -->
+              <input type="hidden" id="fDiasVAA">
+              <input type="hidden" id="fVAExtDias" value="0">
+            </div>
+            <!-- compat oculto -->
+            <input type="hidden" id="fDiasVA">
+
 
             <!-- ▌ EL TUBO Y LA CÁNULA — mudados desde «📊 General» el 17-sep-2026.
                  Estaban TRES SECCIONES antes de donde se usan. Al listar el
@@ -12207,7 +12228,19 @@ function autoCoopera(){
   // Auto S5Q y Cooperación
   const gcsO=parseInt(v('fGCSO'))||0, gcsV=parseInt(v('fGCSV'))||1, gcsM=parseInt(v('fGCSM'))||0;
   const gcsNum=gcsO+(isNaN(parseInt(v('fGCSV')))?1:gcsV)+gcsM;
-  const noCooper=bnm||(sas===1)||(gcsNum<8);
+  /* 🔴 17-sep-2026 · SIN GLASGOW MEDIDO, NADIE CONCLUYE NADA. Esta línea decía
+     `gcsNum<8` a secas, y desde que el Glasgow arranca vacío la suma de tres
+     campos en blanco da 1 —la verbal automática del intubado más dos ceros—:
+     con SAS 4, o sea un paciente VIGIL, TRANQUILO Y COOPERADOR, el formulario
+     escribía solo «S5Q <3» y «No cooperador», y de paso apagaba las escalas que
+     dependen de la cooperación (MRC, FSS, dinamometría).
+     Peor que un dato faltante: un dato FALSO que escribe el programa en la
+     ficha de alguien que está cooperando. Lo que evalúa una persona es la
+     ocular y la motora; sin ninguna de las dos, el Glasgow no opina.
+     🪤 Se vio MIRANDO LA PANTALLA, no con una prueba de valores: es la misma
+     raíz que el Glasgow 15 de fábrica, una capa más abajo. */
+  const gcsMedido=!!(v('fGCSO')||v('fGCSM'));
+  const noCooper=bnm||(sas===1)||(gcsMedido&&gcsNum<8);
   if(noCooper){
     const s5=$('fS5Q'); if(s5) s5.value='lt3';
     const coop=$('fCoop'); if(coop) coop.value='No cooperador';

@@ -1770,3 +1770,50 @@ vía aérea de arriba sigue siendo el estado previo con el que llegó — que es
 precisamente la regla de los tres ejes que esa guardia protege.
 
 **175 guardias · 175 verdes.**
+
+---
+
+## 17-sep-2026 · «General» se queda con lo del paciente
+
+Diego: *«hazlo»* — la mudanza que quedaba del PRD.
+
+El tubo y la cánula se habían mudado en una tanda anterior. Esta termina el
+trabajo: se va también el **selector de vía aérea**, la **máquina de eventos**
+(«¿qué pasó hoy con la vía aérea?», que es la puerta a intubación, extubación,
+reintubación, TQT y decanulación) y los **cuatro contadores de días**.
+
+Eran más de la mitad de los 36 campos que la tarjeta de datos «generales» había
+llegado a tener, y vivían tres secciones antes de donde se usan. Ahora
+Respiratorio abre con lo primero que se mira —qué pasó hoy con la vía aérea, con
+qué respira y cuántos días lleva—, después el tubo, después cómo se ventila.
+
+En General queda lo que de verdad es del paciente y no del turno: día de
+estadía, ficha previa a la UCI, adecuación del esfuerzo terapéutico, fase
+clínica, reingreso y aislamiento.
+
+🔴 **Mover el marcado no podía tocar la máquina de eventos.** Los ids son los
+mismos y las funciones no cambiaron; la guardia declara los cinco eventos uno
+por uno y comprueba que cada uno abre su bloque.
+
+### 🔴 Y la captura destapó otro dato falso escrito solo
+
+Con **SAS 4** —vigil, tranquilo, cooperador— y el Glasgow todavía sin medir, el
+formulario escribía por su cuenta «S5Q <3» y «**No cooperador**». Misma raíz que
+el Glasgow de fábrica: la suma de tres campos vacíos da 1 —la verbal automática
+del intubado más dos ceros— y el automatismo leía ese 1 como un paciente en
+coma. De paso apagaba las escalas que dependen de la cooperación: MRC, FSS y
+dinamometría.
+
+Es peor que un dato faltante: es un dato **falso** que escribe el programa en la
+ficha de alguien que está cooperando. Lo que evalúa una persona es la ocular y
+la motora; sin ninguna de las dos, el Glasgow no opina.
+
+Van tres bugs de la misma familia en un día —el Glasgow 15 de fábrica, la verbal
+que saltaba a 5 al desintubar, y este— y los tres salieron de la misma raíz: un
+campo vacío tratado como un cero con significado clínico.
+
+🪤 **Y otra vez lo encontró una captura, no una guardia.** Ninguna prueba de
+valores lo cazaba porque el valor «No cooperador» es perfectamente válido; lo
+que estaba mal era que nadie lo había escrito.
+
+**176 guardias · 176 verdes.** Nueva: `general_solo_lo_suyo.js`.

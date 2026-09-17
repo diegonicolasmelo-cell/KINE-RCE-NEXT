@@ -119,6 +119,41 @@ const { chromium } = require('playwright-core');
   no('★★ SAS 7 · sin cooperación', s7.coop);
   si('🔴 SAS 7 · con CAM-ICU (el CAM tiene piso, no techo)', s7.cam);
 
+  /* ══ 2b · 🔴 Sin Glasgow medido, nadie concluye nada ══════════════════
+     Con SAS 4 —vigil, tranquilo, cooperador— y el Glasgow todavía sin medir,
+     el formulario escribía SOLO «S5Q <3» y «No cooperador». Venía de la misma
+     raíz que el Glasgow de fábrica: la suma de tres campos vacíos daba 1 (la
+     verbal automática del intubado más dos ceros), y el automatismo leía ese 1
+     como un paciente en coma.
+     El resultado es peor que un dato faltante: es un dato FALSO escrito por el
+     programa en la ficha de un paciente que está cooperando, y que además
+     apaga las escalas que dependen de la cooperación (MRC, FSS, dinamometría).
+     Se vio MIRANDO LA PANTALLA, no con una prueba de valores. */
+  console.log('\n2b · 🔴 El automatismo no concluye sin medición');
+  const N = await p.evaluate(async () => {
+    // 🪤 El escenario venía de recorrer SAS 1, 6 y 7, que dejaron el S5Q en
+    // «<3». El caso que interesa es el del formulario RECIÉN ABIERTO —que es
+    // como llega el colega— así que se limpia lo que aquellas pruebas dejaron.
+    // (Con un S5Q ya puesto, deducir «No cooperador» de él es correcto: ahí sí
+    // hay una medición detrás.)
+    ['fGCSO', 'fGCSM', 'fS5Q', 'fCoop'].forEach(id => { const e = $(id); if (e) e.value = ''; });
+    $('fSed').value = 'Escalón 6'; if (typeof hSed === 'function') hSed();
+    $('fSAS').value = '4'; $('fSAS').dispatchEvent(new Event('change'));
+    if (typeof autoCoopera === 'function') autoCoopera();
+    await new Promise(r => setTimeout(r, 80));
+    const sinMedir = { s5q: v('fS5Q'), coop: v('fCoop') };
+    // …y con el Glasgow medido bajo sí concluye, que es su trabajo
+    const set = (id, val) => { const e = $(id); if (e) { e.value = val; e.dispatchEvent(new Event('change')); } };
+    set('fGCSO', '1'); set('fGCSM', '1');
+    if (typeof autoCoopera === 'function') autoCoopera();
+    await new Promise(r => setTimeout(r, 80));
+    const medidoBajo = { s5q: v('fS5Q'), coop: v('fCoop') };
+    return { sinMedir, medidoBajo };
+  });
+  eq('★★ con SAS 4 y Glasgow sin medir, el S5Q queda vacío', N.sinMedir.s5q, '');
+  eq('★★ …y no se escribe «No cooperador» solo', N.sinMedir.coop, '');
+  eq('★ control · con Glasgow 3 medido sí concluye', N.medidoBajo.coop, 'No cooperador');
+
   /* ══ 3 · La PPC se calcula ═════════════════════════════════════════════ */
   console.log('\n3 · ★ La PPC es PAM − PIC, no un tercer número suelto');
   const C = await p.evaluate(async () => {
