@@ -1,15 +1,26 @@
 # KINE-RCE-NEXT — reglas vigentes
 
-Reconstrucción del Registro Clínico Electrónico de Kinesiología UCI del
-Hospital San Pablo de Coquimbo, según `PLAN_MAESTRO.md`. Google Apps Script +
+Registro Clínico Electrónico de Kinesiología UCI del Hospital San Pablo de
+Coquimbo. Google Apps Script +
 Google Sheets. El usuario es **Diego Melo Villagrán**, coordinador de
 kinesiólogos, **no programador**: trabaja en español, actualiza el proyecto
 pegando a mano los archivos en el editor de Apps Script y prueba en el
 navegador del hospital o de su casa.
 
 > 📓 **Este archivo son las REGLAS y se lee entero.** Lo que se hizo y por qué
-> va a `BITACORA.md`. Lo que falta del plan, medido, va a `ESTADO_PLAN.md`.
-> El detalle clínico y el modelo de datos están en la skill `rce-kine`.
+> va a `BITACORA.md`. El detalle clínico y el modelo de datos están en la skill
+> `rce-kine`.
+>
+> 🔴 **18-sep-2026 · Los PRD y planes anteriores están ARCHIVADOS** en
+> `docs/archivo/` por decisión de Diego: ya no mandan y no se citan como
+> argumento. Lo esencial de lo aprendido —el terreno, sus decisiones clínicas
+> ya cerradas y las trampas pagadas— está destilado en `docs/LO_ESENCIAL.md`.
+> Los acuerdos nuevos se cierran con `docs/GUIA_DE_ACUERDOS.md`, y a medida que
+> él responda, sus respuestas se escriben ahí **con sus palabras**.
+>
+> 🪤 Archivar los planes NO archiva las guardias: un acuerdo de producto se
+> puede cambiar, una cicatriz no. Las reglas de este archivo y `build/checks/`
+> siguen valiendo enteras.
 
 ---
 

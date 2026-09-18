@@ -184,7 +184,7 @@ const si = (l, cond, detalle) => {
      arreglo obvio es dejar que la cabecera envuelva en dos líneas, y eso
      choca de frente con una decisión ya tomada que `checks/piel.js` protege
      («el encabezado es UNA sola franja compacta»). Elegir entre las dos es de
-     Diego, no de quien acomoda la caja, y está planteado en ESTADO_PLAN.md.
+     Diego, no de quien acomoda la caja, y está planteado en docs/archivo/ESTADO_PLAN.md.
 
      Lo que sí exige es que la lista NO CREZCA. Esta es la línea base medida:
      si mañana un control más se cae de la cabecera, esto se pone rojo y hay

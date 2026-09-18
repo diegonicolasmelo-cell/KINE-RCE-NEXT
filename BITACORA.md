@@ -3,8 +3,12 @@
 Qué se cambió en NEXT, por qué, qué se midió y con qué trampa se tropezó.
 
 **Esto NO son las reglas vigentes.** Las reglas viven en `CLAUDE.md`, que se
-lee entero en cada sesión. Lo que falta del plan, medido sobre el código, vive
-en `ESTADO_PLAN.md`. Este archivo se consulta cuando hace falta el porqué.
+lee entero en cada sesión. Este archivo se consulta cuando hace falta el porqué.
+
+🗂️ **18-sep-2026** · Los planes y PRD pasaron a `docs/archivo/` y dejaron de
+mandar. Lo esencial está destilado en `docs/LO_ESENCIAL.md`. Las entradas de
+abajo que los citan siguen siendo verdad sobre **lo que pasó**; lo que ya no
+vale es su autoridad.
 
 La bitácora de la aplicación anterior —un año de versiones— se quedó en el
 repositorio de origen (`diegonicolasmelo-cell/RCE-KINE`, `BITACORA.md`). No se
@@ -117,7 +121,7 @@ en su casilla.
 
 D9 se cerró en julio; las cuatro funciones llegaron en julio y agosto, pedidas
 por Diego, y el plan nunca se actualizó. **En los hechos D9 quedó superada**,
-pero eso lo tiene que decir él: la pregunta está escrita en `ESTADO_PLAN.md`.
+pero eso lo tiene que decir él: la pregunta está escrita en `docs/archivo/ESTADO_PLAN.md`.
 
 Lo que sí se hizo es la minimización (§10 del plan). `rut_minimo.js` siembra un
 RUT sintético, llama al dispatcher **acción por acción** y exige que no

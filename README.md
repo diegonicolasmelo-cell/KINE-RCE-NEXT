@@ -5,8 +5,13 @@ Hospital San Pablo de Coquimbo.
 
 ## Qué es este repositorio
 
-La **reconstrucción** de RCE-KINE según `PLAN_MAESTRO.md`, desarrollada y
-probada **aparte** de la aplicación que usa el equipo.
+La nueva generación de RCE-KINE, desarrollada y probada **aparte** de la
+aplicación que usa el equipo.
+
+🗂️ **18-sep-2026 · Los PRD y planes anteriores están archivados** en
+`docs/archivo/` por decisión de Diego, para cerrar los acuerdos desde cero. Lo
+esencial de lo aprendido está en `docs/LO_ESENCIAL.md`; las preguntas abiertas,
+en `docs/GUIA_DE_ACUERDOS.md`.
 
 🔴 **NEXT no modifica ni despliega la aplicación del hospital.** Su paquete de
 entrega va a una planilla nueva con su propio proyecto de Apps Script. No
@@ -25,12 +30,13 @@ incluye datos clínicos reales, credenciales ni configuración de producción.
 |---|---|
 | `v2/` | **El código fuente.** Es la verdad del proyecto: acá se programa. |
 | `entrega/` | El paquete de 13 archivos listo para pegar en el editor. **Se genera**, no se edita. |
-| `build/checks/` | La batería: ~145 guardias, cada una nacida de un error que costó caro. |
+| `build/checks/` | La batería: 179 guardias, cada una nacida de un error que costó caro. |
 | `build/` | El empaquetador, el corredor de la batería y los bancos de medición. |
 | `herramientas/` | Diagnóstico y utilidades que se pegan sueltas en el editor. |
-| `PLAN_MAESTRO.md` | El plan de la reconstrucción y sus nueve decisiones (D1–D9). |
-| `ESTADO_PLAN.md` | **Qué del plan ya está hecho y qué falta, medido sobre el código.** El mejor punto de entrada. |
+| `docs/LO_ESENCIAL.md` | **Lo que se sabe antes de empezar: el terreno, las decisiones clínicas de Diego y las trampas pagadas.** El mejor punto de entrada. |
+| `docs/GUIA_DE_ACUERDOS.md` | Las preguntas abiertas, las que cambian lo que se construye. |
 | `BITACORA.md` | Qué se cambió en NEXT, por qué, y con qué trampa se tropezó. |
+| `docs/archivo/` | Los planes y PRD que **ya no mandan**. Se guardan por su porqué, no por su autoridad. |
 | `docs/base/` | Documentos de referencia y los 13 PRD que trae la base. |
 
 ## Para empezar

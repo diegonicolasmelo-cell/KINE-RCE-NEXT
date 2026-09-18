@@ -6,7 +6,7 @@
 // emparejar los gases que llegan del laboratorio, detectar reingresos, el
 // buscador («al que solo tenía el RUT a mano no le servía de nada») y el botón
 // que lo copia para abrir el laboratorio. Sacarlo hoy rompería esas cuatro
-// cosas, así que la decisión de fondo es de Diego (ver ESTADO_PLAN.md §G4).
+// cosas, así que la decisión de fondo es de Diego (ver docs/archivo/ESTADO_PLAN.md §G4).
 //
 // Lo que NO depende de esa decisión es la minimización (§10 del plan): que el
 // RUT no salga en ninguna respuesta que no lo necesite. Eso ya se cuidaba
@@ -60,7 +60,7 @@ const PERMITIDAS = {
   // todo sale de `DB`, que es este censo. Sacar el RUT de aquí obliga a
   // inventar ese viaje por paciente en una app que pasó un año quitando
   // viajes. Es una decisión de diseño de Diego, no una fuga que tapar: está
-  // planteada en ESTADO_PLAN.md §G4.
+  // planteada en docs/archivo/ESTADO_PLAN.md §G4.
   GET_BOOT: 'el censo del arranque: el navegador lo usa en la ficha, los botones de laboratorio y las hojas impresas',
   GET_TODAS_CAMAS: 'el mismo censo por la ruta clásica de arranque (_bootLegacy)',
 };
