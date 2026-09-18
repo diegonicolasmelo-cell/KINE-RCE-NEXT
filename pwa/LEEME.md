@@ -68,6 +68,17 @@ El flujo corre primero la guardia: si `pwa/` está desactualizada respecto de
 `v2/`, no publica.
 
 ⚠️ **GitHub Pages deja el sitio público** (con cuenta gratis no hay otra
-opción). Lo público es la **pantalla**, no los datos. Si prefieres que ni la
-pantalla lo sea, el mismo contenido de esta carpeta sirve tal cual en Firebase
-Hosting o Cloudflare Pages, que era la recomendación del PRD.
+opción). Lo público es la **pantalla**, no los datos.
+
+🪤 **Y cambiar de alojamiento no arregla eso.** Firebase Hosting y Cloudflare
+Pages —los dos que nombraba el PRD— sirven esta carpeta tal cual y **también
+dejan el sitio público por defecto**: ninguno trae control de acceso de fábrica.
+Lo que de verdad decide quién entra a los datos es el candado del turno
+(`accesoEncender()`), no dónde viva la pantalla. Se anota acá porque la frase
+anterior daba a entender lo contrario y podía llevar a mudar el sitio creyendo
+que con eso quedaba cerrado.
+
+Si además se quiere que ni la pantalla sea pública, hace falta poner un login
+DELANTE del sitio —Cloudflare Access es el camino corto, porque se configura
+desde el navegador y no toca el código—. Es una decisión aparte, no un efecto
+de mudarse.
