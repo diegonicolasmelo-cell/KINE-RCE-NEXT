@@ -127,7 +127,10 @@ function generarTextoEvolucion(d) {
   try { farm = JSON.parse(d.SED_FARMACOS || '[]') || []; } catch (e) { farm = []; }
   const farmTxt = farm.length ? ` con ${farm.map(function (x) { return String(x).toLowerCase(); }).join(', ')}` : '';
   let sedStr = bnm ? `Sedado${escTxt ? ' ' + escTxt : ''}+BNM${sasTxt || ' para meta SAS 1'}${farmTxt}.`
-             : (sed === 'Sin sedación') ? ('Sin sedoanalgesia' + (vigilia ? ', ' + vigilia.toLowerCase() : '') + '.')
+             /* 🗂️ 18-sep-2026 · «Sin sedación», no «Sin sedoanalgesia» (Diego). El
+                selector del formulario se llama así y la evolución decía otra cosa:
+                quien la lee tenía que traducir. Espejo del cliente. */
+             : (sed === 'Sin sedación') ? ('Sin sedación' + (vigilia ? ', ' + vigilia.toLowerCase() : '') + '.')
              : `Sedado${vigilTxt} ${escTxt}${sasTxt}${farmTxt}.`;
   // GCS: el total (SED_GCS_TOT="11T") y la verbal (SED_GCS_V="1T") ya vienen con
   // "T" desde el cliente en intubado; /15 solo para paciente sin VA artificial.

@@ -1936,3 +1936,52 @@ Columna nueva `SED_VIGILIA`, **al final** (408). Hay que correr
 `crearORepararEstructura()`.
 
 **178 guardias · 178 verdes.** Nueva: `vigilia_sin_sedacion.js`.
+
+---
+
+## 18-sep-2026 · El día de suspensión es el del retiro, no el del despertar
+
+Diego, zanjando la pregunta que quedó abierta anoche: *«el día de suspensión de
+sedación es el día de retiro de fármacos cuando efectivamente le suspenden.
+Sería el día que el colega no marque medicamentos clasificados con efecto
+sedante y en el turno anterior sí estaban marcados»*.
+
+Yo había confundido dos preguntas en una sola regla. **Son dos:**
+
+| | Quién la contesta |
+|---|---|
+| ¿Está profundamente sedado HOY? | el **SAS** (1-2 sí, 3 o más no) |
+| ¿Qué día se le **suspendió**? | el día en que se **retiran los fármacos** |
+
+El error se veía en un caso concreto: paciente en **escalón 2 con la sedación
+todavía corriendo** que despierta a **SAS 3**. La regla vieja le anotaba la
+suspensión **ese** día, a un paciente que seguía con los fármacos puestos. Ahora
+la anota al día siguiente, cuando efectivamente se los sacan.
+
+Y si nunca se los sacan —pasa de sedación profunda a sedación vigil sin escalón
+de por medio— **no hay fecha que anotar**: le cambiaron la sedación, no se la
+suspendieron. Antes ahí se inventaba una.
+
+🪤 **La fecha sí se borra si vuelve a sedación profunda**, y eso lo sigue
+diciendo el SAS. Por eso el precedex para la agitación —SAS 6— no la toca: ése
+era el caso de agosto del que salió todo esto, y sigue resuelto.
+
+🪤 **Hacen falta las dos señales para leer un retiro**, el escalón *y* la lista de
+sedantes. Con la lista sola, un colega que deja el escalón puesto sin marcar
+ningún chip le inventaría al paciente una fecha de suspensión que nadie decidió.
+La función nueva es `sedantesPuestos()` y vive en el dominio puro, al lado de
+`sedacionProfunda()`, con la diferencia entre las dos escrita encima.
+
+### El BNM vive y muere con la sedación
+
+*«Sin sedación desaparece igual BNM, porque solo puede ser bloqueado con
+sedación»*. La casilla se esconde **y se desmarca**: un bloqueo neuromuscular
+sin sedación es un paciente paralizado y despierto, y eso no puede quedar
+marcado por descuido.
+
+### «Sin sedación», no «Sin sedoanalgesia»
+
+El selector del formulario se llama «Sin sedación» y la evolución escribía otra
+cosa. Quien la leía tenía que traducir. Ahora sale: «Sin sedación, somnoliento.»
+
+**178 guardias · 178 verdes.**

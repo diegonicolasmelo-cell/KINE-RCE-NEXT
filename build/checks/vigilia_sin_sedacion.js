@@ -76,12 +76,15 @@ const rel = (extra) => String(generarTextoEvolucion(Object.assign({
   VENT_VIA_AEREA: 'TQT', VENT_SOPORTE: 'VM', SED_TIPO: 'Sin sedación'
 }, extra || {})) || '');
 
+/* 🗂️ 18-sep-2026 · «Sin sedación», no «Sin sedoanalgesia» (Diego). El
+   selector de arriba se llama así y la evolución decía otra cosa: quien la lee
+   tiene que traducir. */
 si('★ sin sedación y somnoliento: lo dice',
-   /Sin sedoanalgesia, somnoliento\./.test(rel({ SED_VIGILIA: 'Somnoliento' })));
+   /Sin sedación, somnoliento\./.test(rel({ SED_VIGILIA: 'Somnoliento' })));
 si('   vigil y cooperador también',
-   /Sin sedoanalgesia, vigil y cooperador\./.test(rel({ SED_VIGILIA: 'Vigil y cooperador' })));
+   /Sin sedación, vigil y cooperador\./.test(rel({ SED_VIGILIA: 'Vigil y cooperador' })));
 si('   y sin el dato, la frase de siempre',
-   /Sin sedoanalgesia\./.test(rel({})));
+   /Sin sedación\./.test(rel({})));
 // 🔴 Con sedación puesta manda el SAS y el campo no se narra: si una fila vieja
 // lo trajera escrito, narrarlo sería contradecir al SAS en la misma frase.
 no('★ con sedación puesta NO se narra la vigilia, manda el SAS',
@@ -118,14 +121,21 @@ const { chromium } = require('playwright-core');
 
     // (a) arranca sin sedación: se pide la vigilia, no el SAS
     $('fSed').value = 'Sin sedación'; hSed();
-    const sinSed = { vigilia: vis('gVigilia'), sas: vis('gSAS'), meta: vis('gSASmeta') };
+    const sinSed = { vigilia: vis('gVigilia'), sas: vis('gSAS'), meta: vis('gSASmeta'),
+                     bnm: vis('gBNM') };
     $('fVigilia').value = 'Somnoliento';
     const txtSin = String(genTexto() || '');
 
     // (b) se seda: desaparece la vigilia, aparece el SAS, y el dato se borra
     $('fSed').value = 'Escalón 6'; hSed();
     const conSed = { vigilia: vis('gVigilia'), sas: vis('gSAS'), meta: vis('gSASmeta'),
-                     valor: $('fVigilia').value };
+                     bnm: vis('gBNM'), valor: $('fVigilia').value };
+
+    // (b2) el BNM marcado con sedación tiene que APAGARSE al sacarla: no se
+    //      puede bloquear a un paciente que no está sedado.
+    $('cBNM').checked = true;
+    $('fSed').value = 'Sin sedación'; hSed();
+    const bnmTrasSacar = { visible: vis('gBNM'), marcado: $('cBNM').checked };
 
     // (c) vuelve a quedar sin sedación y se guarda de verdad: el payload no
     // se arma en una función aparte, se arma dentro de guardar().
@@ -137,7 +147,8 @@ const { chromium } = require('playwright-core');
     window.toast = _t;
     await new Promise(r => setTimeout(r, 150));
     const pay = (window._ll.find(x => x.a === 'GUARDAR_EVOLUCION') || {}).d || null;
-    return { sinSed, conSed, txtSin, enviado: pay ? pay.SED_VIGILIA : '(no salió el guardado)' };
+    return { sinSed, conSed, bnmTrasSacar, txtSin,
+             enviado: pay ? pay.SED_VIGILIA : '(no salió el guardado)' };
   });
 
   si('★★ sin sedación se pide el estado de vigilia', R.sinSed.vigilia);
@@ -146,8 +157,16 @@ const { chromium } = require('playwright-core');
   si('★★ al sedar aparece el SAS…', R.conSed.sas);
   no('   …y se va la vigilia: nunca los dos a la vez (el pisón de Diego)', R.conSed.vigilia);
   eq('★ y el dato se BORRA al sedar, no queda colgado', R.conSed.valor, '');
+  /* 🔴 18-sep-2026 · EL BNM TAMBIÉN SE VA. Diego: «sin sedación desaparece
+     igual BNM, porque solo puede ser bloqueado con sedación». Un bloqueo
+     neuromuscular sin sedación es un paciente paralizado y despierto: no es una
+     casilla que deba poder marcarse por descuido. */
+  no('★★ sin sedación no se puede bloquear: el BNM no está', R.sinSed.bnm);
+  si('   …y con sedación vuelve', R.conSed.bnm);
+  no('★ al sacar la sedación el BNM desaparece…', R.bnmTrasSacar.visible);
+  no('   …y se DESMARCA, no queda marcado a escondidas', R.bnmTrasSacar.marcado);
   si('★★ la pantalla narra igual que el servidor',
-     /Sin sedoanalgesia, somnoliento\./.test(R.txtSin));
+     /Sin sedación, somnoliento\./.test(R.txtSin));
   eq('★ y el dato viaja a la planilla', R.enviado, 'Sopor superficial');
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');

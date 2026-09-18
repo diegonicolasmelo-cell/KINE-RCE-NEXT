@@ -153,6 +153,27 @@ function sasEnPalabras(sas) {
  * casilla SED_VIGIL y pueden no traer SAS. Esas se leen por la casilla, que es
  * como se han leído hasta hoy.
  */
+/* ¿HAY SEDANTES PUESTOS EN ESTE TURNO? Es la pregunta de la que cuelga la FECHA
+   DE SUSPENSIÓN de la sedación en la entrega de turno. Diego, 18-sep-2026: «el
+   día de suspensión de sedación es el día de retiro de fármacos, cuando
+   efectivamente le suspenden. Sería el día que el colega no marque medicamentos
+   clasificados con efecto sedante y en el turno anterior sí estaban marcados».
+   🔴 NO SE CONFUNDE CON sedacionProfunda(). Son dos preguntas:
+     · ¿está profundamente sedado HOY? → lo dice el SAS.
+     · ¿qué día se le suspendió?       → lo dice el retiro de los fármacos.
+   🪤 Se mira el escalón **o** la lista, nunca la lista sola: un colega puede
+   dejar el escalón puesto sin marcar ningún chip, y leer eso como un retiro le
+   inventaría al paciente una fecha de suspensión que nadie decidió. Hace falta
+   que las DOS señales digan que no hay nada puesto. */
+function sedantesPuestos(d) {
+  const f = d || {};
+  const tipo = String(f.SED_TIPO || '');
+  if (tipo && tipo !== 'Sin sedación') return true;
+  let lista = [];
+  try { lista = JSON.parse(f.SED_FARMACOS || '[]') || []; } catch (e) { lista = []; }
+  return lista.length > 0;
+}
+
 function sedacionProfunda(d) {
   const f = d || {};
   const tipo = String(f.SED_TIPO || '');

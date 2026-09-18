@@ -2679,11 +2679,25 @@ function _entFicha(id, c, e, episodio, cultivo, fecha, fechaEf, turno, ePrev) {
      La casilla SED_VIGIL —el parche de agosto— salió del formulario, y las
      filas escritas antes de hoy se siguen leyendo por ella. */
   const _profunda = function (ev) { return sedacionProfunda(ev); };
-  let sedSusp = '', bnmSusp = '', _sedAntes = false, _bnmAntes = false;
+  /* 🔴 18-sep-2026 · LA FECHA ES LA DEL RETIRO, no la del despertar. Lo zanjó
+     Diego: «el día de suspensión de sedación es el día de retiro de fármacos,
+     cuando efectivamente le suspenden. Sería el día que el colega no marque
+     medicamentos clasificados con efecto sedante y en el turno anterior sí
+     estaban marcados». Antes se fijaba en el primer turno que dejaba de ser
+     profundo, y con el escalón 2 todavía corriendo y un SAS 3 eso le adelantaba
+     un día la suspensión a un paciente que seguía sedado.
+     🪤 Pero la fecha SÍ se borra si vuelve a sedación PROFUNDA, y eso lo decide
+     el SAS: por eso el precedex para la agitación —SAS 6— no la toca. Ese era
+     el caso de agosto del que salió todo esto. */
+  let sedSusp = '', bnmSusp = '', _conFarmacos = false, _bnmAntes = false;
   episodio.forEach(function (ev) {
     const tipo = String(ev.SED_TIPO || '');
-    if (_profunda(ev)) { _sedAntes = true; sedSusp = ''; }
-    else if (tipo && _sedAntes && !sedSusp) sedSusp = dd(ev.FECHA);
+    if (tipo || ev.SED_FARMACOS) {
+      const hay = sedantesPuestos(ev);
+      if (_profunda(ev)) sedSusp = '';
+      if (!hay && _conFarmacos) sedSusp = dd(ev.FECHA);
+      _conFarmacos = hay;
+    }
     if (esVerdadero(ev.SED_BNM)) { _bnmAntes = true; bnmSusp = ''; }
     else if (_bnmAntes && !bnmSusp) bnmSusp = dd(ev.FECHA);
   });

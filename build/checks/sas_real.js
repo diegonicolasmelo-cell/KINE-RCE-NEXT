@@ -185,31 +185,32 @@ for (let d = 5; d <= 8; d++) {
   }));
 }
 const f1 = ficha(historia);
-/* 🗂️ 17-sep-2026 · LA FECHA SE ADELANTÓ DEL 04 AL 03, y no es un ajuste de
-   la guardia para que pase: es la consecuencia directa de que la profundidad
-   la diga el SAS. El día 3 el paciente todavía tiene el escalón 2 puesto, pero
-   con SAS 3 —«somnoliento, despierta al llamado y se vuelve a dormir»— ya no
-   está profundo. Antes la casilla «sedación vigil» quedaba sin marcar y la regla
-   lo contaba como profundo un día de más.
-   🔴 ESTO ESPERA UNA PALABRA DE DIEGO. Él dijo las dos cosas: «el SAS es lo
-   que define si finalmente es sedación profunda o no» y, sobre esta fecha,
-   «¿cuándo se suspendió? cuando realmente no tenga puestos los fármacos». Con
-   el escalón puesto y SAS 3 las dos lecturas caen en días distintos. Manda la
-   primera, que es la que gobierna el resto del sistema —los gates de
-   cooperación, S5Q y CAM-ICU cortan en ese mismo 3— y la que él aprobó como
-   principio. Si prefiere la segunda: sedacionProfunda() suma «hay fármacos
-   puestos» a la condición y esta fecha vuelve al 04. */
-eq('★ la fecha de suspensión sobrevive al precedex de la agitación', f1.sedSusp, '03-08');
+/* 🔴 18-sep-2026 · QUÉ DÍA SE SUSPENDIÓ, lo zanjó Diego y no es el día en que
+   el paciente despierta: «el día de suspensión de sedación es el día de retiro de
+   fármacos, cuando efectivamente le suspenden. Sería el día que el colega no
+   marque medicamentos clasificados con efecto sedante y en el turno anterior
+   sí estaban marcados».
+   Son DOS preguntas distintas y cada una tiene su fuente:
+     · ¿Está profundamente sedado HOY?  → lo dice el SAS (1-2 sí, 3 o más no).
+     · ¿Qué día se le suspendió?        → el día que se retiraron los fármacos.
+   Confundirlas fue mi error: con el escalón 2 todavía puesto y SAS 3, la fecha
+   se había adelantado un día a un paciente que seguía con la sedación corriendo.
+   🪤 Y la fecha SÍ se borra si vuelve a sedación PROFUNDA —ahí manda el SAS—:
+   por eso el precedex de la agitación, con SAS 6, no la toca. Ese era el caso
+   de agosto que dio origen a todo esto. */
+eq('★★ la fecha es la del RETIRO de los fármacos, no la del despertar', f1.sedSusp, '04-08');
 eq('la entrega muestra el SAS ACTUAL', f1.sas, '6');
 eq('…y la meta al lado', f1.sasMeta, '4');
 eq('…y las filas ya escritas conservan su marca SED_VIGIL', f1.sedVigil, true);
 eq('…y qué sedante tiene puesto', (f1.sedFarmacos || []).join(','), 'Precedex');
 
-// ★ EL PAR QUE LO DEMUESTRA: la misma historia con SAS 2 el día 3. Sigue
-// profundo, y la fecha se corre sola al 04. Manda el SAS, no el calendario.
+// ★ EL PAR QUE LO DEMUESTRA: el día 3 despierta a SAS 3 pero el escalón 2
+// sigue corriendo. Con SAS 2 ese mismo día la fecha NO se mueve: en los dos
+// casos la suspensión es el 04, el día que se retiran los fármacos.
 const sigueProfundo = historia.map(e => e.FECHA === '2026-08-03'
   ? Object.assign({}, e, { SED_SAS: '2', SED_SAS_META: '2' }) : e);
-eq('★ con SAS 2 el día 3, la fecha se corre al 04', ficha(sigueProfundo).sedSusp, '04-08');
+eq('★ despertar con la sedación puesta no adelanta la fecha',
+  ficha(sigueProfundo).sedSusp, '04-08');
 
 // ★ CONTROL NEGATIVO: el mismo episodio, pero el precedex del 05 viene con un
 // SAS 2 —volvió a estar profundo—. Ahí la fecha SÍ tiene que borrarse; si no,
@@ -224,16 +225,19 @@ eq('★ control: si el día 5 vuelve a SAS 2, la fecha SÍ se borra',
 
 // Y el caso de siempre: nunca volvió a sedarse ⇒ la fecha se mantiene.
 eq('sin volver a sedar, la fecha se mantiene',
-  ficha(historia.slice(0, 4)).sedSusp, '03-08');
+  ficha(historia.slice(0, 4)).sedSusp, '04-08');
 
-// Un episodio que pasa de profunda DIRECTO a vigil, sin «Sin sedación» de por
-// medio: la suspensión de la profunda es ese mismo día.
+// ★★ Un episodio que pasa de profunda DIRECTO a vigil, sin «Sin sedación» de
+// por medio: NUNCA se retiraron los fármacos, así que no hay suspensión que
+// anotar. Le cambiaron la sedación, no se la sacaron. 🪤 Antes esto daba el
+// 03-08 —el día que despertó— y era una fecha inventada.
 const directo = [
   evo(1, { SED_TIPO: 'Escalón 3', SED_SAS: '2' }),
   evo(2, { SED_TIPO: 'Escalón 3', SED_SAS: '2' }),
   evo(3, { SED_TIPO: 'Fuera de escalón', SED_SAS: '5', SED_SAS_META: '4', SED_VIGIL: 'TRUE' }),
 ];
-eq('★ de profunda directo a vigil: suspendida ese día', ficha(directo).sedSusp, '03-08');
+eq('★★ de profunda a vigil SIN retirar fármacos: no hay suspensión',
+  ficha(directo).sedSusp, '');
 
 // Sin ningún registro de sedación no se inventa una fecha.
 eq('sin dato de sedación, no se inventa fecha',

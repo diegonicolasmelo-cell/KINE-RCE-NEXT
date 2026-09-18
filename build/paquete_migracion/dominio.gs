@@ -164,6 +164,27 @@ function sasEnPalabras(sas) {
  * casilla SED_VIGIL y pueden no traer SAS. Esas se leen por la casilla, que es
  * como se han leído hasta hoy.
  */
+/* ¿HAY SEDANTES PUESTOS EN ESTE TURNO? Es la pregunta de la que cuelga la FECHA
+   DE SUSPENSIÓN de la sedación en la entrega de turno. Diego, 18-sep-2026: «el
+   día de suspensión de sedación es el día de retiro de fármacos, cuando
+   efectivamente le suspenden. Sería el día que el colega no marque medicamentos
+   clasificados con efecto sedante y en el turno anterior sí estaban marcados».
+   🔴 NO SE CONFUNDE CON sedacionProfunda(). Son dos preguntas:
+     · ¿está profundamente sedado HOY? → lo dice el SAS.
+     · ¿qué día se le suspendió?       → lo dice el retiro de los fármacos.
+   🪤 Se mira el escalón **o** la lista, nunca la lista sola: un colega puede
+   dejar el escalón puesto sin marcar ningún chip, y leer eso como un retiro le
+   inventaría al paciente una fecha de suspensión que nadie decidió. Hace falta
+   que las DOS señales digan que no hay nada puesto. */
+function sedantesPuestos(d) {
+  const f = d || {};
+  const tipo = String(f.SED_TIPO || '');
+  if (tipo && tipo !== 'Sin sedación') return true;
+  let lista = [];
+  try { lista = JSON.parse(f.SED_FARMACOS || '[]') || []; } catch (e) { lista = []; }
+  return lista.length > 0;
+}
+
 function sedacionProfunda(d) {
   const f = d || {};
   const tipo = String(f.SED_TIPO || '');
@@ -608,7 +629,10 @@ function generarTextoEvolucion(d) {
   try { farm = JSON.parse(d.SED_FARMACOS || '[]') || []; } catch (e) { farm = []; }
   const farmTxt = farm.length ? ` con ${farm.map(function (x) { return String(x).toLowerCase(); }).join(', ')}` : '';
   let sedStr = bnm ? `Sedado${escTxt ? ' ' + escTxt : ''}+BNM${sasTxt || ' para meta SAS 1'}${farmTxt}.`
-             : (sed === 'Sin sedación') ? ('Sin sedoanalgesia' + (vigilia ? ', ' + vigilia.toLowerCase() : '') + '.')
+             /* 🗂️ 18-sep-2026 · «Sin sedación», no «Sin sedoanalgesia» (Diego). El
+                selector del formulario se llama así y la evolución decía otra cosa:
+                quien la lee tenía que traducir. Espejo del cliente. */
+             : (sed === 'Sin sedación') ? ('Sin sedación' + (vigilia ? ', ' + vigilia.toLowerCase() : '') + '.')
              : `Sedado${vigilTxt} ${escTxt}${sasTxt}${farmTxt}.`;
   // GCS: el total (SED_GCS_TOT="11T") y la verbal (SED_GCS_V="1T") ya vienen con
   // "T" desde el cliente en intubado; /15 solo para paciente sin VA artificial.

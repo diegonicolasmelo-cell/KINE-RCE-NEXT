@@ -3315,7 +3315,12 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <option>Escalón 4</option><option>Escalón 5</option><option>Escalón 6</option>
                   <option>Fuera de escalón</option>
                 </select></div>
-              <div class="check cr wa"><input type="checkbox" id="cBNM" onchange="autoCoopera()"><label for="cBNM">🔒 BNM</label></div>
+              <!-- 🔴 18-sep-2026 · El BNM vive y muere con la sedación (Diego): «sin
+                   sedación desaparece igual BNM, porque solo puede ser bloqueado con
+                   sedación». Un bloqueo neuromuscular sin sedación es un paciente
+                   paralizado y despierto; no es una casilla que pueda quedar marcada
+                   por descuido. hSed() la esconde Y la desmarca. -->
+              <div id="gBNM" class="check cr wa"><input type="checkbox" id="cBNM" onchange="autoCoopera()"><label for="cBNM">🔒 BNM</label></div>
               <!-- SAS ACTUAL vs META (ago-2026). Antes había UN casillero: la
                    evolución lo narraba como meta y cuatro decisiones de la app
                    lo leían como el estado del paciente, así que con un paciente
@@ -11555,10 +11560,10 @@ function genTexto() {
   let s;
   if($('cBNM')?.checked) s=`Sedado${_escTxt?' '+_escTxt:''}+BNM${_sasTxt||' para meta SAS 1'}${_farmTxt}.`;
   /* 🗂️ 17-sep-2026 · Sin sedación, la frase lleva el estado de vigilia si
-     alguien lo anotó: «Sin sedoanalgesia, somnoliento.». Espejo del servidor
+     alguien lo anotó: «Sin sedación, somnoliento.». Espejo del servidor
      (dominio_texto.gs). Con sedación NO se narra: ahí manda el SAS, y decir
      las dos cosas en la misma frase sería contradecirse. */
-  else if(sed==='Sin sedación'){ const _vg=gv('fVigilia'); s='Sin sedoanalgesia'+(_vg?', '+_vg.toLowerCase():'')+'.'; }
+  else if(sed==='Sin sedación'){ const _vg=gv('fVigilia'); s='Sin sedación'+(_vg?', '+_vg.toLowerCase():'')+'.'; }
   else s=`Sedado${_vigilTxt} ${_escTxt}${_sasTxt}${_farmTxt}.`;
   // GCS: en intubado el total ("11T") y la verbal ("1T") ya vienen con "T"
   // desde calcGCS; el sufijo /15 solo aplica a paciente sin vía aérea artificial.
@@ -12907,7 +12912,7 @@ function hSed(){
      la misma evolución. El campo que se esconde se BORRA: si no, un «vigil y
      cooperador» anotado antes de sedar se guardaría junto al escalón 6. */
   if(sedado){
-    show('gSAS');show('gSASmeta');show('gSedFarmacos');
+    show('gSAS');show('gSASmeta');show('gSedFarmacos');show('gBNM');
     const vg=$('fVigilia');if(vg)vg.value='';hide('gVigilia');
   }
   else{
@@ -12915,6 +12920,8 @@ function hSed(){
     // Sin sedación no hay meta que perseguir ni sedantes que declarar.
     const m=$('fSASmeta');if(m)m.value='';hide('gSASmeta');
     _sedFarmSet([]); hide('gSedFarmacos');
+    // 🔴 Ni bloqueo que poner: solo se bloquea a un paciente sedado.
+    const bn=$('cBNM');if(bn)bn.checked=false; hide('gBNM');
     show('gVigilia');
   }
   autoCoopera();
