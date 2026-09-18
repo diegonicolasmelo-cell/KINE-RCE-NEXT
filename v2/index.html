@@ -3377,24 +3377,42 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--neuro);margin:4px 0 6px;">GCS</div>
             <div class="row" style="align-items:flex-end;">
               <div class="col ws"><label>O</label>
-                <select id="fGCSO" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+                <select id="fGCSO" onchange="_gcsManual(this);calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
               <div class="col ws"><label>V</label>
-                <select id="fGCSV" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option value="1T">1T</option></select></div>
+                <select id="fGCSV" onchange="_gcsManual(this);calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option value="1T">1T</option></select></div>
               <div class="col ws"><label>M</label>
-                <select id="fGCSM" onchange="calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+                <select id="fGCSM" onchange="_gcsManual(this);calcGCS();autoCoopera()"><option value=""></option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
               <div class="mon" style="height:38px;"><span style="font-size:.58rem;color:var(--muted);">GCS</span><span id="lblGCS" class="bold">15</span></div>
             </div>
             <!-- Fila 3: Nivel de cooperación y delirium -->
             <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--neuro);margin:4px 0 6px;">Nivel de cooperación y delirium</div>
             <div class="row" style="margin-bottom:0;">
               <div class="col wa" id="gS5Qw"><label>S5Q</label>
-                <select id="fS5Q" onchange="autoCoopera()">
+                <select id="fS5Q" onchange="_s5qManual(this);autoCoopera()">
                   <option value="">-</option>
                   <option value="lt3">&lt;3</option>
                   <option value="gte3">≥3</option>
+                  <!-- 🔴 18-sep-2026 · «No evaluable» se mudó ACÁ desde la
+                       interpretación, que dejó de ser un selector. Es la
+                       evaluación que no se pudo hacer —afasia, sordera, barrera
+                       idiomática—, así que su lugar es el S5Q y no su lectura. De
+                       ella cuelgan el bloqueo de MRC, FSS y dinamometría y la
+                       categorización SOCHIMI: no se podía perder. -->
+                  <option value="ne">No evaluable</option>
                 </select></div>
+              <!-- 🔴 18-sep-2026 · SE LEE, NO SE ELIGE. Diego: «en S5Q, la
+                   interpretación del nivel de cooperación no debería seleccionarse,
+                   ya que es eso: interpretación».
+                   Era un híbrido: el formulario ya la rellenaba desde el S5Q y
+                   además la dejaba abierta para escribirle encima. Dos fuentes de
+                   verdad, y ganaba la última que se tocara: bastaba corregir el S5Q
+                   después para dejar escrito «S5Q ≥3, no cooperador» en la misma
+                   evolución. Ahora sale del S5Q y de nada más.
+                   Se muestra con la misma caja que el GCS —el otro valor que
+                   calcula el sistema— para que se lea como lo que es. -->
               <div class="col wa" id="gCoopw"><label>Interpretación</label>
-                <select id="fCoop" onchange="aplicarGatesEval()"><option value="">-</option><option>Cooperador</option><option>No cooperador</option><option>No evaluable</option></select></div>
+                <input type="hidden" id="fCoop">
+                <div class="mon" style="height:38px;min-width:120px;"><span id="lblCoop" class="bold">—</span></div></div>
               <div class="col wa" id="gCAMw"><label>CAM-ICU</label>
                 <select id="fCAMICU"><option value="">-</option><option value="pos">Positivo (+)</option><option value="neg">Negativo (−)</option><option value="ne">No evaluable</option></select></div>
             </div>
@@ -7578,7 +7596,10 @@ function fillForm(s) {
   if(s.DIAS_VM!==''&&s.DIAS_VM!=null) _diasVMSellado=s.DIAS_VM;
   if(s.DIAS_VNI!==''&&s.DIAS_VNI!=null) _diasVNISellado=s.DIAS_VNI;
   if(s.VA_EXTERNO_DIAS!==undefined){ set('fVAExtDias',s.VA_EXTERNO_DIAS||0); actualizarDiasVA(); }
-  set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
+  set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q);
+  // 🪤 La cooperación NO se copia de la fila: se deriva del S5Q que acaba de
+  // cargarse. Copiarla reabriría la segunda fuente por la puerta de atrás.
+  _coopDerivar();
   set('fVigilia',s.SED_VIGILIA);
   set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
@@ -7815,7 +7836,10 @@ function fillFormReplica(s) {
   if(s.DIAS_VNI!==''&&s.DIAS_VNI!=null) _diasVNISellado=s.DIAS_VNI;
 
   // Sedación / neurológico
-  set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q); set('fCoop',s.SED_COOPERACION);
+  set('fSed',s.SED_TIPO); set('fSAS',s.SED_SAS); set('fS5Q',s.SED_S5Q);
+  // 🪤 La cooperación NO se copia de la fila: se deriva del S5Q que acaba de
+  // cargarse. Copiarla reabriría la segunda fuente por la puerta de atrás.
+  _coopDerivar();
   set('fVigilia',s.SED_VIGILIA);
   set('fSASmeta',s.SED_SAS_META);
   try{ _sedFarmSet(JSON.parse(s.SED_FARMACOS||'[]')||[]); }catch(e){ _sedFarmSet([]); }
@@ -8137,10 +8161,9 @@ function _podarEventosPayload(p){
    otro valor, la cascada manda. */
 const _CASCADAS={
   fVA:   ['fGCSV'],
-  cBNM:  ['fGCSO','fGCSV','fGCSM','fS5Q','fCoop','fKTMct','fKTMcat','fKTMraz','fKTMcontra'],
-  fSAS:  ['fGCSO','fGCSV','fGCSM','fS5Q','fCoop'],
-  fGCSO: ['fS5Q','fCoop'], fGCSV: ['fS5Q','fCoop'], fGCSM: ['fS5Q','fCoop'],
-  fS5Q:  ['fCoop'],
+  cBNM:  ['fGCSO','fGCSV','fGCSM','fS5Q','fKTMct','fKTMcat','fKTMraz','fKTMcontra'],
+  fSAS:  ['fGCSO','fGCSV','fGCSM','fS5Q'],
+  fGCSO: ['fS5Q'], fGCSV: ['fS5Q'], fGCSM: ['fS5Q'],
   cHAct: ['fFecHME'],
   cTqtO: ['poTqtModo'], cIntubO: ['poIntubModo'], poReintubSop: ['poReintubModo'],
 };
@@ -8445,7 +8468,7 @@ function _validarRangosCliente(){
 // reconstruye el campo (cambio de modo = el kine ya está editando ese módulo).
 // Los campos de ESTADO (vía aérea, soporte, modo, fase, dx) no se marcan:
 // son hechos que persisten entre turnos, no mediciones.
-const _HER_CAMPOS=['fSed','fSAS','fSASmeta','fVigilia','fS5Q','fCoop','fGCSO','fGCSV','fGCSM',   // sedación / conciencia
+const _HER_CAMPOS=['fSed','fSAS','fSASmeta','fVigilia','fS5Q','fGCSO','fGCSV','fGCSM',   // sedación / conciencia
   'fHEst','fDVA','fDVAcnt','fHTT',                                          // hemodinamia
   'fDVEalt',                                                                // altura de la DVE (prescripción que persiste)
   'fMPVal','fRuidosVal','fRuidosLoc',                                       // auscultación
@@ -12236,6 +12259,26 @@ function calcResp(el) {
   const lit=parseFloat(v(P+'litros'))||0;
   if(modo==='NRC'&&lit>0) set(L+'fio2nrc',`~${Math.min(100,21+4*lit)}%`);
 }
+/* La interpretación del S5Q: la escribe el sistema y se muestra en el cuadro.
+   🪤 Sin S5Q se BORRA, no se deja el valor anterior: un «Cooperador» que
+   sobrevive a borrar la evaluación que lo produjo es un dato huérfano, y se lee
+   igual que uno medido.
+   🪤 VA FUERA de autoCoopera(). Escrita adentro quedaba en su ámbito y la
+   carga de un turno guardado —fillFormReplica, que también la llama— moría con
+   «_coopDerivar is not defined», con el panel a medio abrir. Lo cazó
+   regresion_ui.js. */
+/* Alguien tocó el campo a mano: deja de ser del automatismo y ya no se suelta.
+   Es la única forma de distinguir un valor medido de uno puesto por el
+   programa cuando los dos pueden ser el mismo número. */
+function _gcsManual(e){ if(e && e.dataset) delete e.dataset.auto; }
+// Alguien eligió el S5Q a mano: deja de ser del automatismo y ya no se suelta.
+function _s5qManual(e){ if(e && e.dataset) delete e.dataset.auto; }
+const COOP_DE_S5Q={lt3:'No cooperador',gte3:'Cooperador',ne:'No evaluable'};
+function _coopDerivar(){
+  const t=COOP_DE_S5Q[v('fS5Q')]||'';
+  const h=$('fCoop'); if(h) h.value=t;
+  const l=$('lblCoop'); if(l) l.textContent=t||'—';
+}
 function autoCoopera(){
   // El gate de cooperación/delirium depende del SAS y del Glasgow, y los dos
   // llegan acá: se recalcula al final (ver aplicarGatesNeuro).
@@ -12249,9 +12292,9 @@ function autoCoopera(){
   const auto3 = bnm || (sas === 1);
   if(auto3){
     const o=$('fGCSO'), vv=$('fGCSV'), m=$('fGCSM');
-    if(o){ o.value='1'; }
-    if(vv){ vv.value=intub?'1T':'1'; }
-    if(m){ m.value='1'; }
+    if(o){ o.value='1'; o.dataset.auto='1'; }
+    if(vv){ vv.value=intub?'1T':'1'; vv.dataset.auto='1'; }
+    if(m){ m.value='1'; m.dataset.auto='1'; }
     setTimeout(calcGCS, 0);
   } else {
     /* 🪤 17-sep-2026 · …y al dejar de aplicar, se SUELTA. El automatismo
@@ -12260,11 +12303,20 @@ function autoCoopera(){
        como coma —se escondían la cooperación, el S5Q y el CAM-ICU justo en el
        rango donde sí se piden—. Solo se borra lo que puso el automatismo (el
        1/1T/1 exacto): un Glasgow 3 escrito a mano por alguien que de verdad
-       evaluó no se toca. */
+       evaluó no se toca.
+       🪤 18-sep-2026 · Y ahora se sabe cuál puso, no se adivina por el valor. La
+       adivinanza no distinguía el 1/1T/1 del automatismo del que escribe una
+       persona evaluando a un paciente que de verdad no responde, así que le
+       borraba la medición al segundo — lo mismo que el comentario de arriba
+       decía querer evitar. Se vio cuando el S5Q empezó a soltarse detrás del
+       Glasgow y arrastró con él la interpretación. */
     const o=$('fGCSO'), vv=$('fGCSV'), m=$('fGCSM');
-    const loPusoElAuto = o && m && o.value === '1' && m.value === '1' &&
-                         vv && (vv.value === '1T' || vv.value === '1');
-    if(loPusoElAuto){ o.value=''; m.value=''; if(!intub) vv.value=''; setTimeout(calcGCS, 0); }
+    const loPusoElAuto = [o,vv,m].some(e=>e && e.dataset.auto==='1');
+    if(loPusoElAuto){
+      [o,m].forEach(e=>{ if(e && e.dataset.auto==='1'){ e.value=''; delete e.dataset.auto; } });
+      if(vv && vv.dataset.auto==='1' && !intub){ vv.value=''; delete vv.dataset.auto; }
+      setTimeout(calcGCS, 0);
+    }
   }
 
   // Auto S5Q y Cooperación
@@ -12283,14 +12335,20 @@ function autoCoopera(){
      raíz que el Glasgow 15 de fábrica, una capa más abajo. */
   const gcsMedido=!!(v('fGCSO')||v('fGCSM'));
   const noCooper=bnm||(sas===1)||(gcsMedido&&gcsNum<8);
-  if(noCooper){
-    const s5=$('fS5Q'); if(s5) s5.value='lt3';
-    const coop=$('fCoop'); if(coop) coop.value='No cooperador';
-  } else {
-    const s5v=v('fS5Q');
-    if(s5v==='lt3'){const e=$('fCoop');if(e)e.value='No cooperador';}
-    else if(s5v==='gte3'){const e=$('fCoop');if(e)e.value='Cooperador';}
-  }
+  /* 🪤 18-sep-2026 · EL S5Q AUTOMÁTICO TAMBIÉN SE SUELTA, igual que el Glasgow
+     de arriba. Tocar el BNM o el SAS y devolverlos dejaba «S5Q <3» escrito —y
+     con él «No cooperador»— en un paciente al que nadie evaluó. Es el cuarto de
+     la misma familia: un valor que pone el programa y se queda cuando su razón
+     desaparece, indistinguible de uno medido.
+     Se marca lo que puso el automatismo y solo eso se borra; si una persona
+     eligió <3, la marca no está y el valor no se toca (_s5qManual). */
+  const _s5=$('fS5Q');
+  if(noCooper){ if(_s5 && _s5.value!=='lt3'){ _s5.value='lt3'; _s5.dataset.auto='1'; } }
+  else if(_s5 && _s5.dataset.auto==='1'){ _s5.value=''; delete _s5.dataset.auto; }
+  /* 🔴 18-sep-2026 · UNA SOLA LÍNEA ESCRIBE LA INTERPRETACIÓN. Antes había dos
+     ramas que la ponían a mano y un selector por el que se le podía escribir
+     encima: tres fuentes para un dato que se deduce de una. */
+  _coopDerivar();
   aplicarGatesEval();
   // El SAS y el Glasgow llegan los dos por acá, y son justo los que deciden si
   // se pide cooperación, S5Q y CAM-ICU: los gates se dejan al día en el mismo
@@ -15426,7 +15484,7 @@ const PLANT_DATOS={
   /* 🪤 El S5Q se guarda como clave («lt3»/«gte3»), no como texto: el comodín
      tiene que traducirlo igual que el motor (dominio_texto.gs) o la plantilla
      escribiría «S5Q gte3» en la ficha. */
-  s5q:{ v:()=>({lt3:'<3',gte3:'\u2265'+'3'}[v('fS5Q')]||''), pre:'S5Q ' },
+  s5q:{ v:()=>({lt3:'<3',gte3:'\u2265'+'3',ne:'no evaluable'}[v('fS5Q')]||''), pre:'S5Q ' },
   camicu:{ v:()=>({pos:'positivo',neg:'negativo',ne:'no evaluable'}[v('fCAMICU')]||''), pre:'CAM-ICU ' },
   mp:{ v:()=>v('fMPVal')||'', pre:'MP ' },
   ruidos:{ v:()=>{ try{ return _auscRuidos().txt; }catch(e){ return ''; } }, pre:'con ' },
@@ -20045,7 +20103,7 @@ function imprimirHojaRHB(){
   const esT=x=>x===true||x==='TRUE';
   const esc=escapeHtml;
   const evoDia=f=>evos.find(e=>String(e.TURNO_KEY)===f+'-Dia')||null;
-  const s5q=x=>x==='lt3'?'<3':(x==='gte3'?'≥3':(x||''));
+  const s5q=x=>x==='lt3'?'<3':(x==='gte3'?'≥3':(x==='ne'?'no evaluable':(x||'')));
   const dvaF=x=>{x=String(x||'');if(!x||/sin requerimientos/i.test(x))return '—';return x.replace(/^DVA\s*(dosis\s*)?/i,'');};
   const filas=[  // [etiqueta, fn(evo), separadorSuperior]
     ['Sedación (SAS)',e=>e.SED_SAS??''],

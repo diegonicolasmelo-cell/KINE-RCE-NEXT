@@ -119,7 +119,15 @@ const INDEX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
   const vuelto = await pagina.evaluate(() => document.activeElement && document.activeElement.id);
   si('al cerrar, el foco vuelve al elemento que lo abrió', vuelto === abrir.disparador,
     'volvió a «' + vuelto + '», se esperaba «' + abrir.disparador + '»');
-  si('la pila queda vacía', await pagina.evaluate(() => Modal.abiertos().length) === 0);
+  /* 🪤 18-sep-2026 · SE MIDE QUE SALIÓ DE LA PILA, no que la pila esté vacía.
+     Sin servidor detrás, el arranque termina mostrando el overlay de login —que
+     es un modal legítimo y bien registrado—, así que «vacía» dependía de si el
+     arranque había llegado a pintarlo antes de los 1200 ms de espera: la misma
+     guardia salía verde con la batería en paralelo (más lenta) y roja corrida
+     sola. Lo que esta línea protege es que cerrar un modal lo saque de la pila,
+     y eso se mide sin depender de quién más esté abierto. */
+  si('el modal cerrado sale de la pila',
+    !(await pagina.evaluate(() => Modal.abiertos().indexOf('ayudaMod') >= 0)));
 
   /* ── 5 · No le pisa el foco al modal que ya lo colocó ───────────────────── */
   const respetado = await pagina.evaluate(async () => {

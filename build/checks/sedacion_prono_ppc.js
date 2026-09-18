@@ -93,7 +93,10 @@ const { chromium } = require('playwright-core');
     if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
     await new Promise(r => setTimeout(r, 60));
     const ve = (id) => { const e = document.getElementById(id); return !!e && !!e.offsetParent; };
-    return { coop: ve('fCoop'), s5q: ve('fS5Q'), cam: ve('fCAMICU'), gcs: ve('fGCSO') };
+    // 🗂️ 18-sep-2026 · La interpretación dejó de ser un selector (ahora la
+    // escribe el S5Q), así que se mide el GRUPO que el gate esconde y no el
+    // campo, que es oculto por diseño y nunca tendría offsetParent.
+    return { coop: ve('gCoopw'), s5q: ve('fS5Q'), cam: ve('fCAMICU'), gcs: ve('fGCSO') };
   }, sas);
 
   const s1 = await gates(1);

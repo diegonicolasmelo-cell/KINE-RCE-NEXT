@@ -143,8 +143,11 @@ function generarTextoEvolucion(d) {
   // respuesta verbal). Lo que alguien evalúa es la ocular y la motora.
   if (v('SED_GCS_O') || v('SED_GCS_M'))
     sedStr += ` GCS ${gcsTot}${intubado ? '' : '/15'} (O:${gcsO}, V:${gcsV}, M:${gcsM})`;
-  const s5qTxt = s5q === 'lt3' ? '<3' : (s5q === 'gte3' ? '≥3' : s5q);
-  if (s5q)  sedStr += `, S5Q ${s5qTxt}/5`;
+  /* 🗂️ 18-sep-2026 · «ne» = el S5Q no se le pudo aplicar (afasia, sordera,
+     barrera idiomática). Va sin «/5»: no es un puntaje bajo, es una evaluación
+     que no se hizo, y escribir «no evaluable/5» las confunde. */
+  const s5qTxt = s5q === 'lt3' ? '<3' : (s5q === 'gte3' ? '≥3' : (s5q === 'ne' ? 'no evaluable' : s5q));
+  if (s5q)  sedStr += `, S5Q ${s5qTxt}${s5q === 'ne' ? '' : '/5'}`;
   // Cooperación: solo si NO está profundamente sedado (SAS ≠ 1-2 o GCS > 7).
   const _sasN = parseInt(sas, 10), _gcsN = parseInt(gcsTot, 10);
   if (coop && ((!isNaN(_sasN) && _sasN !== 1 && _sasN !== 2) || (!isNaN(_gcsN) && _gcsN > 7))) sedStr += `, ${coop}`;

@@ -1985,3 +1985,65 @@ El selector del formulario se llama «Sin sedación» y la evolución escribía 
 cosa. Quien la leía tenía que traducir. Ahora sale: «Sin sedación, somnoliento.»
 
 **178 guardias · 178 verdes.**
+
+---
+
+## 18-sep-2026 · La interpretación se lee, no se elige
+
+Diego: *«en S5Q, la interpretación del nivel de cooperación no debería
+seleccionarse, ya que es eso: interpretación»*.
+
+Tenía razón, y el campo era un híbrido peligroso. El formulario **ya** lo
+completaba solo desde el S5Q —<3 no cooperador, ≥3 cooperador— y además lo
+dejaba abierto para escribirle encima. Dos fuentes de verdad, y ganaba la última
+que se tocara: bastaba corregir el S5Q después para dejar escrito «S5Q ≥3, no
+cooperador» en la misma evolución.
+
+Ahora se muestra en **la misma caja que el GCS** —el otro valor que calcula el
+sistema— para que se lea como lo que es. El dato sigue viajando a la planilla en
+`SED_COOPERACION`, desde un campo oculto que escribe una sola línea.
+
+### 🔴 «No evaluable» se mudó al S5Q
+
+Era una opción de la interpretación, y no se podía perder: es una respuesta
+clínica real —el paciente está despierto pero el S5Q no se le puede aplicar:
+afasia, sordera, barrera idiomática— y de ella cuelgan el bloqueo de MRC, FSS y
+dinamometría y la categorización SOCHIMI. Su lugar es el **S5Q**, que es la
+evaluación que no se pudo hacer, no su lectura.
+
+En el relato va sin «/5»: «S5Q no evaluable», porque no es un puntaje bajo.
+
+### 🪤 Y salió un cuarto bug de la familia del Glasgow de fábrica
+
+Al derivar la interpretación se destapó que **tocar el BNM o el SAS y
+devolverlos dejaba «S5Q <3» escrito** —y con él «No cooperador»— en un paciente
+al que nadie evaluó. El automatismo lo ponía y no lo soltaba. Lo cazó
+`panel_no_pisa_datos.js`.
+
+Y arreglarlo destapó el de más abajo: el Glasgow **adivinaba** cuál era suyo
+comparando el valor. Cualquier 1/1T/1 le parecía propio, incluido el que escribe
+alguien evaluando a un paciente que de verdad no responde: le borraba la
+medición justo en el caso que su comentario decía querer respetar. Ahora los dos
+automatismos **marcan** lo que ponen y sueltan solo eso; lo que tocó una persona
+no se toca.
+
+### 🪤 Dos guardias que medían mal
+
+`modal_foco.js` exigía que la pila de modales quedara **vacía** al cerrar. Sin
+servidor detrás, el arranque termina mostrando el overlay de login —un modal
+legítimo—, así que el resultado dependía de si el arranque había llegado a
+pintarlo antes de los 1200 ms de espera: verde con la batería en paralelo (más
+lenta) y roja corrida sola. Ahora mide que el modal cerrado **salga** de la
+pila, que es lo que dice proteger.
+
+Y `coopera_no_se_elige.js` nació leyendo el reloj: `SHIFT` sale de la hora real,
+y de noche `aplicarGatesEval()` se va por la primera línea sin tocar MRC ni FSS.
+Se vio a las 23:30. El turno se congela.
+
+🪤 **Y una que escribí y borré.** Añadí a `glasgow_medido.js` un escenario para
+el Glasgow medido a mano, y **nunca se vio rojo**: pasaba igual contra el código
+sin arreglar. Una guardia que no distingue las dos versiones no prueba lo que
+dice, así que salió. Lo que protege ya lo mide `sedacion_prono_ppc.js`, que sí
+se vio roja.
+
+**179 guardias · 179 verdes.** Nueva: `coopera_no_se_elige.js`.
