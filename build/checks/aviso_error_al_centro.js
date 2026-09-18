@@ -190,6 +190,19 @@ function selloEsperado() {
     !!sello && sello === selloEsperado(),
     'el index dice «' + (sello || '(sin meta)') + '» y el empaquetador «' + selloEsperado() + '»');
 
+  /* 🔴 18-sep-2026 · Y EL AVISO DE FALLO LLEVA EL MISMO. Es el único sello que
+     Diego alcanza a ver cuando la app NO arranca —el resto de la pantalla no
+     existe todavía—, y estaba escrito a mano aparte del meta: se quedó en
+     «NEXT-1.1-pwa» durante cinco versiones. Un aviso de error que miente sobre
+     qué versión lo produjo manda a depurar la equivocada. */
+  const selloAviso = await p.evaluate(() => {
+    const m = (document.documentElement.innerHTML || '').match(/La app no pudo iniciar[\s\S]{0,160}?\[index ([^\]]+)\]/);
+    return m ? m[1] : '';
+  });
+  si('★ y el aviso de «no pudo iniciar» lleva el mismo sello, no uno viejo',
+    !!selloAviso && selloAviso === sello,
+    'el aviso dice «' + (selloAviso || '(sin sello)') + '» y el meta «' + sello + '»');
+
   si('sin errores JS en toda la corrida', errs.filter(e => !/favicon/.test(e)).length === 0, errs.join(' | '));
 
   await b.close();

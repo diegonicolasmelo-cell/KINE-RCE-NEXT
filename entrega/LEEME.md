@@ -46,6 +46,40 @@ al final.
 
 ---
 
+## Desde CERO: planilla nueva y proyecto nuevo
+
+Para la primera vez, o para volver a empezar limpio. 🔴 Es una planilla **de
+pruebas**, aparte de la que usa el equipo en la unidad.
+
+1. **Planilla nueva** en Google Sheets (hoja en blanco). Ponerle un nombre que
+   se distinga a simple vista de la de producción, p. ej. «RCE KINE — NEXT
+   (pruebas)».
+2. **Extensiones → Apps Script.** El proyecto tiene que nacer *desde la
+   planilla*: así queda amarrado a ella. El permiso que pide el código es
+   `spreadsheets.currentonly`, que solo alcanza a la planilla que lo aloja.
+3. **Configuración del proyecto** (el engranaje ⚙️ de la izquierda) →
+   marcar **«Mostrar el archivo de manifiesto appsscript.json en el editor»**.
+4. **Borrar el archivo que viene de fábrica** (`Código.gs` / `Code.gs`).
+5. **Crear los 13 archivos** de la tabla de arriba, con el ➕ de «Archivos»:
+   · los `.gs` como **Script**, con el nombre SIN extensión (`esquema`, `repo`,
+     `infra`, `dominio`, `servicios`, `api`, `webapp`, `mantenimiento`,
+     `mantenimiento_manuel`, `spike`);
+   · `index` y `spike_gis` como **HTML**;
+   · `appsscript.json` ya existe tras el paso 3: se reemplaza su contenido.
+6. **Pegar cada archivo entero** y guardar (Ctrl+S).
+7. **Correr `crearORepararEstructura()`** (vive en `esquema`) desde el selector
+   de funciones. La primera vez Google pide autorizar los permisos: es normal,
+   el proyecto es propio. Después, revisar el registro de ejecución: crea todas
+   las hojas con sus encabezados y las semillas de CONFIG.
+8. **Implementar → Nueva implementación → Aplicación web**, con
+   «Ejecutar como: yo» y «Quién tiene acceso: cualquier persona».
+9. Abrir la dirección `/exec` que entrega, con **Ctrl+Shift+R**.
+
+🪤 El paso 7 no se puede saltar ni automatizar: sin él las hojas y las columnas
+no existen, y el formulario manda datos a ninguna parte **sin avisar**.
+
+---
+
 ## Después de pegar
 
 1. Guardar.
