@@ -153,22 +153,148 @@ cumplimiento del equipo y hoy no existe.
 
 ---
 
-## 2 · Respiratorio — pendiente
+## 2 · Respiratorio — CERRADO el 19-sep-2026
 
-Lo que Diego dijo en el turno real, sin mockup todavía:
+Mockup: `claude.ai/artifact/LofVBJixQjAxavx5PtqXS8`
 
-- El TOT y la VM, como **texto** en la segunda fila del bloque, donde ya se
-  declaran — no en dos cuadros aparte.
-- El número del TOT se elige a mano.
-- 🔴 **La fijación nace en blanco y no sugiere nada.** *«La gente no anota; si
-  sugiere 22, no anotan nada.»*
-- El modal de «¿qué pasó con la vía aérea?» **se ofrece siempre en el primer
-  turno**, porque el paciente pudo haberse intubado. Si no se declara nada y
-  después se elige TOT, es que llegó con TOT.
-- Dentro del mismo turno puede cambiarse el tubo o extubarse: ahí el evento
-  pregunta **solo cómo queda**.
-- 🔴 **Extubación y PVE hay que aclararlos.** *«El "no corresponde" igual es un
-  no.»*
+Salió del mismo turno real. Son ocho acuerdos: **seis los pidió Diego** y dos
+los propuse yo —la separación de extubación y PVE, que él aprobó, y el pre-marcado
+en ámbar, que no objetó.
+
+| # | Acuerdo | Estado |
+|---|---|---|
+| 1 | TOT y VM como **texto**, en la fila donde ya se declaran | por programar |
+| 2 | El **número del TOT** se elige a mano | por programar |
+| 3 | 🔴 La **fijación nace en blanco** y no sugiere nada | por programar |
+| 4 | El **modal de vía aérea** se ofrece siempre en el primer turno | por programar |
+| 5 | «No corresponde» pasa a ser **un NO con razón**, la del protocolo | por programar |
+| 6 | La **extubación sale de la PVE**: prueba y evento se registran aparte | por programar |
+| 7 | **Días por horas completas** —24, 48, 72— para vía aérea, VM y estadía | por programar |
+| 8 | El sistema **pre-marca** las razones que ya conoce, en ámbar y con la cifra | por programar |
+
+### 2.1 · TOT y VM se escriben donde se declaran
+
+> *«Esto se podría anotar como texto justo donde ya se declara TOT y VM,
+> segunda fila de ese bloque.»*
+
+No dos cuadros aparte: una línea de texto en el mismo lugar donde el colega ya
+está mirando. Un dato que vive lejos de donde se declara es un dato que se
+llena mal o no se llena.
+
+### 2.2 · El número del TOT, a mano
+
+> *«TOT n° se selecciona manual.»*
+
+### 2.3 · La fijación nace en blanco — y ésta es la más importante de las tres
+
+> *«La fijación ojalá no sugiriera nada, ya que la gente no anota, porque si
+> sugiere 22 no anotan nada.»*
+
+🔴 Hoy el campo trae `22` de sugerencia y por eso nadie lo corrige: **la
+sugerencia se convierte en el dato**. Queda en blanco. Es la misma familia de
+bugs que veníamos persiguiendo —un valor que pone el programa y termina
+leyéndose como si lo hubiera medido alguien— y acá se resuelve al revés que en
+el S5Q: donde no hay nada que calcular, no se propone nada.
+
+### 2.4 · El modal de vía aérea, siempre en el primer turno
+
+> *«Debería aparecer igual el modal de qué pasó con la vía aérea la primera
+> vez.»*
+
+Porque el paciente pudo haberse intubado en ese mismo turno. Si no se declara
+nada y después se elige TOT, se entiende que llegó con TOT. Dentro del mismo
+turno también puede cambiarse el tubo o extubarse: ahí el evento pregunta
+**solo cómo queda**.
+
+🪤 Sigue valiendo entera la regla de siempre: los eventos de vía aérea se
+registran **a mano**. El modal recuerda, no decide.
+
+### 2.5 · «No corresponde» pasa a ser un NO con razón
+
+> *«Ahora extubación y PVE hay que arreglarlo de tal forma que quede más claro.
+> Ahí deberíamos trabajar, ya que el "no corresponde" igual es un no.»*
+
+Hoy «no corresponde» y «no se hizo» caen en el mismo saco y después no se puede
+contar ninguna de las dos cosas. Pasa a ser **un solo NO que siempre pide
+razón**, y las razones no las invento yo:
+
+> *«Según protocolo son las de la imagen.»* — tres capturas del **Protocolo de
+> Destete y Extubación** de la unidad.
+
+Van en **dos niveles, que no se mezclan**:
+
+- **No aplica el protocolo** (3): adecuación del esfuerzo terapéutico, VMI menor
+  a 24 horas, VM domiciliaria.
+- **Criterio de la evaluación diaria** (8): cuadro clínico no resuelto,
+  inestabilidad hemodinámica, parámetros de oxigenación/ventilación alterados,
+  infección activa, conciencia o sedación que no permita SAS 3-4, ausencia de
+  esfuerzo respiratorio, inestabilidad metabólica, anemia.
+
+🔵 La diferencia entre los dos niveles es la que hace que el dato sirva: «a este
+paciente el protocolo no se le aplica» vale para todo el episodio; «hoy no se
+puede» vale solo para hoy. Contarlas juntas mezclaría dos cosas distintas.
+
+### 2.6 · La extubación sale de dentro de la PVE
+
+> *«Separar extubación de PVE me parece bien, dale.»* (propuesta mía, aprobada)
+
+Son dos hechos distintos y hoy están anidados: se puede pasar una PVE y no
+extubar, y se puede extubar sin PVE. **La prueba se registra como prueba y el
+evento de vía aérea como evento**, cada uno por su lado.
+
+### 2.7 · Los días se cuentan por horas, no por calendario
+
+> *«Días de vía aérea, que haga el cálculo respecto a las horas. 27 horas 1 día.
+> 12 horas 0 días.»*
+>
+> *«El control de días de VM y de estadía debe ser el mismo: pasado 24 horas
+> cuenta 1 día. Decía que 35 horas por ejemplo son 1 día. Pasó las 48 horas
+> considero 2 y así.»*
+>
+> *«38 horas es 1 día.»*
+
+**Cada 24 horas completas suma un día y lo que sobra no cuenta.** Los cortes son
+24, 48, 72. Igual para los tres: vía aérea, VM y estadía.
+
+| Horas | Días |
+|---|---|
+| 12 h | 0 |
+| 27 h | 1 |
+| 35 h | 1 |
+| 38 h | **1** |
+| 48 h | 2 |
+
+🪤 La fila de 38 h estuvo en duda: en el primer mensaje decía 2 y la regla daba
+1. **Diego zanjó 1.** Queda escrito acá porque es exactamente el tipo de detalle
+que después aparece raro en un informe y nadie se acuerda de dónde salió.
+
+🪤 **Consecuencia que hay que tener presente:** el REM cuenta días cama por
+calendario. Con este cálculo, el día de estadía que ve el colega y el día cama
+del REM van a diferir en los bordes. No es un error, pero si los dos aparecen en
+pantalla hay que decir cuál es cuál.
+
+🔵 **Desbloquea algo que se había apagado.** El candado que limitaba la PVE por
+días de VM se calculaba por calendario y bloqueaba a colegas que por horas
+reales sí cumplían el protocolo; la solución de entonces fue apagarlo. Con el
+conteo por horas puede volver a servir — y el protocolo lo pide explícitamente:
+**VMI menor a 24 horas es criterio de exclusión**.
+
+En la tarjeta se muestra **«0 · 9 h»**: el día y las horas que lo respaldan, para
+que nadie tenga que confiar a ciegas.
+
+### 2.8 · El sistema marca, no decide
+
+(propuesta mía, sin objeción de Diego)
+
+Cuando el turno ya tiene los datos que el protocolo mira —PEEP, PaFi, FiO2,
+SpO2, modo de VM, GCS, SAS, drogas vasoactivas—, el sistema **pre-marca en
+ámbar** la razón que corresponde y muestra la cifra que la justifica: «Parámetros
+alterados · PEEP 12».
+
+🔴 Se puede desmarcar siempre. Es la misma regla que salió de la familia de bugs:
+**un valor que pone el programa se marca como suyo y solo eso se suelta.**
+
+---
 
 ## 3 · Evaluaciones y KTM — pendiente
 
