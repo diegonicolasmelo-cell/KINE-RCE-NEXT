@@ -2138,4 +2138,21 @@ guardia que grita por cualquier cosa se termina apagando. Ahora busca la
 **estructura** del dato —unas iniciales pegadas a un nombre, que es como se
 escribe una nómina— y no tiene falsos positivos.
 
+### 🪤🪤 Y la guardia de privacidad fue, por un rato, la fuga
+
+Para cazar los nombres sueltos le escribí **la lista de los quince apellidos**.
+O sea: el archivo que existe para que no haya nombres en el repositorio los
+tenía todos, y **se acusó a sí mismo** al correr. El comentario de más arriba en
+ese mismo archivo ya lo advertía —«esta guardia NO puede traer la lista de
+nombres para buscarlos»— y lo hice igual, tres pantallas abajo.
+
+El tercer intento —buscar el contexto, «NOMBRE: …» o «Klgo. …»— cazaba también
+los nombres **inventados** que las pruebas necesitan, y distinguir uno real de
+uno inventado pide una lista de excepciones que crece con cada prueba. Así es
+como una guardia se pudre.
+
+**Así que ese barrido no se automatiza, y queda escrito por qué.** Lo que de
+verdad protege es lo estructural: si no hay dónde escribir una nómina —porque el
+equipo llega de la planilla— no hay nómina que se escape.
+
 **181 guardias · 181 verdes.** Nueva: `el_equipo_no_va_en_el_codigo.js`.

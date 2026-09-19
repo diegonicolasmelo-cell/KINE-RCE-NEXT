@@ -80,22 +80,27 @@ console.log('\n2 · ★★ Ni lo que se PUBLICA, que es lo que ve cualquiera');
   eq('   ' + f + ' (' + por + ')', revisar(f), 0);
 });
 
-/* 🪤 Y no basta con que no haya LISTAS: había nombres completos del equipo
-   sueltos como datos de prueba —uno de ellos como NOMBRE DE PACIENTE en un
-   smoke test— y en comentarios de atribución. Un nombre de pila («pedido de
-   Diego») se queda: es como se habla en el proyecto y no identifica solo. Lo
-   que no puede quedar es nombre + apellido de una persona real. */
-console.log('\n2b · Ni nombres completos sueltos como dato de prueba');
-{
-  const APELLIDOS = /\b(Melo Villagr[áa]n|Contardo Cisternas|Fuentes Blanco|Ortega Wanders|Parra Rojas|Wilson Espinoza|Guerrero Espinoza|Ortiz G[óo]mez|Vega Astudillo|Gonz[áa]lez Tapia|Gonz[áa]lez V[áa]squez|Morales Flores|[ÁA]ngel G[óo]mez|Campos Rivera|Caama[ñn]o)\b/;
-  const fg = require('child_process').execFileSync('git',
-    ['-C', raiz, 'ls-files', 'v2', 'build/checks', 'herramientas', 'entrega', 'pwa'],
-    { encoding: 'utf8' }).trim().split('\n');
-  const sucios = fg.filter(f => f && !f.includes('/base/') &&
-    APELLIDOS.test(fs.readFileSync(path.join(raiz, f), 'utf8')));
-  eq('★★ ningún archivo del proyecto lleva el apellido de alguien del equipo',
-    sucios.length ? sucios.join(' · ') : 0, 0);
-}
+/* 🪤🪤 19-sep-2026 · LO QUE ESTA GUARDIA NO PUEDE HACER, Y POR QUÉ.
+   Intenté añadirle un barrido de «nombres completos sueltos», para cazar los
+   que no vienen en lista —una firma de prueba, un comentario, un nombre de
+   paciente en un smoke test—. Dos intentos, los dos malos:
+
+   1. Buscar un nombre POR SU FORMA acusó a «Helvetica Neue», «Modo
+      Coordinación» y «Kinesiterapia Respiratoria».
+   2. Buscar los apellidos del equipo obligaba a ESCRIBIRLOS ACÁ. O sea: el
+      archivo que existe para que no haya nombres en el repositorio los tenía
+      los quince, y se acusó a sí mismo al correr. El comentario de arriba ya
+      lo advertía y lo hice igual.
+
+   La versión buena —buscar el contexto, «NOMBRE: …» o «Klgo. …»— caza también
+   los nombres INVENTADOS que las pruebas necesitan, y distinguir uno real de
+   uno inventado exige una lista de excepciones que crece con cada prueba. Así
+   es exactamente como una guardia se pudre (CLAUDE.md).
+
+   Así que no se automatiza. Lo que de verdad protege es lo estructural de
+   arriba: si no hay dónde escribir una nómina —porque el equipo llega de la
+   planilla— no hay nómina que se escape. Los nombres sueltos que había se
+   barrieron a mano el 19-sep y quedan en la bitácora. */
 
 console.log('\n3 · De dónde salen entonces las firmas');
 const idx = fs.readFileSync(path.join(raiz, 'v2/index.html'), 'utf8');
