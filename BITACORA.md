@@ -2051,3 +2051,46 @@ dice, así que salió. Lo que protege ya lo mide `sedacion_prono_ppc.js`, que s�
 se vio roja.
 
 **179 guardias · 179 verdes.** Nueva: `coopera_no_se_elige.js`.
+
+---
+
+## 19-sep-2026 · La pantalla de arranque decía una cosa y pasaba otra
+
+Diego publicó NEXT en su planilla nueva, abrió la app y quedó en **«No se pudo
+verificar la conexión con el servidor»**. Buscamos una hora en el lugar
+equivocado: el permiso del despliegue, la versión publicada, la dirección del
+`/exec`, el archivo `webapp`. Todo estaba sano.
+
+Lo que pasaba de verdad: **el servidor respondía perfecto**, y lo que respondía
+era «Sesión no válida. Inicia sesión con Google» — porque `CONFIG.AUTH_DEV_MODE`
+estaba en `FALSE` y el login de Google no está montado. Un rechazo del servidor,
+que es una respuesta buena, se mostraba como un problema de red.
+
+Es **la misma familia del Glasgow de fábrica**: la pantalla afirma algo que
+nadie comprobó. Y en el arranque es peor, porque no hay nada más que mirar:
+quien abre la app solo tiene esa frase para saber qué hacer.
+
+Ahora los dos casos se ven distintos, porque lo que hay que hacer es distinto:
+
+| Lo que pasa | Lo que dice |
+|---|---|
+| El servidor no contesta | «No se pudo alcanzar el servidor» + revisa la conexión y que esté publicada para «Cualquier usuario» |
+| El servidor contesta y no deja entrar | «El servidor respondió, pero no dejó entrar» + **el motivo textual** |
+
+El motivo va **textual** a propósito: adivinarlo fue exactamente el problema.
+
+### 🪤 Y la herramienta de diagnóstico tenía su propia pista falsa
+
+`diagnostico.gs` mostraba la dirección de `ScriptApp.getService().getUrl()` y
+pedía compararla con la que uno tiene abierta. Corrido desde el editor, eso
+devuelve la de **`/dev`** —la de pruebas, con un identificador **propio**,
+distinto al de cualquier implementación publicada—. Verlas distintas hacía
+pensar «estoy entrando a otra implementación» cuando no era cierto. Le pasó a
+Diego en medio de la búsqueda.
+
+Y se le agregó lo que le faltaba para este caso: revisaba `doGet` —la puerta del
+navegador— y no `doPost`, que es por donde entra la app instalada. El punto 5b
+llama a `doPost` a mano con la misma petición del arranque; es el que dijo, en
+una línea, que el servidor estaba sano por los dos caminos.
+
+**180 guardias · 180 verdes.** Nueva: `el_arranque_dice_por_que.js`.

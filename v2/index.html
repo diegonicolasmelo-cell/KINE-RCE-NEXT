@@ -5390,7 +5390,7 @@ function gs(accion, datos, ok, fail) {
   api(accion, datos).then(d => { if (ok) ok(d); }).catch(e => {
     const msg = (e && e.message) || String(e);
     // Token GIS expirado a mitad de sesión → pedir re-login sin perder la vista
-    if (/Sesión no válida|Inicia sesión|Entra con tu clave|Tu sesión expiró/i.test(msg)) { loading(false); mostrarLogin(); }
+    if (/Sesión no válida|Inicia sesión|Entra con tu clave|Tu sesión expiró/i.test(msg)) { loading(false); mostrarLogin(msg); }
     else if (msg !== 'offline') toast('❌ ' + msg);
     if (fail) fail(msg);
   });
@@ -20722,7 +20722,20 @@ function accSalir(){
   });
 }
 
-function mostrarLogin(){
+/* 🔴 19-sep-2026 · POR QUÉ SE ESTÁ PIDIENDO EL LOGIN. La pantalla de arranque
+   decía «No se pudo verificar la conexión con el servidor» pasara lo que
+   pasara, y eso nos costó una hora buscando en el lugar equivocado: Diego
+   publicó la app, el servidor respondía perfecto, y lo que contestaba era
+   «Sesión no válida» porque CONFIG.AUTH_DEV_MODE estaba en FALSE. Un rechazo
+   del servidor —una respuesta buena— se mostraba como un problema de red, y
+   revisamos el permiso del despliegue, la versión publicada, la dirección del
+   /exec y el archivo webapp, todos sanos.
+   Es la familia del Glasgow de fábrica: la pantalla afirma algo que nadie
+   comprobó, y en el arranque no hay nada más que mirar. Lo fija
+   el_arranque_dice_por_que.js. */
+let _loginMotivo='';
+function mostrarLogin(motivo){
+  if(motivo!==undefined) _loginMotivo=String(motivo||'');
   const ovl=$('loginOvl'); if(!ovl) return;
   // Sin dirección del servidor no se puede ni preguntar si hay candado.
   if(cfgFaltaDireccion()){ cfgMostrar(); return; }
@@ -20739,15 +20752,24 @@ function mostrarLogin(){
     api('ACCESO_ESTADO',{token:TOKEN}).then(d=>{
       window.__ACC_ACTIVO=!!(d&&d.activo);
       mostrarLogin();
-    }).catch(()=>{ window.__ACC_ACTIVO=false; mostrarLogin(); });
+    }).catch(e=>{ window.__ACC_ACTIVO=false; mostrarLogin((e&&e.message)||''); });
     return;
   }
   if(!LOGIN_UI_ACTIVO){
     // Mensaje neutro de reconexión: sin GIS, sin mención a demo ni desarrollo.
     const sub=$('loginSub'); if(sub) sub.innerHTML='Registro Clínico Electrónico · Kinesiología';
     const gb=$('gisBtn'); if(gb) gb.style.display='none';
-    $('loginMsg').innerHTML='No se pudo verificar la conexión con el servidor.<br><br>'+
-      '<button onclick="location.reload()" style="padding:9px 22px;background:#0e3a5f;color:#fff;border:none;border-radius:8px;font-weight:800;cursor:pointer;">🔄 Reintentar</button>';
+    /* Dos cosas MUY distintas, y lo que hay que hacer también lo es:
+       · el servidor no contesta  → red, dirección del /exec o permiso del
+         despliegue;
+       · el servidor contesta y no deja entrar → identidad (AUTH_DEV_MODE en
+         la hoja CONFIG, o el acceso del turno encendido sin clave puesta).
+       El motivo del servidor se muestra TEXTUAL: adivinarlo fue el problema. */
+    const _sinRed = !_loginMotivo || _loginMotivo==='offline' || _loginMotivo==='sin-direccion';
+    const _btn='<br><br><button onclick="location.reload()" style="padding:9px 22px;background:#0e3a5f;color:#fff;border:none;border-radius:8px;font-weight:800;cursor:pointer;">🔄 Reintentar</button>';
+    $('loginMsg').innerHTML = _sinRed
+      ? 'No se pudo alcanzar el servidor.<br><span style="font-size:.85em;color:#64748b;">Revisa la conexión, y que la aplicación web esté publicada para «Cualquier usuario».</span>'+_btn
+      : 'El servidor respondió, pero no dejó entrar:<br><b>'+escapeHtml(_loginMotivo)+'</b>'+_btn;
     return;
   }
   // v2.1: el client id se pide en RUNTIME (GET_LOGIN_INFO es pública, pre-login)

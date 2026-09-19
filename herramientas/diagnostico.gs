@@ -163,12 +163,19 @@ function diagnosticoArranque() {
       L.push('     👉 Implementar → Nueva implementación → Aplicación web.');
       problemas.push('publicar la aplicación web');
     } else {
-      L.push('✅ 6 · Aplicación web publicada. La dirección BUENA es:');
+      L.push('✅ 6 · Aplicación web publicada.');
       L.push('     ' + svc.getUrl());
-      L.push('     👉 Compara ESA dirección con la que tienes abierta en el navegador.');
-      L.push('        Si no son iguales, estás entrando a otra implementación.');
-      L.push('        Si son iguales: Implementar → Administrar implementaciones → ✏️ →');
-      L.push('        Nueva versión (el /exec sirve la versión desplegada, no lo guardado).');
+      // 🪤 19-sep-2026 · ESTA DIRECCIÓN NO SIRVE PARA COMPARAR, y antes este
+      // punto pedía compararla: corrido desde el editor, getUrl() devuelve la
+      // de /dev —la de pruebas, con un identificador PROPIO, distinto al de
+      // cualquier implementación publicada—. Verlas distintas hacía pensar
+      // «estoy entrando a otra implementación» cuando no era cierto, y mandaba
+      // a buscar al lugar equivocado. Le pasó a Diego.
+      L.push('     🪤 Si termina en /dev, es la de PRUEBAS y su identificador es');
+      L.push('        distinto por diseño: NO se compara con la de /exec. La buena');
+      L.push('        se lee en Implementar → Administrar implementaciones.');
+      L.push('     👉 Si la app no toma los cambios: ✏️ → Nueva versión (el /exec');
+      L.push('        sirve la versión desplegada, no lo último guardado).');
     }
   } catch (e) {
     L.push('⚠️ 6 · No se pudo consultar la publicación: ' + e.message);
