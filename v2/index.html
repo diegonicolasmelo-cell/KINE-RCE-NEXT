@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.5-ktm-noche">
+<meta name="rce-version" content="NEXT-2.6-terapia-fisica">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -4528,7 +4528,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  la KTR respiratoria SÍ se registra de noche, pero vive arriba,
                  en Respiratorio. Lo cuida ktm_de_noche.js. -->
             <div id="dKTMnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
-              🌙 <b>En el turno noche la KTM no se registra.</b> La tarjeta queda a la vista
+              🌙 <b>En el turno noche la terapia física no se registra.</b> La tarjeta queda a la vista
               para que veas en qué va el paciente, pero no se llena.
               La <b>KTR respiratoria sí</b> se registra de noche, y está arriba, en Respiratorio.
             </div>
@@ -4707,6 +4707,18 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <div class="fcard fc-imt" id="fcImtBox">
           <div class="fcard-hdr"><span class="fcard-title">💨 IMT / ⚡ EMS — Entrenamiento muscular</span></div>
           <div class="fcard-body">
+
+            <!-- 🌙 Mismo trato que la KTM (Diego, 19-sep-2026): «IMT y EMS son
+                 parte de la terapia física, es decir es rehabilitación, parte
+                 del paquete. Movilización precoz (posicionamiento, movilidad
+                 pasiva activa), EMS e IMT. Podría ir de noche apagada.»
+                 El aviso se repite acá a propósito: es OTRA tarjeta, y una
+                 apagada sin explicación deja igual de perdido que una que
+                 desaparece. Lo cuida ktm_de_noche.js. -->
+            <div id="dIMTnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
+              🌙 <b>En el turno noche no se registra terapia física.</b> El IMT y la EMS son
+              parte del mismo paquete que la KTM, así que se ven y no se llenan.
+            </div>
             <div class="check wa" style="border:none;background:transparent;padding:0;margin-bottom:0;">
                     <input type="checkbox" id="cIMT" onchange="if(this.checked)show('dIMT');else hide('dIMT');">
                     <label for="cIMT" style="font-weight:700;color:#0369a1;">💨 IMT (Entrenamiento muscular inspiratorio)</label>
@@ -5319,7 +5331,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.5-ktm-noche]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.6-terapia-fisica]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -16018,23 +16030,33 @@ function setPendDesde(jsonStr){
   renderPend();
 }
 
-/** 🌙 «KTM A» — de noche la tarjeta de Rehabilitación se ve y no se llena.
+/** 🌙 «KTM A» — de noche la TERAPIA FÍSICA se ve y no se llena.
  *
- *  Apaga TODOS sus controles, la atenúa y saca el aviso que explica por qué.
- *  De día los vuelve a encender: las reglas del día (SAS 1 sobre los niveles,
- *  AET IIIC, BNM) corren DESPUÉS en aplicarGatesEval y vuelven a apagar lo
- *  suyo, así que el orden importa y esta función va primero.
+ *  Apaga TODOS los controles de sus tarjetas, las atenúa y saca el aviso que
+ *  explica por qué. De día los vuelve a encender: las reglas del día (SAS 1
+ *  sobre los niveles, AET IIIC, BNM) corren DESPUÉS en aplicarGatesEval y
+ *  vuelven a apagar lo suyo, así que el orden importa y esta función va
+ *  primero.
+ *
+ *  🔵 SON DOS TARJETAS Y UN SOLO PAQUETE. Diego, 19-sep-2026: «IMT y EMS son
+ *  parte de la terapia física, es decir es rehabilitación, parte del paquete.
+ *  Movilización precoz (posicionamiento, movilidad pasiva activa), EMS e IMT.
+ *  Podría ir de noche apagada.» Por eso el IMT/EMS dejó de esconderse de noche
+ *  y se apaga igual que la KTM: lo que es una sola cosa para el equipo tiene
+ *  que comportarse como una sola cosa en la pantalla.
  *
  *  🪤 VIVE EN EL ÁMBITO GLOBAL, no dentro de aplicarGatesEval. Una `function`
  *  declarada dentro de otra no cuelga de ninguna parte, y ya nos costó una
  *  sesión: `_coopDerivar` estaba anidada y la réplica del turno reventaba con
  *  «no está definida» sin que nada lo avisara al cargar.
  */
-function _ktmModoNoche(on){
-  const card=$('fcKtmCard'); if(!card) return;
-  card.querySelectorAll('input,select,button,textarea').forEach(e=>{ e.disabled=!!on; });
-  card.classList.toggle('solo-lectura', !!on);
-  const av=$('dKTMnoche'); if(av) av.classList.toggle('hidden', !on);
+function _rehabModoNoche(on){
+  [['fcKtmCard','dKTMnoche'], ['fcImtBox','dIMTnoche']].forEach(function(par){
+    const card=$(par[0]); if(!card) return;
+    card.querySelectorAll('input,select,button,textarea').forEach(e=>{ e.disabled=!!on; });
+    card.classList.toggle('solo-lectura', !!on);
+    const av=$(par[1]); if(av) av.classList.toggle('hidden', !on);
+  });
 }
 
 //  GATES DE EVALUACIÓN (acordado):
@@ -16054,8 +16076,10 @@ function aplicarGatesEval(){
      veces hay dato y a veces no, el porcentaje de cumplimiento deja de querer
      decir algo. 🪤 Esto CAMBIA la convención que exigía regresion_ui.js. */
   const k=$('fcKtmCard'); if(k && esNoche) k.classList.remove('hidden');
-  _ktmModoNoche(esNoche);
-  const imt=$('fcImtBox'); if(imt) imt.classList.toggle('hidden', esNoche); // IMT: disponible siempre, salvo de noche
+  // 🔵 El IMT/EMS va en el mismo paquete y por eso ya NO se esconde de noche:
+  //    se apaga, igual que la KTM (ver _rehabModoNoche).
+  const imt=$('fcImtBox'); if(imt) imt.classList.remove('hidden');
+  _rehabModoNoche(esNoche);
   // De noche la KTM NO APLICA (Diego, ago-2026): estado NEUTRO, no «no
   // realizada» — forzar 'n' hacía que cada evolución nocturna narrara «KTM no
   // realizada.» y marcara un estado que la estadística manual nunca tuvo.

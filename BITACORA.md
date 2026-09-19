@@ -2248,3 +2248,28 @@ Sello de entrega: `NEXT-2.5-ktm-noche`.
 - **2 · Respiratorio: CERRADA.**
 - **3 · Evaluaciones y KTM: CERRADA.**
 - **4 · Prono: pendiente** — es la que sigue.
+
+---
+
+## 19-sep-2026 · El IMT y la EMS son el mismo paquete
+
+Le dije que la tarjeta de IMT/EMS quedaba fuera del acuerdo porque era «una
+tarjeta aparte», y me corrigió:
+
+> *«IMT y EMS son parte de la terapia física, es decir es rehabilitación, parte
+> del paquete. Movilización precoz (posicionamiento, movilidad pasiva activa),
+> EMS e IMT. Podría ir de noche apagada.»*
+
+Ahora se apaga de noche igual que la KTM, con su propio aviso — repetido a
+propósito, porque es otra tarjeta y una apagada sin explicación deja igual de
+perdido que una que desaparece. `_ktmModoNoche` pasó a llamarse
+`_rehabModoNoche` y cubre las dos: el nombre viejo mentía.
+
+🪤 **Lo que vale más que el arreglo** es la definición que dejó dicha y que no
+estaba escrita en ninguna parte: la terapia física son **movilización precoz
+(posicionamiento, movilidad pasiva y activa), EMS e IMT**. Hoy el
+posicionamiento y la movilidad pasiva/activa no se registran como tales, sino
+a través del nivel de KTM. Si para el equipo es *un* paquete, puede que también
+tenga que ser *una* tarjeta — anotado, sin tocar.
+
+**183 guardias · 183 verdes.** Sello de entrega: `NEXT-2.6-terapia-fisica`.

@@ -372,10 +372,33 @@ rojas de noche. Ninguna congelaba `SHIFT`. Quedaron con el turno fijo y el
 motivo escrito adentro. `ktm_sesiones` ya congelaba la **fecha** y no el
 **turno**: no son lo mismo.
 
-🔵 **La tarjeta de IMT/EMS sigue escondiéndose de noche.** No entra en este
-acuerdo: es una tarjeta aparte y se esconde **entera**, así que no deja el
-encabezado huérfano que era el problema. Si Diego quiere que también se vea
-apagada, se hace igual.
+### 3.2b · El IMT y la EMS van en el mismo paquete
+
+Se lo planteé como una tarjeta aparte que quedaba fuera del acuerdo, y me
+corrigió:
+
+> *«IMT y EMS son parte de la terapia física, es decir es rehabilitación, parte
+> del paquete. Movilización precoz (posicionamiento, movilidad pasiva activa),
+> EMS e IMT. Podría ir de noche apagada.»*
+
+Así que la tarjeta de **IMT / EMS** dejó de esconderse de noche y **se apaga
+igual que la KTM**, con su propio aviso. El aviso se repite a propósito: es otra
+tarjeta, y una apagada sin explicación deja igual de perdido que una que
+desaparece.
+
+🔵 **Y deja dicho de qué se compone la terapia física**, que hasta ahora no
+estaba escrito en ninguna parte:
+
+| La terapia física es | Dónde vive hoy |
+|---|---|
+| Movilización precoz — posicionamiento, movilidad pasiva y activa | Rehabilitación (KTM, niveles 1-5) |
+| EMS — electroestimulación muscular | Tarjeta IMT/EMS |
+| IMT — entrenamiento muscular inspiratorio | Tarjeta IMT/EMS |
+
+🪤 **Queda una pregunta abierta que no toqué:** si para el equipo es *un* paquete,
+puede que también tenga que ser *una* tarjeta. Hoy son dos, y el posicionamiento
+y la movilidad pasiva/activa no se registran como tales sino a través del nivel
+de KTM. No lo cambio sin que Diego lo pida.
 
 ### 3.3 · KTR no es KTM, y el aviso lo dice
 

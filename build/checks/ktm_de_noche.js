@@ -66,7 +66,12 @@ async function turno(p, cual, extra) {
     await new Promise(r => setTimeout(r, 200));
     const card = document.getElementById('fcKtmCard');
     const aviso = document.getElementById('dKTMnoche');
+    const imt = document.getElementById('fcImtBox');
+    const avisoImt = document.getElementById('dIMTnoche');
     const enPaso2 = {
+      imtTarjeta: visible(imt),
+      imtVivos: imt ? [...imt.querySelectorAll('input,select,button,textarea')].filter(e => !e.disabled).length : -1,
+      imtAviso: visible(avisoImt),
       tarjeta: visible(card),
       cuerpo: card ? card.querySelector('.fcard-body').innerText.replace(/\s+/g, ' ').trim().length : 0,
       estados: ['bKTMr', 'bKTMs', 'bKTMn'].map(id => !!document.getElementById(id)?.disabled),
@@ -126,12 +131,24 @@ async function turno(p, cual, extra) {
   eq('★★ los diez, marcados de solo lectura', N.chipsApagados, 10);
   si('★ y una línea lo explica', /no se registran|solo lectura|último/i.test(N.pieNoche));
 
+  /* ══ 4b · El IMT/EMS es del mismo paquete y va igual ══════════════════ */
+  console.log('\n4b · 🔴 El IMT/EMS es terapia física: se apaga, no desaparece');
+  // Diego, 19-sep-2026: «IMT y EMS son parte de la terapia física, es decir es
+  // rehabilitación, parte del paquete. Movilización precoz (posicionamiento,
+  // movilidad pasiva activa), EMS e IMT. Podría ir de noche apagada.»
+  si('★★ la tarjeta de IMT/EMS está a la vista', N.imtTarjeta);
+  eq('★★ y ninguno de sus controles queda vivo', N.imtVivos, 0);
+  si('★ y dice por qué, sin hacer buscar la explicación en la otra tarjeta', N.imtAviso);
+
   /* ══ 5 · De día no cambia nada ════════════════════════════════════════ */
   console.log('\n5 · De día sigue todo como estaba');
   const D = await turno(p, 'Dia');
   si('★ la tarjeta se ve', D.tarjeta);
   eq('★★ los botones de estado, vivos', D.estados.join(','), 'false,false,false');
   no('★ sin aviso de noche', D.aviso);
+  si('★ el IMT/EMS también se ve', D.imtTarjeta);
+  si('★★ …con sus controles vivos', D.imtVivos > 0);
+  no('★ …y sin aviso de noche', D.imtAviso);
   eq('★★ los diez chips con onclick', D.chipsConClick, 10);
   eq('★ ninguno marcado de solo lectura', D.chipsApagados, 0);
 
