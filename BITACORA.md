@@ -2201,3 +2201,50 @@ Sello de entrega: `NEXT-2.4-medicion`.
   por horas que Diego zanjó («38 horas es 1 día»).
 - **Sección 3 · Evaluaciones y KTM: abierta**, con los dos errores ya
   arreglados y tres preguntas para él.
+
+---
+
+## 19-sep-2026 · «KTM A» — de noche se ve y no se llena
+
+Diego eligió la opción **A** de las tres que le ofrecí. La tarjeta de
+Rehabilitación **ya no desaparece de noche**: se ve atenuada, con todos sus
+controles apagados, y un aviso dice por qué. El aviso hace además el trabajo que
+la tarjeta escondida impedía: aclara que **la KTR respiratoria sí se registra de
+noche y vive arriba, en Respiratorio**. Eran dos cosas que se llaman casi igual y
+estaban en pantallas distintas.
+
+Los **diez chips del pool** quedan de noche en **solo lectura** —se ven con su
+valor, fecha y firma, no se tocan, y una línea lo explica—. Con eso se cierra el
+tercer defecto que quedó anotado el mismo día: los chips que abren un formulario
+lo abrían DENTRO de la tarjeta que se escondía, así que tocarlos no hacía nada.
+
+Lo que **no** cambió: de noche la KTM sigue sin registrarse y el estado nace
+neutro. La opción B —dejarla registrable— se descartó porque hoy «KTM de noche»
+significa cero **por definición**: si a veces hay dato y a veces no, el
+porcentaje de cumplimiento deja de querer decir algo.
+
+🪤 **Se cambió una convención a propósito.** `regresion_ui.js` exigía que la
+tarjeta quedara oculta de noche. Quedó actualizada —mide que la KTM no se marque
+y que la tarjeta quede apagada— con la razón escrita al lado, que es como se
+borra una guardia sin que se pudra.
+
+### 🪤🪤 La trampa del reloj, por CUARTA vez
+
+Al hacer que la pantalla dependa del turno, **tres guardias se pusieron rojas
+solas**: `cuatro_pasos`, `ktm_sesiones` y `paso_evaluaciones`. Ninguna congelaba
+`SHIFT`, así que salían verdes de día y rojas de noche — y la batería corrió a
+las 22:18. Nadie las había tocado: cambió el código que probaban.
+
+Lo fino: **`ktm_sesiones` ya congelaba la fecha** (`gDate` inventado) **y no el
+turno**. No son lo mismo, y hasta hoy daba igual. Las tres quedaron con `SHIFT`
+fijo y el motivo escrito adentro.
+
+**183 guardias · 183 verdes.** Nueva: `ktm_de_noche.js`.
+Sello de entrega: `NEXT-2.5-ktm-noche`.
+
+### Los acuerdos, al día
+
+- **1 · Ingreso: CERRADA.**
+- **2 · Respiratorio: CERRADA.**
+- **3 · Evaluaciones y KTM: CERRADA.**
+- **4 · Prono: pendiente** — es la que sigue.

@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.4-medicion">
+<meta name="rce-version" content="NEXT-2.5-ktm-noche">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1197,6 +1197,13 @@ table.rhb2 .rl{width:128px;text-align:left;}
   color:var(--muted);margin:0 0 7px;}
 .pe2-fila{display:flex;gap:6px;flex-wrap:wrap;}
 .pe2-fila .abadge{font-size:.8rem;padding:5px 11px;}
+/* 🌙 «KTM A» (Diego, 19-sep-2026): de noche se ve y no se llena. El chip
+   apagado tiene que VERSE apagado — si se ve igual que uno vivo, el colega lo
+   toca, no pasa nada y cree que la app se colgó. */
+.abadge.solo-lectura{opacity:.6;cursor:default;}
+.pe2-noche{margin-top:8px;font-size:.76rem;color:var(--muted);background:#f1f5f9;
+  border:1px solid #e2e8f0;border-radius:7px;padding:6px 10px;}
+.fcard.solo-lectura .sub-sec{opacity:.55;}
 /* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
    aprieta. Lo que es interactivo tiene que verse interactivo. */
 #pasoEvalNada{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;
@@ -4514,6 +4521,18 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="fcard-hdr"><span class="fcard-title">🏃 REHABILITACIÓN</span></div>
           <div class="fcard-body">
 
+            <!-- 🌙 «KTM A» (Diego, 19-sep-2026). Antes la tarjeta entera
+                 desaparecía de noche y el colega la buscaba sin saber que el
+                 sistema la había escondido. Ahora se ve, apagada, y dice por
+                 qué — y de paso aclara la confusión que la escondida provocaba:
+                 la KTR respiratoria SÍ se registra de noche, pero vive arriba,
+                 en Respiratorio. Lo cuida ktm_de_noche.js. -->
+            <div id="dKTMnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
+              🌙 <b>En el turno noche la KTM no se registra.</b> La tarjeta queda a la vista
+              para que veas en qué va el paciente, pero no se llena.
+              La <b>KTR respiratoria sí</b> se registra de noche, y está arriba, en Respiratorio.
+            </div>
+
             <!-- VÁLVULA DE FONACIÓN — uso del turno (solo TQT). El modo ventilatorio
                  se elige arriba; aquí se registra el USO como intervención de rehabilitación. -->
             <div id="dVfonSec" class="sub-sec hidden">
@@ -5300,7 +5319,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.4-medicion]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.5-ktm-noche]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6649,6 +6668,13 @@ function pasoEvalPintar(){
   const ingresando = (typeof v === 'function') && v('cIng') === 'true';
   if(!c.PATIENT_ID && !ingresando){ caja.innerHTML = ''; return; }
 
+  /* 🌙 «KTM A» (Diego, 19-sep-2026) alcanza también al pool. De noche los
+     chips se SIGUEN VIENDO —viven fuera de la tarjeta que se esconde— pero no
+     se tocan: los que abren un formulario lo abrían DENTRO de la tarjeta de
+     evaluaciones, que de noche no está, así que tocarlos no hacía nada y
+     parecía que la app se había colgado. */
+  const esNoche = (typeof SHIFT !== 'undefined') && SHIFT === 'Noche';
+
   // Las repetibles, con su procedencia.
   const serie = _PASO_SERIE.map(e => {
     const val = e.col ? String(c[e.col] == null ? '' : c[e.col]).trim() : '';
@@ -6656,11 +6682,15 @@ function pasoEvalPintar(){
     const fec = e.fec ? String(c[e.fec] || '') : '';
     const fir = e.fir ? String(c[e.fir] || '') : '';
     const detalle = pend ? '' : [val, fec ? _fdd(fec) : '', fir].filter(Boolean).join(' · ');
-    const tit = pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
-                     : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo';
-    return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') + '" style="cursor:pointer;"' +
+    const tit = esNoche
+      ? (pend ? e.tip + ' — sin medir en este episodio. De noche no se registra'
+              : e.tip + ': ' + detalle + '. De noche no se registra')
+      : (pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
+              : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo');
+    return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') + (esNoche ? ' solo-lectura' : '') +
+      '" style="cursor:' + (esNoche ? 'default' : 'pointer') + ';"' +
       ' data-esc="' + escapeHtml(e.k) + '" data-evk="' + escapeHtml(e.k) + '" title="' + escapeHtml(tit) + '"' +
-      ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)">' +
+      (esNoche ? '' : ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)"') + '>' +
       escapeHtml(e.lbl) + (pend ? ' sin medir' : ' ' + escapeHtml(detalle)) + '</span>';
   }).join('');
 
@@ -6671,6 +6701,7 @@ function pasoEvalPintar(){
   caja.innerHTML =
     '<div class="pe2-t">Lo que este episodio lleva medido</div>' +
     '<div class="pe2-fila">' + serie + '</div>' +
+    (esNoche ? '<div class="pe2-noche">🌙 De noche no se registran mediciones funcionales nuevas: esto es lo último que hay, con la fecha y quién lo midió.</div>' : '') +
     (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
 }
 
@@ -15987,6 +16018,25 @@ function setPendDesde(jsonStr){
   renderPend();
 }
 
+/** 🌙 «KTM A» — de noche la tarjeta de Rehabilitación se ve y no se llena.
+ *
+ *  Apaga TODOS sus controles, la atenúa y saca el aviso que explica por qué.
+ *  De día los vuelve a encender: las reglas del día (SAS 1 sobre los niveles,
+ *  AET IIIC, BNM) corren DESPUÉS en aplicarGatesEval y vuelven a apagar lo
+ *  suyo, así que el orden importa y esta función va primero.
+ *
+ *  🪤 VIVE EN EL ÁMBITO GLOBAL, no dentro de aplicarGatesEval. Una `function`
+ *  declarada dentro de otra no cuelga de ninguna parte, y ya nos costó una
+ *  sesión: `_coopDerivar` estaba anidada y la réplica del turno reventaba con
+ *  «no está definida» sin que nada lo avisara al cargar.
+ */
+function _ktmModoNoche(on){
+  const card=$('fcKtmCard'); if(!card) return;
+  card.querySelectorAll('input,select,button,textarea').forEach(e=>{ e.disabled=!!on; });
+  card.classList.toggle('solo-lectura', !!on);
+  const av=$('dKTMnoche'); if(av) av.classList.toggle('hidden', !on);
+}
+
 //  GATES DE EVALUACIÓN (acordado):
 //  · Noche: Evaluaciones Funcionales y Terapia Física OCULTAS (KTM queda "no realizada").
 //  · Paciente no cooperador / no evaluable / BNM: se bloquean los tests VOLITIVOS
@@ -15995,7 +16045,16 @@ function setPendDesde(jsonStr){
 function aplicarGatesEval(){
   // — Noche —
   const esNoche = SHIFT==='Noche';
-  const k=$('fcKtmCard'); if(k) k.classList.toggle('hidden', esNoche);
+  /* 🌙 «KTM A» (Diego, 19-sep-2026): DE NOCHE SE VE Y NO SE LLENA.
+     Hasta acá la tarjeta se escondía entera —acuerdo de ago-2026— y eso le
+     hizo perder un rato buscando algo que el sistema había guardado sin
+     decirlo: «en turno no aparece KTM aunque lo estoy probando de noche».
+     Le di tres caminos y eligió éste. Se descartó dejarla registrable (la
+     opción B) porque hoy «KTM de noche» significa cero POR DEFINICIÓN: si a
+     veces hay dato y a veces no, el porcentaje de cumplimiento deja de querer
+     decir algo. 🪤 Esto CAMBIA la convención que exigía regresion_ui.js. */
+  const k=$('fcKtmCard'); if(k && esNoche) k.classList.remove('hidden');
+  _ktmModoNoche(esNoche);
   const imt=$('fcImtBox'); if(imt) imt.classList.toggle('hidden', esNoche); // IMT: disponible siempre, salvo de noche
   // De noche la KTM NO APLICA (Diego, ago-2026): estado NEUTRO, no «no
   // realizada» — forzar 'n' hacía que cada evolución nocturna narrara «KTM no

@@ -72,6 +72,12 @@ const no = (l, g) => eq(l, !!g, 'false');
        equipo»), así que ese truco dejaba el selector sin la firma y el guardado
        no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
     const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
+    /* 🪤 TURNO CONGELADO. Desde el 19-sep («KTM A») la pantalla cambia según
+       el turno: de noche la KTM se apaga y los chips del pool quedan en solo
+       lectura. Sin fijar SHIFT esta guardia sale verde de día y roja de
+       noche — que es la trampa del reloj, otra vez. */
+    SHIFT = 'Dia';
+    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
     pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(300);
@@ -132,6 +138,12 @@ const no = (l, g) => eq(l, !!g, 'false');
     if (typeof setKTMstate === 'function') setKTMstate('r');
     const n = $('fKTMniv'); if (n) { n.value = '3'; n.dispatchEvent(new Event('change')); }
     window.__llamadas.length = 0;
+    /* 🪤 TURNO CONGELADO. Desde el 19-sep («KTM A») la pantalla cambia según
+       el turno: de noche la KTM se apaga y los chips del pool quedan en solo
+       lectura. Sin fijar SHIFT esta guardia sale verde de día y roja de
+       noche — que es la trampa del reloj, otra vez. */
+    SHIFT = 'Dia';
+    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
     pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(200);

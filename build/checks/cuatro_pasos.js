@@ -66,6 +66,13 @@ const no = (l, g) => eq(l, !!g, 'false');
     window.recargarSilencioso = () => {};
     renderGrid();
     abrirPanel('3', false, false);
+    /* 🪤 TURNO CONGELADO. Desde el 19-sep («KTM A») la pantalla cambia según
+       el turno: de noche la KTM se apaga y los chips del pool quedan en solo
+       lectura. Sin fijar SHIFT esta guardia sale verde de día y roja de
+       noche — que es la trampa del reloj, otra vez. */
+    SHIFT = 'Dia';
+    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
+
   });
   await p.waitForTimeout(400);
 

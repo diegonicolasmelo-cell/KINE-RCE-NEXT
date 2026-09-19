@@ -92,7 +92,14 @@ const path = require('path');
     SHIFT='Noche';
     fillFormReplica({KTM_IMT:'TRUE',KTM_EMS:'TRUE',KTM_REALIZADA:'TRUE',KTM_NIVEL_KTR:'3',VENT_VIA_AEREA:'TOT',VENT_SOPORTE:'VM'});
     r.nocheIMT=$('cIMT').checked; r.nocheEMS=$('cEMS').checked;
-    r.nocheKTMr=$('cKTMr').checked; r.nocheOculto=$('fcKtmCard').classList.contains('hidden');
+    r.nocheKTMr=$('cKTMr').checked;
+    // 🌙 19-sep-2026 · Antes acá se medía que la tarjeta quedara OCULTA de
+    //   noche. Esa convención se cambió: Diego eligió la opción A, «se ve y no
+    //   se llena», porque esconderla le hizo perder tiempo buscando algo que
+    //   el sistema había guardado sin decirlo. Lo que esta guardia sigue
+    //   cuidando —que de noche la KTM no quede marcada— no cambió. Lo nuevo
+    //   lo mide ktm_de_noche.js.
+    r.nocheApagada=!!$('bKTMr').disabled;
     // Día con previa Noche: la pauta llega desde la última evolución de DÍA adjunta
     SHIFT='Dia'; $('kf').reset();
     fillFormReplica({KTM_IMT:false,KTM_REALIZADA:false,VENT_VIA_AEREA:'TOT',VENT_SOPORTE:'VM',
@@ -101,7 +108,7 @@ const path = require('path');
     return r;
   });
   eq('noche: IMT/EMS NO se arrastran (sin sesión fantasma)', !TF.nocheIMT && !TF.nocheEMS, true);
-  eq('noche: KTM forzada a "no realizada" y tarjeta oculta', !TF.nocheKTMr && TF.nocheOculto, true);
+  eq('noche: la KTM no queda marcada y la tarjeta queda apagada', !TF.nocheKTMr && TF.nocheApagada, true);
   eq('día: la pauta llega de la última evolución de DÍA', TF.diaIMT && TF.diaKTMr, true);
   eq('día: pauta IMT heredada', TF.diaFreq, '3');
 

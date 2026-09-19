@@ -296,7 +296,7 @@ alterados · PEEP 12».
 
 ---
 
-## 3 · Evaluaciones y KTM — abierto, esperando a Diego
+## 3 · Evaluaciones y KTM — CERRADO el 19-sep-2026
 
 Mockup: `claude.ai/artifact/1qqf353bXaEdWsk7RqGDFp`
 
@@ -326,33 +326,64 @@ construirlo de nuevo valía la pena ir a mirar: son diez chips —MRC-ss, FSS-IC
 CPAx, Pimáx, PEmáx, FEmáx, Dinamometría, IMS, Ecografía y Protección de vía
 aérea— cada uno con su último valor, la fecha y la firma de quien midió.
 
-### 3.2 · Lo que falta decidir: la KTM de noche
+### 3.2 · La KTM de noche: se ve y no se llena
 
 > *«En turno no aparece KTM aunque lo estoy probando de noche… debería mostrar
 > al menos el pool de evaluaciones.»*
+>
+> *«KTM A.»*
 
-En agosto se acordó que de noche la KTM no aplica y la tarjeta se esconde. Tres
-caminos, sin decidir:
+En agosto se acordó que de noche la KTM no aplica y **la tarjeta se escondía
+entera**. Eso le hizo perder tiempo buscando algo que el sistema había guardado
+sin decirlo. Le ofrecí tres caminos y eligió el **A**:
 
-| | Opción | Qué pasa |
+| | Opción | Qué pasaba |
 |---|---|---|
-| **A** | Se ve, no se llena | La tarjeta aparece con los botones apagados y una línea que dice por qué. **Es la que recomiendo.** |
-| **B** | Se puede llenar igual | Rompe la estadística: hoy «KTM de noche» significa cero por definición. |
-| **C** | Se queda como está | Oculta. Es lo que le hizo perder tiempo en el turno real. |
+| **A** | **Se ve, no se llena** | ✅ **Elegida.** La tarjeta aparece apagada y dice por qué. |
+| B | Se puede llenar igual | Descartada: rompe la estadística. |
+| C | Se queda oculta | Descartada: es lo que le hizo perder el rato. |
 
-🪤 **Arrastra un tercer defecto que depende de esta decisión.** De noche el pool
-se ve, pero los chips que abren un formulario —ecografía, tos y deglución,
-Pimáx— no tienen dónde abrirlo: el formulario vive dentro de la tarjeta que se
-esconde. **Tocarlos no hace nada.** Con A quedan apagados y se dice por qué;
-con B se abren; con C hay que apagarlos a mano.
+**Lo que cambia:**
 
-### 3.3 · Lo que hay que aclarar con él
+- La tarjeta de Rehabilitación **se ve de noche**, atenuada, con todos sus
+  controles apagados.
+- Sale un aviso que dice **por qué** — y de paso aclara la confusión que la
+  tarjeta escondida provocaba: *la KTR respiratoria sí se registra de noche, y
+  está arriba, en Respiratorio*.
+- Los **diez chips del pool** quedan en **solo lectura** de noche: se ven con su
+  último valor, fecha y firma, pero no se tocan, y una línea lo explica. Eso
+  cierra el tercer defecto que había quedado anotado.
 
-🔵 **KTR no es KTM, y están lejos una de otra.** La KTR respiratoria vive en
-Respiratorio y se registra de noche igual que de día; la KTM motora vive en
-Rehabilitación y de noche desaparece. Si lo que buscaba esa noche era la KTR,
-el problema es otro: **dos cosas que se llaman casi igual y están en pantallas
-distintas**.
+**Lo que NO cambia:** de noche la KTM sigue **sin registrarse**, y el estado
+nace **neutro** —ni «realizada» ni «no realizada»—, porque forzar «no realizada»
+hacía que cada evolución nocturna narrara algo que la estadística manual nunca
+tuvo. Se descartó la opción B por eso mismo: hoy «KTM de noche» significa cero
+**por definición**; si a veces hay dato y a veces no, el porcentaje de
+cumplimiento deja de querer decir algo.
+
+🪤 **Esto cambió una convención anterior a propósito**, y la guardia que la
+exigía (`regresion_ui.js`, «tarjeta oculta») quedó actualizada con la razón
+escrita. Lo nuevo lo cuida `build/checks/ktm_de_noche.js`.
+
+🪤 **Y destapó la trampa del reloj por cuarta vez.** Al hacer que la pantalla
+dependa del turno, **tres guardias que leían la hora real** —`cuatro_pasos`,
+`ktm_sesiones` y `paso_evaluaciones`— se pusieron rojas solas: verdes de día,
+rojas de noche. Ninguna congelaba `SHIFT`. Quedaron con el turno fijo y el
+motivo escrito adentro. `ktm_sesiones` ya congelaba la **fecha** y no el
+**turno**: no son lo mismo.
+
+🔵 **La tarjeta de IMT/EMS sigue escondiéndose de noche.** No entra en este
+acuerdo: es una tarjeta aparte y se esconde **entera**, así que no deja el
+encabezado huérfano que era el problema. Si Diego quiere que también se vea
+apagada, se hace igual.
+
+### 3.3 · KTR no es KTM, y el aviso lo dice
+
+La KTR respiratoria vive en **Respiratorio** y se registra de noche igual que de
+día; la KTM motora vive en **Rehabilitación**. Son dos cosas que se llaman casi
+igual y están en pantallas distintas, y con la tarjeta escondida no había dónde
+enterarse. **El aviso de la opción A lo dice en pantalla**, así que la pregunta
+se contesta sola: quien busque la KTR de noche va a leer dónde está.
 
 ### 3.4 · Lo que sale gratis si esto sigue
 

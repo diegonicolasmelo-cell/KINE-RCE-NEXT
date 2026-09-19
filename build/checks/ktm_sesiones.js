@@ -124,6 +124,12 @@ const { chromium } = require('playwright-core');
     DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', VIA_AEREA: 'TOT', SOPORTE: 'VM' }];
     renderGrid(); abrirPanel('3', false, false);
     await new Promise(r => setTimeout(r, 300));
+    /* 🪤 TURNO CONGELADO. Desde el 19-sep («KTM A») la pantalla cambia según
+       el turno: de noche la KTM se apaga y los chips del pool quedan en solo
+       lectura. Sin fijar SHIFT esta guardia sale verde de día y roja de
+       noche — que es la trampa del reloj, otra vez. */
+    SHIFT = 'Dia';
+    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
     if (typeof pasoIr === 'function') pasoIr(2);
     $('fVA').value = 'TOT'; cascadeVA();
     $('fSop').value = 'VM'; cascadeSop(); $('fModo').value = 'ACVC'; renderParams();
