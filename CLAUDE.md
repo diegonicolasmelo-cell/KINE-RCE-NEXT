@@ -15,8 +15,9 @@ navegador del hospital o de su casa.
 > `docs/archivo/` por decisión de Diego: ya no mandan y no se citan como
 > argumento. Lo esencial de lo aprendido —el terreno, sus decisiones clínicas
 > ya cerradas y las trampas pagadas— está destilado en `docs/LO_ESENCIAL.md`.
-> Los acuerdos nuevos se cierran con `docs/GUIA_DE_ACUERDOS.md`, y a medida que
-> él responda, sus respuestas se escriben ahí **con sus palabras**.
+> Los acuerdos nuevos se cierran con `docs/GUIA_DE_ACUERDOS.md` y, a medida que
+> Diego decide, se escriben en **`docs/ACUERDOS_REDISENO.md` con sus palabras**.
+> Ése es hoy la vara: si contradice algo de `docs/archivo/`, manda él.
 >
 > 🪤 Archivar los planes NO archiva las guardias: un acuerdo de producto se
 > puede cambiar, una cicatriz no. Las reglas de este archivo y `build/checks/`
