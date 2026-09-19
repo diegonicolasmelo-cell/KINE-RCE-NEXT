@@ -2156,3 +2156,48 @@ verdad protege es lo estructural: si no hay dónde escribir una nómina —porqu
 equipo llega de la planilla— no hay nómina que se escape.
 
 **181 guardias · 181 verdes.** Nueva: `el_equipo_no_va_en_el_codigo.js`.
+
+---
+
+## 19-sep-2026 · «En registrar una evaluación no sale nada» eran dos errores
+
+Diego registró un turno real de noche y avisó que el paso de evaluaciones salía
+en blanco. Fui a reproducirlo con el reloj congelado y **no era uno, eran dos
+encima**:
+
+1. **La tarjeta hueca.** `hEgr()` escondía de noche el contenido
+   (`#fcEgrCard`) pero no la tarjeta, y quedaba «📏 Registrar una medición»
+   flotando sobre 26 píxeles de nada. Un encabezado que promete algo que no
+   está y no dice por qué.
+2. **El pool en cero durante el ingreso.** `pasoEvalPintar()` cortaba con
+   `if(!c.PATIENT_ID)`, y el PATIENT_ID se asigna al **ocupar la cama**, o sea
+   al guardar: mientras se ingresa, la cama todavía no lo tiene. Justo el
+   momento en que el pool más sirve —paciente nuevo, las diez escalas por
+   medir— era el único en que no aparecía.
+
+🪤 **Lo que casi hago mal.** Diego pidió «que muestre al menos el pool de
+evaluaciones» y lo primero que hice fue empezar a diseñarlo. No hacía falta:
+**el pool ya existía y lo había pedido él mismo el 17-sep**. Ir a mirar el
+código antes de construir ahorró un mockup entero de algo que ya estaba.
+
+**La guardia se escribió primero y se vio roja** con seis fallos, y no cuida
+solo esta tarjeta: recorre **todas** las `.fcard` y exige que ninguna quede con
+encabezado a la vista y cuerpo vacío, en cuatro escenarios —día y noche,
+ingreso y paciente ya ingresado—. Es una familia de fallas, no un caso: el
+cuerpo de varias tarjetas depende del turno, de la cooperación o del BNM.
+
+🪤 **Y se coló una tercera, que no arreglé a propósito.** De noche el pool se
+sigue viendo (vive fuera de la tarjeta), pero los chips que abren un formulario
+—ecografía, tos y deglución, Pimáx— no tienen dónde abrirlo y **tocarlos no
+hace nada**. El arreglo depende de una decisión de Diego que está en el mockup
+(A, B o C para la KTM de noche), así que queda escrito y esperando.
+
+**182 guardias · 182 verdes.** Nueva: `medicion_no_queda_hueca.js`.
+Sello de entrega: `NEXT-2.4-medicion`.
+
+### Los acuerdos, al día
+
+- **Sección 2 · Respiratorio: CERRADA.** Ocho acuerdos, con la regla de conteo
+  por horas que Diego zanjó («38 horas es 1 día»).
+- **Sección 3 · Evaluaciones y KTM: abierta**, con los dos errores ya
+  arreglados y tres preguntas para él.

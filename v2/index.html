@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.3-vigilia">
+<meta name="rce-version" content="NEXT-2.4-medicion">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -5300,7 +5300,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.3-vigilia]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.4-medicion]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6639,7 +6639,15 @@ const _PASO_SERIE = [
 function pasoEvalPintar(){
   const caja = $('pasoEvalChips'); if(!caja) return;
   const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
-  if(!c.PATIENT_ID){ caja.innerHTML = ''; return; }
+  /* 🔴 19-sep-2026 · EN EL INGRESO TAMBIÉN SE PINTA. El PATIENT_ID se asigna
+     al ocupar la cama, o sea al GUARDAR: mientras se ingresa, la cama todavía
+     no lo tiene y el pool salía con cero chips. Justo el momento en que más
+     sirve —paciente nuevo, las diez por medir— era el único en que no
+     aparecía, y Diego lo vio en el turno real: «en registrar una evaluación no
+     sale nada». Sin paciente y sin ingreso sí se deja vacío: no hay episodio
+     que mostrar. */
+  const ingresando = (typeof v === 'function') && v('cIng') === 'true';
+  if(!c.PATIENT_ID && !ingresando){ caja.innerHTML = ''; return; }
 
   // Las repetibles, con su procedencia.
   const serie = _PASO_SERIE.map(e => {
@@ -13352,6 +13360,14 @@ function hEgr(){
   const esNoche = SHIFT === 'Noche';
   const card = $('fcEgrCard');
   if (card) card.classList.toggle('hidden', esNoche);
+  /* 🔴 SI SE ESCONDE EL CUERPO, SE ESCONDE LA TARJETA. Antes solo se ocultaba
+     #fcEgrCard y quedaba «📏 Registrar una medición» flotando sobre 26 píxeles
+     de nada: un encabezado que promete algo que no está y no dice por qué.
+     Eso es lo que Diego encontró de noche en el turno real. El pool de chips
+     vive FUERA de esta tarjeta (#pasoEvalChips), así que de noche se sigue
+     viendo qué lleva medido el episodio. Lo cuida medicion_no_queda_hueca.js. */
+  const marco = $('fcEval');
+  if (marco) marco.classList.toggle('hidden', esNoche);
   if (!esNoche && $('cEgr')?.checked) show('dEgr'); else hide('dEgr');
 }
 let _nombreTimer=null;

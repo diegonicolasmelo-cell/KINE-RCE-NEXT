@@ -296,12 +296,83 @@ alterados · PEEP 12».
 
 ---
 
-## 3 · Evaluaciones y KTM — pendiente
+## 3 · Evaluaciones y KTM — abierto, esperando a Diego
 
-- De noche se esconden la tarjeta de KTM y la de evaluaciones. Es por diseño
-  (no se hacen de noche), pero Diego pidió ver al menos el pool.
-- Propuesta mía, sin acordar: **de noche se muestran en modo lectura** —lo
-  último medido con su fecha— y no se puede registrar nuevo.
+Mockup: `claude.ai/artifact/1qqf353bXaEdWsk7RqGDFp`
+
+### 3.1 · Lo que ya se arregló (no era decisión, eran errores)
+
+> *«En registrar una evaluación no sale nada.»*
+
+Reproducido con el reloj congelado. Eran **dos fallas encima**:
+
+1. 🔴 **De noche la tarjeta quedaba con encabezado y sin cuerpo.** `hEgr()`
+   escondía `#fcEgrCard` pero no `#fcEval`: quedaba «📏 Registrar una medición»
+   sobre 26 píxeles de nada.
+2. 🔴 **En el turno de ingreso el pool salía con cero chips.**
+   `pasoEvalPintar()` cortaba con `if(!c.PATIENT_ID)`, y el PATIENT_ID se
+   asigna al **ocupar la cama**, o sea al guardar. Mientras se ingresa, la cama
+   todavía no lo tiene. Justo el momento en que el pool más sirve —paciente
+   nuevo, las diez por medir— era el único en que no aparecía.
+
+Los dos arreglados, con guardia escrita primero y vista roja:
+`build/checks/medicion_no_queda_hueca.js`. **La guardia no cuida solo esta
+tarjeta**: recorre todas y exige que ninguna quede con encabezado a la vista y
+cuerpo vacío, en los cuatro escenarios (día/noche × ingreso/paciente).
+
+🪤 **El pool ya existía y lo había pedido él mismo el 17-sep** («que se abran
+solas de forma individual y no que aparezcan todas de golpe»). Antes de
+construirlo de nuevo valía la pena ir a mirar: son diez chips —MRC-ss, FSS-ICU,
+CPAx, Pimáx, PEmáx, FEmáx, Dinamometría, IMS, Ecografía y Protección de vía
+aérea— cada uno con su último valor, la fecha y la firma de quien midió.
+
+### 3.2 · Lo que falta decidir: la KTM de noche
+
+> *«En turno no aparece KTM aunque lo estoy probando de noche… debería mostrar
+> al menos el pool de evaluaciones.»*
+
+En agosto se acordó que de noche la KTM no aplica y la tarjeta se esconde. Tres
+caminos, sin decidir:
+
+| | Opción | Qué pasa |
+|---|---|---|
+| **A** | Se ve, no se llena | La tarjeta aparece con los botones apagados y una línea que dice por qué. **Es la que recomiendo.** |
+| **B** | Se puede llenar igual | Rompe la estadística: hoy «KTM de noche» significa cero por definición. |
+| **C** | Se queda como está | Oculta. Es lo que le hizo perder tiempo en el turno real. |
+
+🪤 **Arrastra un tercer defecto que depende de esta decisión.** De noche el pool
+se ve, pero los chips que abren un formulario —ecografía, tos y deglución,
+Pimáx— no tienen dónde abrirlo: el formulario vive dentro de la tarjeta que se
+esconde. **Tocarlos no hace nada.** Con A quedan apagados y se dice por qué;
+con B se abren; con C hay que apagarlos a mano.
+
+### 3.3 · Lo que hay que aclarar con él
+
+🔵 **KTR no es KTM, y están lejos una de otra.** La KTR respiratoria vive en
+Respiratorio y se registra de noche igual que de día; la KTM motora vive en
+Rehabilitación y de noche desaparece. Si lo que buscaba esa noche era la KTR,
+el problema es otro: **dos cosas que se llaman casi igual y están en pantallas
+distintas**.
+
+### 3.4 · Lo que sale gratis si esto sigue
+
+Con el pool sabiendo qué falta, sale el **porcentaje de cumplimiento** por
+episodio y por unidad — la misma vuelta de tuerca del acuerdo 1.8. 🪤 Con una
+advertencia: **no todas las diez aplican a todos los pacientes**; a un sedado
+profundo no se le mide MRC ni FSS y contarlo como «no cumplido» sería castigar
+al equipo por hacer lo correcto. Qué entra en el denominador es conversación
+aparte.
+
+### 3.5 · Lo otro que lo frenó esa noche
+
+> *«No aparece firma, así que no puedo avanzar al relato.»*
+
+Arreglado antes: el selector estaba vacío porque los nombres del equipo salieron
+del código por privacidad y todavía no se leían de la planilla. Ahora
+`equipoRoster()` lee la hoja **KINESIOLOGOS**, y si está vacía el selector lo
+dice en vez de quedarse mudo.
+
+---
 
 ## 4 · Prono — pendiente
 
