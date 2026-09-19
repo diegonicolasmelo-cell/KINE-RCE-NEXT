@@ -20,6 +20,16 @@
 // `offsetParent` (trampa de Diego, ago-2026: un panel con opacity:0 da
 // display:block, visibility:visible y rect de 508×153 y sale en blanco).
 //
+// 🔃 19-sep-2026 · CAMBIÓ DÓNDE SE LEE, NO QUÉ SE EXIGE. La franja pasó a ser
+// «un evento que arrastra el estado» (Diego: «prono y se prono este turno
+// puede confundir»), y con eso las seis casillas se fueron a un contenedor
+// escondido — los chips `sPronoTip`/`sSupinoTip` incluidos. El número ahora se
+// lee en `#pronoEstado` («🔃 En prono · ⏱ 14,5 h») y el «desde cuándo» en
+// `#pronoDesde`. La exigencia de Manuel sigue entera, y de hecho más fuerte:
+// antes el detalle vivía en un tooltip que el celular no tiene, y ahora está
+// escrito al lado. Por eso esta guardia mide los elementos nuevos en vez de
+// aflojar lo que pide.
+//
 // Uso: node build/checks/prono_horas_a_la_vista.js [ruta.html]
 const { chromium } = require('playwright-core');
 const path = require('path');
@@ -69,14 +79,11 @@ const montar = (pg, opts) => pg.evaluate((o) => {
   }
   window._pronoAbierto = o.abierto || '';
   const c = document.getElementById('cProno'); c.checked = !!o.prono;
-  document.getElementById('dPronoHora').classList.toggle('hidden', !o.prono);
   const s = document.getElementById('cSupino'); if (s) s.checked = !!o.supino;
   const se = document.getElementById('cSupinoEv'); if (se) se.checked = !!o.supino;
-  if (o.supino) {
-    document.getElementById('dSupinoHora').classList.remove('hidden');
-    document.getElementById('fSupinoHora').value = o.horaSupino || '';
-  }
+  if (o.supino) document.getElementById('fSupinoHora').value = o.horaSupino || '';
   _updatePronoTip(); _updateSupinoTip();
+  if (typeof pronoPintar === 'function') pronoPintar();
   return { franjaOculta: document.getElementById('dPronoStrip').classList.contains('hidden') };
 }, opts);
 
@@ -106,10 +113,12 @@ const seVe = (pg, id) => pg.evaluate((elId) => {
   await abrirElPanel(pg);
   await montar(pg, { prono: true, abierto: '2026-08-28 20:03' });
   await pg.waitForTimeout(300);
-  let v = await seVe(pg, 'sPronoTip');
-  si('★ el chip se ve (rect con área y sin ancestro apagado)', v.existe && v.ancho > 0 && v.alto > 0 && v.opaco, v);
+  let v = await seVe(pg, 'pronoEstado');
+  si('★ el estado se ve (rect con área y sin ancestro apagado)', v.existe && v.ancho > 0 && v.alto > 0 && v.opaco, v);
   si('★ y dice las horas EN EL TEXTO, no solo en el tooltip', /\d+([.,]\d+)?\s*h/.test(v.texto) && /prono/i.test(v.texto), v.texto);
-  si('el tooltip conserva el detalle de desde cuándo', /desde/i.test(String(v.tip)), v.tip);
+  const desde = await seVe(pg, 'pronoDesde');
+  si('★ el «desde cuándo» también se LEE, ya no vive en un tooltip',
+     desde.opaco && desde.ancho > 0 && /desde/i.test(desde.texto), desde.texto);
   // El número escrito es el que calcula el motor, no uno inventado por la vista.
   const delMotor = await pg.evaluate(() => {
     const ini = _pronoInicioTS();
@@ -121,15 +130,15 @@ const seVe = (pg, id) => pg.evaluate((elId) => {
   console.log('\n2 · Sin pronación abierta');
   await montar(pg, { prono: false, abierto: '' });
   await pg.waitForTimeout(200);
-  v = await seVe(pg, 'sPronoTip');
-  si('★ el chip queda oculto', !v.opaco || v.ancho === 0, v);
+  v = await seVe(pg, 'pronoEstado');
+  si('★ el estado dice «Supino», no un prono fantasma', /supino/i.test(v.texto), v.texto);
   si('…y sin número pegado de la vez anterior', !/\d+([.,]\d+)?\s*h/.test(v.texto), v.texto);
 
   /* ══ 3 · El ciclo que se cierra también se lee ═════════════════════════ */
   console.log('\n3 · Al supinar, el total del ciclo');
   await montar(pg, { prono: false, supino: true, horaSupino: '08:00', abierto: '2026-08-28 20:03' });
   await pg.waitForTimeout(200);
-  v = await seVe(pg, 'sSupinoTip');
+  v = await seVe(pg, 'pronoDesde');
   si('★ el total del ciclo se lee en pantalla', /\d+([.,]\d+)?\s*h/.test(v.texto), v.texto);
   const cierre = await pg.evaluate(() => _pronoHorasCiclo());
   si('★ y es el que se va a sellar en la ficha', v.texto.indexOf(String(cierre).replace('.', ',')) > -1, { enPantalla: v.texto, seSella: cierre });
@@ -153,8 +162,8 @@ const seVe = (pg, id) => pg.evaluate((elId) => {
   });
   si('la tarjeta Respiratorio se abre al tocarla', !plegada.sigueePlegada, plegada);
   await cel.waitForTimeout(400);
-  v = await seVe(cel, 'sPronoTip');
-  si('★ el chip se ve en el celular', v.existe && v.ancho > 0 && v.alto > 0 && v.opaco, v);
+  v = await seVe(cel, 'pronoEstado');
+  si('★ el estado se ve en el celular', v.existe && v.ancho > 0 && v.alto > 0 && v.opaco, v);
   si('★ con las horas escritas (sin hover, que en táctil no existe)', /\d+([.,]\d+)?\s*h/.test(v.texto), v.texto);
   const desborda = await cel.evaluate(() => {
     const s = document.getElementById('dPronoStrip');

@@ -428,7 +428,7 @@ dice en vez de quedarse mudo.
 
 ---
 
-## 4 · Prono — propuesto, esperando a Diego
+## 4 · Prono — CERRADO el 19-sep-2026
 
 Mockup: `claude.ai/artifact/SAHsrZc9R6PvHBu9NnDK5n`
 
@@ -450,32 +450,61 @@ y `PRONO_HORAS` guardan cuándo empieza, cuándo termina y cuánto duró, y el c
 14,5 h (desde el 18-09)». Lo que falta no es el motor: es que **la pantalla del
 turno lo use** en vez de pedir a mano lo que el sistema ya sabe.
 
-### 4.2 · Lo propuesto, sin construir
+### 4.2 · Un evento que arrastra el estado — construido
 
-1. **El prono sube a la primera fila**, junto a vía aérea y soporte: los tres
-   dicen en qué estado está el paciente ahora.
-2. **Cuatro casillas y dos horas pasan a un estado y una acción.** Si está en
-   prono, el botón dice **Supinar**; si no, **Pronar**. Nunca los dos.
-   > *«El supino se entiende como el término del prono; lo importante es el
-   > prono.»*
-3. **El prono se ve en la tarjeta de la cama**, con las horas — el mismo chip
-   que ya existe en la entrega, puesto donde se mira primero.
+Le propuse un estado y un botón, y él lo formuló mejor:
 
-### 4.3 · Lo que falta que Diego decida
+> *«El prono como evento puede arrastrar estado hasta que se suspenda con
+> supinar? Eso en vez de tener varios botones porque prono y se prono este turno
+> puede confundir.»*
 
-| # | Pregunta | Por qué no lo hago solo |
+Eso es lo que se construyó. **Seis controles pasan a uno.** Cuatro situaciones,
+un botón en cada una:
+
+| Situación | Lo que se ve | El botón |
 |---|---|---|
-| 1 | ¿Subo el prono a la primera fila? | Cambia de sitio algo que el equipo ya sabe dónde está. |
-| 2 | ¿Se saca la casilla ámbar «se prona este turno»? | 🪤 Toca una cicatriz. |
-| 3 | ¿Hay un número de horas que valga la pena avisar? | Si no hay un corte real en la unidad, no invento uno. |
+| Sin prono | «Supino» | **Pronar** |
+| Se pronó en este turno | «🔃 En prono» + la hora | **Deshacer** |
+| Viene pronado de antes | «🔃 En prono · ⏱ 14,5 h · desde 18-09 21:30» | **Supinar** |
+| Se supinó en este turno | «Supinado · ciclo de 36 h» | **Deshacer** |
 
-🪤 **Sobre la 2.** La casilla ámbar existe porque Diego reportó el bug: estar en
-prono no es haber pronado, y sin separarlas el sistema contaba una pronación por
-cada turno que el paciente siguiera boca abajo. Desde entonces el servidor guarda
-**el momento en que empieza el ciclo**, así que «se pronó este turno» pasó a ser
-un hecho que se puede **leer**, no adivinar. Con una excepción: el paciente que
-**llega ya pronado** desde otra unidad — ahí el ciclo no empezó acá y hay que
-preguntar, igual que el modal de vía aérea del primer turno (acuerdo 2.4).
+🔴 **El estado se arrastra del CICLO, no del turno anterior.** Antes venía de
+replicar la fila previa: si un turno se saltaba, el paciente «dejaba» de estar en
+prono sin que nadie lo supinara. Ahora sale del ciclo abierto que el servidor
+guarda, y ése vive en el episodio.
+
+🪤 **La cicatriz no se reabre, se resuelve mejor.** La casilla «se prona este
+turno» existía porque Diego reportó que el sistema contaba una pronación en
+**cada** turno que el paciente siguiera boca abajo. Con este modelo el **evento**
+se registra una sola vez —el turno en que se toca «Pronar»— y el **estado** se
+deriva del ciclo. Las dos columnas se siguen escribiendo separadas: lo que cambió
+es quién las marca.
+
+🔴 **Ninguna columna cambió.** `RESP_POS_PRONO`, `RESP_PRONO_EVENTO`,
+`RESP_POS_SUPINO`, `RESP_SUPINO_EVENTO` y las horas se escriben igual que antes,
+así que el servidor, la entrega, la timeline y el texto clínico siguen intactos.
+Las seis casillas viejas siguen en la pantalla, **escondidas y vivas** — mismo
+patrón que `fCoop` con la interpretación del S5Q.
+
+Lo cuida `build/checks/prono_un_boton.js`.
+
+### 4.3 · Lo que quedó pendiente
+
+| # | Pendiente | Estado |
+|---|---|---|
+| 1 | Subir el prono a la primera fila, junto a vía aérea y soporte | **sin hacer** — la franja sigue donde estaba |
+| 2 | Mostrar el prono en la tarjeta de la cama | **sin hacer** |
+| 3 | ¿Hay un número de horas que valga la pena avisar? | **sin respuesta** — no invento un corte |
+
+🪤 **Y una limitación que conviene saber:** si en un mismo turno se prona **y** se
+supina —un prono que no se tolera y se revierte a las dos horas—, el modelo solo
+guarda el último de los dos. Ya era así antes; no lo empeoré, pero tampoco está
+resuelto.
+
+🔃 **Lo que la guardia de las horas dejó mejor de paso.** `prono_horas_a_la_vista`
+existe porque Manuel avisó que no se veían las horas en el celular: el número
+vivía en un tooltip y en táctil no hay hover. Con el control nuevo, el «desde
+cuándo» **también dejó de ser tooltip** y se lee escrito al lado.
 
 ### 4.4 · Lo que NO se vuelve a preguntar
 

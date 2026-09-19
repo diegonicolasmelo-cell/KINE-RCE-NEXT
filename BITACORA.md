@@ -2273,3 +2273,56 @@ a través del nivel de KTM. Si para el equipo es *un* paquete, puede que tambié
 tenga que ser *una* tarjeta — anotado, sin tocar.
 
 **183 guardias · 183 verdes.** Sello de entrega: `NEXT-2.6-terapia-fisica`.
+
+---
+
+## 19-sep-2026 · El prono: un evento que arrastra el estado
+
+Le había propuesto «un estado y un botón» y Diego lo formuló mejor:
+
+> *«El prono como evento puede arrastrar estado hasta que se suspenda con
+> supinar? Eso en vez de tener varios botones porque prono y se prono este
+> turno puede confundir.»*
+
+**Seis controles pasaron a uno.** Cuatro situaciones, un botón en cada una:
+sin prono → *Pronar*; pronado en este turno → *Deshacer*; viene pronado de
+antes → *Supinar*; supinado en este turno → *Deshacer*.
+
+🔴 **El estado se arrastra del CICLO, no del turno anterior.** Antes venía de
+replicar la fila previa: si un turno se saltaba, el paciente «dejaba» de estar
+en prono sin que nadie lo supinara.
+
+🪤 **La cicatriz de estado-vs-evento no se reabrió: se resolvió mejor.** La
+casilla «se prona este turno» existía porque el sistema contaba una pronación en
+cada turno que el paciente siguiera boca abajo. Ahora el evento se registra una
+sola vez y el estado se deriva. Las dos columnas se siguen escribiendo
+separadas.
+
+🔴 **Ninguna columna cambió.** Las seis casillas viejas siguen en la pantalla,
+escondidas y vivas, porque son las que arman el payload y las que leen
+`fillForm` y `fillFormReplica`. Sacarlas habría obligado a tocar el servidor, la
+entrega, la timeline, el texto clínico y veinticuatro guardias para un cambio
+que es solo de pantalla. Mismo patrón que `fCoop` con la interpretación del S5Q.
+
+### 🪤 Dos trampas en la misma tanda
+
+**El falso verde, otra vez.** La primera versión de la guardia decía «ninguna de
+las cuatro casillas se ve» y salía VERDE contra el código sin arreglar — porque
+la franja vive en el **paso 2** y yo medía parado en el paso 1, donde todo está
+`paso-oculto`. Es la segunda vez hoy: la misma trampa apareció en
+`ktm_de_noche.js`. **Una guardia que no se ve roja no prueba lo que dice.**
+
+**Y una guardia que había que apuntar, no aflojar.** `prono_horas_a_la_vista`
+existe porque Manuel avisó desde el turno que no se veían las horas de prono en
+el celular: el número vivía en un tooltip y en táctil no hay hover. Al mover las
+casillas al contenedor escondido, los chips que medía se fueron con ellas. No se
+tocó lo que exige — se apuntó a los elementos nuevos, y de paso **el «desde
+cuándo» dejó de ser tooltip** y ahora se lee escrito al lado. La cicatriz quedó
+mejor protegida que antes.
+
+**184 guardias · 184 verdes.** Nueva: `prono_un_boton.js`.
+Sello de entrega: `NEXT-2.7-prono`.
+
+### Los cuatro acuerdos, cerrados
+
+1 · Ingreso · 2 · Respiratorio · 3 · Evaluaciones y KTM · 4 · Prono.

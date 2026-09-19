@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.6-terapia-fisica">
+<meta name="rce-version" content="NEXT-2.7-prono">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -4330,29 +4330,43 @@ document.documentElement.setAttribute('data-piel', 'inst');
 <div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                   <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
-                  <div class="check wa"><input type="checkbox" id="cProno" onchange="hPosEspecial('prono')"><label for="cProno">Prono</label></div>
-                  <div id="dPronoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
+
+                  <!-- 🔴 UN EVENTO QUE ARRASTRA EL ESTADO (Diego, 19-sep-2026):
+                       «el prono como evento puede arrastrar estado hasta que se
+                       suspenda con supinar? Eso en vez de tener varios botones
+                       porque prono y se prono este turno puede confundir».
+                       Antes había SEIS controles —Prono, Se prona este turno,
+                       Supino, Se supina este turno y dos horas— y dos se
+                       llamaban casi igual que los otros dos. Ahora: un estado
+                       que se lee y UN botón. Lo cuida prono_un_boton.js. -->
+                  <span id="pronoEstado" style="font-size:.86rem;font-weight:700;color:#0e7490;"></span>
+                  <span id="pronoDesde" style="font-size:.76rem;color:var(--muted);"></span>
+                  <button type="button" id="btnProno" data-nodirty onclick="pronoAccion()"
+                    style="background:#0e7490;color:#fff;border:none;border-radius:8px;padding:6px 15px;font-size:.84rem;font-weight:700;cursor:pointer;">Pronar</button>
+                  <span id="pronoHoraBox" class="hidden" style="display:inline-flex;align-items:center;gap:4px;">
                     <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
-                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
-                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
-                    <!-- ESTADO vs EVENTO (v5.32): la casilla de arriba dice cómo está
-                         el paciente; esta dice que la pronación se hizo ESTE turno y
-                         es la única que registra el procedimiento. -->
-                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
-                      <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
-                      <label for="cPronoEv" title="Marca solo el turno en que se realiza la pronación">Se prona este turno</label>
-                    </span>
-                  </div>
-                  <div class="check wa"><input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')"><label for="cSupino">Supino</label></div>
-                  <div id="dSupinoHora" class="hidden" style="display:inline-flex;align-items:center;gap:3px;">
-                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
-                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
-                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="font-size:.7rem;display:none;">⏱</span>
-                    <span class="check wa" style="background:#fef3c7;border-color:#fcd34d;">
-                      <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
-                      <label for="cSupinoEv" title="Marca solo el turno en que se supina al paciente">Se supina este turno</label>
-                    </span>
-                  </div>
+                    <input type="time" id="fPronoHoraVis" oninput="pronoHoraMano()" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
+                  </span>
+
+                  <!-- 🪤 LAS CUATRO CASILLAS SIGUEN ACÁ, ESCONDIDAS Y VIVAS.
+                       Son las que arman el payload (RESP_POS_PRONO,
+                       RESP_PRONO_EVENTO, RESP_POS_SUPINO, RESP_SUPINO_EVENTO) y
+                       las que leen fillForm y fillFormReplica. Sacarlas habría
+                       obligado a tocar el servidor, la entrega, la timeline, el
+                       texto clínico y veinticuatro guardias para un cambio que
+                       es SOLO de pantalla: lo que cambió es QUIÉN las marca, no
+                       qué se guarda. Mismo patrón que `fCoop` con la
+                       interpretación del S5Q. -->
+                  <span id="pronoCajasOcultas" style="display:none;">
+                    <input type="checkbox" id="cProno" onchange="hPosEspecial('prono')">
+                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();">
+                    <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
+                    <input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')">
+                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();">
+                    <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
+                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
+                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -5337,7 +5351,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.6-terapia-fisica]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.7-prono]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -12684,6 +12698,7 @@ function cascadeSop(preModo, preInterfaz) {
 function _gatePronoStrip(){
   const el=$('dPronoStrip'); if(!el) return;
   el.classList.toggle('hidden', v('fSop')!=='VM');
+  if(typeof pronoPintar==='function') pronoPintar();
 }
 function _showCol(id){ const el=$(id); if(el){el.classList.remove('hidden');el.style.display='flex';} }
 function _hideCol(id){ const el=$(id); if(el){el.classList.add('hidden');el.style.display='none';} }
@@ -13246,6 +13261,111 @@ function _updateSupinoTip(){
   tip.style.display='inline-flex';
 }
 function _horaAhoraCli(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🔃 PRONO · UN EVENTO QUE ARRASTRA EL ESTADO  (Diego, 19-sep-2026)
+
+   «El prono como evento puede arrastrar estado hasta que se suspenda con
+    supinar? Eso en vez de tener varios botones porque prono y se prono este
+    turno puede confundir.»
+
+   Cuatro situaciones y UN botón en cada una:
+
+     supino      → «Pronar»     (no hay ciclo abierto)
+     pronado     → «Deshacer»   (el ciclo se abrió en ESTE turno)
+     en prono    → «Supinar»    (el ciclo viene de antes y sigue abierto)
+     supinado    → «Deshacer»   (el ciclo se cerró en ESTE turno)
+
+   🪤 LA CICATRIZ NO SE REABRE. La casilla «se prona este turno» existía porque
+   Diego reportó que el sistema contaba una pronación en CADA turno que el
+   paciente siguiera boca abajo (v5.32): estar en prono no es haber pronado.
+   Acá el EVENTO se registra una sola vez —el turno en que se toca «Pronar»— y
+   el ESTADO se arrastra del ciclo abierto que el servidor ya guarda
+   (`window._pronoAbierto`, que sale de PRONO_INICIO_TS sin SUPINO_TS). Se
+   siguen escribiendo las dos columnas, separadas como siempre; lo que cambió
+   es que ya no hay que marcarlas a mano.
+
+   🔴 ARRASTRAR ES DEL CICLO, NO DEL TURNO ANTERIOR. Antes el estado venía de
+   replicar la fila previa: si un turno se saltaba, el paciente «dejaba» de
+   estar en prono sin que nadie lo supinara. El ciclo abierto vive en el
+   episodio y no se pierde.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** En cuál de las cuatro situaciones estamos. */
+function _pronoSituacion(){
+  const pro=!!$('cProno')?.checked, proEv=!!$('cPronoEv')?.checked;
+  const sup=!!$('cSupino')?.checked, supEv=!!$('cSupinoEv')?.checked;
+  if(sup&&supEv) return 'supinado';
+  if(pro&&proEv) return 'pronado';
+  if(pro||window._pronoAbierto) return 'enprono';
+  return 'supino';
+}
+
+const _PRONO_BOTON={supino:'Pronar', pronado:'Deshacer', enprono:'Supinar', supinado:'Deshacer'};
+
+/** Pinta el estado y el único botón. No decide nada: lee. */
+function pronoPintar(){
+  const caja=$('dPronoStrip'); if(!caja) return;
+  const sit=_pronoSituacion();
+
+  /* El estado ARRASTRADO se marca en la casilla escondida para que el payload
+     siga diciendo la verdad: el paciente está en prono aunque nadie lo haya
+     vuelto a marcar en este turno. */
+  if(sit==='enprono' && $('cProno') && !$('cProno').checked) $('cProno').checked=true;
+
+  const est=$('pronoEstado'), des=$('pronoDesde'), btn=$('btnProno'), hbox=$('pronoHoraBox'), hvis=$('fPronoHoraVis');
+  const ini=_pronoInicioTS();
+
+  if(est){
+    if(sit==='supino')        est.textContent='Supino';
+    else if(sit==='supinado') est.textContent='Supinado';
+    else {
+      const hrs=ini?_horasTS(ini,_tsEvTurno(v('gDate'),SHIFT,_horaAhoraCli())):'';
+      est.textContent='🔃 En prono'+(hrs===''?'':' · ⏱ '+_hTxt(hrs));
+    }
+  }
+  if(des){
+    if(sit==='supinado'){ const c=_pronoHorasCiclo(); des.textContent=c===''?'':'ciclo de '+_hTxt(c); }
+    else if(sit==='supino') des.textContent='';
+    else des.textContent=ini?('desde '+_tsLegible(ini)):'';
+  }
+  if(btn) btn.textContent=_PRONO_BOTON[sit]||'Pronar';
+  /* La hora solo se pide cuando hay un evento de ESTE turno que fecharla; en
+     «en prono» arrastrado la hora es de otro turno y no se toca acá. */
+  const pideHora=(sit==='pronado'||sit==='supinado');
+  if(hbox) hbox.classList.toggle('hidden', !pideHora);
+  if(hvis && pideHora) hvis.value = (sit==='pronado') ? v('fPronoHora') : v('fSupinoHora');
+}
+
+/** El único botón: prona, supina o deshace lo de este turno. */
+function pronoAccion(){
+  const sit=_pronoSituacion();
+  if(sit==='supino'){
+    $('cProno').checked=true; hPosEspecial('prono');
+    $('cPronoEv').checked=true;
+    if(!v('fPronoHora')) $('fPronoHora').value=_horaAhoraCli();
+  } else if(sit==='enprono'){
+    $('cSupino').checked=true; hPosEspecial('supino');
+    $('cSupinoEv').checked=true;
+    if(!v('fSupinoHora')) $('fSupinoHora').value=_horaAhoraCli();
+  } else {
+    // Deshacer: se borra lo que se marcó EN ESTE TURNO y se vuelve a lo que
+    // había. Nunca toca el ciclo de turnos anteriores.
+    ['cProno','cPronoEv','cSupino','cSupinoEv'].forEach(id=>{ const e=$(id); if(e) e.checked=false; });
+    ['fPronoHora','fSupinoHora'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+    _pronoTs=0; _supinoTs=0;
+    const a=$('fPronoTs'); if(a) a.value=''; const bb=$('fSupinoTs'); if(bb) bb.value='';
+  }
+  hPos(); _renderAutoProcs(); _updatePronoTip(); _updateSupinoTip(); pronoPintar();
+}
+
+/** La hora que el colega corrige a mano va al campo del evento que toque. */
+function pronoHoraMano(){
+  const sit=_pronoSituacion(), hv=v('fPronoHoraVis');
+  if(sit==='pronado'){ const e=$('fPronoHora'); if(e) e.value=hv; }
+  else if(sit==='supinado'){ const e=$('fSupinoHora'); if(e) e.value=hv; }
+  _updatePronoTip(); _updateSupinoTip(); pronoPintar();
+}
 /** Horas reales de VM desde TS_INICIO_SOPORTE (censo de la cama) hasta ahora,
     para informar el gate de PVE sin depender de días de calendario. */
 function _pveHorasVM(){
