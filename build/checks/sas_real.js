@@ -140,7 +140,7 @@ const DB = {
 const evo = (d, extra) => Object.assign({
   ID_CAMA: '12', PATIENT_ID: 'p12', FECHA: '2026-08-' + String(d).padStart(2, '0'),
   TURNO_KEY: '2026-08-' + String(d).padStart(2, '0') + '-Dia', TURNO: 'Dia',
-  VENT_VIA_AEREA: 'TQT', VENT_SOPORTE: 'VM', PLAN_FIRMA_KINE: 'Klgo. Diego Melo',
+  VENT_VIA_AEREA: 'TQT', VENT_SOPORTE: 'VM', PLAN_FIRMA_KINE: 'Klgo. Ana Pérez',
 }, extra);
 
 global.repoLeerTodos = (h, c, v) => { let f = (DB[h] || []).slice(); if (c !== undefined) f = f.filter(r => String(r[c]) === String(v)); return f; };

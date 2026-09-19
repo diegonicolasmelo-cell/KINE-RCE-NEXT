@@ -62,8 +62,8 @@ const { chromium } = require('playwright-core');
     // Con TOT la PVE pasó a ser obligatoria de declarar (ago-2026): se contesta
     // «no» y, con la firma puesta, el aviso desaparece
     $('fPVEval').value = 'no';
-    $('fFirma').innerHTML = '<option value="Diego Melo">Diego Melo</option>';
-    $('fFirma').value = 'Diego Melo';
+    $('fFirma').innerHTML = '<option value="Ana Pérez">Ana Pérez</option>';
+    $('fFirma').value = 'Ana Pérez';
     rielRender();
     r.faltaVacio = $('gFalta').textContent;
     // Saltar a una sección no revienta

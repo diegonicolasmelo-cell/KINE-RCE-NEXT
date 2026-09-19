@@ -52,7 +52,7 @@ function calcularIndicadores(desde, hasta) {
     // ── Denominadores base ──
     // **Día con VM = el paciente estuvo en VM en algún momento del turno**,
     // ya sea al empezarlo (`VENT_SOPORTE`) o al cerrarlo (`VENT_SOPORTE_FINAL`).
-    // Decisión de Manuel Fuentes, 8-ago-2026, y corrige un error real: hasta hoy
+    // Decisión de Luis Toro, 8-ago-2026, y corrige un error real: hasta hoy
     // este denominador contaba SOLO el soporte de inicio mientras que la VM
     // prolongada y la mediana pre-TQT (más abajo) ya usaban la definición
     // amplia. Con un paciente que entraba en VNI y terminaba en VM el turno no

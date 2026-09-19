@@ -189,7 +189,10 @@ const { chromium } = require('playwright-core');
     const n = document.querySelector('input[name="pveSupExt"][value="no"]'); n.checked = true; hPveSupExt();
     window._toasts = []; const _t = window.toast; window.toast = m => { window._toasts.push(m); };
     window._llamadas = 0; const _gs = window.gs; window.gs = () => { window._llamadas++; };
-    document.getElementById('fFirma').value = 'DMV';
+    // 🪤 El equipo se siembra: ya no viene en el código (ver
+    // el_equipo_no_va_en_el_codigo.js) y sin él no hay firma que elegir.
+    if (window.Turnos) Turnos.setRoster([{ f: 'KIN', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]);
+    document.getElementById('fFirma').value = 'KIN';
     try { guardar(); } catch (e) { window._toasts.push('ERR ' + e.message); }
     window.toast = _t; window.gs = _gs;
     return { toasts: window._toasts, llamadas: window._llamadas };

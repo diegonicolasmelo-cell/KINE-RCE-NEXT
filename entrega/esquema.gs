@@ -1024,20 +1024,18 @@ function _sembrar(ss) {
     hCM.getRange(2, 1, filasCM.length, 6).setValues(filasCM);
   }
 
-  // KINESIOLOGOS — semilla (EMAIL vacío: se completa antes de producción)
+  /* KINESIOLOGOS — SIN SEMILLA, y es deliberado (19-sep-2026).
+     Acá había quince nombres completos escritos a mano. Este archivo se pega
+     en el editor y vive en un repositorio que, para publicar el sitio, tiene
+     que ser público: la nómina del equipo quedaba expuesta.
+     La hoja se crea vacía y Diego escribe ahí a su gente (FIRMA, NOMBRE,
+     TRATAMIENTO, ACTIVO). Es dato de la unidad, no del programa, y la planilla
+     es privada. El registro lo avisa para que no se descubra en el turno. */
   const hK = ss.getSheetByName('KINESIOLOGOS');
   if (hK.getLastRow() < 2) {
-    const seed = [
-      ['MOW','Mauricio Ortega Wanders','',false,true],['FGE','Felipe Guerrero Espinoza','',false,true],
-      ['NPR','Natalia Parra Rojas','',false,true],['SOG','Sergio Ortiz Gómez','',false,true],
-      ['MVA','María Vega Astudillo','',false,true],['AWE','Álvaro Wilson Espinoza','',false,true],
-      ['EGT','Eduardo González Tapia','',false,true],['DMV','Diego Melo Villagrán','',false,true],
-      ['KGV','Karen González Vásquez','',false,true],['CMF','Carlos Morales Flores','',false,true],
-      ['AAG','Andrés Ángel Gómez','',false,true],['MFB','Manuel Fuentes Blanco','',false,true],
-      ['ACR','Aline Campos Rivera','',false,true],['RC','Rodrigo Caamaño','',false,true],
-      ['MCC','Magdalena Contardo Cisternas','',true,true],
-    ];
-    hK.getRange(2, 1, seed.length, 5).setValues(seed);
+    console.log('⚠️ La hoja KINESIOLOGOS está VACÍA. Escribe ahí a tu equipo ' +
+                '(FIRMA, NOMBRE, TRATAMIENTO, ACTIVO) — sin eso el selector de ' +
+                'firma sale vacío y no se puede guardar ninguna evolución.');
   }
 
   // PLANTILLAS_EVOLUCION — las 17 de la unidad (tanda 3): solo si está vacía.

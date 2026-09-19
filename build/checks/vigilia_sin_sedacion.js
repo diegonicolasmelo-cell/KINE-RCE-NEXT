@@ -141,7 +141,14 @@ const { chromium } = require('playwright-core');
     // se arma en una función aparte, se arma dentro de guardar().
     $('fSed').value = 'Sin sedación'; hSed();
     $('fVigilia').value = 'Sopor superficial';
-    const f = document.getElementById('fFirma'); if (f && !f.value) f.value = (f.options[1] || {}).value || '';
+    /* 🪤 19-sep-2026 · El equipo se SIEMBRA, porque ya no viene en el código:
+       los nombres se mudaron a la hoja KINESIOLOGOS y el selector de firma nace
+       vacío hasta que el arranque lo llena. Antes bastaba con añadir una opción
+       si no había ninguna; ahora siempre hay una (el aviso «falta cargar el
+       equipo»), así que ese truco dejaba el selector sin la firma y el guardado
+       no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
+    if (window.Turnos) Turnos.setRoster([{ f: 'KIN', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]);
+    const f = document.getElementById('fFirma'); if (f) f.value = 'KIN';
     window._ll = []; const _t = window.toast; window.toast = () => {};
     try { guardar(); } catch (e) { /* lo dice el assert de abajo */ }
     window.toast = _t;

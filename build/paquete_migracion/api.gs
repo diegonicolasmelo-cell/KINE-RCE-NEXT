@@ -280,6 +280,9 @@ function obtenerBoot(datos, ctx, auth) {
       yo: { email: ctx.email, firma: ctx.firma, dev: !!(auth && auth.dev) },
       config: _configUI(),
       fases: catalogo('FASE_CLINICA'),
+      // 🔴 El equipo, desde la hoja KINESIOLOGOS. Los nombres de las personas
+      // no se escriben en el código: ver equipoRoster() en svc_turnos.gs.
+      equipo: (typeof equipoRoster === 'function') ? equipoRoster() : [],
       // 📋 Plantillas de evolución (tanda 3): el catálogo entero, la barra lo
       // ordena por cama. Sin filas, la barra no existe y el formulario es el de siempre.
       plantillas: (typeof plantillasListar === 'function') ? plantillasListar() : [],
@@ -343,7 +346,7 @@ function _auditar(ctx, accion, fn, datos) {
 function testFlujoCamas() {
   const T = null; // en dev mode el token se ignora
   const ing = api('INGRESAR_PACIENTE', {
-    idCama: '1', nombre: 'Diego Melo Villagrán', edad: 34, sexo: 'M', talla: 175,
+    idCama: '1', nombre: 'Ana Pérez Soto', edad: 34, sexo: 'M', talla: 175,
     diagnostico: 'IRA', viaAerea: 'TOT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV',
   }, T);
   console.log('INGRESO:', JSON.stringify(ing));

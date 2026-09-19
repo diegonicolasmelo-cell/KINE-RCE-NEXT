@@ -15056,23 +15056,19 @@ window.Turnos = (function () {
 
   // aux:true → no hace turnos habitualmente, pero puede evolucionar.
   // t = tratamiento profesional para el texto clínico (Klgo./Klga.)
-  const ROSTER = [
-    { n: 'Mauricio Ortega Wanders',     f: 'MOW', t: 'Klgo.' },
-    { n: 'Felipe Guerrero Espinoza',    f: 'FGE', t: 'Klgo.' },
-    { n: 'Natalia Parra Rojas',         f: 'NPR', t: 'Klga.' },
-    { n: 'Sergio Ortiz Gómez',          f: 'SOG', t: 'Klgo.' },
-    { n: 'María Vega Astudillo',        f: 'MVA', t: 'Klga.' },
-    { n: 'Álvaro Wilson Espinoza',      f: 'AWE', t: 'Klgo.' },
-    { n: 'Eduardo González Tapia',      f: 'EGT', t: 'Klgo.' },
-    { n: 'Diego Melo Villagrán',        f: 'DMV', t: 'Klgo.' },
-    { n: 'Karen González Vásquez',      f: 'KGV', t: 'Klga.' },
-    { n: 'Carlos Morales Flores',       f: 'CMF', t: 'Klgo.' },
-    { n: 'Andrés Ángel Gómez',          f: 'AAG', t: 'Klgo.' },
-    { n: 'Manuel Fuentes Blanco',       f: 'MFB', t: 'Klgo.' },
-    { n: 'Aline Campos Rivera',         f: 'ACR', t: 'Klga.' },
-    { n: 'Rodrigo Caamaño',             f: 'RC',  t: 'Klgo.' },
-    { n: 'Magdalena Contardo Cisternas', f: 'MCC', t: 'Klga.', aux: true },
-  ];
+  /* 🔴 19-sep-2026 · EL EQUIPO YA NO SE ESCRIBE ACÁ. Había quince nombres
+     completos en esta lista, y este archivo se empaqueta tal cual en pwa/ y se
+     publica como sitio: la nómina quedaba a la vista de cualquiera que abriera
+     la dirección. Ahora llega del arranque (GET_BOOT → equipo), leída de la
+     hoja KINESIOLOGOS, que es privada porque la planilla lo es.
+     Lo fija build/checks/el_equipo_no_va_en_el_codigo.js. */
+  let ROSTER = [];
+  function setRoster(lista) {
+    ROSTER = Array.isArray(lista) ? lista.filter(function (r) { return r && r.f; }) : [];
+    fillFirmaSelect(document.getElementById('fFirma'));
+    fillFirmaSelect(document.getElementById('egFirma'));
+  }
+
   /** Firma → «Klgo./Klga. Nombre Apellido» para el texto clínico. */
   function firmaTexto(f) {
     const r = ROSTER.find(x => x.f === f);
@@ -15344,6 +15340,13 @@ window.Turnos = (function () {
 
   function fillFirmaSelect(sel, current) {
     if (!sel) return;
+    /* 🪤 Un selector vacío y mudo manda a buscar al lugar equivocado — es la
+       misma lección del mensaje de arranque. Si la hoja no tiene a nadie, el
+       propio selector lo dice y dice dónde se arregla. */
+    if (!ROSTER.length) {
+      sel.innerHTML = '<option value="">⚠️ Falta cargar el equipo en la hoja KINESIOLOGOS</option>';
+      return;
+    }
     const opts = ['<option value="">— Seleccionar firma —</option>']
       .concat(ROSTER.map(r => `<option value="${r.f}">${r.f} — ${r.n}${r.aux ? ' (apoyo)' : ''}</option>`));
     sel.innerHTML = opts.join('');
@@ -15367,7 +15370,8 @@ window.Turnos = (function () {
     return firmaDeCama(idCama) || firmaPrevia || '';
   }
 
-  function init(semilla) {
+  function init(semilla, equipo) {
+    if (equipo !== undefined) ROSTER = Array.isArray(equipo) ? equipo.filter(function (r) { return r && r.f; }) : [];
     fillFirmaSelect(document.getElementById('fFirma'));
     fillFirmaSelect(document.getElementById('egFirma'));
     if (semilla && (semilla.team || semilla.assign)) {
@@ -15382,7 +15386,7 @@ window.Turnos = (function () {
   }
 
   return {
-    ROSTER, init, open, close, syncKey, firmaTexto,
+    get ROSTER(){ return ROSTER; }, setRoster, init, open, close, syncKey, firmaTexto,
     toggleTeam, setBrush, paintBed, paintSeccion, clearAll,
     decorateCard, repaint, renderLegend,
     firmaDeCama, firmaSugerida, fillFirmaSelect, currentKey,
@@ -20534,7 +20538,7 @@ window.onload = function() {
     EVOS_DIA=b.evos||[];
     _evosCache[_f0]={ts:Date.now(), evos:EVOS_DIA};
     EVO_SET=new Set(EVOS_DIA.filter(e=>String(e.TURNO_KEY)===`${_f0}-${SHIFT}`).map(e=>String(e.ID_CAMA)));
-    if(window.Turnos) Turnos.init(b.asignacion);
+    if(window.Turnos) Turnos.init(b.asignacion, b.equipo);
     _bootFresco={ ts:Date.now(), key:`${_f0}-${SHIFT}` };
     renderGrid(); loading(false); tutHolaMostrar(); serviInit();
     _aftIniciar();          // aviso de fin de turno (O4): un tick por minuto
@@ -20563,7 +20567,13 @@ function bootApp(){
   poblarKTMcontra();
   gs('GET_TODAS_CAMAS', {}, camas => {
     DB = camas || [];
-    loadEvoSet(() => { if(window.Turnos) Turnos.init(); renderGrid(); loading(false); tutHolaMostrar(); serviInit(); });
+    loadEvoSet(() => {
+      if(window.Turnos) Turnos.init();
+      // 🔴 La ruta de respaldo no trae el equipo en el mismo viaje: se pide
+      // aparte. Sin esto el selector de firma queda vacío y no se puede guardar.
+      api('GET_BOOT',{}).then(b=>{ if(window.Turnos&&b&&b.equipo) Turnos.setRoster(b.equipo); }).catch(()=>{});
+      renderGrid(); loading(false); tutHolaMostrar(); serviInit();
+    });
   }, () => {
     loading(false);
     $('bedGrid').innerHTML='<div style="padding:40px;text-align:center;color:var(--danger);font-weight:600;">❌ No se pudo conectar con el servidor.<br><span style="font-size:.83rem;color:var(--muted);">Verifica que el script esté publicado como Web App.</span></div>';

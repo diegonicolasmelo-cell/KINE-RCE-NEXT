@@ -1402,8 +1402,8 @@ function buscarPacientes(q) {
     const qRut = /^[\d.]{6,}-?[\dkK]$/.test(String(q || '').trim()) ? _rutNormal(q) : '';
 
     // ── Palabras sueltas, en cualquier orden (ago-2026) ───────────────────
-    // Antes se buscaba la frase entera pegada: «Melo Villagrán» encontraba a
-    // Diego Melo Villagrán, pero «Diego Villagrán» no. Ahora se exigen TODAS
+    // Antes se buscaba la frase entera pegada: «Pérez Soto» encontraba a
+    // Ana Pérez Soto, pero «Ana Soto» no. Ahora se exigen TODAS
     // las palabras, cada una en cualquier parte y en cualquier orden — que es
     // como uno recuerda a un paciente: el nombre y un apellido, no la frase.
     const palabras = t.split(/\s+/).filter(function (p) { return p.length >= 2; });
@@ -4263,7 +4263,7 @@ function anexarEventoRapido(datos, ctx) {
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA));
       const pid = ubic ? pidEvo : pidCama;
-      // 15 caracteres cortaban «Klgo. Diego Melo» (son 16) y la línea de tiempo
+      // 15 caracteres cortaban «Klgo. Ana Pérez» (son 16) y la línea de tiempo
       // mostraba «Klgo. Diego Mel». El límite existe solo para que un valor
       // absurdo no reviente la celda; 60 es el mismo techo que usa la
       // auditoría de firmas en mantenimiento.gs.
@@ -6824,7 +6824,7 @@ function calcularIndicadores(desde, hasta) {
     // ── Denominadores base ──
     // **Día con VM = el paciente estuvo en VM en algún momento del turno**,
     // ya sea al empezarlo (`VENT_SOPORTE`) o al cerrarlo (`VENT_SOPORTE_FINAL`).
-    // Decisión de Manuel Fuentes, 8-ago-2026, y corrige un error real: hasta hoy
+    // Decisión de Luis Toro, 8-ago-2026, y corrige un error real: hasta hoy
     // este denominador contaba SOLO el soporte de inicio mientras que la VM
     // prolongada y la mediana pre-TQT (más abajo) ya usaban la definición
     // amplia. Con un paciente que entraba en VNI y terminaba en VM el turno no
@@ -9350,6 +9350,29 @@ function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, pa
 // ════════════════════════════════════════════════════════════════════
 // ── svc_turnos.gs ──
 // ════════════════════════════════════════════════════════════════════
+
+/* ── EL EQUIPO, PARA EL SELECTOR DE FIRMA (19-sep-2026) ────────────────────
+   🔴 LOS NOMBRES DE LAS PERSONAS VIENEN DE LA PLANILLA, NUNCA DEL CÓDIGO.
+   Hasta hoy la lista de los quince kinesiólogos estaba escrita a mano dentro
+   de index.html. Ese archivo se empaqueta tal cual en pwa/ y se publica como
+   sitio, y GitHub Pages con cuenta gratis exige repositorio público: la nómina
+   del equipo quedaba a la vista de cualquiera que abriera la dirección.
+   La planilla es privada; el código, no. Por eso este viaje. Lo fija
+   build/checks/el_equipo_no_va_en_el_codigo.js. */
+function equipoRoster() {
+  try {
+    return repoLeerTodos('KINESIOLOGOS')
+      .filter(function (k) { return esVerdadero(k.ACTIVO) && String(k.FIRMA || '').trim(); })
+      .map(function (k) {
+        return {
+          f: String(k.FIRMA || '').trim(),
+          n: String(k.NOMBRE || '').trim(),
+          t: String(k.TRATAMIENTO || '').trim() || 'Klgo.',
+          aux: esVerdadero(k.APOYO)
+        };
+      });
+  } catch (e) { return []; }
+}
 
 /**
  * svc_turnos.gs — Tablero de asignación de turno (v1: "🎨 Asignar turno").

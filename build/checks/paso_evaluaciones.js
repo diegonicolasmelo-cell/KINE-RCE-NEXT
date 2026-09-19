@@ -65,7 +65,13 @@ const no = (l, g) => eq(l, !!g, 'false');
     $('fVA').value = 'TQT'; cascadeVA();
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();
-    const f = $('fFirma'); if (f) { if (!f.options.length) f.add(new Option('DMV', 'DMV')); f.value = 'DMV'; }
+    /* 🪤 19-sep-2026 · El equipo se SIEMBRA, porque ya no viene en el código:
+       los nombres se mudaron a la hoja KINESIOLOGOS y el selector de firma nace
+       vacío hasta que el arranque lo llena. Antes bastaba con añadir una opción
+       si no había ninguna; ahora siempre hay una (el aviso «falta cargar el
+       equipo»), así que ese truco dejaba el selector sin la firma y el guardado
+       no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
+    const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
     pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(300);
@@ -121,7 +127,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     $('fVA').value = 'TQT'; cascadeVA();
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();
-    const f = $('fFirma'); if (f) { if (!f.options.length) f.add(new Option('DMV', 'DMV')); f.value = 'DMV'; }
+    const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
     // KTM nivel 3 (sedente al borde de la cama) SIN ningún FSS en el episodio
     if (typeof setKTMstate === 'function') setKTMstate('r');
     const n = $('fKTMniv'); if (n) { n.value = '3'; n.dispatchEvent(new Event('change')); }

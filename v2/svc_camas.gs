@@ -636,8 +636,8 @@ function buscarPacientes(q) {
     const qRut = /^[\d.]{6,}-?[\dkK]$/.test(String(q || '').trim()) ? _rutNormal(q) : '';
 
     // ── Palabras sueltas, en cualquier orden (ago-2026) ───────────────────
-    // Antes se buscaba la frase entera pegada: «Melo Villagrán» encontraba a
-    // Diego Melo Villagrán, pero «Diego Villagrán» no. Ahora se exigen TODAS
+    // Antes se buscaba la frase entera pegada: «Pérez Soto» encontraba a
+    // Ana Pérez Soto, pero «Ana Soto» no. Ahora se exigen TODAS
     // las palabras, cada una en cualquier parte y en cualquier orden — que es
     // como uno recuerda a un paciente: el nombre y un apellido, no la frase.
     const palabras = t.split(/\s+/).filter(function (p) { return p.length >= 2; });

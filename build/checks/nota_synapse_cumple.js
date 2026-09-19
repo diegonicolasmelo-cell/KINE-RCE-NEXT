@@ -73,11 +73,11 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
   /* ══ 2 · SERVIDOR · cumpleaños del día ══════════════════════════════ */
   console.log('\n2 · Quién cumple hoy');
   const KIN = [
-    { FIRMA: 'DMV', NOMBRE: 'Diego Melo Villagrán', ACTIVO: true,  CUMPLE: '02-09' },
-    { FIRMA: 'MCC', NOMBRE: 'Magdalena Contardo',   ACTIVO: true,  CUMPLE: '2/9' },      // sin cero, con barra
-    { FIRMA: 'MFB', NOMBRE: 'Manuel Fuentes',       ACTIVO: true,  CUMPLE: '15-11' },
-    { FIRMA: 'AWE', NOMBRE: 'Álvaro Wilson',        ACTIVO: false, CUMPLE: '02-09' },    // ya no está
-    { FIRMA: 'RC',  NOMBRE: 'Rodrigo Caamaño',      ACTIVO: true,  CUMPLE: '' },
+    { FIRMA: 'DMV', NOMBRE: 'Ana Pérez Soto', ACTIVO: true,  CUMPLE: '02-09' },
+    { FIRMA: 'MCC', NOMBRE: 'Carla Díaz',   ACTIVO: true,  CUMPLE: '2/9' },      // sin cero, con barra
+    { FIRMA: 'MFB', NOMBRE: 'Luis Toro',       ACTIVO: true,  CUMPLE: '15-11' },
+    { FIRMA: 'AWE', NOMBRE: 'Jorge Salas',        ACTIVO: false, CUMPLE: '02-09' },    // ya no está
+    { FIRMA: 'RC',  NOMBRE: 'Nicolás Vera',      ACTIVO: true,  CUMPLE: '' },
   ];
   global.repoLeerTodos = h => (h === 'KINESIOLOGOS' ? KIN : []);
   global.hoyISO = () => '2026-09-02';
@@ -111,7 +111,7 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
             { ID_CAMA: '4', OCUPADA: true, NOMBRE: 'PACIENTE PRUEBA', EDAD: 60, RUT: '11111111-1', VIA_AEREA: 'TOT' },
             { ID_CAMA: '5', OCUPADA: true, NOMBRE: 'PACIENTE SIN RUT', EDAD: 70, RUT: '', VIA_AEREA: 'Natural' },
           ], evos: [], asignacion: { team: [], assign: {} },
-          cumples: [{ firma: 'DMV', nombre: 'Diego Melo Villagrán' }] } };
+          cumples: [{ firma: 'DMV', nombre: 'Ana Pérez Soto' }] } };
         setTimeout(() => ok({ ok: true, data: R[a] !== undefined ? R[a] : null }), 5);
       } }; } }; } } } };
   });
@@ -128,7 +128,7 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
   }));
   eq('★ el botón 🩻 sale UNA vez: solo en la cama con RUT', R.conRut, 1);
   si('★ la mascota está de cumpleaños (gorro y globos)', R.gorro);
-  si('★ el globo saluda por el nombre de pila', /Hoy está de cumpleaños Diego/.test(R.texto));
+  si('★ el globo saluda por el nombre de pila', /Hoy está de cumpleaños Ana/.test(R.texto));
 
   // El clic: copia el RUT y abre Synapse en otra pestaña
   await p.evaluate(() => abrirSynapse('4'));
@@ -204,7 +204,7 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
   const pose = await p.evaluate(() => {
     try { localStorage.setItem(MASC_KEY, 'persona'); } catch (e) {}
     mascAplicar();
-    cumpleAplicar([{ firma: 'DMV', nombre: 'Diego Melo Villagrán' }]);
+    cumpleAplicar([{ firma: 'DMV', nombre: 'Ana Pérez Soto' }]);
     const img = document.querySelector('#tutBtn .masc-persona');
     const gorro = document.querySelector('#tutBtn .cump-gorro');
     const conCumple = { esPose: !!img && img.src === mauriSrc('cumple'),
@@ -212,7 +212,7 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
     cumpleAplicar([]);
     const vuelve = !!img && img.src !== mauriSrc('cumple');
     try { localStorage.setItem(MASC_KEY, 'servi'); } catch (e) {}
-    mascAplicar(); cumpleAplicar([{ firma: 'DMV', nombre: 'Diego Melo Villagrán' }]);
+    mascAplicar(); cumpleAplicar([{ firma: 'DMV', nombre: 'Ana Pérez Soto' }]);
     const serviEmoji = getComputedStyle(gorro).display !== 'none';
     cumpleAplicar([]);
     return { ...conCumple, vuelve, serviEmoji };
@@ -237,7 +237,7 @@ const _esq = require('fs').readFileSync(require('path').join(__dirname, '..', '.
                      pose: lovImg.src === mauriSrc('sofa'),
                      confeti: getComputedStyle(document.getElementById('lovConfeti')).display,
                      alto: getComputedStyle(btnImg).height };
-    cumpleAplicar([{ firma: 'DMV', nombre: 'Diego Melo Villagrán' }]);
+    cumpleAplicar([{ firma: 'DMV', nombre: 'Ana Pérez Soto' }]);
     const conf = document.querySelectorAll('#lovConfeti span');
     const fest = { clase: lov.classList.contains('cumple'),
                    pose: lovImg.src === mauriSrc('festejo'),

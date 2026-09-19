@@ -51,8 +51,8 @@ const PROPS = {};
 const CACHE = {};
 let RELOJ = Date.now();
 const KINES = [
-  { FIRMA: 'DMV', NOMBRE: 'Diego Melo', EMAIL: 'diego@sim', ACTIVO: true, TRATAMIENTO: 'Klgo.' },
-  { FIRMA: 'MFB', NOMBRE: 'Manuel Fuentes', EMAIL: 'manuel@sim', ACTIVO: true, TRATAMIENTO: 'Klgo.' },
+  { FIRMA: 'DMV', NOMBRE: 'Ana Pérez', EMAIL: 'diego@sim', ACTIVO: true, TRATAMIENTO: 'Klgo.' },
+  { FIRMA: 'MFB', NOMBRE: 'Luis Toro', EMAIL: 'manuel@sim', ACTIVO: true, TRATAMIENTO: 'Klgo.' },
   { FIRMA: 'CSR', NOMBRE: 'Carla Soto', EMAIL: 'carla@sim', ACTIVO: true, TRATAMIENTO: 'Klga.' },
   { FIRMA: 'XXX', NOMBRE: 'Ya no trabaja', EMAIL: 'x@sim', ACTIVO: false, TRATAMIENTO: 'Klgo.' },
 ];
@@ -139,7 +139,7 @@ const entra = API.accesoEntrar({ usuario: 'dmv', clave: 'clave-de-prueba-1' });
 si('con la clave correcta se entra', entra.ok === true, JSON.stringify(entra));
 si('…y devuelve un token', !!(entra.ok && entra.data.token));
 si('…y dice de quién es la firma', entra.ok && entra.data.firma === 'DMV', entra.ok && entra.data.firma);
-si('…y trae el nombre para saludar', entra.ok && /Diego/.test(entra.data.nombre || ''), entra.ok && entra.data.nombre);
+si('…y trae el nombre para saludar', entra.ok && /Ana/.test(entra.data.nombre || ''), entra.ok && entra.data.nombre);
 const TOKEN = entra.ok ? entra.data.token : '';
 
 si('la sesión resuelve a la firma', (API.accesoSesion(TOKEN) || {}).firma === 'DMV');

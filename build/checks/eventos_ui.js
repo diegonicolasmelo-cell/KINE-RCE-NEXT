@@ -50,6 +50,12 @@ const path = require('path');
   eq('fila TOTAL cuadra (22+1)', REG.totalCells, 23);
 
   // ── Popover: abrir desde el botón, tipos y payload ──
+  // El equipo de prueba, sembrado por la puerta real antes de cualquier firma.
+  await p.evaluate(() => {
+    if (window.Turnos) Turnos.setRoster([{ f: 'AAA', n: 'Uno de prueba', t: 'Klgo.' },
+                                         { f: 'BBB', n: 'Dos de prueba', t: 'Klga.' },
+                                         { f: 'CCC', n: 'Tres de prueba', t: 'Klgo.' }]);
+  });
   const POP = await p.evaluate(() => {
     document.querySelector('#notionTable tbody .tc-n .ev-btn').click();
     return {
@@ -63,7 +69,14 @@ const path = require('path');
   eq('popover visible al tocar ➕', POP.visible, true);
   eq('título con la cama', POP.titulo.indexOf('Cama 3') > -1, true);
   eq('6 tipos de evento', POP.lista, 6);
-  eq('select de firma poblado (roster 15 + placeholder)', POP.firmas, 16);
+  /* 🪤 19-sep-2026 · Antes esto exigía 16 opciones: los quince nombres que
+     estaban escritos en el código más el placeholder. Los nombres se mudaron a
+     la hoja KINESIOLOGOS —el index se publica como sitio y la nómina quedaba a
+     la vista— así que un número fijo ya no dice nada. Se siembra un equipo de
+     tres INVENTADO y se comprueba que el selector lo tome: eso mide el
+     mecanismo, que es lo que de verdad se quería proteger. */
+  eq('★ el selector se llena con el equipo que llega, no con uno escrito a mano',
+    await p.evaluate(() => document.getElementById('fFirma').options.length), 4);
   eq('turno preseleccionado según la hora', POP.turnoPre, true);
 
   const TIP = await p.evaluate(() => {
@@ -82,7 +95,7 @@ const path = require('path');
     $('evFirma').value = '';
     const antes = _ll.filter(x => x.a === 'ANEXAR_EVENTO').length;
     evGuardar();                                   // sin firma → no debe llamar
-    $('evFirma').value = 'DMV';
+    $('evFirma').value = 'AAA';
     $('evCultTipo').value = 'Aspirado traqueal'; $('evCultHall').value = 'BLEE+'; $('evHora').value = '16:30';
     evSetTurno('Noche');   // el turno elegido A LA VISTA manda sobre la hora actual
     evGuardar();
@@ -97,7 +110,7 @@ const path = require('path');
   eq('payload tipo cultivo', PAY.d && PAY.d.tipo, 'cultivo');
   eq('payload turnoKey AAAA-MM-DD-Turno', /^\d{4}-\d{2}-\d{2}-(Dia|Noche)$/.test(PAY.d && PAY.d.turnoKey), true);
   eq('el turno elegido en el popover manda en el payload', /-Noche$/.test(PAY.d && PAY.d.turnoKey), true);
-  eq('payload firma y hallazgo', PAY.d && PAY.d.firmaKine === 'DMV' && PAY.d.cultHallazgo === 'BLEE+' && PAY.d.hora === '16:30', true);
+  eq('payload firma y hallazgo', PAY.d && PAY.d.firmaKine === 'AAA' && PAY.d.cultHallazgo === 'BLEE+' && PAY.d.hora === '16:30', true);
   eq('popover se cierra tras guardar', PAY.cerrado, true);
 
   /* ── 🗂️ 17-sep-2026 · La franja «Aceptar» de dispositivos SALIÓ ──────────
@@ -142,9 +155,9 @@ const path = require('path');
   eq('no recalcula en cada visita (1 llamada)', IND.soloUna, 1);
 
   // ── Firma en texto ──
-  const FIR = await p.evaluate(() => [Turnos.firmaTexto('DMV'), Turnos.firmaTexto('NPR'), Turnos.firmaTexto('ZZZ')]);
-  eq('firma masculina', FIR[0], 'Klgo. Diego Melo Villagrán');
-  eq('firma femenina', FIR[1], 'Klga. Natalia Parra Rojas');
+  const FIR = await p.evaluate(() => [Turnos.firmaTexto('AAA'), Turnos.firmaTexto('BBB'), Turnos.firmaTexto('ZZZ')]);
+  eq('firma masculina', FIR[0], 'Klgo. Uno de prueba');
+  eq('firma femenina', FIR[1], 'Klga. Dos de prueba');
   eq('firma fuera de roster → fallback', FIR[2], 'Klgo. ZZZ');
 
   console.log(errs.length ? ('\nERRORES JS:\n' + errs.join('\n')) : '\nsin errores JS');

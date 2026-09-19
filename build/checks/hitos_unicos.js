@@ -150,7 +150,7 @@ DB = { TIMELINE: [
 ] };
 _timelineDelGuardado('7', '2026-08-12', 'Dia',
   ['INGRESO', 'INTUBACIÓN'],                       // lo que manda el formulario
-  'Klgo. Diego Melo', 'd@x.cl', 'pA',
+  'Klgo. Ana Pérez', 'd@x.cl', 'pA',
   [{ tipo: 'ingreso', texto: 'Ingreso UCI. Dx: HSA' }]);   // el de guardarEvolucion
 eq('con los tres autores queda UN solo hito de ingreso', hitos('7', 'ingreso').length, 1);
 eq('…y es el primero que se escribió, no el último', hitos('7', 'ingreso')[0].TEXTO, 'Ingreso a UCI. Dx: HSA');
@@ -159,7 +159,7 @@ eq('…y ningún ingreso se coló como procedimiento', hitos('7', 'procedimiento
 
 // (b) Re-guardar el turno no agrega otro.
 _timelineDelGuardado('7', '2026-08-12', 'Dia', ['INGRESO', 'INTUBACIÓN'],
-  'Klgo. Diego Melo', 'd@x.cl', 'pA', [{ tipo: 'ingreso', texto: 'Ingreso UCI. Dx: HSA' }]);
+  'Klgo. Ana Pérez', 'd@x.cl', 'pA', [{ tipo: 'ingreso', texto: 'Ingreso UCI. Dx: HSA' }]);
 eq('re-guardar no agrega un segundo ingreso', hitos('7', 'ingreso').length, 1);
 eq('…y la intubación tampoco se duplica', hitos('7', 'via_aerea').length, 1);
 
@@ -172,7 +172,7 @@ DB = { TIMELINE: [
   { ID_HITO: 'H0', ID_CAMA: '7', PATIENT_ID: 'pVIEJO', FECHA: '2026-07-01', TURNO: 'Dia',
     TIPO: 'ingreso', TEXTO: 'Ingreso a UCI. Dx: otro paciente', TIMESTAMP: '2026-07-01 09:00:00' },
 ] };
-_timelineDelGuardado('7', '2026-08-12', 'Dia', ['INGRESO'], 'Klgo. Diego Melo', 'd@x.cl', 'pNUEVO', []);
+_timelineDelGuardado('7', '2026-08-12', 'Dia', ['INGRESO'], 'Klgo. Ana Pérez', 'd@x.cl', 'pNUEVO', []);
 eq('★ el paciente nuevo recibe SU ingreso pese al del anterior', hitos('7', 'ingreso').length, 2);
 eq('★ …y el del anterior sigue intacto',
   hitos('7', 'ingreso').filter(h => h.PATIENT_ID === 'pVIEJO').length, 1);
@@ -197,14 +197,14 @@ eq('la firma ya no se corta en 15 caracteres', /firma[^\n]*slice\(0,\s*15\)/.tes
 // se usa el literal para que los bloques 4-6 igual corran y se pueda comprobar
 // que esta guardia falla contra la versión vieja.
 const PREF = typeof _hitoAnexoPrefijo === 'function' ? _hitoAnexoPrefijo('EEG') : '🔧 EEG';
-const RICO = PREF + ' 14:00 — control post crisis (anexo) · Klgo. Diego Melo';
+const RICO = PREF + ' 14:00 — control post crisis (anexo) · Klgo. Ana Pérez';
 DB = { TIMELINE: [
   { ID_HITO: 'H1', ID_CAMA: '4', PATIENT_ID: 'pB', FECHA: '2026-08-12', TURNO: 'Dia',
-    TIPO: 'anexo', TEXTO: RICO, AUTOR: 'Klgo. Diego Melo', TIMESTAMP: '2026-08-12 14:05:00' },
+    TIPO: 'anexo', TEXTO: RICO, AUTOR: 'Klgo. Ana Pérez', TIMESTAMP: '2026-08-12 14:05:00' },
 ] };
 // El anexo también sumó su procedimiento a PROC_JSON, así que el re-guardado
 // lo ve en la lista: ahí es donde antes le escribía encima.
-_timelineDelGuardado('4', '2026-08-12', 'Dia', ['EEG', 'IMT'], 'Klgo. Diego Melo', 'd@x.cl', 'pB', []);
+_timelineDelGuardado('4', '2026-08-12', 'Dia', ['EEG', 'IMT'], 'Klgo. Ana Pérez', 'd@x.cl', 'pB', []);
 const anexos = hitos('4', 'anexo');
 eq('el hito del anexo sigue vivo', anexos.length, 1);
 eq('…con su hora, su detalle y su firma', anexos[0].TEXTO, RICO);
@@ -238,7 +238,7 @@ for (let d = 2; d <= 13; d++) {
     ID_CAMA: '7', PATIENT_ID: 'p7', TURNO_KEY: '2026-08-' + String(d).padStart(2, '0') + '-Dia',
     FECHA: '2026-08-' + String(d).padStart(2, '0'), TURNO: 'Dia',
     RESP_PRONO_EVENTO: 'TRUE', RESP_PRONO_HORA: '19:00',
-    VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', PLAN_FIRMA_KINE: 'Klgo. Diego Melo',
+    VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', PLAN_FIRMA_KINE: 'Klgo. Ana Pérez',
   });
 }
 const DBE = {

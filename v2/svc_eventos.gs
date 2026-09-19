@@ -226,7 +226,7 @@ function anexarEventoRapido(datos, ctx) {
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA));
       const pid = ubic ? pidEvo : pidCama;
-      // 15 caracteres cortaban «Klgo. Diego Melo» (son 16) y la línea de tiempo
+      // 15 caracteres cortaban «Klgo. Ana Pérez» (son 16) y la línea de tiempo
       // mostraba «Klgo. Diego Mel». El límite existe solo para que un valor
       // absurdo no reviente la celda; 60 es el mismo techo que usa la
       // auditoría de firmas en mantenimiento.gs.

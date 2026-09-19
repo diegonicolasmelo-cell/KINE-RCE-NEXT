@@ -13,9 +13,9 @@ const { chromium } = require('playwright-core');
   await p.addInitScript(() => {
     window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
       api(a, d) {
-        // HOY: Caamaño en la cama 1. El 28 de julio esa cama la ocupaba otro paciente.
+        // HOY: Quiroz en la cama 1. El 28 de julio esa cama la ocupaba otro paciente.
         const HOY = [
-          { ID_CAMA: '1', OCUPADA: true, NOMBRE: 'Caamaño Pérez', EDAD: 70, SEXO: 'M', DIAGNOSTICO: 'NAC', VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'ACVC', FECHA_INGRESO: '2026-07-30' },
+          { ID_CAMA: '1', OCUPADA: true, NOMBRE: 'Quiroz Pérez', EDAD: 70, SEXO: 'M', DIAGNOSTICO: 'NAC', VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'ACVC', FECHA_INGRESO: '2026-07-30' },
           { ID_CAMA: '2', OCUPADA: true, NOMBRE: 'Rosa Rojas', EDAD: 66, SEXO: 'F', DIAGNOSTICO: 'EPOC', VIA_AEREA: 'Natural', SOPORTE: 'CNAF', FECHA_INGRESO: '2026-07-29' },
           { ID_CAMA: '3', OCUPADA: false }];
         const EVOS28 = [{ ID_CAMA: '1', TURNO_KEY: '2026-07-28-Dia', PAC_NOMBRE: 'Luis Antiguo Soto',
@@ -32,7 +32,7 @@ const { chromium } = require('playwright-core');
   const fails = []; const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk ? '✅' : '❌') + ' ' + l + ': ' + JSON.stringify(g)); if (!okk) fails.push(l); };
 
   const HOY = await p.evaluate(() => ({
-    caamano: $('bedGrid').textContent.indexOf('Caamaño') > -1,
+    caamano: $('bedGrid').textContent.indexOf('Quiroz') > -1,
     egreso: $('bedGrid').textContent.indexOf('Egr.') > -1,
     mover: !!document.querySelector('#bedGrid .bmov:not(.hidden)'),
   }));
@@ -46,7 +46,7 @@ const { chromium } = require('playwright-core');
     const cards = [...document.querySelectorAll('#bedGrid .bcard')];
     const txt = $('bedGrid').textContent;
     return {
-      ocupanteDeHoy: txt.indexOf('Caamaño') > -1,
+      ocupanteDeHoy: txt.indexOf('Quiroz') > -1,
       pacienteDeEseDia: txt.indexOf('Luis Antiguo Soto') > -1,
       diasDeEseDia: /Día 6/.test(txt),        // 6 días de estadía AL 28, no los de hoy
       // El COD_PACIENTE salió de la tarjeta en ago-2026 (decisión de Diego:
@@ -76,7 +76,7 @@ const { chromium } = require('playwright-core');
     volverAHoy();
     await new Promise(r => setTimeout(r, 420));
     const txt = $('bedGrid').textContent;
-    return { caamano: txt.indexOf('Caamaño') > -1, egreso: txt.indexOf('Egr.') > -1,
+    return { caamano: txt.indexOf('Quiroz') > -1, egreso: txt.indexOf('Egr.') > -1,
       sinRegistro: txt.indexOf('Sin registro ese día') > -1 };
   });
   eq('al volver a hoy reaparece el ocupante actual', VUELTA.caamano, true);

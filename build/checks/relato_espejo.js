@@ -99,7 +99,13 @@ const { chromium } = require('playwright-core');
 
     // Lo mínimo que el guardado exige, para poder capturar el payload real.
     const firma = $('fFirma');
-    if (firma) { if (!firma.options.length) firma.add(new Option('DMV', 'DMV')); firma.value = 'DMV'; }
+    /* 🪤 19-sep-2026 · El equipo se SIEMBRA, porque ya no viene en el código:
+       los nombres se mudaron a la hoja KINESIOLOGOS y el selector de firma nace
+       vacío hasta que el arranque lo llena. Antes bastaba con añadir una opción
+       si no había ninguna; ahora siempre hay una (el aviso «falta cargar el
+       equipo»), así que ese truco dejaba el selector sin la firma y el guardado
+       no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
+    if (firma) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); firma.value = 'DMV'; }
     if (typeof hPVEtoggle === 'function') hPVEtoggle('nc');
     const texto = (typeof genTexto === 'function') ? String(genTexto() || '') : '';
 

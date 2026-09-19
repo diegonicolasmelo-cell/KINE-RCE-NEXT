@@ -239,7 +239,7 @@ console.log('\n8 · Buscador por RUT y por palabras en cualquier orden');
 
 DB.ARCHIVO_PACIENTES.push({
   ID_ARCHIVO: 'ARCH_2', PATIENT_ID: 'PID_2', CAMA_ORIGEN: '5',
-  NOMBRE: 'Diego Melo Villagrán', RUT: '22.222.222-2', EDAD: 34, SEXO: 'M',
+  NOMBRE: 'Ana Pérez Soto', RUT: '22.222.222-2', EDAD: 34, SEXO: 'M',
   DIAGNOSTICO: 'IRA', FECHA_INGRESO: '2026-06-01', FECHA_EGRESO: '2026-06-10', DIAS_TOTAL: 9,
 });
 
@@ -248,10 +248,10 @@ const buscar = q => { const b = api('GET_BUSCAR_PACIENTE', { q }, null); return 
 ok_('encuentra por RUT con puntos y guion', buscar('22.222.222-2').some(x => x.patientId === 'PID_2'));
 ok_('encuentra por RUT sin puntos', buscar('22222222-2').some(x => x.patientId === 'PID_2'));
 ok_('encuentra por RUT sin guion', buscar('222222222').some(x => x.patientId === 'PID_2'));
-ok_('sigue encontrando por la frase pegada (como antes)', buscar('melo villagran').some(x => x.patientId === 'PID_2'));
-ok_('AHORA encuentra por nombre + apellido salteado', buscar('diego villagran').some(x => x.patientId === 'PID_2'));
-ok_('…y en orden invertido', buscar('villagran diego').some(x => x.patientId === 'PID_2'));
-ok_('…sin acentos', buscar('villagran').some(x => x.patientId === 'PID_2'));
+ok_('sigue encontrando por la frase pegada (como antes)', buscar('perez soto').some(x => x.patientId === 'PID_2'));
+ok_('AHORA encuentra por nombre + apellido salteado', buscar('ana soto').some(x => x.patientId === 'PID_2'));
+ok_('…y en orden invertido', buscar('soto ana').some(x => x.patientId === 'PID_2'));
+ok_('…sin acentos', buscar('perez').some(x => x.patientId === 'PID_2'));
 ok_('no inventa coincidencias', buscar('zzzz nadie').length === 0);
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -326,7 +326,7 @@ r = api('COORD_PEDIR_CODIGO', { usuario: 'coord1' }, null);
 ok_('sin correo en KINESIOLOGOS avisa y no manda nada', r.ok === false, r.error);
 ok_('…sin gastar un envío', MAILS.length === _mails0);
 
-DB.KINESIOLOGOS.push({ FIRMA: 'MCC', NOMBRE: 'Magdalena Contardo Cisternas',
+DB.KINESIOLOGOS.push({ FIRMA: 'MCC', NOMBRE: 'Carla Díaz Rojas',
   TRATAMIENTO: 'Klga.', EMAIL: 'magdalena@hospital.cl', ACTIVO: true });
 
 r = api('COORD_PEDIR_CODIGO', { usuario: 'coord1' }, null);

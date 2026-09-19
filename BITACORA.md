@@ -2094,3 +2094,48 @@ llama a `doPost` a mano con la misma petición del arranque; es el que dijo, en
 una línea, que el servidor estaba sano por los dos caminos.
 
 **180 guardias · 180 verdes.** Nueva: `el_arranque_dice_por_que.js`.
+
+---
+
+## 19-sep-2026 · 🔴 La nómina del equipo estaba publicada
+
+Buscando por qué a Diego no le aparecía el selector de firma apareció esto: los
+**quince nombres completos** de los kinesiólogos estaban escritos a mano en dos
+lugares del código — la semilla de `esquema.gs` y una lista `ROSTER` dentro de
+`index.html`.
+
+La del index es la grave. `index.html` se empaqueta **tal cual** en `pwa/`, que
+es lo que se publica como sitio, y GitHub Pages con cuenta gratis **exige
+repositorio público**. La nómina quedó a la vista de cualquiera que abriera la
+dirección o el repositorio, desde el momento en que se publicó.
+
+`CLAUDE.md` lo dice desde el 2-sep, a propósito de los cumpleaños: «tampoco
+datos personales de los funcionarios: se escriben en la planilla, no en el
+código». **La regla existía.** La lista venía heredada del sistema anterior y
+nadie la miró al publicar — yo tampoco, y publicar fue idea mía.
+
+**Ahora el equipo vive en la hoja `KINESIOLOGOS`**, que es privada porque la
+planilla lo es. El arranque lo trae (`GET_BOOT → equipo`, `equipoRoster()` en
+`svc_turnos.gs`) y el selector se llena con eso. La semilla del esquema ya no
+escribe a nadie: la hoja nace vacía y el registro avisa que hay que cargarla.
+
+🪤 **Y si la hoja está vacía, el selector lo DICE** — «⚠️ Falta cargar el equipo
+en la hoja KINESIOLOGOS» — en vez de quedarse mudo. Es la misma lección del
+mensaje de arranque de esta mañana: un control vacío y callado manda a buscar al
+lugar equivocado.
+
+### No eran solo las listas
+
+El barrido encontró **30 apariciones más** de nombres completos: como firmas de
+prueba en las guardias, en comentarios de atribución, y una como **nombre de
+paciente** en un smoke test de `api.gs`. Todas reemplazadas por nombres
+inventados. Los nombres de pila sueltos («pedido de Diego») se quedan: es como
+se habla en este proyecto y no identifican por sí solos.
+
+🪤 **La primera versión de la guardia buscaba «nombres por su forma»** y acusó a
+«Helvetica Neue», «Modo Coordinación» y «Kinesiterapia Respiratoria». Una
+guardia que grita por cualquier cosa se termina apagando. Ahora busca la
+**estructura** del dato —unas iniciales pegadas a un nombre, que es como se
+escribe una nómina— y no tiene falsos positivos.
+
+**181 guardias · 181 verdes.** Nueva: `el_equipo_no_va_en_el_codigo.js`.

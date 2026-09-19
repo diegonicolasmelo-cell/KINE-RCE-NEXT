@@ -1,3 +1,26 @@
+/* ── EL EQUIPO, PARA EL SELECTOR DE FIRMA (19-sep-2026) ────────────────────
+   🔴 LOS NOMBRES DE LAS PERSONAS VIENEN DE LA PLANILLA, NUNCA DEL CÓDIGO.
+   Hasta hoy la lista de los quince kinesiólogos estaba escrita a mano dentro
+   de index.html. Ese archivo se empaqueta tal cual en pwa/ y se publica como
+   sitio, y GitHub Pages con cuenta gratis exige repositorio público: la nómina
+   del equipo quedaba a la vista de cualquiera que abriera la dirección.
+   La planilla es privada; el código, no. Por eso este viaje. Lo fija
+   build/checks/el_equipo_no_va_en_el_codigo.js. */
+function equipoRoster() {
+  try {
+    return repoLeerTodos('KINESIOLOGOS')
+      .filter(function (k) { return esVerdadero(k.ACTIVO) && String(k.FIRMA || '').trim(); })
+      .map(function (k) {
+        return {
+          f: String(k.FIRMA || '').trim(),
+          n: String(k.NOMBRE || '').trim(),
+          t: String(k.TRATAMIENTO || '').trim() || 'Klgo.',
+          aux: esVerdadero(k.APOYO)
+        };
+      });
+  } catch (e) { return []; }
+}
+
 /**
  * svc_turnos.gs — Tablero de asignación de turno (v1: "🎨 Asignar turno").
  *
