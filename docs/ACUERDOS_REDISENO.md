@@ -428,6 +428,59 @@ dice en vez de quedarse mudo.
 
 ---
 
-## 4 · Prono — pendiente
+## 4 · Prono — propuesto, esperando a Diego
 
-- Prono y supino **se declaran arriba**, no donde están hoy.
+Mockup: `claude.ai/artifact/SAHsrZc9R6PvHBu9NnDK5n`
+
+> *«Prono y supino deberían declararse arriba.»*
+
+### 4.1 · Lo que ya está hecho (y no lo sabía cuando lo pidió)
+
+El 17-sep el prono **salió de la traqueostomía** y tiene sección propia:
+
+> *«Prono y supino viven junto a TQT; eso es un procedimiento en caso de falla
+> respiratoria catastrófica y es un evento aparte, no relacionado con TQT.»*
+
+Pero quedó **al final del bloque respiratorio**, después de todos los parámetros
+del ventilador. En el teléfono, eso es scroll.
+
+🔵 **Y el motor del ciclo ya existe y funciona.** `PRONO_INICIO_TS`, `SUPINO_TS`
+y `PRONO_HORAS` guardan cuándo empieza, cuándo termina y cuánto duró, y el ciclo
+**cruza turnos y días** sin perderse. La entrega de turno ya escribe «🔃 En prono
+14,5 h (desde el 18-09)». Lo que falta no es el motor: es que **la pantalla del
+turno lo use** en vez de pedir a mano lo que el sistema ya sabe.
+
+### 4.2 · Lo propuesto, sin construir
+
+1. **El prono sube a la primera fila**, junto a vía aérea y soporte: los tres
+   dicen en qué estado está el paciente ahora.
+2. **Cuatro casillas y dos horas pasan a un estado y una acción.** Si está en
+   prono, el botón dice **Supinar**; si no, **Pronar**. Nunca los dos.
+   > *«El supino se entiende como el término del prono; lo importante es el
+   > prono.»*
+3. **El prono se ve en la tarjeta de la cama**, con las horas — el mismo chip
+   que ya existe en la entrega, puesto donde se mira primero.
+
+### 4.3 · Lo que falta que Diego decida
+
+| # | Pregunta | Por qué no lo hago solo |
+|---|---|---|
+| 1 | ¿Subo el prono a la primera fila? | Cambia de sitio algo que el equipo ya sabe dónde está. |
+| 2 | ¿Se saca la casilla ámbar «se prona este turno»? | 🪤 Toca una cicatriz. |
+| 3 | ¿Hay un número de horas que valga la pena avisar? | Si no hay un corte real en la unidad, no invento uno. |
+
+🪤 **Sobre la 2.** La casilla ámbar existe porque Diego reportó el bug: estar en
+prono no es haber pronado, y sin separarlas el sistema contaba una pronación por
+cada turno que el paciente siguiera boca abajo. Desde entonces el servidor guarda
+**el momento en que empieza el ciclo**, así que «se pronó este turno» pasó a ser
+un hecho que se puede **leer**, no adivinar. Con una excepción: el paciente que
+**llega ya pronado** desde otra unidad — ahí el ciclo no empezó acá y hay que
+preguntar, igual que el modal de vía aérea del primer turno (acuerdo 2.4).
+
+### 4.4 · Lo que NO se vuelve a preguntar
+
+🔒 **El prono vigil está zanjado.** La franja aparece solo con el paciente en
+**VM**, por decisión de Diego de agosto: *el prono vigil fue práctica de pandemia
+y la evidencia actual no lo respalda como rutina*. El caso excepcional va en
+texto libre. Queda escrito acá porque es justo el tipo de cosa que alguien vuelve
+a proponer en tres meses sin saber que ya se decidió.
