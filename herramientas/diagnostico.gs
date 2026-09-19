@@ -41,6 +41,8 @@ function diagnosticoArranque() {
     ['servicios',     'obtenerTodasLasCamas'],
     ['api',           'api'],
     ['webapp',        'doGet'],
+    ['webapp (PWA)',  'doPost'],   // 🔴 la puerta de la app instalada
+
     ['mantenimiento', 'cuadrarEncabezados'],
   ];
   var faltan = [];
@@ -53,7 +55,7 @@ function diagnosticoArranque() {
     L.push('❌ 2 · Faltan archivos por pegar: ' + faltan.join(' · '));
     problemas.push('pegar los archivos que faltan');
   } else {
-    L.push('✅ 2 · Los 9 archivos del editor están.');
+    L.push('✅ 2 · Los archivos del editor están, con las DOS puertas (doGet y doPost).');
   }
 
   // ── 3 · ¿Están las hojas? ────────────────────────────────────────────
@@ -111,6 +113,43 @@ function diagnosticoArranque() {
     }
   }
 
+  // ── 5b · LA PRUEBA DE LA APP INSTALADA (19-sep-2026) ─────────────────
+  // El punto 5 llama a api() directo, que es como entra la app DENTRO del
+  // iframe de Apps Script. La app instalada en el teléfono entra por otra
+  // puerta: manda un POST al /exec y lo contesta doPost. Un servidor sano por
+  // dentro puede fallar por esa puerta —porque falta el archivo, porque la
+  // versión desplegada es anterior, o porque doPost revienta— y el síntoma es
+  // EXACTAMENTE el mismo: «No se pudo verificar la conexión».
+  // Acá se llama a doPost a mano, con la misma petición que hace la app al
+  // arrancar. Si esto responde, el servidor está sano y el problema está en el
+  // camino (permiso o versión); si revienta, el error sale con nombre.
+  if (typeof doPost === 'function') {
+    try {
+      var cuerpo = JSON.stringify({ accion: 'ACCESO_ESTADO', datos: {}, token: null });
+      var salida = doPost({ postData: { contents: cuerpo, type: 'text/plain' } });
+      var texto = salida && salida.getContent ? String(salida.getContent()) : '(sin contenido)';
+      if (texto.length > 300) texto = texto.slice(0, 300) + '…';
+      if (texto.indexOf('"ok":true') >= 0) {
+        L.push('✅ 5b · La puerta de la APP INSTALADA responde: ' + texto);
+        L.push('     El servidor está sano por los DOS caminos. Si la app sigue sin');
+        L.push('     conectar, el problema es del camino, no del código: revisa el 6 y el 7.');
+      } else {
+        L.push('❌ 5b · La puerta de la app instalada CONTESTA UN RECHAZO: ' + texto);
+        problemas.push('ver el mensaje del punto 5b');
+      }
+    } catch (e) {
+      L.push('❌ 5b · doPost LANZA ERROR: ' + e.message);
+      L.push('     Ése es el error que deja la app en «No se pudo verificar la conexión».');
+      problemas.push('corregir doPost: ' + e.message);
+    }
+  } else {
+    L.push('❌ 5b · NO EXISTE doPost: la app instalada no tiene por dónde entrar.');
+    L.push('     Falta pegar el archivo «webapp» (o se pegó una versión anterior a la');
+    L.push('     puerta HTTP). Dentro del editor la app funcionaría igual, y por eso');
+    L.push('     este fallo pasa desapercibido hasta que se abre desde el teléfono.');
+    problemas.push('pegar el archivo «webapp» completo');
+  }
+
   // ── 6 · ¿La app está PUBLICADA, y en qué dirección? ──────────────────
   // El servidor puede estar sano y la app fallar igual: /exec sirve la
   // VERSIÓN DESPLEGADA, no lo último guardado. Si la implementación quedó
@@ -145,8 +184,14 @@ function diagnosticoArranque() {
   L.push('     · «Ejecutar como» debe decir TU cuenta (no «Usuario que accede»).');
   L.push('     · «Quién tiene acceso» debe decir «Cualquier usuario».');
   L.push('     · La versión debe ser POSTERIOR al último pegado.');
-  L.push('     Y en el menú Ejecuciones: al abrir la app debe aparecer una');
-  L.push('     ejecución nueva. Si no aparece ninguna, la llamada no está llegando.');
+  L.push('');
+  L.push('🔎 8 · LA PRUEBA QUE LO ZANJA, y no necesita saber programar:');
+  L.push('     Abre el menú «Ejecuciones» (el ⏱ de la izquierda), deja esa pestaña');
+  L.push('     abierta, y en OTRA recarga la app del teléfono o de GitHub.');
+  L.push('     · Aparece una ejecución nueva  → la llamada SÍ llega: el problema');
+  L.push('       está en la respuesta, y el punto 5b dice cuál es.');
+  L.push('     · NO aparece ninguna           → la llamada NO llega: es el permiso');
+  L.push('       del despliegue o la versión desplegada (puntos 6 y 7).');
 
   L.push('');
   L.push(problemas.length
