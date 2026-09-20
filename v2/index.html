@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.1-cierre">
+<meta name="rce-version" content="NEXT-3.2-pendiente-dura">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -5408,7 +5408,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.1-cierre]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.2-pendiente-dura]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6670,6 +6670,13 @@ function pasoPendDejar(texto){
   const t = String(texto || '').trim();
   const idCama = v('cBed');
   if(!t || !idCama) return;
+  // El mismo encargo no se deja dos veces: el servidor también lo rechaza, pero
+  // avisarlo acá evita el viaje y el mensaje de error.
+  if(typeof _pendYaAbierto === 'function' && _pendYaAbierto(t)){
+    toast('📌 Ese pendiente ya está abierto en este paciente');
+    const i = $('pasoPendTxt'); if(i) i.value = '';
+    return;
+  }
   _pedirFirma().then(firma => {
     if(firma === null) return;
     api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '' })
@@ -6870,7 +6877,11 @@ function pendEpiPintar(){
   caja.classList.remove('hidden');
   caja.innerHTML = '<div class="pe-t">📌 Te dejaron pendiente</div>' + abiertos.map(p =>
     '<div class="pe-i"><span class="pe-tx">' + escapeHtml(p.tx || '') +
-      (p.ab ? '<span class="pe-de">' + escapeHtml(p.ab) + (p.abTs ? ' · ' + escapeHtml(String(p.abTs).slice(0,10)) : '') + '</span>' : '') +
+      (p.ab ? '<span class="pe-de">' + escapeHtml(p.ab) +
+              (p.abTs ? ' · ' + escapeHtml(String(p.abTs).slice(0,10)) : '') +
+              // Cuántos días lleva: uno de hace dos días es el que hay que empujar.
+              (function(){ const e=(typeof _pendEdad==='function')?_pendEdad(p.abTs):''; return e&&e!=='hoy'?' · '+escapeHtml(e):''; })() +
+              '</span>' : '') +
     '</span>' +
     '<button type="button" class="pe-btn" data-nodirty data-pend="' + escapeHtml(p.id || '') +
       '" onclick="pendEpiCerrar(&quot;' + escapeJs(p.id || '') + '&quot;)">Cerrar</button></div>'
@@ -16282,16 +16293,50 @@ let _PEND_PUESTOS=[];
    Set que se guardaba en PLAN_PENDIENTES y moría con el turno: el colega que
    entraba mañana no los veía y, sobre todo, NO LOS PODÍA CERRAR. Ahora son lo
    que siempre debieron ser: atajos para escribir rápido en la lista única. */
+/** Los pendientes ABIERTOS del episodio, normalizados para comparar textos. */
+function _pendNorm(t){ return String(t||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function _pendAbiertosCama(){
+  const c=(typeof _camaPanel==='function')?(_camaPanel()||{}):{};
+  let l=[]; try{ l=JSON.parse(c.PENDIENTES_JSON||'[]')||[]; }catch(e){ l=[]; }
+  return l.filter(x=>x && String(x.tx||'').trim() && !x.ci);
+}
+/** Cuánto lleva abierto un pendiente, con la MISMA regla de días del proyecto:
+ *  24 horas completas suman un día (acuerdo 2.7). 0 se dice «hoy», no «0 días»,
+ *  porque «0 días» se lee como un dato roto. */
+function _pendEdad(abTs){
+  if(!abTs) return '';
+  const h=_horasTS(String(abTs).replace('T',' '), (v('gDate')||hoy())+' '+_horaAhoraCli());
+  if(h==='') return '';
+  const d=Math.floor(h/24);
+  return d<=0 ? 'hoy' : (d===1 ? '1 día' : d+' días');
+}
+
+/* 🔴 20-sep-2026 · LOS ATAJOS SABEN LO QUE YA ESTÁ ABIERTO. Diego: «un
+   pendiente se puede arrastrar más de 12 horas, hay veces que está pabellón
+   pendiente en 2 días». Antes el chip solo se marcaba con lo puesto en ESTE
+   turno, así que al día siguiente aparecía limpio, alguien lo tocaba de nuevo
+   y quedaban dos pendientes idénticos. Ahora se mira el episodio, se dice
+   cuántos días lleva, y tocarlo no abre nada. Lo fija pendiente_arrastra.js. */
 function renderPend(){
   const box=$('pendChips'); if(!box) return;
+  const abiertos=_pendAbiertosCama();
   box.innerHTML=PEND_LIST.map(p=>{
-    const puesto=_PEND_PUESTOS.indexOf(p)>=0;
-    return `<button type="button" class="fase-chip${puesto?' on':''}" data-nodirty onclick="togglePend(this.dataset.p)" data-p="${String(p).replace(/"/g,'&quot;')}">${puesto?'✓ ':'+ '}${p}</button>`;
+    const ya=abiertos.filter(x=>_pendNorm(x.tx)===_pendNorm(p))[0];
+    const puesto=!!ya || _PEND_PUESTOS.indexOf(p)>=0;
+    const edad=ya?_pendEdad(ya.abTs):'';
+    const tit=puesto?(ya?('Abierto desde hace '+(edad||'poco')+'. Se cierra desde la cama.'):'Dejado en este turno'):'Dejarlo pendiente';
+    return `<button type="button" class="fase-chip${puesto?' on':''}" data-nodirty title="${escapeHtml(tit)}" onclick="togglePend(this.dataset.p)" data-p="${String(p).replace(/"/g,'&quot;')}">${puesto?'✓ ':'+ '}${escapeHtml(p)}${edad?' · '+escapeHtml(edad):''}</button>`;
   }).join('');
 }
 function togglePend(p){
-  if(_PEND_PUESTOS.indexOf(p)>=0) return;   // ya puesto: se cierra desde la cama
+  if(_pendYaAbierto(p)){ toast('📌 «'+p+'» ya está pendiente; se cierra desde la cama'); return; }
   pasoPendDejar(p);
+}
+/** ¿Ese texto ya está encargado? Mira el episodio y lo puesto en este turno. */
+function _pendYaAbierto(t){
+  const n=_pendNorm(t);
+  if(_PEND_PUESTOS.some(x=>_pendNorm(x)===n)) return true;
+  return _pendAbiertosCama().some(x=>_pendNorm(x.tx)===n);
 }
 /** Al re-editar un turno, los pendientes que ESE turno dejó puestos. Solo para
  *  pintarlos como hechos: cerrarlos se hace desde la cama, no desde acá. */

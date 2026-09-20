@@ -642,7 +642,34 @@ desaparece el prefijo «Nota: ».
 
 Lo cuida `build/checks/cierre_tres_bloques.js`.
 
-### 5.4 · Lo que quedaba por mirar del paso 4
+### 5.4 · Un pendiente dura lo que tenga que durar
+
+> *«Un pendiente se puede arrastrar más de 12 horas, hay veces que está pabellón
+> pendiente en 2 días.»*
+
+Que **dure** ya estaba resuelto con la fusión —viven en el episodio—, pero el
+ejemplo destapó dos cosas que faltaban:
+
+1. 🔴 **Se duplicaban, y lo introduje yo.** Al hacer que los atajos abrieran
+   pendiente de episodio, el chip solo se marcaba con lo puesto en **este**
+   turno. «Pabellón pendiente» abierto ayer aparecía limpio, alguien lo tocaba
+   de nuevo y quedaban **dos pendientes idénticos**. Con un encargo que dura dos
+   días, eso pasa el segundo día, siempre.
+   La defensa quedó **en los dos lados**: la pantalla no ofrece abrir lo que ya
+   está abierto, y el servidor lo rechaza igual — dos teléfonos pueden tocar el
+   mismo chip a la vez y ninguno sabe del otro.
+2. 🔵 **No se veía cuánto lleva.** Uno de hoy y uno de hace dos días eran la
+   misma línea, y no son lo mismo: el de dos días es el que hay que ir a
+   empujar. Ahora cada uno dice sus días —**«Pabellón pendiente · 2 días»**—, con
+   la misma regla de 24 horas completas del acuerdo 2.7. El de hoy dice **«hoy»**
+   y no «0 días», que se lee como un dato roto.
+
+🪤 **Un pendiente cerrado sí se puede volver a abrir**: pabellón el lunes y otra
+vez el jueves son dos encargos distintos, no un duplicado.
+
+Lo cuida `build/checks/pendiente_arrastra.js`.
+
+### 5.5 · Lo que quedaba por mirar del paso 4
 
 Sin acuerdo todavía, anotado al pasar:
 

@@ -2481,3 +2481,34 @@ pendiente bajó al paso 3) y `nada_del_guardado_despues` (la Nota ya no es caja)
 
 **188 guardias · 188 verdes.** Nueva: `cierre_tres_bloques.js`.
 Sello de entrega: `NEXT-3.1-cierre`.
+
+---
+
+## 20-sep-2026 · «Pabellón pendiente en 2 días»
+
+Diego: *«Un pendiente se puede arrastrar más de 12 horas, hay veces que está
+pabellón pendiente en 2 días.»* Que duraran ya estaba resuelto con la fusión de
+esta misma mañana, pero el ejemplo destapó dos cosas.
+
+🔴 **Se duplicaban, y lo introduje yo hoy.** Al hacer que los atajos abrieran
+pendiente de episodio, el chip solo se marcaba con lo puesto en ESTE turno. Un
+encargo de ayer aparecía limpio al día siguiente, alguien lo tocaba de nuevo y
+quedaban dos pendientes idénticos abiertos. **Con un pendiente que dura dos
+días, eso pasa el segundo día, siempre** — o sea que el caso que Diego nombró
+era exactamente el que lo disparaba.
+
+La defensa quedó en los dos lados: la pantalla no ofrece abrir lo que ya está
+abierto, y el servidor lo rechaza igual. No es redundancia: **dos teléfonos
+pueden tocar el mismo chip a la vez y ninguno sabe del otro.**
+
+🔵 **Y ahora se ve cuánto lleva.** «Pabellón pendiente · 2 días». Uno de hoy y
+uno de hace dos días eran la misma línea en pantalla y no son lo mismo: el de
+dos días es el que hay que ir a empujar. Se usa la regla de días que ya se
+acordó para vía aérea, VM y estadía —24 horas completas— y el de hoy dice
+«hoy», no «0 días», que se lee como un dato roto.
+
+🪤 Un pendiente **cerrado** sí se puede volver a abrir: pabellón el lunes y otra
+vez el jueves son dos encargos distintos.
+
+**189 guardias · 189 verdes.** Nueva: `pendiente_arrastra.js`.
+Sello de entrega: `NEXT-3.2-pendiente-dura`.

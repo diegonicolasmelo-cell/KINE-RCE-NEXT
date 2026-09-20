@@ -7438,6 +7438,20 @@ function pendAbrir(datos, ctx) {
       const r = _pendCama(idCama);
       if (r.e) return r.e;
       const lista = _pendLeer(r.cama);
+      /* 🔴 NO SE ABRE DOS VECES LO MISMO (20-sep-2026). Diego: «un pendiente se
+         puede arrastrar más de 12 horas, hay veces que está pabellón pendiente
+         en 2 días». Con un encargo que dura dos días, el segundo día alguien
+         vuelve a tocar el mismo atajo y quedaban DOS pendientes idénticos
+         abiertos. La pantalla ya no lo ofrece, pero la defensa tiene que estar
+         acá también: dos teléfonos pueden tocar el mismo chip a la vez y
+         ninguno sabe del otro.
+         🪤 Solo cuenta lo ABIERTO: pabellón el lunes y otra vez el jueves son
+         dos encargos distintos, no un duplicado. */
+      const _norm = function (t) { return String(t || '').trim().toLowerCase().replace(/\s+/g, ' '); };
+      const _yaEsta = lista.some(function (p) { return p && !p.ci && _norm(p.tx) === _norm(texto); });
+      if (_yaEsta) {
+        return err('Ese pendiente ya está abierto en este paciente.', ERR.VALIDACION);
+      }
       if (lista.filter(function (p) { return !p.ci; }).length >= _PEND_MAX) {
         return err('Este paciente ya tiene ' + _PEND_MAX + ' pendientes abiertos. Cierra alguno antes de agregar otro.', ERR.VALIDACION);
       }
