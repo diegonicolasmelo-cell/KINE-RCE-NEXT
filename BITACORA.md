@@ -2360,3 +2360,35 @@ guardias que miran una regla y no un caso.
 **185 guardias · 185 verdes.** Nueva: `prono_arriba.js`.
 Sello de entrega: `NEXT-2.8-prono-arriba`.
 🔴 **La próxima tanda necesita `crearORepararEstructura()`** — hay columna nueva.
+
+---
+
+## 20-sep-2026 · «Y se selecciona con horario»
+
+Cuatro palabras de Diego que cerraron un agujero silencioso. Al tocar «Pronar»,
+el campo de la hora se rellenaba con **la hora del reloj**. En la ronda eso es
+falso la mitad de las veces: se registra a las 10:00 lo que pasó a las 08:00 y,
+como el campo ya venía lleno, nadie lo corrige.
+
+Es **la misma trampa que la fijación del TOT** —«si sugiere 22 no anotan nada»—
+pero peor: de esa hora salen las **horas en prono**, que son las que deciden
+cuándo supinar al paciente. La sugerencia no era un número cómodo: era el dato.
+
+Ahora la hora nace vacía, el cursor cae en el selector y mientras falte se lee
+**«⚠️ falta la hora»**.
+
+### 🪤 El arreglo traía su propia trampa
+
+Dejar la hora vacía y nada más habría **cambiado un dato falso por otro**:
+`_tsEventoTurno` tiene un respaldo que, sin hora, asume las **15:00** de día y
+las **03:00** de noche. Sirve para filas viejas, pero acá habría sellado el
+ciclo de prono contra una hora inventada — y una vez sellada no hay forma de
+distinguirla de una real.
+
+Por eso el servidor tampoco sella: **sin hora no hay momento**. El ciclo queda
+sin cerrar, a la vista, en vez de mentir con las 15:00. La guardia mide **las
+dos mitades**, pantalla y servidor, porque arreglar solo una habría dejado el
+agujero abierto por el otro lado.
+
+**186 guardias · 186 verdes.** Nueva: `prono_hora_se_elige.js`.
+Sello de entrega: `NEXT-2.9-hora-se-elige`.

@@ -511,6 +511,31 @@ Lo cuida `build/checks/prono_un_boton.js`.
    El «deshacer» no desapareció: bajó a **enlace chico** al lado, porque un
    toque por error deja un evento falso en la ficha y tiene que poder borrarse.
 
+### 4.4 · La hora del prono se elige, no se sugiere
+
+> *«Y se selecciona con horario.»*
+
+🔴 Hasta acá, al tocar «Pronar» el campo se rellenaba con **la hora del reloj**.
+En la ronda eso es falso la mitad de las veces: el colega registra a las 10:00
+lo que pasó a las 08:00 y, como el campo ya venía lleno, nadie lo corrige.
+
+Es **la misma trampa que la fijación del TOT** (acuerdo 2.3): *«si sugiere 22 no
+anotan nada»*. La sugerencia se vuelve el dato. Pero acá el daño es peor que un
+número mal anotado: de esa hora salen **las horas en prono**, que son las que
+deciden cuándo supinar al paciente.
+
+Ahora la hora **nace vacía**, el selector aparece con el cursor puesto, y
+mientras falte se ve **«⚠️ falta la hora»**.
+
+🪤 **Y el arreglo tenía una trampa propia.** Dejar la hora vacía sin más habría
+cambiado un dato falso por otro: `_tsEventoTurno` tiene un respaldo que, sin
+hora, asume las **15:00** de día y las **03:00** de noche. Un ciclo sellado
+contra una hora inventada es indistinguible de uno real. Así que el servidor
+tampoco sella: **sin hora no hay momento**, y el ciclo queda sin cerrar a la
+vista en lugar de mentir. Lo cuida `prono_hora_se_elige.js`, que mide las dos
+mitades —la pantalla y el servidor— porque arreglar solo una habría dejado el
+agujero abierto por el otro lado.
+
 🪤 **La columna nueva nació con un bug y una guardia vieja lo cazó en el acto.**
 `alta_no_deja_rastro.js` se puso roja: al liberar la cama, `PRONO_DESDE` se
 quedaba con el ciclo del paciente **anterior** y el siguiente lo heredaba —la

@@ -6211,11 +6211,21 @@ function _procNombreCiclo(clave, hora) {
 
 /** Sella PRONO_INICIO_TS / SUPINO_TS y cierra PRONO_HORAS al supinar. */
 function _pronoSellarCiclo(idCama, turnoKey, fecha, turno, datos, _evos) {
-  if (esVerdadero(datos.RESP_PRONO_EVENTO)) {
-    datos.PRONO_INICIO_TS = _tsEventoTurno(fecha, turno, datos.RESP_PRONO_HORA);
+  /* 🔴 SIN HORA NO SE SELLA NADA (20-sep-2026, Diego: «y se selecciona con
+     horario»). `_tsEventoTurno` tiene un respaldo que, sin hora, asume las
+     15:00 de día y las 03:00 de noche — sirve para filas viejas, pero acá
+     sellaría un ciclo de prono contra una hora INVENTADA, y después no hay
+     forma de distinguirla de una real. De esa hora salen las horas en prono,
+     que son las que deciden cuándo supinar. Mejor un ciclo que se queda sin
+     cerrar y se ve, que uno que miente con 15:00.
+     Lo fija prono_hora_se_elige.js. */
+  const _hp = String(datos.RESP_PRONO_HORA || '').trim();
+  const _hs = String(datos.RESP_SUPINO_HORA || '').trim();
+  if (esVerdadero(datos.RESP_PRONO_EVENTO) && _hp) {
+    datos.PRONO_INICIO_TS = _tsEventoTurno(fecha, turno, _hp);
   }
-  if (esVerdadero(datos.RESP_SUPINO_EVENTO)) {
-    const ts = _tsEventoTurno(fecha, turno, datos.RESP_SUPINO_HORA);
+  if (esVerdadero(datos.RESP_SUPINO_EVENTO) && _hs) {
+    const ts = _tsEventoTurno(fecha, turno, _hs);
     datos.SUPINO_TS = ts;
     // si se pronó y supinó en el mismo turno, el inicio es el de esta misma fila
     const ini = datos.PRONO_INICIO_TS || _pronoAbiertoTS(idCama, turnoKey, _evos);
