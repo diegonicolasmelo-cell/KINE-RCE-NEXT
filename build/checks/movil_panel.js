@@ -115,7 +115,13 @@ const MONTAR = () => {
     const k = Object.keys(porTitulo);
     const sed = porTitulo[k.find(x => /Sedaci/i.test(x))];
     const aus = porTitulo[k.find(x => /Auscultaci/i.test(x))];
-    const plan = porTitulo[k.find(x => /Planes/i.test(x))];
+    /* 🗂️ 20-sep-2026 · «Planes y Pendientes» pasó a llamarse «Cerrar el turno»
+       al partirse en tres bloques. Se busca POR ID y no por título: el rótulo
+       es cosa de Diego y puede volver a cambiar, el id no. */
+    const _pl = document.getElementById('fcPlanes');
+    const _plSt = _pl && _pl.querySelector('.fcard-hdr .mst');
+    const _plRs = _pl && _pl.querySelector('.fcard-hdr .mres');
+    const plan = _pl ? { st: _plSt ? _plSt.textContent : null, res: _plRs ? _plRs.textContent : null } : undefined;
     const prev = porTitulo[k.find(x => /Prevenci/i.test(x))];
     return { sed, aus, plan, prev, todas: k.length };
   });

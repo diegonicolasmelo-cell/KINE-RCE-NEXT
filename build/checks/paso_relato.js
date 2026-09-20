@@ -95,15 +95,25 @@ const no = (l, g) => eq(l, !!g, 'false');
   }));
 
   console.log('\n2 · ★ Dejar pendiente, con lo que faltó medir');
-  si('se ofrece dejar pendiente', await ver('#pasoPend'));
-  const sug = await txt('#pasoPend');
+  /* 🗂️ 20-sep-2026 · DEJAR PENDIENTE SE MUDÓ AL PASO 3, y no es un detalle de
+     sitio: vivía DESPUÉS del guardado, así que quien cerraba al guardar no lo
+     veía y terminaba anotando el encargo en la Nota del Turno — donde muere a
+     las 12 horas y nadie lo puede cerrar. Diego lo dijo con todas sus letras:
+     «a veces la opción no está y se termina anotando en notas o anotaciones».
+     Ahora vive en el bloque C del cierre (#cgPend), junto a los atajos y al
+     campo libre. Lo que esta guardia protege no cambió —que se sugiera lo que
+     faltó medir y que el pendiente vaya al EPISODIO—, solo dónde se mira. */
+  await p.evaluate(() => pasoIr(3));
+  await p.waitForTimeout(250);
+  si('se ofrece dejar pendiente, ya en el cierre', await ver('#cgPend'));
+  const sug = await txt('#cgPend');
   si('★ sugiere medir el FSS, que el paso 2 mostró sin medir', /FSS/.test(sug));
   si('★ …y la Pimáx, que tampoco se midió', /Pim/i.test(sug));
   no('no sugiere el MRC, que SÍ está medido', /MRC/.test(sug));
 
   await p.evaluate(() => { window.__llamadas.length = 0; });
   await p.evaluate(() => {
-    const s = document.querySelector('#pasoPend [data-sug]'); if (s) s.click();
+    const s = document.querySelector('#cgPend [data-sug]'); if (s) s.click();
   });
   await p.waitForTimeout(400);
   const abrir = await p.evaluate(() => window.__llamadas.filter(x => x.a === 'PEND_ABRIR'));
@@ -121,6 +131,12 @@ const no = (l, g) => eq(l, !!g, 'false');
   const libre = await p.evaluate(() => window.__llamadas.filter(x => x.a === 'PEND_ABRIR'));
   eq('★ se manda el texto escrito', String(((libre[0] || {}).d || {}).texto || ''), 'Avisar a fonoaudiología el lunes');
   eq('…y el campo queda limpio para el siguiente', await p.evaluate(() => v('pasoPendTxt')), '');
+
+  /* Vuelta al relato: las secciones 2 y 3 bajaron al paso 3 con el cierre, y lo
+     que sigue mide el camino de vuelta DESDE el relato. Sin esto, «atrás»
+     saldría del paso 3 al 2 y la medición diría otra cosa. */
+  await p.evaluate(() => pasoIr(4));
+  await p.waitForTimeout(200);
 
   console.log('\n4 · ★ D2 + D3 · el retoque no se pisa en silencio');
   // Sin retoque: volver atrás no pregunta nada.

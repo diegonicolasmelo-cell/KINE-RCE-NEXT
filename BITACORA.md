@@ -2434,3 +2434,50 @@ síntoma que la guardia investigaba**. Confundirlos habría sido cómodo y falso
 
 **187 guardias · 187 verdes.** Nueva: `nada_del_guardado_despues.js`.
 Sello de entrega: `NEXT-3.0-firma-alcanzable`.
+
+---
+
+## 20-sep-2026 · El cierre del turno: tres bloques, cada uno con su reloj
+
+Diego sobre las cajas del cierre: *«en realidad ahí debería agruparse en uno
+solo. Una cosa dirigida a narrar qué pasó hoy y otra a dejar pendientes. El plan
+kinésico… debería ser algo aparte.»* Y al aprobar: *«con el detalle de que el
+pendiente sea libre porque a veces la opción no está y se termina anotando en
+notas o anotaciones»*.
+
+**No eran tres cajas: eran cinco**, y hacían dos cosas distintas sin decirlo.
+Tres se narran en la evolución (anotaciones, Nota y Plan) y dos no (los chips
+del turno y los pendientes del episodio). Quedó en **Qué pasó hoy · Plan para el
+próximo turno · Lo que queda pendiente**, cada uno con su reloj escrito en el
+rótulo.
+
+🔵 **El plan aparte, pero pegado al relato.** Un pendiente se cierra; un plan no.
+Si viviera con los pendientes quedaría abierto para siempre y ensuciaría la
+cuenta de cumplidos. Además ya es la última línea del texto (Manuel, ago-2026).
+
+🔴 **El campo libre de pendientes es lo que evita la fuga.** Sin él, el encargo
+termina en la Nota — que muere en 12 horas y que nadie puede cerrar. Diego lo
+describió exacto, y por eso la guardia mide que esté A LA VISTA junto a los
+atajos, no en otra pantalla.
+
+🪤 **Convivían el problema y su arreglo.** Los chips morían a las 12 h («por eso
+nadie podía cerrarlos», dice el código) y los pendientes del episodio nacieron
+para eso. Ahora los atajos abren pendiente de episodio igual que el texto libre,
+y `PLAN_PENDIENTES` sigue viajando con lo puesto en el turno para que la ficha
+de la entrega no pierda nada.
+
+### 🪤 Un bug mío que cazó la batería
+
+Al renombrar `PEND_SEL` quedaron **cuatro referencias huérfanas** —el borrador
+local, el autoguardado y un listener— y el borrador dejó de escribirse.
+`borrador_local.js` y `cierre_tres_acciones.js` se pusieron rojas en el acto.
+Lección barata: **renombrar una global exige barrer todas sus referencias antes
+de correr nada**, con un grep, no con la memoria.
+
+Tres guardias más pedían la convención vieja y se actualizaron con la razón
+escrita: `movil_panel` (que ahora busca la tarjeta **por id y no por título**,
+porque el rótulo es de Diego y puede volver a cambiar), `paso_relato` (dejar
+pendiente bajó al paso 3) y `nada_del_guardado_despues` (la Nota ya no es caja).
+
+**188 guardias · 188 verdes.** Nueva: `cierre_tres_bloques.js`.
+Sello de entrega: `NEXT-3.1-cierre`.

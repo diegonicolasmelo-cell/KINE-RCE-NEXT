@@ -557,7 +557,7 @@ a proponer en tres meses sin saber que ya se decidió.
 
 ---
 
-## 5 · El cierre del turno — un bloqueante encontrado el 20-sep-2026
+## 5 · El cierre del turno — CERRADO el 20-sep-2026
 
 No salió de un mockup: salió de ir a mirar el paso 4 antes de dibujarlo.
 
@@ -601,7 +601,48 @@ razón escrita, y resultó que **ya defendía esta regla sin notarlo**: su punto
 dice que el guardado ocurre al salir de las evaluaciones. Lo que se guarda ahí
 se escribe ahí.
 
-### 5.3 · Lo que queda por mirar del paso 4
+### 5.3 · Tres bloques, cada uno con su reloj
+
+> *«Pendientes del turno, anotaciones del turno y dejar pendientes para el turno
+> que viene… en realidad ahí debería agruparse en uno solo. Una cosa dirigida a
+> narrar qué pasó hoy y otra a dejar pendientes. El plan kinésico… debería ser
+> algo aparte.»*
+>
+> *«Sí a todo, con el detalle de que el pendiente sea libre porque a veces la
+> opción no está y se termina anotando en notas o anotaciones.»*
+
+No eran tres cajas: **eran cinco**, y hacían dos cosas distintas sin decirlo.
+Tres se narran en la evolución, dos no. Quedaron así:
+
+| Bloque | Qué entra | Hasta cuándo vive |
+|---|---|---|
+| **Qué pasó hoy** | anotaciones, que **absorben la Nota del Turno** | va al relato de hoy |
+| **Plan para el próximo turno** | hacia dónde va el paciente | **cierra el relato** |
+| **Lo que queda pendiente** | una sola lista, la del episodio | hasta que alguien lo cierre |
+
+🔵 **El plan va aparte, y pegado al relato, no con los pendientes.** Un pendiente
+se cierra; un plan no: «continuar movilización progresiva» no se marca nunca y
+quedaría abierto para siempre, ensuciando la cuenta de cumplidos. Además ya es
+la última línea del texto, por pedido de Manuel en ago-2026.
+
+🔴 **El campo libre de pendientes va a la vista, junto a los atajos**, y ésta no
+es una decisión cosmética: sin él, el encargo termina en la Nota —que muere en
+12 horas y que nadie puede cerrar—. Es justo la fuga que Diego describió.
+
+🪤 **Convivían el problema y su arreglo.** Los chips morían a las 12 h («por eso
+nadie podía cerrarlos», dice el código) y los pendientes del episodio nacieron
+para arreglarlo. Ahora los atajos **abren pendiente de episodio**, igual que el
+texto libre. `PLAN_PENDIENTES` sigue viajando con lo puesto en el turno, así que
+la ficha de la entrega no pierde nada.
+
+🪤 **La Nota vieja no se pierde:** al re-editar una evolución que la traía, entra
+como **una anotación sin hora** —que es exactamente lo que era— y el campo se
+vacía para no narrarla dos veces. Lo único que cambia en el texto es que
+desaparece el prefijo «Nota: ».
+
+Lo cuida `build/checks/cierre_tres_bloques.js`.
+
+### 5.4 · Lo que quedaba por mirar del paso 4
 
 Sin acuerdo todavía, anotado al pasar:
 

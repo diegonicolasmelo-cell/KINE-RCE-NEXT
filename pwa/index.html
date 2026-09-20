@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.0-firma-alcanzable">
+<meta name="rce-version" content="NEXT-3.1-cierre">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1200,6 +1200,22 @@ table.rhb2 .rl{width:128px;text-align:left;}
   border-radius:8px;cursor:pointer;font-family:inherit;}
 .pp-libre button:hover{border-color:var(--primary);color:var(--primary);}
 .pp-puesto{font-size:.82rem;color:#0f766e;margin-top:6px;font-weight:600;}
+/* 🔴 EL CIERRE DEL TURNO SON TRES BLOQUES (Diego, 20-sep-2026). Cada uno con
+   su color y, sobre todo, con su RELOJ escrito en el rótulo: lo que se narra
+   hoy, lo que orienta mañana y lo que queda encargado hasta que alguien lo
+   cierre. Antes eran cinco cajas con nombres casi iguales. */
+.cierre-g{border:1px solid var(--border);border-radius:11px;padding:11px 12px;margin-bottom:10px;background:#fff;}
+.cierre-g:last-of-type{margin-bottom:0;}
+.cierre-g.cg-narra{border-left:3px solid #1d4ed8;background:#eff6ff;}
+.cierre-g.cg-plan{border-left:3px solid #0e7a5f;background:#e9f6f1;}
+.cierre-g.cg-pend{border-left:3px solid #c97a12;background:#fdf4e5;}
+.cg-t{font-size:.8rem;font-weight:800;margin:0 0 3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.cg-narra .cg-t{color:#1d4ed8;} .cg-plan .cg-t{color:#0e7a5f;} .cg-pend .cg-t{color:#c97a12;}
+.cg-r{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:600;
+      letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:4px;
+      background:rgba(255,255,255,.8);border:1px solid var(--border);color:var(--muted);}
+.cg-s{font-size:.74rem;color:var(--muted);margin:0 0 8px;}
+
 /* Paso 2 · los chips del episodio y la salida barata */
 #pasoEvalChips{margin-bottom:14px;}
 .pe2-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
@@ -4977,62 +4993,83 @@ document.documentElement.setAttribute('data-piel', 'inst');
            Lo fija nada_del_guardado_despues.js, que ya no mira solo la firma:
            recorre TODOS los campos del payload. -->
       <div class="fcard fc-g" id="fcPlanes" data-paso="3">
-        <div class="fcard-hdr"><span class="fcard-title">📋 Planes y Pendientes</span></div>
+        <div class="fcard-hdr"><span class="fcard-title">📋 Cerrar el turno</span></div>
         <div class="fcard-body">
-          <!-- Pendientes predefinidos: recordatorios del turno (sin fecha, NO se
-               replican; llegan a la ficha de la entrega para el que recibe) -->
-          <div class="col" style="margin-bottom:12px;">
-            <label>⏳ Pendientes del turno <span style="font-weight:400;color:var(--muted);text-transform:none;">— recordatorio para la entrega, solo de este turno</span></label>
-            <div id="pendChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;"></div>
-            <input type="text" id="pendLibre" placeholder="Otro pendiente… + Enter" style="margin-top:7px;height:30px;max-width:280px;">
-          </div>
-          <!-- 📌 Anotaciones del turno (v5.97, Diego 5-sep-2026): hechos SIN
-               estadística que SÍ se narran en la evolución — el «Otro» del ➕
-               pero desde el formulario. Hora OPCIONAL (decisión de Diego).
-               Se guardan en ANOTACIONES_JSON; cada una deja su hito 📌. -->
-          <div class="col" style="margin-bottom:10px;">
-            <label>📌 Anotaciones del turno <span style="font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;">— quedan en el texto y el historial, no suman a estadística</span></label>
+
+          <!-- ▌ A · QUÉ PASÓ HOY — se narra en la evolución.
+               📌 Las anotaciones ABSORBIERON la «Nota del Turno» (Diego,
+               20-sep-2026): las dos se narraban y morían con el turno, y la
+               única diferencia era que la anotación lleva hora opcional y deja
+               hito en el historial. Una nota es una anotación sin hora. -->
+          <div class="cierre-g cg-narra" id="cgQuePaso">
+            <p class="cg-t">Qué pasó hoy <span class="cg-r">va al relato de hoy</span></p>
+            <p class="cg-s">Hechos que se cuentan y no suman a estadística.</p>
             <div id="anotLista" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;"></div>
             <div style="display:flex;gap:6px;align-items:center;">
-              <input type="text" id="anotTxt" placeholder="ej.: EEG realizado, evaluado por neurología" style="flex:1;min-width:0;height:32px;" onkeydown="if(event.key==='Enter'){event.preventDefault();anotAgregar();}">
+              <input type="text" id="anotTxt" placeholder="ej.: EEG realizado, evaluado por neurología" style="flex:1;min-width:0;height:32px;" onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();anotAgregar();}">
               <input type="time" id="anotHora" title="Hora (opcional)" style="width:104px;height:32px;flex-shrink:0;">
               <button type="button" class="dpset" style="flex-shrink:0;" onclick="anotAgregar()">➕ Agregar</button>
             </div>
+            <!-- 🪤 El campo de la Nota se queda ESCONDIDO y vacío: `fillForm`
+                 lo sigue escribiendo y al cargar una evolución vieja su texto
+                 se convierte en anotación (ver `_notaVieja...` más abajo). -->
+            <input type="hidden" id="fNota" value="">
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-            <div class="col"><label>Plan Kinésico (próximo turno)</label>
-              <textarea id="fPlanes" rows="3" placeholder="Plan para el próximo turno..." style="width:100%;box-sizing:border-box;"></textarea></div>
-            <div class="col"><label>Nota del Turno</label>
-              <textarea id="fNota" rows="3" placeholder="Observaciones adicionales..." style="width:100%;box-sizing:border-box;"></textarea></div>
+
+          <!-- ▌ B · EL PLAN — aparte, y pegado al relato, NO a los pendientes.
+               Diego: «el plan kinésico… en realidad debería ser algo aparte».
+               Va aquí y no con los encargos porque un pendiente SE CIERRA y un
+               plan no: «continuar movilización progresiva» no se marca nunca, y
+               mezclarlo dejaría un pendiente abierto para siempre que ensucia
+               la cuenta de cumplidos. Además ya es la última línea del texto
+               («Plan: …»), por pedido de Manuel en ago-2026. -->
+          <div class="cierre-g cg-plan" id="cgPlan">
+            <p class="cg-t">Plan para el próximo turno <span class="cg-r">cierra el relato</span></p>
+            <p class="cg-s">Hacia dónde va este paciente. Es la última línea de la evolución.</p>
+            <textarea id="fPlanes" rows="2" placeholder="Continuar movilización progresiva, apuntar a sedente…" style="width:100%;box-sizing:border-box;"></textarea>
           </div>
-          <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+
+          <!-- ▌ C · LO QUE QUEDA PENDIENTE — UNA sola lista, la del EPISODIO.
+               🪤 Antes había dos: los chips del turno, que morían a las 12 h y
+               «por eso nadie podía cerrarlos», y los del episodio, que nacieron
+               justo para arreglar eso. Convivían el problema y su arreglo con
+               nombres casi iguales. Ahora los atajos abren pendiente de
+               episodio, igual que el texto libre.
+               🔴 EL CAMPO LIBRE VA A LA VISTA, junto a los atajos (Diego:
+               «que el pendiente sea libre, porque a veces la opción no está y
+               se termina anotando en notas o anotaciones»). Sin él, un encargo
+               real termina en una caja que muere en 12 horas. -->
+          <div class="cierre-g cg-pend" id="cgPend">
+            <p class="cg-t">Lo que queda pendiente <span class="cg-r">hasta que alguien lo cierre</span></p>
+            <p class="cg-s">Tareas concretas. Las ve quien abra esta cama mañana, y cualquiera puede cerrarlas.</p>
+            <div id="pendChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
+            <div id="pasoPendSugs" class="pp-sugs"></div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:5px;">
+              <input type="text" id="pasoPendTxt" placeholder="Otro pendiente: escríbelo como quieras…" style="flex:1;min-width:0;height:32px;"
+                     onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();pasoPendEscrito();}">
+              <button type="button" class="dpset" id="pasoPendBtn" style="flex-shrink:0;" data-nodirty onclick="pasoPendEscrito()">📌 Dejar</button>
+            </div>
+            <div id="pasoPendPuestos" style="margin-top:6px;"></div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:10px;">
             <div class="col" style="min-width:180px;flex-grow:0;"><label>Firma Kinesiólogo</label>
               <select id="fFirma" class="bold tc" style="width:100%;"></select></div>
           </div>
         </div>
       </div>
 
-
       <button type="button" id="pasoEvalNada" data-paso="3" data-nodirty onclick="pasoSinMedir()">
         No medí nada este turno
         <small>Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
       </button>
 
-      <!-- 📌 Lo que queda encargado para el turno que viene. Vive en el
-           EPISODIO (svc_pendientes.gs), así que el colega que abra esta cama
-           mañana lo va a ver arriba de su paso 1. -->
-      <div id="pasoPend" data-paso="4">
-        <div class="pp-hdr">📌 Dejar pendiente para el turno que viene</div>
-        <div class="pp-body">
-          <div id="pasoPendSugs" class="pp-sugs"></div>
-          <div class="pp-libre">
-            <input type="text" id="pasoPendTxt" placeholder="Otro encargo para el turno que viene…"
-                   onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();pasoPendEscrito();}">
-            <button type="button" id="pasoPendBtn" data-nodirty onclick="pasoPendEscrito()">Dejar</button>
-          </div>
-          <div id="pasoPendPuestos"></div>
-        </div>
-      </div>
+      <!-- 🗂️ 20-sep-2026 · El bloque suelto «Dejar pendiente para el turno que
+           viene» YA NO VIVE ACÁ. Se fundió con los chips en el bloque C de
+           «Cerrar el turno» (paso 3): eran dos listas de pendientes con
+           nombres casi iguales, y ésta —la única que se puede cerrar— estaba
+           DESPUÉS del guardado, así que quien cerraba antes terminaba
+           anotando el encargo en la Nota, donde muere. -->
 
       <!-- ACCIONES — al FINAL del formulario y pegadas abajo (Diego,
            15-ago-2026): la barra es sticky y AHORA el texto vive arriba de
@@ -5377,7 +5414,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.0-firma-alcanzable]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.1-cierre]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6316,6 +6353,8 @@ function pasoIr(n){
   const g = $('btnGuardar'); if(g) g.style.display = 'none';
   if(n === 1 && typeof prevPintar === 'function'){ prevPintar(); prevAvanceUI(); }
   if(n === 3 && typeof pasoEvalPintar === 'function') pasoEvalPintar();
+  // Las sugerencias de pendientes viven ahora en el cierre (paso 3).
+  if(n === 3 && typeof pasoPendSugerir === 'function') pasoPendSugerir();
   if(n === 4 && typeof pasoRelatoPintar === 'function') pasoRelatoPintar();
   const pc = document.querySelector('#sp .pcontent'); if(pc) pc.scrollTop = 0;
   if(typeof _rielDeb === 'function') _rielDeb();
@@ -6616,7 +6655,6 @@ function pasoRelatoPintar(){
     g.innerHTML = '<span class="pg-tic">✓</span> Guardado · evolución del turno ' +
       escapeHtml(t) + ', ' + escapeHtml(_fdd(f) || f);
   }
-  pasoPendSugerir();
 }
 
 /** Las sugerencias son lo que el paso 2 dejó sin medir. Nada inventado. */
@@ -6643,8 +6681,10 @@ function pasoPendDejar(texto){
     api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '' })
       .then(() => {
         const i = $('pasoPendTxt'); if(i) i.value = '';
+        if(_PEND_PUESTOS.indexOf(t) < 0) _PEND_PUESTOS.push(t);
         const lista = $('pasoPendPuestos');
         if(lista) lista.innerHTML += '<div class="pp-puesto">📌 ' + escapeHtml(t) + '</div>';
+        renderPend();
         toast('📌 Pendiente dejado para el turno que viene');
       })
       .catch(e => toast('❌ No se pudo dejar el pendiente: ' + (e && e.message ? e.message : e)));
@@ -6910,7 +6950,7 @@ function abrirPanel(id, esIng, verFicha) {
   // v2: fases clínicas + reintubación standalone + COD + evaluaciones nocturnas
   FASES_SEL=new Set(); _faseHeredada=false; renderFases();
   if(typeof _plantReset==='function') _plantReset();   // plantilla: parte siguiendo la sugerencia del turno
-  PEND_SEL=new Set(); renderPend();
+  _PEND_PUESTOS=[]; renderPend();
   const _spCod=$('spCod'); if(_spCod) _spCod.textContent='';
   hide('dReintubDetT'); hide('dIntubDet');
   _vmHistFlag=false; _transIntubEsteTurno=false; window._vfonHoras=0; window._pronoAbierto='';
@@ -7236,7 +7276,7 @@ function _borradorEstado(){
     v:1, hora:_hhmm(), ts:Date.now(), firma:(campos.fFirma||''),
     campos,
     procs:[...(PROCS||[])],
-    fases:[...FASES_SEL], pend:[...PEND_SEL], aisl:[..._aislTags],
+    fases:[...FASES_SEL], pend:_PEND_PUESTOS.slice(), aisl:[..._aislTags],
     ti:JSON.parse(JSON.stringify(_tiState)),
     cultF:{..._cultFechas}, cultT:[..._cultTurno],
     secrQty:_secrQty, pronoTs:_pronoTs, supinoTs:_supinoTs,
@@ -7286,7 +7326,7 @@ function _borradorRestaurar(idCama){
   });
   PROCS=[...(d.procs||[])]; renderChips();
   FASES_SEL=new Set(d.fases||[]); renderFases();
-  PEND_SEL=new Set(d.pend||[]); renderPend();
+  _PEND_PUESTOS=Array.isArray(d.pend)?d.pend.slice():[]; renderPend();
   _aislTags=[...(d.aisl||[])]; renderAislTags();
   if(d.ti){ Object.keys(_tiState).forEach(k=>delete _tiState[k]); Object.assign(_tiState,d.ti);
     tiRender('fSecrTags','fSecrVal','sky'); tiRender('fCultTags','fCultVal','violet'); }
@@ -7891,6 +7931,7 @@ function fillForm(s) {
   setIMS(s.EVAL_IMS!==undefined&&s.EVAL_IMS!==null?String(s.EVAL_IMS):'');
   set('fPlanes',s.PLAN_PLANES); set('fNota',s.PLAN_NOTA_TURNO); set('fFirma',s.PLAN_FIRMA_KINE);
   _anotCargar(s.ANOTACIONES_JSON||'[]');   // 📌 no heredable, como la Nota
+  _notaViejaAAnotacion(s.PLAN_NOTA_TURNO);  // la Nota se fundió con las anotaciones
   aplicarFirmaTurno(s.PLAN_FIRMA_KINE);
   setFasesDesde(s.FASE_JSON||'');
   setPendDesde(s.PLAN_PENDIENTES||'');
@@ -9279,7 +9320,7 @@ function guardar() {
     MUE_RESULTADOS_JSON:JSON.stringify((_tiState['fCultTags']||[]).filter(Boolean)),
     EVAL_IMS:v('fIMS'),
     FASE_JSON: JSON.stringify(Array.from(FASES_SEL)),
-    PLAN_PENDIENTES: JSON.stringify(Array.from(PEND_SEL)),
+    PLAN_PENDIENTES: JSON.stringify(_PEND_PUESTOS),
     PLAN_PLANES:v('fPlanes'), PLAN_NOTA_TURNO:v('fNota'), PLAN_FIRMA_KINE:v('fFirma'),
     ANOTACIONES_JSON: JSON.stringify(ANOTS||[]),
   };
@@ -11346,7 +11387,9 @@ function renderChips() {
 // #sp vía innerHTML (los elementos se recrean y pierden sus listeners).
 function _bindPanelListeners(){
   $('inProc')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();addProc();} });
-  $('pendLibre')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const t=e.target.value.trim(); if(t){ PEND_SEL.add(t); renderPend(); e.target.value=''; } } });
+  /* 🗂️ 20-sep-2026 · `pendLibre` desapareció con la fusión del cierre: el
+     texto libre de pendientes es ahora `pasoPendTxt`, que abre pendiente de
+     EPISODIO en vez de sumar a una lista que moría en 12 horas. */
   // Vista previa en vivo de los procedimientos automáticos (delegado sobre el form)
   $('kf')?.addEventListener('change', _renderAutoProcs);
   $('kf')?.addEventListener('input', _renderAutoProcs);
@@ -11575,6 +11618,22 @@ function _anotTexRefrescar(){
     }
   }catch(e){}
 }
+/** 📌 La «Nota del Turno» se fundió con las anotaciones (Diego, 20-sep-2026).
+ *  Una evolución vieja puede traerla escrita; en vez de perderla o de mostrar
+ *  una caja que ya no existe, entra como UNA ANOTACIÓN SIN HORA — que es
+ *  exactamente lo que era. El campo se vacía para que no se narre dos veces.
+ *  🪤 Se compara el texto antes de agregar: re-editar el mismo turno dos veces
+ *  no puede ir dejando copias. */
+function _notaViejaAAnotacion(nota){
+  const t=String(nota||'').trim();
+  const campo=$('fNota'); if(campo) campo.value='';
+  if(!t) return;
+  if((ANOTS||[]).some(a=>String(a&&a.t||'').trim()===t)) return;
+  ANOTS.push({t:t, h:''});
+  anotRender();
+  if(typeof _anotTexRefrescar==='function') _anotTexRefrescar();
+}
+
 function _anotCargar(json){
   try{ const a=JSON.parse(json||'[]'); ANOTS=Array.isArray(a)?a.filter(x=>x&&String(x.t||'').trim()):[]; }
   catch(e){ ANOTS=[]; }
@@ -16221,19 +16280,30 @@ function setFasesDesde(jsonStr){
 const PEND_LIST=['CCAET pendiente','Progresar weaning','Pabellón pendiente','EEG','Traslado',
   'Test de apnea','TQT','Cambio de TOT','Cambio de TQT','Decanulación','Evaluación funcional',
   'Pronar','Supinar','Rx tórax control','TAC/Scanner','Ventana de sedación','Válvula de fonación','Egreso'];
-let PEND_SEL=new Set();
+/* Lo que ESTE turno dejó encargado. Viaja en PLAN_PENDIENTES para que la ficha
+   de la entrega siga mostrando los del turno; los pendientes de verdad viven en
+   el episodio y se cierran desde la cama. */
+let _PEND_PUESTOS=[];
+/* 🔴 LOS ATAJOS ABREN PENDIENTE DE EPISODIO (20-sep-2026). Antes marcaban un
+   Set que se guardaba en PLAN_PENDIENTES y moría con el turno: el colega que
+   entraba mañana no los veía y, sobre todo, NO LOS PODÍA CERRAR. Ahora son lo
+   que siempre debieron ser: atajos para escribir rápido en la lista única. */
 function renderPend(){
   const box=$('pendChips'); if(!box) return;
-  const extras=[...PEND_SEL].filter(p=>!PEND_LIST.includes(p));
-  box.innerHTML=[...PEND_LIST,...extras].map(p=>{
-    const on=PEND_SEL.has(p);
-    return `<button type="button" class="fase-chip${on?' on':''}" onclick="togglePend(this.dataset.p)" data-p="${String(p).replace(/"/g,'&quot;')}">${on?'✓ ':''}${p}</button>`;
+  box.innerHTML=PEND_LIST.map(p=>{
+    const puesto=_PEND_PUESTOS.indexOf(p)>=0;
+    return `<button type="button" class="fase-chip${puesto?' on':''}" data-nodirty onclick="togglePend(this.dataset.p)" data-p="${String(p).replace(/"/g,'&quot;')}">${puesto?'✓ ':'+ '}${p}</button>`;
   }).join('');
 }
-function togglePend(p){ if(PEND_SEL.has(p)) PEND_SEL.delete(p); else PEND_SEL.add(p); renderPend(); }
+function togglePend(p){
+  if(_PEND_PUESTOS.indexOf(p)>=0) return;   // ya puesto: se cierra desde la cama
+  pasoPendDejar(p);
+}
+/** Al re-editar un turno, los pendientes que ESE turno dejó puestos. Solo para
+ *  pintarlos como hechos: cerrarlos se hace desde la cama, no desde acá. */
 function setPendDesde(jsonStr){
-  PEND_SEL=new Set();
-  try{ (JSON.parse(jsonStr||'[]')||[]).forEach(p=>PEND_SEL.add(p)); }catch(e){}
+  _PEND_PUESTOS=[];
+  try{ (JSON.parse(jsonStr||'[]')||[]).forEach(p=>{ const t=String(p||'').trim(); if(t) _PEND_PUESTOS.push(t); }); }catch(e){}
   renderPend();
 }
 

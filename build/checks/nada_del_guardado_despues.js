@@ -99,7 +99,7 @@ const { chromium } = require('playwright-core');
       const cs = getComputedStyle(e), r = e.getBoundingClientRect();
       return cs.display !== 'none' && cs.visibility !== 'hidden' && !!(r.width || r.height);
     };
-    const antes = { firma: vis('fFirma'), planes: vis('fPlanes'), nota: vis('fNota'), pend: vis('pendChips') };
+    const antes = { firma: vis('fFirma'), planes: vis('fPlanes'), anot: vis('anotTxt'), pend: vis('pendChips') };
     // Se intenta guardar SIN firma: el aviso tiene que poder atenderse.
     pasoAvanzar();
     await new Promise(r => setTimeout(r, 250));
@@ -112,7 +112,12 @@ const { chromium } = require('playwright-core');
   });
   si('★★ la firma se ve en el paso que guarda', R.antes.firma);
   si('★★ el Plan Kinésico también', R.antes.planes);
-  si('★★ y la Nota del Turno', R.antes.nota);
+  /* 🗂️ 20-sep-2026 · La «Nota del Turno» dejó de ser una caja: se fundió con
+     las anotaciones (Diego dijo que sí). Sigue viajando en el payload como
+     campo escondido —una evolución vieja puede traerla y se convierte en
+     anotación al cargar—, así que lo que hay que exigir no es que SE VEA, sino
+     que haya dónde escribir lo que antes iba ahí. */
+  si('★★ y hay dónde escribir lo que antes era la Nota', R.antes.anot);
   si('★ y los pendientes del turno', R.antes.pend);
   si('   el aviso por firma faltante sigue saliendo', /firma/i.test(R.aviso));
   si('★★ …y el campo que pide está A LA VISTA para atenderlo', R.firmaTrasElAviso);
