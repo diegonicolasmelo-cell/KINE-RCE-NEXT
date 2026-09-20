@@ -2547,3 +2547,30 @@ la redefine y corre la real. Lo que hay que doblar es lo que ella usa por
 debajo.
 
 **190 guardias · 190 verdes.** Nueva: `pendientes_siguen_al_paciente.js`.
+
+---
+
+## 20-sep-2026 · Tanda para pegar: NEXT-3.2-pendiente-dura
+
+Cinco archivos: **index · esquema · servicios · api · dominio**.
+
+🪤 Yo había supuesto cuatro (index, esquema, y los svc_ sueltos). `que_pegar.js`
+dijo **cinco**: faltaban `api` y `dominio`. Es exactamente el fallo para el que
+se escribió esa herramienta — el repo tiene 31 `.gs` y el editor 10, así que
+«cambié tal servicio» no dice a simple vista si además se movió algo de otro
+grupo. **No se recuerda: se calcula.**
+
+🔴 **Requiere `crearORepararEstructura()`**: entra la columna `PRONO_DESDE` en
+CAMAS_ESTADO.
+
+Verificado antes de enviar: `cmp` contra el generado (los cinco idénticos), el
+cohete es **ASCII puro**, los acentos vivos en los `.gs`, el sello
+`NEXT-3.2-pendiente-dura` presente y la columna nueva en esquema y servicios.
+**190 guardias · 190 verdes.**
+
+Qué lleva, desde lo último que pegó (`NEXT-2.3-vigilia`): el equipo desde la
+planilla, la interpretación del S5Q derivada, los mensajes de arranque, el pool
+de evaluaciones desde el ingreso, la KTM y la terapia física apagadas de noche,
+el prono como evento con un solo botón y su hora elegida, el cierre del turno en
+tres bloques, la firma alcanzable y los pendientes que duran, no se duplican y
+viajan con el paciente.
