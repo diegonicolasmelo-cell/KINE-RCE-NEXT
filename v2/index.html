@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.7-prono">
+<meta name="rce-version" content="NEXT-2.8-prono-arriba">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -940,6 +940,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .a-vm{background:var(--danger);color:#fff;}
 .a-dias{background:var(--n-yellow-bg);color:var(--n-yellow);}
 .a-ktm{background:var(--n-purple-bg);color:var(--n-purple);}
+/* 🔃 Pronación en curso. 🔒 UN SOLO ESTILO, sin variantes por horas: Diego
+   («no hay corte») — la unidad no tiene un número a partir del cual avisar. */
+.a-prono{background:#ecfeff;color:#0e7490;border:1px solid #a5f3fc;}
 .a-pend{background:var(--n-orange-bg);color:var(--n-orange);}
 .a-eval{background:var(--n-blue-bg);color:var(--n-blue);}
 .bfoot{position:relative;z-index:2;padding:9px 13px;background:#f0e2b6;border:1px solid #d6bf84;border-top:1px dashed #e2d09c;border-radius:0 0 12px 12px;box-shadow:0 3px 10px rgba(120,90,20,.12);display:flex;gap:6px;flex-wrap:wrap;transition:box-shadow .18s;}
@@ -3664,6 +3667,68 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <!-- compat oculto -->
             <input type="hidden" id="fDiasVA">
 
+            <!-- ▌ 🔃 PRONO · EN LA PRIMERA FILA desde el 19-sep-2026.
+                 Diego: «sube la franja a la primera fila». Venía al FINAL del
+                 bloque respiratorio, después de todos los parámetros del
+                 ventilador, y en el teléfono eso es scroll. El prono es un
+                 estado del paciente que dura días —como la vía aérea y el
+                 soporte—, así que va donde van ellos: primero en qué estado
+                 está, después cómo se ventila.
+                 Antes ya había salido de la traqueostomía (17-sep): «eso es un
+                 procedimiento en caso de falla respiratoria catastrófica y es
+                 un evento aparte, no relacionado con TQT». Esto termina la
+                 mudanza. Lo fija prono_arriba.js. -->
+            <div class="sub-sec">
+<div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                  <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
+
+                  <!-- 🔴 UN EVENTO QUE ARRASTRA EL ESTADO (Diego, 19-sep-2026):
+                       «el prono como evento puede arrastrar estado hasta que se
+                       suspenda con supinar? Eso en vez de tener varios botones
+                       porque prono y se prono este turno puede confundir».
+                       Antes había SEIS controles —Prono, Se prona este turno,
+                       Supino, Se supina este turno y dos horas— y dos se
+                       llamaban casi igual que los otros dos. Ahora: un estado
+                       que se lee y UN botón. Lo cuida prono_un_boton.js. -->
+                  <span id="pronoEstado" style="font-size:.86rem;font-weight:700;color:#0e7490;"></span>
+                  <span id="pronoDesde" style="font-size:.76rem;color:var(--muted);"></span>
+                  <button type="button" id="btnProno" data-nodirty onclick="pronoAccion()"
+                    style="background:#0e7490;color:#fff;border:none;border-radius:8px;padding:6px 15px;font-size:.84rem;font-weight:700;cursor:pointer;">Pronar</button>
+                  <!-- 🔵 La salida de emergencia, deliberadamente chica: si
+                       alguien tocó «Pronar» por error queda un evento falso en
+                       la ficha, así que tiene que poder borrarlo. No compite
+                       con el botón principal — es un enlace, no un botón. -->
+                  <button type="button" id="btnPronoDeshacer" class="hidden" data-nodirty onclick="pronoDeshacer()"
+                    style="background:none;border:none;color:var(--muted);font-size:.74rem;text-decoration:underline;cursor:pointer;padding:2px 4px;">deshacer</button>
+                  <span id="pronoHoraBox" class="hidden" style="display:inline-flex;align-items:center;gap:4px;">
+                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
+                    <input type="time" id="fPronoHoraVis" oninput="pronoHoraMano()" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
+                  </span>
+
+                  <!-- 🪤 LAS CUATRO CASILLAS SIGUEN ACÁ, ESCONDIDAS Y VIVAS.
+                       Son las que arman el payload (RESP_POS_PRONO,
+                       RESP_PRONO_EVENTO, RESP_POS_SUPINO, RESP_SUPINO_EVENTO) y
+                       las que leen fillForm y fillFormReplica. Sacarlas habría
+                       obligado a tocar el servidor, la entrega, la timeline, el
+                       texto clínico y veinticuatro guardias para un cambio que
+                       es SOLO de pantalla: lo que cambió es QUIÉN las marca, no
+                       qué se guarda. Mismo patrón que `fCoop` con la
+                       interpretación del S5Q. -->
+                  <span id="pronoCajasOcultas" style="display:none;">
+                    <input type="checkbox" id="cProno" onchange="hPosEspecial('prono')">
+                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();">
+                    <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
+                    <input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')">
+                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();">
+                    <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
+                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
+                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
 
             <!-- ▌ EL TUBO Y LA CÁNULA — mudados desde «📊 General» el 17-sep-2026.
                  Estaban TRES SECCIONES antes de donde se usan. Al listar el
@@ -4305,66 +4370,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 </div>
               </div>
             </div>
-
-            <!-- ▌ 🔃 PRONO / SUPINO — SECCIÓN PROPIA desde el 17-sep-2026.
-                 Vivía pegado a la traqueostomía y no tienen ninguna relación.
-                 Diego: «prono y supino viven junto a TQT; eso es un
-                 procedimiento en caso de falla respiratoria catastrófica y es
-                 un evento aparte, no relacionado con TQT».
-                 Los tres posicionamientos son cosas distintas y por eso viven
-                 separados: el decúbito LATERAL es técnica del turno (favorecer
-                 un pulmón, atelectasia) y se queda en terapia respiratoria; la
-                 CABECERA 30-45° es prevención de NAVM y se fue al paso 1; el
-                 PRONO trasciende el turno y es un evento en sí mismo — «el
-                 supino se entiende como el término del prono; lo importante es
-                 el prono».
-                 Mismos IDs: fillForm, el payload y los globitos ⏱ siguen
-                 intactos; solo cambió dónde está. -->
-            <div class="sub-sec">
-<div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                  <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
-
-                  <!-- 🔴 UN EVENTO QUE ARRASTRA EL ESTADO (Diego, 19-sep-2026):
-                       «el prono como evento puede arrastrar estado hasta que se
-                       suspenda con supinar? Eso en vez de tener varios botones
-                       porque prono y se prono este turno puede confundir».
-                       Antes había SEIS controles —Prono, Se prona este turno,
-                       Supino, Se supina este turno y dos horas— y dos se
-                       llamaban casi igual que los otros dos. Ahora: un estado
-                       que se lee y UN botón. Lo cuida prono_un_boton.js. -->
-                  <span id="pronoEstado" style="font-size:.86rem;font-weight:700;color:#0e7490;"></span>
-                  <span id="pronoDesde" style="font-size:.76rem;color:var(--muted);"></span>
-                  <button type="button" id="btnProno" data-nodirty onclick="pronoAccion()"
-                    style="background:#0e7490;color:#fff;border:none;border-radius:8px;padding:6px 15px;font-size:.84rem;font-weight:700;cursor:pointer;">Pronar</button>
-                  <span id="pronoHoraBox" class="hidden" style="display:inline-flex;align-items:center;gap:4px;">
-                    <label style="font-size:.68rem;color:var(--muted);">Hora:</label>
-                    <input type="time" id="fPronoHoraVis" oninput="pronoHoraMano()" style="height:26px;font-size:.75rem;border:1px solid #a5f3fc;border-radius:5px;padding:0 4px;">
-                  </span>
-
-                  <!-- 🪤 LAS CUATRO CASILLAS SIGUEN ACÁ, ESCONDIDAS Y VIVAS.
-                       Son las que arman el payload (RESP_POS_PRONO,
-                       RESP_PRONO_EVENTO, RESP_POS_SUPINO, RESP_SUPINO_EVENTO) y
-                       las que leen fillForm y fillFormReplica. Sacarlas habría
-                       obligado a tocar el servidor, la entrega, la timeline, el
-                       texto clínico y veinticuatro guardias para un cambio que
-                       es SOLO de pantalla: lo que cambió es QUIÉN las marca, no
-                       qué se guarda. Mismo patrón que `fCoop` con la
-                       interpretación del S5Q. -->
-                  <span id="pronoCajasOcultas" style="display:none;">
-                    <input type="checkbox" id="cProno" onchange="hPosEspecial('prono')">
-                    <input type="time" id="fPronoHora" oninput="_updatePronoTip();_updateSupinoTip();">
-                    <input type="checkbox" id="cPronoEv" onchange="hPos();_renderAutoProcs();_updatePronoTip();">
-                    <input type="checkbox" id="cSupino" onchange="hPosEspecial('supino')">
-                    <input type="time" id="fSupinoHora" oninput="_updateSupinoTip();">
-                    <input type="checkbox" id="cSupinoEv" onchange="hPos();_renderAutoProcs();_updateSupinoTip();">
-                    <span id="sPronoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
-                    <span id="sSupinoTip" class="interp-tip interp-ok" data-tip="" style="display:none;">⏱</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
 
             <!-- Manejo respiratorio -->
             <div class="sub-sec">
@@ -5345,7 +5350,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.7-prono]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.8-prono-arriba]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -5958,6 +5963,18 @@ function renderGrid() {
       if(dvm>=14) al+=`<span class="abadge a-vm">⚠️ VM ${dvm}d</span>`;
       if(d>=21)   al+=`<span class="abadge a-dias">🕐 ${d}d UCI</span>`;
       if(c.KTM_SUSP===true||c.KTM_SUSP==='TRUE') al+=`<span class="abadge a-ktm">🚫 KTMC</span>`;
+      /* 🔃 PRONACIÓN EN CURSO EN LA TARJETA (Diego, 19-sep-2026: «si muestra»).
+         Para saber que la cama 7 lleva catorce horas boca abajo había que abrir
+         la evolución o leer la entrega. Cuántas horas lleva es justo lo que
+         decide cuándo supinarlo, así que va donde se mira primero.
+         🔒 SIN UMBRAL DE COLOR: Diego, el mismo día, «no hay corte». El chip se
+         ve igual con 5 horas que con 40 — inventar un número aquí sería
+         inventar un criterio clínico que la unidad no tiene. Lo fija
+         prono_arriba.js midiendo que el estilo no cambie. */
+      if(c.PRONO_DESDE){
+        const _ph=_horasTS(c.PRONO_DESDE, (c._RETRO?fecha:hoy())+' '+_horaAhoraCli());
+        al+=`<span class="abadge a-prono" title="Pronación en curso desde ${escapeHtml(_tsLegible(c.PRONO_DESDE))}">🔃 En prono${_ph===''?'':' '+escapeHtml(_hTxt(_ph))}</span>`;
+      }
       // Categorización SOCHIMI del último turno: chips R (resp) y M (motora).
       // Usa el nivel guardado con la config vigente ese turno; filas antiguas
       // (solo puntaje) se derivan con el n° de variables por defecto.
@@ -9043,7 +9060,10 @@ function guardar() {
     RESP_POS_PRONO: bv('cProno'),
     RESP_POS_SUPINO:bv('cSupino'),
     // el EVENTO del turno (v5.32): la posición describe, esto declara
-    RESP_PRONO_EVENTO: bv('cProno') && bv('cPronoEv'),
+    // 🔴 El evento no depende del estado final: se puede pronar y supinar en el
+    //    mismo turno, y entonces la fila dice que hubo pronación Y supinación
+    //    aunque el paciente termine boca arriba.
+    RESP_PRONO_EVENTO: bv('cPronoEv'),
     RESP_SUPINO_EVENTO:bv('cSupino') && bv('cSupinoEv'),
     RESP_POS_LIBRE: v('fPosLibre'),
     RESP_PRONO_TS:  v('fPronoTs'),
@@ -13216,7 +13236,10 @@ function _msTS(ts){ const m=String(ts||'').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\
 function _horasTS(a,b){ const x=_msTS(a),y=_msTS(b); if(x===null||y===null||y<x) return ''; return Math.round((y-x)/36e5*10)/10; }
 /** Inicio de la pronación abierta (la de este turno o la que trae el episodio). */
 function _pronoInicioTS(){
-  if($('cProno')?.checked&&$('cPronoEv')?.checked) return _tsEvTurno(v('gDate'),SHIFT,v('fPronoHora'));
+  /* 🔴 Basta con el EVENTO. Antes exigía además `cProno` —el estado— y por eso
+     al supinar en el mismo turno el ciclo se cerraba «sin prono que cerrar»:
+     supinar apaga el estado, pero la pronación igual ocurrió. */
+  if($('cPronoEv')?.checked) return _tsEvTurno(v('gDate'),SHIFT,v('fPronoHora'));
   return window._pronoAbierto||'';
 }
 /** Horas del ciclo que se cierra al supinar ('' si no corresponde). */
@@ -13289,13 +13312,20 @@ function _horaAhoraCli(){ const d=new Date(); return String(d.getHours()).padSta
 function _pronoSituacion(){
   const pro=!!$('cProno')?.checked, proEv=!!$('cPronoEv')?.checked;
   const sup=!!$('cSupino')?.checked, supEv=!!$('cSupinoEv')?.checked;
-  if(sup&&supEv) return 'supinado';
-  if(pro&&proEv) return 'pronado';
+  if(sup&&supEv) return 'supinado';   // gana la supinación: es lo último que pasó
+  if(proEv) return 'pronado';
   if(pro||window._pronoAbierto) return 'enprono';
   return 'supino';
 }
 
-const _PRONO_BOTON={supino:'Pronar', pronado:'Deshacer', enprono:'Supinar', supinado:'Deshacer'};
+/* 🔴 19-sep-2026 · TRAS PRONAR, «SUPINAR» AL TIRO. Diego: «podría ser que se
+   marquen prono y la hora y aparezca botón supino inmediatamente». Antes el
+   botón ofrecía «Deshacer» y no había forma de supinar en el mismo turno: un
+   prono que no se tolera y se revierte a las dos horas no se podía registrar
+   entero. 🔵 El servidor YA lo soportaba —`_pronoSellarCiclo` calcula el ciclo
+   «si se pronó y supinó en el mismo turno»—; la limitación era solo de acá.
+   El «deshacer» no desaparece: baja a enlace, al lado. */
+const _PRONO_BOTON={supino:'Pronar', pronado:'Supinar', enprono:'Supinar', supinado:'Pronar'};
 
 /** Pinta el estado y el único botón. No decide nada: lee. */
 function pronoPintar(){
@@ -13324,6 +13354,9 @@ function pronoPintar(){
     else des.textContent=ini?('desde '+_tsLegible(ini)):'';
   }
   if(btn) btn.textContent=_PRONO_BOTON[sit]||'Pronar';
+  // El «deshacer» solo cuando hay algo de ESTE turno que deshacer.
+  const und=$('btnPronoDeshacer');
+  if(und) und.classList.toggle('hidden', !(sit==='pronado'||sit==='supinado'));
   /* La hora solo se pide cuando hay un evento de ESTE turno que fecharla; en
      «en prono» arrastrado la hora es de otro turno y no se toca acá. */
   const pideHora=(sit==='pronado'||sit==='supinado');
@@ -13334,22 +13367,34 @@ function pronoPintar(){
 /** El único botón: prona, supina o deshace lo de este turno. */
 function pronoAccion(){
   const sit=_pronoSituacion();
-  if(sit==='supino'){
+  if(sit==='supino'||sit==='supinado'){
+    // Pronar. Desde 'supinado' se abre un ciclo nuevo en el mismo turno.
+    if(sit==='supinado'){ ['cSupino','cSupinoEv'].forEach(id=>{const e=$(id); if(e) e.checked=false;}); $('fSupinoHora').value=''; }
     $('cProno').checked=true; hPosEspecial('prono');
     $('cPronoEv').checked=true;
     if(!v('fPronoHora')) $('fPronoHora').value=_horaAhoraCli();
-  } else if(sit==='enprono'){
-    $('cSupino').checked=true; hPosEspecial('supino');
+  } else {
+    /* Supinar — desde 'enprono' (ciclo de antes) o desde 'pronado' (se pronó
+       hace un rato en este mismo turno y no se toleró).
+       🔴 `cPronoEv` NO se toca: el evento de pronación de este turno tiene que
+       sobrevivir a la supinación, o el ciclo se cierra «sin prono que cerrar».
+       Por eso tampoco se usa hPosEspecial('supino'), que lo desmarcaba. */
+    $('cSupino').checked=true;
+    if(!_supinoTs){ _supinoTs=Date.now(); const h=$('fSupinoTs'); if(h) h.value=_supinoTs; }
+    $('cProno').checked=false;
     $('cSupinoEv').checked=true;
     if(!v('fSupinoHora')) $('fSupinoHora').value=_horaAhoraCli();
-  } else {
-    // Deshacer: se borra lo que se marcó EN ESTE TURNO y se vuelve a lo que
-    // había. Nunca toca el ciclo de turnos anteriores.
-    ['cProno','cPronoEv','cSupino','cSupinoEv'].forEach(id=>{ const e=$(id); if(e) e.checked=false; });
-    ['fPronoHora','fSupinoHora'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
-    _pronoTs=0; _supinoTs=0;
-    const a=$('fPronoTs'); if(a) a.value=''; const bb=$('fSupinoTs'); if(bb) bb.value='';
   }
+  hPos(); _renderAutoProcs(); _updatePronoTip(); _updateSupinoTip(); pronoPintar();
+}
+
+/** Borra lo que se marcó EN ESTE TURNO. Nunca toca el ciclo de turnos
+ *  anteriores: si el paciente venía pronado, sigue pronado. */
+function pronoDeshacer(){
+  ['cProno','cPronoEv','cSupino','cSupinoEv'].forEach(id=>{ const e=$(id); if(e) e.checked=false; });
+  ['fPronoHora','fSupinoHora'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+  _pronoTs=0; _supinoTs=0;
+  const a=$('fPronoTs'); if(a) a.value=''; const b=$('fSupinoTs'); if(b) b.value='';
   hPos(); _renderAutoProcs(); _updatePronoTip(); _updateSupinoTip(); pronoPintar();
 }
 

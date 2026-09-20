@@ -488,18 +488,34 @@ patrón que `fCoop` con la interpretación del S5Q.
 
 Lo cuida `build/checks/prono_un_boton.js`.
 
-### 4.3 · Lo que quedó pendiente
+### 4.3 · Lo que faltaba, cerrado el 19-sep
 
-| # | Pendiente | Estado |
-|---|---|---|
-| 1 | Subir el prono a la primera fila, junto a vía aérea y soporte | **sin hacer** — la franja sigue donde estaba |
-| 2 | Mostrar el prono en la tarjeta de la cama | **sin hacer** |
-| 3 | ¿Hay un número de horas que valga la pena avisar? | **sin respuesta** — no invento un corte |
+> *«Sube la franja a la primera fila. Si muestra. No hay corte. Podría ser que se
+> marquen prono y la hora y aparezca botón supino inmediatamente.»*
 
-🪤 **Y una limitación que conviene saber:** si en un mismo turno se prona **y** se
-supina —un prono que no se tolera y se revierte a las dos horas—, el modelo solo
-guarda el último de los dos. Ya era así antes; no lo empeoré, pero tampoco está
-resuelto.
+1. ✅ **La franja subió a la primera fila**, junto a vía aérea y soporte, antes
+   del tubo y de los parámetros del ventilador.
+2. ✅ **El prono se ve en la tarjeta de la cama**, con las horas. Columna nueva
+   `PRONO_DESDE` en CAMAS_ESTADO (espejo del ciclo, que sigue viviendo en
+   EVOLUCIONES). 🔴 **Hay que correr `crearORepararEstructura()` al pegar.**
+3. 🔒 **No hay corte de horas.** Diego: *«no hay corte»*. El chip se ve **igual
+   con 5 horas que con 40** y la guardia lo mide: inventar un número acá sería
+   inventar un criterio clínico que la unidad no tiene.
+4. ✅ **Tras pronar aparece «Supinar» al tiro**, y con eso se resolvió la
+   limitación que quedaba: **pronar y supinar en el mismo turno**, que es el
+   prono que no se tolera y se revierte a las dos horas.
+   🔵 El servidor **ya lo soportaba** (`_pronoSellarCiclo`: «si se pronó y supinó
+   en el mismo turno, el inicio es el de esta misma fila»). La limitación era
+   solo de la pantalla: el evento de pronación dependía del estado final y
+   supinar lo borraba.
+   El «deshacer» no desapareció: bajó a **enlace chico** al lado, porque un
+   toque por error deja un evento falso en la ficha y tiene que poder borrarse.
+
+🪤 **La columna nueva nació con un bug y una guardia vieja lo cazó en el acto.**
+`alta_no_deja_rastro.js` se puso roja: al liberar la cama, `PRONO_DESDE` se
+quedaba con el ciclo del paciente **anterior** y el siguiente lo heredaba —la
+cama nueva habría dicho «En prono 14 h» sin nadie dentro—. Es exactamente para
+eso que esa guardia existe.
 
 🔃 **Lo que la guardia de las horas dejó mejor de paso.** `prono_horas_a_la_vista`
 existe porque Manuel avisó que no se veían las horas en el celular: el número

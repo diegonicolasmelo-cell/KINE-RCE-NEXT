@@ -2326,3 +2326,37 @@ Sello de entrega: `NEXT-2.7-prono`.
 ### Los cuatro acuerdos, cerrados
 
 1 · Ingreso · 2 · Respiratorio · 3 · Evaluaciones y KTM · 4 · Prono.
+
+---
+
+## 20-sep-2026 · El prono, arriba y en la tarjeta
+
+Cuatro cosas de Diego en una línea: *«Sube la franja a la primera fila. Si
+muestra. No hay corte. Podría ser que se marquen prono y la hora y aparezca
+botón supino inmediatamente.»*
+
+- **La franja subió** a la primera fila, junto a vía aérea y soporte, antes del
+  tubo y de los parámetros del ventilador. Termina la mudanza que empezó el
+  17-sep cuando salió de la traqueostomía.
+- **El prono se ve en la tarjeta**, con las horas. Columna nueva `PRONO_DESDE`
+  en CAMAS_ESTADO: espejo del ciclo, que sigue viviendo en EVOLUCIONES.
+- 🔒 **No hay corte de horas.** El chip se ve igual con 5 h que con 40, y la
+  guardia lo mide — para que nadie (yo en tres meses) invente un umbral que la
+  unidad no tiene.
+- **Tras pronar aparece «Supinar» al tiro**, y eso resolvió la limitación que
+  quedaba: **pronar y supinar en el mismo turno**. 🔵 El servidor ya lo
+  soportaba; la limitación era solo de la pantalla, donde el evento de
+  pronación dependía del estado final y supinar lo borraba.
+
+### 🪤 La columna nueva nació con un bug, y una guardia vieja lo cazó sola
+
+`alta_no_deja_rastro.js` se puso roja apenas agregué `PRONO_DESDE`: al liberar
+la cama, la columna se quedaba con el ciclo del paciente **anterior** y el
+siguiente lo heredaba. La cama recién desocupada habría dicho «En prono 14 h»
+sin nadie dentro. No la escribí para esto — la escribieron para una familia de
+fallas, y esta columna cayó justo ahí. Es el mejor argumento a favor de las
+guardias que miran una regla y no un caso.
+
+**185 guardias · 185 verdes.** Nueva: `prono_arriba.js`.
+Sello de entrega: `NEXT-2.8-prono-arriba`.
+🔴 **La próxima tanda necesita `crearORepararEstructura()`** — hay columna nueva.

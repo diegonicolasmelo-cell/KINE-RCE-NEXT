@@ -1248,6 +1248,11 @@ function _limpiarCamaInterno(idCama) {
     PENDIENTES_JSON: '',
     // La interfaz es del episodio: se va con el paciente.
     INTERFAZ: '',
+    // 🔃 El espejo de la pronación (19-sep-2026). Sin esto, la cama recién
+    // liberada seguía diciendo «En prono 14 h» con el ciclo del paciente
+    // ANTERIOR, y el siguiente lo heredaba. Lo cazó `alta_no_deja_rastro.js`
+    // apenas nació la columna: exactamente para eso existe.
+    PRONO_DESDE: '',
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }
@@ -5528,6 +5533,16 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
     TS_INICIO_VA: horaVA,
     TS_INICIO_SOPORTE: horaSoporte,
     TS_INGRESO: cama.TS_INGRESO || '',
+    /* 🔃 Espejo de la pronación abierta para la TARJETA (Diego, 19-sep-2026:
+       «si muestra»). El ciclo de verdad vive en EVOLUCIONES; esto es lo único
+       que la cama necesita saber: desde cuándo está boca abajo, o vacío.
+       Se supina → se limpia; se prona → queda el momento de ESTA fila; si no
+       pasó nada en el turno, se conserva lo que la cama ya traía, que es lo
+       que hace que el estado ARRASTRE aunque un turno no se registre. */
+    PRONO_DESDE: esVerdadero(evo.RESP_SUPINO_EVENTO) ? ''
+               : (esVerdadero(evo.RESP_PRONO_EVENTO)
+                    ? (evo.PRONO_INICIO_TS || _tsEventoTurno(fecha, turno, evo.RESP_PRONO_HORA))
+                    : (cama.PRONO_DESDE || '')),
   };
   // Solo viaja si un tramo nuevo soltó su marca: si no, ni se menciona la
   // columna y el sello de correcciones queda intacto.

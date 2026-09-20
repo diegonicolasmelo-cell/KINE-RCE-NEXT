@@ -459,6 +459,14 @@ const ESQUEMA = {
     // 🫁 La interfaz vigente (16-sep-2026), hermana de VIA_AEREA y SOPORTE:
     // la cama dice con qué dispositivo está el paciente ahora.  — AL FINAL
     ['INTERFAZ','texto','Interfaz (mascarilla, naricera…)'],
+    // 🔃 Pronación EN CURSO (19-sep-2026, Diego: «si muestra»). Hasta acá, para
+    // saber que la cama 7 llevaba catorce horas boca abajo había que abrir la
+    // evolución o leer la entrega. El ciclo completo vive en EVOLUCIONES
+    // (PRONO_INICIO_TS / SUPINO_TS / PRONO_HORAS); esto es solo el espejo que
+    // la TARJETA necesita: el momento en que empezó la pronación abierta, o
+    // vacío si el paciente no está en prono. Lo escribe el guardado del turno,
+    // igual que los ULT_* de arriba.  — SIEMPRE AL FINAL
+    ['PRONO_DESDE','texto','Pronación en curso desde'],
   ]},
   EVOLUCIONES:         { headerRows: 3, cols: _COLS_EVOLUCIONES },
   EVOLUCIONES_ARCHIVO: { headerRows: 3, cols: _COLS_EVOLUCIONES },

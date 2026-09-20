@@ -889,6 +889,16 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
     TS_INICIO_VA: horaVA,
     TS_INICIO_SOPORTE: horaSoporte,
     TS_INGRESO: cama.TS_INGRESO || '',
+    /* 🔃 Espejo de la pronación abierta para la TARJETA (Diego, 19-sep-2026:
+       «si muestra»). El ciclo de verdad vive en EVOLUCIONES; esto es lo único
+       que la cama necesita saber: desde cuándo está boca abajo, o vacío.
+       Se supina → se limpia; se prona → queda el momento de ESTA fila; si no
+       pasó nada en el turno, se conserva lo que la cama ya traía, que es lo
+       que hace que el estado ARRASTRE aunque un turno no se registre. */
+    PRONO_DESDE: esVerdadero(evo.RESP_SUPINO_EVENTO) ? ''
+               : (esVerdadero(evo.RESP_PRONO_EVENTO)
+                    ? (evo.PRONO_INICIO_TS || _tsEventoTurno(fecha, turno, evo.RESP_PRONO_HORA))
+                    : (cama.PRONO_DESDE || '')),
   };
   // Solo viaja si un tramo nuevo soltó su marca: si no, ni se menciona la
   // columna y el sello de correcciones queda intacto.

@@ -482,6 +482,11 @@ function _limpiarCamaInterno(idCama) {
     PENDIENTES_JSON: '',
     // La interfaz es del episodio: se va con el paciente.
     INTERFAZ: '',
+    // 🔃 El espejo de la pronación (19-sep-2026). Sin esto, la cama recién
+    // liberada seguía diciendo «En prono 14 h» con el ciclo del paciente
+    // ANTERIOR, y el siguiente lo heredaba. Lo cazó `alta_no_deja_rastro.js`
+    // apenas nació la columna: exactamente para eso existe.
+    PRONO_DESDE: '',
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }

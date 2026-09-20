@@ -77,7 +77,15 @@ async function leer(p) {
     const btn = document.getElementById('btnProno');
     return {
       // lo que ve el colega
-      botones: [...document.querySelectorAll('#dPronoStrip button')].filter(visible).map(b => b.textContent.trim()),
+      /* 🔃 19-sep-2026 · «Un solo botón» pasó a ser «un solo botón de ACCIÓN».
+         Diego pidió que tras pronar apareciera «Supinar» al tiro, y eso dejó
+         sin lugar al «Deshacer» que antes ocupaba el botón principal: bajó a
+         enlace subrayado, deliberadamente chico, para que un toque por error
+         se pueda borrar sin competir con la acción. Se cuentan los botones de
+         acción; el enlace se mide aparte. */
+      botones: [...document.querySelectorAll('#dPronoStrip button')].filter(visible)
+                 .filter(b => b.id !== 'btnPronoDeshacer').map(b => b.textContent.trim()),
+      deshacerALaVista: visible(document.getElementById('btnPronoDeshacer')),
       textoBoton: btn ? btn.textContent.trim() : '(no hay)',
       estado: (document.getElementById('pronoEstado') || {}).textContent
                 ? document.getElementById('pronoEstado').textContent.replace(/\s+/g, ' ').trim() : '',
@@ -136,7 +144,8 @@ async function leer(p) {
   eq('★ la hora quedó guardada', R.col.PRONO_HORA, '21:30');
   si('★ la pantalla dice que está en prono', /prono/i.test(R.estado));
   eq('★★ y sigue habiendo UN solo botón', R.botones.length, 1);
-  si('★ que ahora ofrece deshacer', /deshacer/i.test(R.textoBoton));
+  si('★★ y ya ofrece supinar en el mismo turno (Diego, 19-sep)', /supinar/i.test(R.textoBoton));
+  si('★ con el enlace para deshacer si fue un toque por error', R.deshacerALaVista);
 
   /* ══ 4 · El estado se arrastra solo al turno siguiente ════════════════ */
   console.log('\n4 · 🔴 El ciclo abierto arrastra el estado, sin volver a marcarlo');
