@@ -2739,3 +2739,110 @@ comparación se cumplía sola y la guardia no probaba nada. La caché al correrl
 
 **193 guardias · 193 verdes.** Nueva: `ingreso_paso_cero.js`.
 Sello de entrega: `NEXT-3.6-paso-cero`.
+
+---
+
+## 20-sep-2026 · Intubar a un paciente que llegó con vía aérea natural · Tanda 3.7
+
+Diego, probando el módulo del turno: «*no puedo intubar a un paciente que llegó
+con natural… sí pude pero se debía declarar arriba y me deja 2 historias, y
+necesito intubar y luego seguir con ese flujo*».
+
+### Lo que estaba pasando, que era peor de lo reportado
+
+Se reprodujo con una sonda sobre un paciente en **Natural · Ambiente**:
+
+| | decía |
+|---|---|
+| la cama | Natural · Ambiente |
+| «📍 Estado previo» del bloque de intubación | **TOT · VM · ACVC** |
+| `INTUB_SOP_PREVIO` (lo que se GUARDA) | **VM** |
+
+O sea: la evolución afirmaba que **se intubó a un paciente que ya estaba
+intubado**. La afirmación clínica falsa más fuerte que quedaba en el sistema
+después de la hemodinamia.
+
+La causa es un orden. `setEventoVA('intub')` llama a `fijarVA('TOT')`, que
+cambia la vía aérea **de arriba**, y recién después el bloque del evento lee
+«cómo estaba el paciente» — de arriba, que ya cambió. El comentario del código
+de julio dice, con todas sus letras, «el bloque de arriba queda como ESTADO
+PREVIO y NO se toca»; el código de septiembre lo tocaba. Nadie lo notó porque
+el caso solo se ve cuando el evento ocurre **en el mismo turno en que el
+paciente llega**: con un turno anterior, el estado previo se reconstruye de la
+fila de ayer y la mentira queda tapada.
+
+Y las «2 historias» son el mismo hecho: arriba quedaba en TOT · VM y el panel
+«✅ Queda con (post-intubación)» —un módulo ventilatorio ENTERO, duplicado—
+volvía a pedir TOT · VM.
+
+### Lo que decidió Diego
+
+Se le presentaron las dos formas de arreglarlo, porque cambian cómo se usa la
+pantalla. Eligió **una sola planilla**: declara la intubación arriba y sigue en
+el mismo módulo de siempre; el sistema le saca una **foto** al estado previo y
+la guarda solo.
+
+### Lo que se programó
+
+**1 · La foto del estado previo.** `_tomarFotoPrevioVA()` corre en
+`setEventoVA` **antes** de que `fijarVA` mueva nada. De ahí salen el «📍 Estado
+previo», `INTUB_SOP_PREVIO`, `INTUB_VA_PREVIA` e `INTUB_MODO_PREVIO`. La foto no
+se repisa —describe un instante— y se olvida al deshacer el evento y al cerrar
+el panel, para que no la herede el paciente siguiente.
+
+**2 · El espejo.** El panel «Queda con» de la intubación (`dIntubQueda`) y el de
+la reintubación (`dReintubQueda`) se esconden, y `_espejarPostEvento()` copia lo
+que se llenó arriba a sus campos: vía aérea, soporte, interfaz, modo, N° de tubo,
+fijación y los parámetros `pi_*` / `pr_*`.
+
+🔴 **Los campos no se borran, se esconden** — igual que las casillas del prono.
+Son los que arman `INTUB_VA_POST`, `VENT_VIA_AEREA_FINAL` y compañía, y los lee
+el servidor. Lo que se va es la SEGUNDA PREGUNTA, no el dato.
+
+🪤 **El espejo tiene una puerta: solo actúa si arriba ya dice la verdad**
+(vía aérea TOT o TQT). Si alguien marca la casilla a mano sin declarar el evento
+arriba, el paciente sigue figurando en Natural y copiar *eso* al panel «queda
+con» guardaría que quedó respirando espontáneo tras intubarse. En ese caso el
+panel vuelve a mostrarse y se llena como antes. Sin esa puerta, marcar la
+casilla con el paciente en oxigenoterapia regeneraba la caja de parámetros SIN
+las variables de VM, y `$('pi_vt')` quedaba en null: lo cazaron
+`interfaz_estado_final.js` y `via_aerea_previo.js`.
+
+🪤 **El espejo se registró como CASCADA** (`_CASCADAS`), no con un borrado
+propio. Marcar y desmarcar la reintubación dejaba el N° de tubo y la fijación
+puestos en campos invisibles; el primer intento —borrarlos dentro del espejo—
+arrasaba con lo escrito a mano, porque el espejo corre con **cada** cambio del
+formulario. El proyecto ya tenía el mecanismo de «deshacer el manotazo»: bastó
+con entrar en él. Lo cazó `panel_no_pisa_datos.js` las dos veces.
+
+🪤 **La TQT NO entró en esta tanda.** Ella ya había resuelto lo mismo **al
+revés** y hace tiempo: esconde el módulo de arriba (`_gateVentPorTqt`) y deja el
+suyo. Las dos formas cumplen «una sola planilla», así que se arregló lo que
+duplicaba y no se tocó lo que funciona. Unificarlas es una decisión de Diego, no
+un arreglo, y queda anotada como pendiente.
+
+### La guardia
+
+`intubar_desde_natural.js`, escrita **primero** y vista **roja con 26 fallos**
+contra el código sin arreglar. Mide seis cosas: que el estado previo diga
+Natural y no TOT ni VM; que no haya dos módulos ventilatorios a la vista; que
+los campos escondidos sigan en el documento; que tras la intubación el turno
+siga como paciente intubado (cuff y succión endotraqueal); que lo escrito
+arriba viaje al payload como estado posterior; y que la foto se olvide al
+deshacer el evento.
+
+🪤 **Y volvió a caer en la trampa de siempre**: el cuff se midió desde el paso 2
+y dio «oculto» sin que nada estuviera roto — vive en el paso 1, con el paquete
+de prevención de NAVM. Cuarta vez en este proyecto. La guardia se para en el
+paso 1 para medirlo y vuelve.
+
+🪤 El reloj va congelado: fecha inventada (12-ago-2026, fuera de las ventanas
+trampa) y turno forzado.
+
+### Lo que apareció de paso y NO se tocó
+
+Con el paciente ya en TOT, el guardado **exige declarar la PVE del turno** —una
+prueba de ventilación espontánea a alguien recién intubado—. Pasa desde antes de
+esta tanda y no es lo que Diego reportó, así que queda anotado, no arreglado.
+
+**194 guardias verdes.** Sello `NEXT-3.7-intubar-natural`.

@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.6-paso-cero">
+<meta name="rce-version" content="NEXT-3.7-intubar-natural">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -4431,8 +4431,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <div id="lblIntubPrevio" style="font-size:.78rem;color:#334155;font-weight:600;">—</div>
                     <input type="hidden" id="fIntubSopPrevio">
                   </div>
-                  <!-- ESTADO POSTERIOR: panel nuevo, no reemplaza nada de arriba -->
-                  <div style="padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;">
+                  <!-- 🔴 ESTADO POSTERIOR — ESCONDIDO Y VIVO (Diego, 20-sep-2026:
+                       «me deja 2 historias»). Este panel repetía el módulo
+                       ventilatorio ENTERO que ya está arriba: el colega
+                       declaraba la intubación, la vía aérea de arriba pasaba a
+                       TOT · VM y acá abajo se le volvía a preguntar lo mismo.
+                       Ahora la planilla es UNA: se llena arriba y `_espejarPostEvento()`
+                       copia el resultado a estos campos.
+                       🔴 NO SE BORRAN, SE ESCONDEN — igual que las casillas del
+                       prono. Son los que arman INTUB_VA_POST, INTUB_SOP_POST,
+                       VENT_VIA_AEREA_FINAL y los parámetros `pi_*`, y los lee
+                       el servidor; borrarlos obligaría a reescribir el guardado.
+                       Lo que se va es la SEGUNDA PREGUNTA, no el dato. -->
+                  <div id="dIntubQueda" class="hidden" style="padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;">
                     <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;color:#15803d;margin-bottom:7px;letter-spacing:.04em;">✅ Queda con (post-intubación)</div>
                     <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;">
                       <div class="col wa"><label style="font-size:.66rem;">Vía aérea</label>
@@ -4455,9 +4466,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <!-- Módulo ventilatorio COMPLETO del estado posterior: las
                          mismas variables y derivados del bloque de arriba. -->
                     <div id="paramsBoxIntub"></div>
-                    <div style="font-size:.68rem;color:#166534;background:#dcfce7;padding:4px 8px;border-radius:5px;margin-top:6px;">
-                      💡 Arriba queda registrado cómo estaba el paciente; aquí, cómo quedó. El siguiente turno evoluciona desde este estado.
-                    </div>
+                  </div>
+                  <div style="font-size:.68rem;color:#166534;background:#dcfce7;padding:4px 8px;border-radius:5px;margin-top:6px;">
+                    💡 Cómo estaba el paciente ya quedó registrado acá arriba. El ventilador con el que queda se llena <b>una sola vez</b>, en «Terapia ventilatoria», como cualquier turno.
                   </div>
                 </div>
               </div>
@@ -5489,7 +5500,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.6-paso-cero]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.7-intubar-natural]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -7074,6 +7085,7 @@ function abrirPanel(id, esIng, verFicha) {
   const _spCod=$('spCod'); if(_spCod) _spCod.textContent='';
   hide('dReintubDetT'); hide('dIntubDet');
   _vmHistFlag=false; _transIntubEsteTurno=false; window._vfonHoras=0; window._pronoAbierto='';
+  _olvidarFotoPrevioVA();   // la foto del previo es de ESTE paciente y este turno
   const _cct=$('cCambioTOT'); if(_cct) _cct.checked=false; _totSnapshot=null; _lockTOT(false);
   hide('dCambioTOTmot'); hide('dCambioTOTdet');
   ['cProcImagen','cProcPabellon','cProcAsistMed'].forEach(id=>{ const e=$(id); if(e) e.checked=false; });
@@ -8440,6 +8452,15 @@ const _CASCADAS={
   fGCSO: ['fS5Q'], fGCSV: ['fS5Q'], fGCSM: ['fS5Q'],
   cHAct: ['fFecHME'],
   cTqtO: ['poTqtModo'], cIntubO: ['poIntubModo'], poReintubSop: ['poReintubModo'],
+  /* 🔴 EL ESPEJO TAMBIÉN ES UNA CASCADA (20-sep-2026). Desde «una sola
+     planilla», declarar el evento COPIA lo de arriba a los campos escondidos
+     del panel «queda con». Eso es una cascada como cualquier otra: si el colega
+     marca y desmarca, lo copiado tiene que irse con ella. Registrarla acá la
+     deja en el mismo mecanismo de siempre en vez de inventar un borrado aparte
+     —que sí se probó y arrasaba con lo escrito a mano—. Lo cazó
+     `panel_no_pisa_datos.js` con el N° de tubo y la fijación. */
+  cReintubT: ['poReintubTotN','poReintubTotCm','poReintubSop','poReintubInterfaz','poReintubModo'],
+  cReintub:  ['poReintubTotN','poReintubTotCm','poReintubSop','poReintubInterfaz','poReintubModo'],
 };
 const _CASC_KTM=['cBNM','fSAS'];   // además devuelven el estado de la KTM
 function _campoVal(id){ const e=$(id); return e ? ((e.type==='checkbox'||e.type==='radio')?String(e.checked):String(e.value||'')) : null; }
@@ -9092,6 +9113,11 @@ function guardar() {
     const _avs=_avisosPreGuardado();
     if(_avs.length){ _mostrarTransAviso(_avs); return; }
   }
+  /* 🔴 El espejo corre SIEMPRE antes de armar el payload. El listener de
+     `change` cubre el uso normal, pero un número recién tecleado que todavía no
+     perdió el foco no lo dispara — y ese número es justo el que el colega acaba
+     de escribir cuando aprieta 💾. */
+  try{ _espejarPostEvento(); }catch(e){}
   const datos={
     ID_CAMA:id, TURNO_KEY:tkey, ES_INGRESO:v('cIng')==='true',
     TRANS_MOTIVO:_transMotivo||'',   // 🗂️ razón escrita si la vía aérea cambió sin evento (va al hito, no a EVOLUCIONES)
@@ -9380,9 +9406,13 @@ function guardar() {
     INTUB_OCURRIO:   bv('cIntubO'),
     INTUB_HORA:      v('fIntubHora'),
     INTUB_DET:       v('fIntubDet'),
+    /* 🔴 EL PREVIO SALE DE LA FOTO, NO DE ARRIBA (20-sep-2026). Arriba ya
+       cambió: al declarar la intubación la vía aérea pasa a TOT. Leerlo de ahí
+       hacía que la evolución afirmara «previo: TOT · VM» de un paciente que
+       llegó en Natural · Ambiente — se intubó a alguien ya intubado. */
     INTUB_SOP_PREVIO: bv('cIntubO') ? (v('fIntubSopPrevio')||_sopPrevioAuto()) : '',
-    INTUB_VA_PREVIA:  bv('cIntubO') ? v('fVA') : '',
-    INTUB_MODO_PREVIO: bv('cIntubO') ? (dispositivoActual()||v('fModo')) : '',
+    INTUB_VA_PREVIA:  bv('cIntubO') ? _vaPrevioAuto() : '',
+    INTUB_MODO_PREVIO: bv('cIntubO') ? _modoPrevioAuto() : '',
     TOT_CAMBIO:      bv('cCambioTOT'),
     TOT_CAMBIO_MOTIVO: v('fCambioTOTmot')==='Otro' ? (v('fCambioTOTdet')||'Otro') : v('fCambioTOTmot'),
     TQT_CAMBIO:      bv('cCambioTQT'),
@@ -14977,7 +15007,35 @@ let _dispSnapshot=null;
    intubado (o traqueostomizado) es parte esencial del registro. El bloque de
    arriba queda como ESTADO PREVIO y el evento despliega su propio panel con el
    estado en que QUEDA. El soporte previo ya no se escribe a mano: se deduce. */
-function _resumenPrevio(){
+/* 🔴 LA FOTO DEL ESTADO PREVIO (Diego, 20-sep-2026, tras «no puedo intubar a
+   un paciente que llegó con natural»).
+   EL BUG: `setEventoVA('intub')` fija la vía aérea ARRIBA (a TOT) y recién
+   después el bloque del evento lee «cómo estaba el paciente» — de arriba, que
+   ya cambió. Con un paciente en Natural · Ambiente el registro terminaba
+   diciendo «previo: TOT · VM», o sea que se intubó a alguien ya intubado, y
+   eso se GUARDABA en INTUB_SOP_PREVIO.
+   LA FOTO: al declarar el evento, y ANTES de tocar nada, se guarda cómo estaba
+   el paciente. Desde ahí sale el «📍 Estado previo» y las columnas *_PREVIO.
+   🪤 La foto NO se repisa: si el colega sigue completando el ventilador (que
+   ahora es el de arriba, porque la planilla es una sola), el previo se quedó
+   quieto en el momento del evento, que es lo que describe. Se olvida al
+   deshacer el evento y al cerrar el panel; si no, el próximo evento heredaría
+   un previo de otro paciente. */
+let _fotoPrevioVA=null;
+function _tomarFotoPrevioVA(){
+  if(_fotoPrevioVA) return;
+  _fotoPrevioVA={ va:v('fVA'), sop:v('fSop'), interfaz:v('fInterfaz'), modo:v('fModo'),
+                  resumen:_resumenAhora(), sopNorm:_sopNormAhora(),
+                  modoPrevio:(typeof dispositivoActual==='function'?(dispositivoActual()||v('fModo')):v('fModo')) };
+}
+function _olvidarFotoPrevioVA(){ _fotoPrevioVA=null; }
+/** Cómo estaba el paciente ANTES del evento (la foto manda sobre lo de arriba). */
+function _resumenPrevio(){ return _fotoPrevioVA ? _fotoPrevioVA.resumen : _resumenAhora(); }
+function _sopPrevioAuto(){ return _fotoPrevioVA ? _fotoPrevioVA.sopNorm : _sopNormAhora(); }
+function _vaPrevioAuto(){ return _fotoPrevioVA ? _fotoPrevioVA.va : v('fVA'); }
+function _modoPrevioAuto(){ return _fotoPrevioVA ? _fotoPrevioVA.modoPrevio
+  : ((typeof dispositivoActual==='function'?dispositivoActual():'')||v('fModo')); }
+function _resumenAhora(){
   // 🫁 El dispositivo entra al resumen igual que el modo (16-sep-2026): con
   // oxigenoterapia lo que identifica al paciente es la naricera o el alto
   // flujo, no un modo ventilatorio que ahí no existe.
@@ -14990,7 +15048,7 @@ function _resumenPrevio(){
   return cab+(par?' — '+par:'');
 }
 /** Soporte previo normalizado para la estadística (VNI, CNAF, naricera, ambiente…) */
-function _sopPrevioAuto(){
+function _sopNormAhora(){
   const sop=v('fSop'), modo=v('fModo');
   // 🫁 Desde los tres ejes (16-sep-2026) el dispositivo vive en su campo; el
   // modo se mira igual para las evoluciones de antes, que lo guardaron ahí.
@@ -15033,6 +15091,63 @@ function _quedaConEjes(va, sop, ids){
   const ver=(id,hay)=>{ const c=$(id); if(c) c.style.display = hay ? '' : 'none'; };
   ver(ids.wModo, modos.length && modos[0]!=='Sin soporte');
   ver(ids.wInterfaz, interfaces.length);
+}
+/* 🔴 EL ESPEJO — UNA SOLA PLANILLA (Diego, 20-sep-2026).
+   Los paneles «Queda con» de la intubación y la reintubación volvían a pedir el
+   módulo ventilatorio ENTERO que ya está arriba: eso eran las «2 historias».
+   Ahora se esconden y esta función copia arriba → abajo, para que el guardado
+   —que lee los `po*` y los parámetros `pi_`/`pr_`— siga viendo exactamente lo
+   mismo que antes. No hay dato nuevo ni columna nueva: cambia DÓNDE se escribe.
+   🪤 La TQT NO entra acá: ella ya resolvió lo mismo al revés (esconde el módulo
+   de arriba y deja el suyo, ver `_gateVentPorTqt`). Unificar las dos formas es
+   una decisión de Diego, no un arreglo; mientras tanto cada una tiene UNA sola
+   planilla, que es lo que importaba.
+   🪤 El orden importa: primero el soporte, después `renderParams*` —que repuebla
+   los selects de interfaz y modo y REGENERA la caja de parámetros—, y recién
+   entonces los valores. Al revés, lo copiado se pierde en el redibujo. */
+function _espejarPostEvento(){
+  const pon=(id,val)=>{ const e=$(id); if(e) e.value=(val==null?'':String(val)); };
+  /* 🔴 EL ESPEJO SOLO ACTÚA SI ARRIBA YA DICE LA VERDAD. El evento se declara en
+     la fila «¿Qué pasó hoy con la vía aérea?», que deja la vía aérea de arriba
+     en TOT/TQT — y recién entonces arriba es el estado posterior y se puede
+     copiar. Si alguien marca la casilla a mano sin declararlo arriba, el
+     paciente sigue figurando en Natural: copiar ESO al panel «queda con» sería
+     guardar que quedó respirando espontáneo tras intubarse. En ese caso el
+     panel vuelve a mostrarse y se llena como antes.
+     🪤 Sin esta puerta, marcar la casilla con el paciente en oxigenoterapia
+     regeneraba la caja de parámetros SIN las variables de VM. Lo cazaron
+     `interfaz_estado_final.js` y `via_aerea_previo.js`. */
+  const arribaInv = (v('fVA')==='TOT' || v('fVA')==='TQT');
+  const cajaI=$('dIntubQueda'); if(cajaI) cajaI.classList.toggle('hidden', arribaInv);
+  const copiarParams=(P)=>{
+    document.querySelectorAll('[id^="'+P+'"]').forEach(e=>{
+      if(!e.id || (e.tagName!=='INPUT'&&e.tagName!=='SELECT')) return;
+      const gemelo=$('r_'+e.id.slice(P.length)); if(gemelo) e.value=gemelo.value;
+    });
+    try{ if(typeof calcResp==='function') calcResp({id:P+'vt'}); }catch(x){}
+  };
+  if($('cIntubO')?.checked && arribaInv){
+    pon('poIntubVA', v('fVA')==='TQT'?'TQT':'TOT');
+    pon('poIntubSop', (v('fSop')==='VM'||v('fSop')==='Oxigenoterapia/OAF')?v('fSop'):'VM');
+    try{ renderParamsIntub(); }catch(x){}
+    pon('poIntubInterfaz', v('fInterfaz'));
+    pon('poIntubModo', v('fModo'));
+    try{ renderParams({P:'pi_',L:'pl_',box:'paramsBoxIntub'}); }catch(x){}
+    pon('poIntubTotN', v('fTOTn')); pon('poIntubTotCm', v('fTOTcm'));
+    copiarParams('pi_');
+  }
+  const hayReintub = (typeof _extReintub==='function' && _extReintub()) || !!$('cReintubT')?.checked;
+  const cajaR=$('dReintubQueda');
+  if(cajaR && !(hayReintub && arribaInv)) cajaR.classList.toggle('hidden', !hayReintub);
+  if(hayReintub && arribaInv){
+    pon('poReintubSop', (v('fSop')==='VM'||v('fSop')==='Oxigenoterapia/OAF')?v('fSop'):'VM');
+    try{ renderParamsReintub(); }catch(x){}
+    pon('poReintubInterfaz', v('fInterfaz'));
+    pon('poReintubModo', v('fModo'));
+    try{ renderParams({P:'pr_',L:'prl_',box:'paramsBoxReintub'}); }catch(x){}
+    pon('poReintubTotN', v('fTOTn')); pon('poReintubTotCm', v('fTOTcm'));
+    copiarParams('pr_');
+  }
 }
 function renderParamsIntub(){
   const va=v('poIntubVA')||'TOT', sop=v('poIntubSop')||'VM';
@@ -15088,14 +15203,21 @@ function _panelReintub(destinoId){
   const panel=$('dReintubQueda'); if(!panel) return;
   if(!destinoId){ panel.classList.add('hidden'); return; }
   const dest=$(destinoId); if(dest) dest.appendChild(panel);
-  panel.classList.remove('hidden');
+  /* 🔴 UNA SOLA PLANILLA (20-sep-2026): el panel se sigue MUDANDO a la rama
+     activa —para que sus ids vivan en un solo lugar y lo escrito no se pierda
+     al cambiar de camino— pero ya NO se muestra: repetía el módulo ventilatorio
+     de arriba. Lo llena `_espejarPostEvento()` con lo que el colega escribió en
+     «Terapia ventilatoria». */
+  panel.classList.add('hidden');
   renderParamsReintub();
+  _espejarPostEvento();
 }
 function hIntub(){
   if($('cIntubO')?.checked){
     show('dIntubDet');
     _pintarPrevios();
     renderParamsIntub();
+    _espejarPostEvento();
     // Circuito nuevo: los dispositivos se fechan hoy (el previo no tenía VM)
     _dispSnapshot={hme:v('fFecHME'),hepa:v('fFecHEPA'),tc:v('fFecSonda')};
     autoFechasDispositivos(true,true);
@@ -19287,6 +19409,10 @@ function _pintarFilaEventoVA(){
 }
 /** El evento se declara aquí; él abre su bloque y fija la vía aérea. */
 function setEventoVA(tipo){
+  // 🔴 La foto del estado previo va PRIMERO, antes de que `fijarVA` mueva la
+  // vía aérea de arriba: si va después, el previo copia el estado posterior y
+  // el registro afirma que se intubó a un paciente que ya estaba intubado.
+  if(tipo&&tipo!=='nada') _tomarFotoPrevioVA();
   _evVAAnunciado=tipo||'nada';
   const scrollA=id=>{ const e=$(id); if(e){ e.scrollIntoView({behavior:'smooth',block:'center'}); e.style.outline='2px solid #1d4ed8'; setTimeout(()=>{e.style.outline='';},2500); } };
   const fijarVA=va=>{ const s=$('fVA'); if(!s) return; s.disabled=false; s.value=va; cascadeVA(); };
@@ -19294,6 +19420,7 @@ function setEventoVA(tipo){
     [['cIntubO',hIntub],['cTqtO',hTqtO],['cDecanOcurrio',hDecan]].forEach(([id,fn])=>{ const e=$(id); if(e&&e.checked){ e.checked=false; try{ fn(); }catch(x){} } });
     ['cReintub','cReintubT'].forEach(id=>{ const e=$(id); if(e&&e.checked){ e.checked=false; try{ ({cReintub:hReintubCheck,cReintubT:hReintubCheckT})[id](); }catch(x){} } });
     const ce=$('cExtSinPve'); if(ce&&ce.checked){ ce.checked=false; try{ hExtSinPve(); }catch(x){} }
+    _olvidarFotoPrevioVA();   // sin evento no hay «antes»: el próximo saca la suya
     fijarVA(_iniVA);
   } else if(tipo==='intub'){
     const e=$('cIntubO'); if(e&&!e.checked){ e.checked=true; hIntub(); }
@@ -19317,6 +19444,7 @@ function setEventoVA(tipo){
     const e=$('cDecanOcurrio'); if(e&&!e.checked){ e.checked=true; hDecan(); }
     fijarVA('Natural'); scrollA('dDecanDet');
   }
+  _pintarPrevios(); _espejarPostEvento();
   _pintarFilaEventoVA(); _lineaFinaVA();
   if(typeof _renderAutoProcs==='function') _renderAutoProcs();
 }
@@ -19329,7 +19457,7 @@ function _lineaFinaVA(){
   s.title=libre?'':'La vía aérea la cambia un evento: decláralo arriba en «¿Qué pasó hoy con la vía aérea?»';
   s.style.opacity=libre?'':'.75';
 }
-try{ document.getElementById('kf')?.addEventListener('change', ()=>{ try{ _lineaFinaVA(); _pintarFilaEventoVA(); }catch(e){} }); }catch(e){}
+try{ document.getElementById('kf')?.addEventListener('change', ()=>{ try{ _lineaFinaVA(); _pintarFilaEventoVA(); _espejarPostEvento(); }catch(e){} }); }catch(e){}
 
 // ── El banner del episodio y el estado que no se hereda ──────────────────
 function _episodioAlFormulario(){
