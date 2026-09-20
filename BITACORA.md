@@ -2512,3 +2512,38 @@ vez el jueves son dos encargos distintos.
 
 **189 guardias · 189 verdes.** Nueva: `pendiente_arrastra.js`.
 Sello de entrega: `NEXT-3.2-pendiente-dura`.
+
+---
+
+## 20-sep-2026 · «¿Los pendientes se quedan en la cama?»
+
+Diego, leyendo que los pendientes «viven en la cama»: *«¿si traslado el paciente
+a otra cama, se quedan los pendientes en la cama y no siguen al paciente? ¿El
+que ingrese a esa cama heredará esos pendientes?»*
+
+La respuesta es que **viajan con el paciente**, y la comprobé antes de decirla.
+Pero la pregunta era buena por lo que apunta: **heredar los encargos del
+paciente anterior es peor que perderlos**, porque nadie duda de un pendiente que
+aparece escrito. Alguien iría a pedir un pabellón que no corresponde.
+
+🪤 **Y era cierto por una razón frágil.** Los dos traslados copian la fila
+ENTERA de la cama con `Object.assign`, así que `PENDIENTES_JSON` viajaba «de
+regalo». Nadie lo decidió: salió gratis. El día que alguien reescriba el
+traslado campo por campo —que es lo natural al agregar una columna— los
+pendientes se quedarían atrás sin que nada avise.
+
+Quedó `pendientes_siguen_al_paciente.js`, que mide **el comportamiento y no la
+implementación**, en los tres caminos: mover a cama vacía, intercambiar dos
+ocupadas y el alta.
+
+🪤 **La guardia nació verde**, y una guardia que nunca se vio roja no prueba lo
+que dice. Así que se rompió el código a propósito —el traslado copiando campo
+por campo, el alta sin barrer la columna— y se comprobó que cazaba las tres
+roturas. Después se restauró.
+
+🪤 Un detalle del arnés que conviene recordar: **no sirve doblar con un stub una
+función que el propio archivo declara** (`_reetiquetarEpisodioACama`); el eval
+la redefine y corre la real. Lo que hay que doblar es lo que ella usa por
+debajo.
+
+**190 guardias · 190 verdes.** Nueva: `pendientes_siguen_al_paciente.js`.

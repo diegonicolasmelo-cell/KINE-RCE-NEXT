@@ -669,7 +669,33 @@ vez el jueves son dos encargos distintos, no un duplicado.
 
 Lo cuida `build/checks/pendiente_arrastra.js`.
 
-### 5.5 · Lo que quedaba por mirar del paso 4
+### 5.5 · Los pendientes viajan con el paciente
+
+> *«¿Si traslado el paciente a otra cama, se quedan los pendientes en la cama y
+> no siguen al paciente? ¿El que ingrese a esa cama heredará esos pendientes?»*
+
+**No se heredan: viajan con el paciente.** La pregunta apunta a un daño real —
+heredar los encargos del paciente anterior es peor que perderlos, porque nadie
+duda de un pendiente que aparece escrito y alguien iría a pedir un pabellón que
+no corresponde.
+
+🔵 **Y el pendiente es texto libre**: «EEG», «GSA de control», «Extubar», lo que
+sea, hasta 300 caracteres. Los chips son solo atajos que escriben ese mismo
+texto; por debajo no hay diferencia.
+
+🪤 **Pero era cierto por una razón frágil.** Los dos traslados —mover a cama
+vacía e intercambiar— copian la fila **entera** con `Object.assign`, así que los
+pendientes viajaban «de regalo». El día que alguien reescriba el traslado campo
+por campo —lo natural al agregar una columna— se quedarían atrás sin que nada
+avise. Por eso quedó `pendientes_siguen_al_paciente.js`, que mide el
+comportamiento y no la implementación, en los tres caminos: cama vacía,
+intercambio y alta.
+
+🪤 La guardia **nació verde**, así que se rompió el código a propósito —el
+traslado copiando campo por campo y el alta sin barrer la columna— para verla
+roja antes de dejarla. Una guardia que nunca se vio roja no prueba lo que dice.
+
+### 5.6 · Lo que quedaba por mirar del paso 4
 
 Sin acuerdo todavía, anotado al pasar:
 
