@@ -770,10 +770,29 @@ siguen escribiendo igual. Lo que cambió es dónde se tocan.
 **Neurología** y **Auscultación** están bien. La PPC se calcula (PAM − PIC) y no
 se puede escribir una que no cuadre.
 
-### 6.4 · Lo chico, todavía sin respuesta
+### 6.4 · Lo chico — hecho («sí a los dos»)
 
-- **Auscultación** tiene dos campos muertos —calidad y localización del
-  murmullo— que nadie lee ni escribe.
-- **RCP** sugiere **3** en «N° de ciclos»: la trampa de la fijación del TOT.
+- **Auscultación:** se borraron los dos campos muertos (calidad y localización
+  del murmullo). No se leían, no se escribían y no iban a ninguna columna.
+- **RCP:** «N° de ciclos» ya no sugiere **3**.
+- 🔵 **Y de regalo la fijación del TOT**, que ya no sugiere **22**: era el
+  acuerdo 2.3, estaba cerrado desde el 19-sep y es una línea.
 
-Los dos quedan a la espera de que Diego diga si se tocan.
+### 6.5 · La regla, y por qué NO se automatizó
+
+Lo que se **mide** no se sugiere; lo que se **configura**, sí puede. Por eso
+`no_sugerir_lo_medido.js` lleva una **lista con la razón al lado** y no una regla
+automática: barrer todos los placeholders decidiría por Diego sobre quince
+campos donde la respuesta no es obvia.
+
+| Qué es | Ejemplo | ¿Sugiere? |
+|---|---|---|
+| Una medición en el paciente | fijación del TOT, ciclos de RCP | **No** |
+| Un formato de ejemplo | el RUT «12.345.678-5» | Sí — enseña la forma, no afirma un valor |
+| Un parámetro de equipo | frecuencia del EMS, carga del IMT | Sí — es configuración que se repite |
+
+🔴 **Y quedó un hallazgo esperando decisión: los gases arteriales.** Siete campos
+—pH 7.38, PaO₂ 80, PaCO₂ 40, HCO₃ 24, EB 0, lactato 1.2, SaO₂ 96— sugieren
+**valores normales**. Es peor que la fijación: el ojo lee «gases normales» y sigue
+de largo, así que no es solo que no se anote, es que se lee una gasometría
+tranquilizadora que nadie tomó. Sin tocar hasta que Diego decida.

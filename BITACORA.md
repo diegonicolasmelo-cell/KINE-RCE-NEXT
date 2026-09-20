@@ -2623,3 +2623,42 @@ de guardado se hicieron una por una.
 
 **191 guardias · 191 verdes.** Nueva: `hdn_y_upot.js`.
 Sello de entrega: `NEXT-3.3-hdn-upot`.
+
+---
+
+## 20-sep-2026 · Lo que se mide no se sugiere · Tanda 3.4
+
+Diego: «sí a los dos». Se borraron los dos campos muertos de auscultación y los
+ciclos de RCP dejaron de sugerir 3. 🔵 De regalo, **la fijación del TOT** dejó de
+sugerir 22: era su acuerdo 2.3, cerrado desde el 19-sep, y era una línea.
+
+🪤 **La guardia NO se automatizó, a propósito.** Al buscar el «22» aparecieron
+**veinte campos** con placeholder numérico, y no son el mismo problema: una
+medición (fijación, ciclos de RCP) no se sugiere, pero un **formato** de ejemplo
+—el RUT— enseña la forma sin afirmar un valor, y un **parámetro de equipo** —la
+frecuencia del EMS, la carga del IMT— es configuración que se repite. Una regla
+automática habría decidido por Diego sobre quince campos. La guardia lleva
+**lista y razón al lado**, y crece cuando él decide.
+
+🔴 **Hallazgo que quedó esperando: los gases arteriales.** Siete campos sugieren
+**valores normales** (pH 7.38, PaO₂ 80, PaCO₂ 40…). Es peor que la fijación: el
+ojo lee «gases normales» y sigue de largo — no es solo que no se anote, es que se
+lee una gasometría tranquilizadora que nadie tomó. Sin tocar hasta que Diego
+decida.
+
+### La tanda
+
+Paquete **NEXT-3.4-limpieza**: index, esquema, servicios, api, dominio.
+Requiere `crearORepararEstructura()`. Reemplaza al 3.2, que quedó descartado.
+
+🪤 **Dos falsos negativos MÍOS al verificar el paquete**, los dos por comprobar
+mal, no por fallas del paquete:
+· busqué `fMPCalidad` en el texto y lo encontré… **en el comentario que explica
+  que se borró**. Es el mismo error que ya costó tres veces en este proyecto
+  (una guardia cazándose a sí misma en su propia documentación), y lo repetí.
+· busqué `placeholder="3"` y lo encontré en `fIMTfreq`, que lo conserva a
+  propósito. La comprobación era demasiado grosera para lo que quería probar.
+El resto de la verificación sí sirvió: decodifiqué el base64 del cohete y
+confirmé, dentro de la app real, que los nueve cambios de estos dos días viajan.
+
+**192 guardias · 192 verdes.** Nueva: `no_sugerir_lo_medido.js`.
