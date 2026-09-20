@@ -2662,3 +2662,39 @@ El resto de la verificación sí sirvió: decodifiqué el base64 del cohete y
 confirmé, dentro de la app real, que los nueve cambios de estos dos días viajan.
 
 **192 guardias · 192 verdes.** Nueva: `no_sugerir_lo_medido.js`.
+
+---
+
+## 20-sep-2026 · Los gases nacen en blanco · Tanda 3.5
+
+Diego: *«los gases sí, mismo criterio, que nazcan en blanco»*. Los siete campos
+de la gasometría sugerían **valores normales**, y ahí el daño es peor que en la
+fijación del TOT: el ojo lee «gases normales» y sigue de largo — no es solo que
+no se anote, es que se lee una gasometría tranquilizadora que nadie tomó.
+
+🪤 **La FiO₂ del gas entró también**, aunque sea un parámetro: de ella sale el
+PaFi, y un PaFi contra un 40 inventado es un número clínico falso que alimenta
+el protocolo de destete. Y por el mismo criterio entró la **SpO₂ al decanular**.
+
+🔵 **El motor ya estaba preparado.** `interpGSA` exige que los números existan
+antes de interpretar, así que con los campos vacíos no calcula nada en vez de
+inventar. Los placeholders eran **solo cosmética engañosa**: el daño estaba
+entero en lo que el ojo leía.
+
+⏳ Sin tocar, a la espera: los tiempos de sesión (KTM 30 min, válvula 30 min,
+IMT 10 min). No son mediciones en el paciente, pero sí se informan.
+
+### 🪤 Rompí un campo al editar, y la guardia lo cazó en el acto
+
+Al insertar el comentario junto a los gases se me comió una comilla y
+`id="fGsaPao2` quedó sin cerrar — el campo habría dejado de existir y la PaO₂ no
+se habría guardado. La guardia que acababa de ampliar se puso roja en el mismo
+segundo, en el assert más aburrido de todos: «el campo fGsaPao2 existe».
+
+Vale anotarlo: los asserts de rutina —«esto sigue estando»— parecen ruido hasta
+que atrapan una edición torpe. Es la segunda vez hoy que un error mío lo
+encuentra la batería y no yo.
+
+**192 guardias · 192 verdes.** Sello de entrega: `NEXT-3.5-gases`.
+Verificado decodificando el base64 del cohete: los once campos de medición
+llegan sin sugerencia dentro de la app real.

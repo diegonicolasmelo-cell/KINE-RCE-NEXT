@@ -791,8 +791,26 @@ campos donde la respuesta no es obvia.
 | Un formato de ejemplo | el RUT «12.345.678-5» | Sí — enseña la forma, no afirma un valor |
 | Un parámetro de equipo | frecuencia del EMS, carga del IMT | Sí — es configuración que se repite |
 
-🔴 **Y quedó un hallazgo esperando decisión: los gases arteriales.** Siete campos
-—pH 7.38, PaO₂ 80, PaCO₂ 40, HCO₃ 24, EB 0, lactato 1.2, SaO₂ 96— sugieren
-**valores normales**. Es peor que la fijación: el ojo lee «gases normales» y sigue
-de largo, así que no es solo que no se anote, es que se lee una gasometría
-tranquilizadora que nadie tomó. Sin tocar hasta que Diego decida.
+### 6.6 · Los gases nacen en blanco
+
+> *«Los gases sí, mismo criterio, que nazcan en blanco.»*
+
+Los siete sugerían **valores normales** —pH 7.38, PaO₂ 80, PaCO₂ 40, HCO₃ 24,
+EB 0, lactato 1.2, SaO₂ 96—. Es peor que la fijación: el ojo lee «gases
+normales» y sigue de largo, así que no es solo que no se anote, es que **se lee
+una gasometría tranquilizadora que nadie tomó**.
+
+🪤 **La FiO₂ del gas entra también**, aunque sea un parámetro y no una medición:
+de ella sale el **PaFi**, y un PaFi calculado contra un 40 inventado es un número
+clínico falso que además alimenta el protocolo de destete.
+
+🔵 **El motor ya estaba preparado**: `interpGSA` exige que los números existan
+antes de interpretar, así que con los campos vacíos no calcula nada en vez de
+inventar. Los placeholders eran solo cosmética engañosa.
+
+Por el mismo criterio entró la **SpO₂ al decanular**, que sugería 95: es una
+medición en el paciente.
+
+⏳ **Quedan en duda, sin tocar:** los tiempos de sesión —KTM 30 min, válvula de
+fonación 30 min, IMT 10 min—. No son mediciones en el paciente sino cuánto duró
+lo que hizo el kinesiólogo, pero sí se informan. Si Diego quiere, entran.

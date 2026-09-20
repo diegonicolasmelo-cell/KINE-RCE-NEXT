@@ -44,6 +44,24 @@ const no = (l, g) => eq(l, !!g, 'false');
 const SIN_SUGERENCIA = [
   ['fTOTcm',     'fijación del TOT — «si sugiere 22, no anotan nada» (19-sep)'],
   ['fRCPciclos', 'ciclos de RCP — mismo caso, y acá el número no es un detalle (20-sep)'],
+  /* 🔴 LOS GASES (Diego, 20-sep: «los gases sí, mismo criterio, que nazcan en
+     blanco»). Acá el daño es PEOR que en la fijación: los siete sugerían
+     VALORES NORMALES, así que el ojo leía «gases normales» y seguía de largo.
+     No es solo que no se anote — es que se lee una gasometría tranquilizadora
+     que nadie tomó.
+     🪤 La FiO₂ del gas entra aunque sea un parámetro y no una medición: de
+     ella sale el PaFi, y un PaFi calculado contra un 40 inventado es un número
+     clínico falso que además alimenta el protocolo de destete. */
+  ['fGsaPh',     'gases — sugería 7.38, un pH normal'],
+  ['fGsaPao2',   'gases — sugería 80'],
+  ['fGsaPaco2',  'gases — sugería 40'],
+  ['fGsaHco3',   'gases — sugería 24'],
+  ['fGsaEb',     'gases — sugería 0'],
+  ['fGsaLact',   'gases — sugería 1.2'],
+  ['fGsaSao2',   'gases — sugería 96'],
+  ['fGsaFio2',   'gases — sugería 40, y de ahí sale el PaFi'],
+  /* Por el mismo criterio: es una medición en el paciente, no configuración. */
+  ['fDecanSpo2', 'SpO₂ al decanular — sugería 95'],
 ];
 
 console.log('\n1 · 🔴 Lo que se mide nace en blanco');
@@ -57,6 +75,8 @@ console.log('\n2 · Lo que NO es una medición puede seguir sugiriendo');
 const conservan = [
   ['fRut',     'es un formato de ejemplo, no un valor'],
   ['fEMSfreq', 'es un parámetro del equipo, no algo que se mida en el paciente'],
+  ['fIMTfreq', 'idem: carga del entrenador, configuración que se repite'],
+  ['fKTMt',    'es cuánto duró la sesión, que decide el kinesiólogo — pendiente de que Diego diga si entra'],
 ];
 conservan.forEach(([id, razon]) => {
   const tag = (idx.match(new RegExp('<input[^>]*id="' + id + '"[^>]*>')) || [''])[0];
@@ -70,7 +90,11 @@ console.log('\n3 · 🪤 Los campos muertos de auscultación se fueron');
 });
 console.log('   (no se leían, no se escribían, no iban a ninguna columna)');
 
-console.log('\n4 · Y lo que SÍ registra la auscultación sigue en pie');
+console.log('\n4 · 🪤 Y el motor sigue sin inventar el PaFi con el gas vacío');
+si('★★ el PaFi del gas solo se calcula con PaO₂ y FiO₂ de verdad',
+   /!isNaN\(po2\)\s*&&\s*!isNaN\(fio2\)\s*&&\s*fio2\s*>\s*0/.test(idx));
+
+console.log('\n5 · Y lo que SÍ registra la auscultación sigue en pie');
 si('★ el murmullo pulmonar', /id="fMPVal"/.test(idx));
 si('★ los ruidos agregados y su localización', /id="fRuidosVal"/.test(idx) && /id="fRuidosLoc"/.test(idx));
 

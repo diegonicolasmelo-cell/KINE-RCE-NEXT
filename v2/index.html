@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.4-limpieza">
+<meta name="rce-version" content="NEXT-3.5-gases">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3943,14 +3943,26 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div id="dGSA" class="hidden" style="margin-top:8px;padding:9px 11px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
                   <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;">
                     <div class="col wa"><label>Hora</label><input type="time" id="fGsaHora" style="height:30px;"></div>
-                    <div class="col wa"><label>pH</label><input type="number" step="0.01" id="fGsaPh" placeholder="7.38" style="width:76px;height:30px;" onchange="interpGSA()"></div>
-                    <div class="col wa"><label>PaO₂</label><input type="number" step="0.1" id="fGsaPao2" placeholder="80" style="width:76px;height:30px;" onchange="interpGSA()"></div>
-                    <div class="col wa"><label>PaCO₂</label><input type="number" step="0.1" id="fGsaPaco2" placeholder="40" style="width:76px;height:30px;" onchange="interpGSA()"></div>
-                    <div class="col wa"><label>HCO₃⁻</label><input type="number" step="0.1" id="fGsaHco3" placeholder="24" style="width:76px;height:30px;" onchange="interpGSA()"></div>
-                    <div class="col wa"><label>EB</label><input type="number" step="0.1" id="fGsaEb" placeholder="0" style="width:70px;height:30px;"></div>
-                    <div class="col wa"><label>Lactato</label><input type="number" step="0.1" id="fGsaLact" placeholder="1.2" style="width:80px;height:30px;"></div>
-                    <div class="col wa"><label>SaO₂ %</label><input type="number" step="0.1" id="fGsaSao2" placeholder="96" style="width:80px;height:30px;"></div>
-                    <div class="col wa"><label>FiO₂ % al momento</label><input type="number" id="fGsaFio2" placeholder="40" style="width:96px;height:30px;" onchange="interpGSA()"></div>
+                    <div class="col wa"><label>pH</label><input type="number" step="0.01" id="fGsaPh" style="width:76px;height:30px;" onchange="interpGSA()"></div>
+                    <!-- 🔴 20-sep-2026 · LOS GASES NACEN EN BLANCO (Diego: «los gases sí, mismo
+                         criterio, que nazcan en blanco»). Los siete sugerían VALORES
+                         NORMALES —pH 7.38, PaO₂ 80, PaCO₂ 40…— así que el ojo leía
+                         «gases normales» y seguía de largo: no es solo que no se
+                         anote, es que se lee una gasometría tranquilizadora que nadie
+                         tomó. La FiO₂ entra aunque sea un parámetro: de ella sale el
+                         PaFi, y un PaFi contra un 40 inventado es un número clínico
+                         falso que alimenta el protocolo de destete.
+                         🔵 El motor ya estaba preparado: `interpGSA` exige que los
+                         números existan antes de interpretar, así que con los campos
+                         vacíos no calcula nada en vez de inventar.
+                         Lo fija no_sugerir_lo_medido.js. -->
+                    <div class="col wa"><label>PaO₂</label><input type="number" step="0.1" id="fGsaPao2" style="width:76px;height:30px;" onchange="interpGSA()"></div>
+                    <div class="col wa"><label>PaCO₂</label><input type="number" step="0.1" id="fGsaPaco2" style="width:76px;height:30px;" onchange="interpGSA()"></div>
+                    <div class="col wa"><label>HCO₃⁻</label><input type="number" step="0.1" id="fGsaHco3" style="width:76px;height:30px;" onchange="interpGSA()"></div>
+                    <div class="col wa"><label>EB</label><input type="number" step="0.1" id="fGsaEb" style="width:70px;height:30px;"></div>
+                    <div class="col wa"><label>Lactato</label><input type="number" step="0.1" id="fGsaLact" style="width:80px;height:30px;"></div>
+                    <div class="col wa"><label>SaO₂ %</label><input type="number" step="0.1" id="fGsaSao2" style="width:80px;height:30px;"></div>
+                    <div class="col wa"><label>FiO₂ % al momento</label><input type="number" id="fGsaFio2" style="width:96px;height:30px;" onchange="interpGSA()"></div>
                   </div>
                   <div id="lblGsaInterp" style="font-size:.76rem;font-weight:700;color:#b91c1c;">—</div>
                 </div>
@@ -4055,7 +4067,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                       </div>
                       <div style="display:flex;align-items:center;gap:4px;">
                         <label style="font-size:.68rem;color:#15803d;font-weight:700;">SpO₂%</label>
-                        <input type="number" id="fDecanSpo2" placeholder="95" style="width:60px;height:28px;font-size:.78rem;border:1px solid #bbf7d0;border-radius:5px;padding:0 7px;background:#fff;">
+                        <input type="number" id="fDecanSpo2" style="width:60px;height:28px;font-size:.78rem;border:1px solid #bbf7d0;border-radius:5px;padding:0 7px;background:#fff;">
                       </div>
                     </div>
                     <div style="font-size:.68rem;color:#166534;background:#dcfce7;padding:4px 8px;border-radius:5px;">
@@ -5445,7 +5457,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.4-limpieza]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.5-gases]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
