@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.5-gases">
+<meta name="rce-version" content="NEXT-3.6-paso-cero">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3045,6 +3045,14 @@ document.documentElement.setAttribute('data-piel', 'inst');
        de quién se trata y después qué se va a registrar (pedido de Diego). -->
   <div id="epBannerCaja"><div id="epBanner" class="hidden"></div></div>
   <div id="spPasos" role="tablist" aria-label="Pasos de la evolución">
+    <!-- 🔴 20-sep-2026 · PASO 0 · EL INGRESO. Acuerdo 1, cerrado el 19-sep y
+         que se había quedado en papel: «el ingreso pasa a ser un modal único,
+         paso 0, que abre al ocupar una cama y lleva derecho al turno». Hasta
+         acá, ingresar mostraba la planilla ENTERA con la identificación arriba
+         — Diego: «me sigue mostrando toda la planilla». Solo existe mientras
+         se ingresa; a un paciente ya ingresado no se le vuelve a ingresar. -->
+    <button type="button" class="paso-t hidden" role="tab" aria-selected="false" id="pasoTab0" data-p="0" data-nodirty onclick="pasoIr(0)">
+      <span class="paso-n">0</span><span class="paso-et">Ingreso</span></button>
     <button type="button" class="paso-t" role="tab" aria-selected="true" data-p="1" data-nodirty onclick="pasoIr(1)">
       <span class="paso-n">1</span><span class="paso-et">Prevención</span></button>
     <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="2" data-nodirty onclick="pasoIr(2)">
@@ -3139,7 +3147,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <div id="repBanner" class="hidden"><span id="repBannerTxt"></span></div>
 
       <!-- IDENTIFICACIÓN — solo visible en ingreso -->
-      <div class="fcard fc-id" id="fcId">
+      <div class="fcard fc-id" id="fcId" data-paso="0">
         <div class="fcard-hdr"><span class="fcard-title">👤 Identificación</span></div>
         <div class="fcard-body">
           <!-- Fila 1: Nombre + Edad + Sexo -->
@@ -3153,10 +3161,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
             </div>
             <div class="col ws" style="min-width:150px;">
-              <label>RUT <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+              <!-- 🔴 OBLIGATORIO desde el 20-sep (acuerdo 1.1): sin RUT el paciente
+                   no se puede cruzar con nada, ni con la ficha del hospital ni
+                   consigo mismo si reingresa. Sigue sin salir de la planilla. -->
+              <label>RUT</label>
               <input type="text" id="fRut" placeholder="12.345.678-5" autocomplete="off" onblur="chkRut()">
               <span id="rutHint" style="font-size:.68rem;min-height:1em;"></span>
               <div id="dRutAlert" class="hidden" style="margin-top:2px;padding:5px 9px;border:1px solid #fca5a5;background:#fef2f2;border-radius:5px;font-size:.75rem;color:#b91c1c;"></div>
+            </div>
+            <!-- 🔵 NOMBRE SOCIAL (acuerdo 1.7): «se añade solamente para fines de
+                 provocar cercanía; algunas personas se identifican más por su
+                 nombre social que por su nombre de pila». Opcional; el legal
+                 es el obligatorio. -->
+            <div class="col ws" style="min-width:150px;">
+              <label>Nombre social <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+              <input type="text" id="fNombreSocial" placeholder="Cómo prefiere que le digan" autocomplete="off">
             </div>
             <div class="col ws"><label>Edad</label><input type="number" id="fEdad" min="0" max="120"></div>
             <div class="col ws"><label>Sexo</label><select id="fSexo" onchange="calcPI()"><option value="" disabled selected>-</option><option value="M">M</option><option value="F">F</option></select></div>
@@ -3195,13 +3214,26 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </select>
             </div>
           </div>
-          <!-- Fila 3 (v2 — hoja RHB): tipo de ingreso (Charlson vive en General, junto a Barthel) -->
+          <!-- 🔵 PROCEDENCIA (acuerdo 1.2, Diego 19-sep): «el apartado "ingreso"
+               debería cambiarse por procedencia, y en reemplazo de anotar
+               electivo o urgencia deberíamos registrar si viene de pabellón,
+               SAMU, urgencias, algún servicio clínico, su casa, entre otros».
+               🪤 «Domicilio» quedó fuera y en su lugar va ELECTIVO: «muchas
+               veces lo traslada el SAMU desde su domicilio… en caso que venga
+               desde su domicilio por forma electiva, prefiero que diga
+               electivo». Sigue escribiendo PAC_INGRESO_TIPO: la columna no
+               cambia, cambia lo que se pregunta. -->
           <div class="row" style="margin-top:2px;margin-bottom:0;">
-            <div class="col wa"><label>Ingreso</label>
-              <select id="fIngTipo" style="min-width:110px;">
+            <div class="col wa"><label>Procedencia</label>
+              <select id="fProcedencia" style="min-width:160px;">
                 <option value="" disabled selected>--</option>
-                <option>Urgencia</option>
+                <option>Pabellón</option>
+                <option>Urgencias</option>
+                <option>SAMU</option>
+                <option>Servicio clínico</option>
                 <option>Electivo</option>
+                <option>Otro hospital</option>
+                <option>Otro</option>
               </select>
             </div>
           </div>
@@ -5463,7 +5495,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.5-gases]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.6-paso-cero]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6377,25 +6409,35 @@ document.addEventListener('wheel', ()=>{
    está en la planilla.
    ══════════════════════════════════════════════════════════════════════════ */
 var PASO_ACTUAL = 1;
-const _PASO_TXT = { 1:'Siguiente: el turno →', 2:'Siguiente: evaluaciones →',
+const _PASO_TXT = { 0:'Siguiente: el turno →', 1:'Siguiente: el turno →', 2:'Siguiente: evaluaciones →',
                     3:'💾 Guardar y ver el relato', 4:'✖ Cerrar la evolución' };
 
 /** Muestra el paso n y esconde lo de los otros. */
 function pasoIr(n){
-  n = Math.max(1, Math.min(4, Number(n) || 1));
+  /* 🔴 El 0 es el INGRESO y solo existe mientras se ingresa (acuerdo 1). Fuera
+     de ahí el mínimo sigue siendo 1: a un paciente ya ingresado no se le
+     vuelve a ingresar. */
+  const _hayCero = v('cIng') === 'true';
+  n = Number(n); if (isNaN(n)) n = _hayCero ? 0 : 1;
+  n = Math.max(_hayCero ? 0 : 1, Math.min(4, n));
   PASO_ACTUAL = n;
   // Sin dueño declarado = del turno. Así una tarjeta nueva aparece en el paso
   // correcto sin que nadie se acuerde de tocar esta función.
   document.querySelectorAll('#kf .fcard, #kf [data-paso]').forEach(el => {
     const mio = String(el.dataset.paso || '2') === String(n);
     el.classList.toggle('paso-oculto', !mio);
+    /* 🪤 La identificación es del paso 0 y no debe asomarse en los demás: sin
+       esto volvería a verse «toda la planilla» con la ficha arriba, que es
+       justo lo que Diego reportó. */
   });
   document.querySelectorAll('#spPasos [data-p]').forEach(t => {
     const p = Number(t.dataset.p);
     t.setAttribute('aria-selected', p === n ? 'true' : 'false');
     t.classList.toggle('paso-hecho', p < n);
   });
-  const at = $('pasoAtras'); if(at) at.style.display = (n === 1) ? 'none' : '';
+  const at = $('pasoAtras'); if(at) at.style.display = (n <= (_hayCero ? 0 : 1)) ? 'none' : '';
+  // La pestaña del ingreso solo aparece cuando se está ingresando.
+  const t0 = $('pasoTab0'); if(t0) t0.classList.toggle('hidden', !_hayCero);
   const av = $('pasoAvanza'); if(av) av.textContent = _PASO_TXT[n];
   // El 💾 de siempre queda fuera de la vista: en el camino hay UN solo botón
   // de avance por paso. Sigue en el DOM y sigue guardando.
@@ -6904,7 +6946,29 @@ function pasoSinMedir(){
 
 
 /** El botón de avance. En el paso 2 lo que hace es GUARDAR. */
+/** 🔴 Del ingreso se sale con lo mínimo para que el paciente EXISTA: nombre y
+ *  RUT. El RUT es obligatorio desde el acuerdo 1.1 —sin él no se puede cruzar
+ *  con nada, ni consigo mismo si reingresa— y el nombre porque ningún ingreso
+ *  puede quedar sin nombre. El resto (diagnóstico, escalas previas, procedencia)
+ *  se puede completar después: a las cuatro de la mañana no siempre se sabe, y
+ *  un paso que obliga a llenar todo se abandona. */
+function _ingresoListo(){
+  if(!String(v('fNombre')||'').trim()){
+    toast('⚠️ El ingreso necesita el nombre del paciente');
+    _irAlCampo('fNombre'); return false;
+  }
+  if(!String(v('fRut')||'').trim()){
+    toast('⚠️ El RUT es obligatorio para ingresar: sin él no se puede cruzar al paciente consigo mismo');
+    _irAlCampo('fRut'); return false;
+  }
+  return true;
+}
+
 function pasoAvanzar(){
+  /* Del ingreso se va DERECHO al turno (acuerdo 1): un paciente que acaba de
+     llegar todavía no tiene circuito que revisar, así que la prevención de
+     NAVM se ve en el turno siguiente. */
+  if(PASO_ACTUAL === 0){ if(_ingresoListo()) pasoIr(2); return; }
   // El paso 1 es el único que puede negarse a avanzar: los filtros y el
   // Trach Care son medida de IAS y están a cargo de kinesiología. Pero se pasa
   // con razón escrita — ver prevListo().
@@ -6972,7 +7036,9 @@ function abrirPanel(id, esIng, verFicha) {
   $('spBed').textContent=`CAMA ${id}`;
   const _tipo = esIng ? 'Ingreso' : 'Evolución';
   const _st = $('spTitle'); if(_st){ _st.dataset.tipo=_tipo; _st.textContent=_tipo; }
-  esIng ? show('fcId') : hide('fcId');
+  /* 🔴 El ingreso abre en su propio paso (acuerdo 1). `fcId` ya no se muestra
+     ni se esconde a mano: es del paso 0 y lo maneja `pasoIr`. */
+  if(!esIng) hide('fcId'); else { const _f=$('fcId'); if(_f) _f.classList.remove('hidden'); }
   _aislTags=[]; renderAislTags();
   ['fSecrTags','fCultTags'].forEach(id=>{ _tiState[id]=[]; tiRender(id, id.replace('Tags','Val'), id==='fCultTags'?'violet':'sky'); });
   if($('fMPVal'))     $('fMPVal').value='';
@@ -7131,7 +7197,11 @@ function abrirPanel(id, esIng, verFicha) {
   // camino arranca en el turno.
   prevSembrar();
   prevGateTab();
-  pasoIr(prevAplicaAlgo() ? 1 : 2);
+  /* 🔴 Y si se está INGRESANDO, el camino arranca en el paso 0 (acuerdo 1):
+     primero quién es el paciente, después el turno. Antes el ingreso abría en
+     el mismo sitio que una evolución cualquiera, con la planilla entera
+     delante. */
+  pasoIr(v('cIng') === 'true' ? 0 : (prevAplicaAlgo() ? 1 : 2));
 }
 
 function actualizarTituloPanel(nombre) {
@@ -7675,7 +7745,7 @@ function fillCama(c, fecha) {
   s('fTalla',c.TALLA_CM); s('fBarthel',c.BARTHEL); s('fEcf',c.ECF);
   updBarthelLbl('fBarthel','lblBarthel'); updEcfLbl('fEcf','lblEcf');
   s('fDx',c.DIAGNOSTICO); s('fRem',c.DIAG_REM);
-  s('fCharlson',c.CHARLSON); s('fIngTipo',c.INGRESO_TIPO); s('fApache',c.APACHE2);
+  s('fCharlson',c.CHARLSON); s('fProcedencia',c.INGRESO_TIPO); s('fNombreSocial',c.NOMBRE_SOCIAL); s('fApache',c.APACHE2);
   $('fDias').value = diasCal(c.TS_INGRESO, c.FECHA_INGRESO, fecha);
   if($('fHoraIng')) $('fHoraIng').value = (String(c.TS_INGRESO||'').slice(11,16)) || '';
   if($('fFechaIng') && v('cIng')!=='true') $('fFechaIng').value = _isoDia(c.FECHA_INGRESO) || '';
@@ -7763,7 +7833,7 @@ function fillForm(s) {
   (function(){ if(!s.CHARLSON_JSON) return; try{ const o=JSON.parse(s.CHARLSON_JSON)||{}; _renderCharlson(); (o.it||[]).forEach(i=>{ const e=$('ch'+i); if(e) e.checked=true; }); const ce=$('chEdad'); if(ce) ce.checked=!!o.edad; sumCharlson(); }catch(e){} })();
   if(s.PAC_SEXO){ $('fSexo').value=s.PAC_SEXO; calcPI(); }
   set('fDx',s.PAC_DIAGNOSTICO); set('fRem',s.PAC_DIAG_REM);
-  set('fCharlson',s.PAC_CHARLSON); set('fIngTipo',s.PAC_INGRESO_TIPO);
+  set('fCharlson',s.PAC_CHARLSON); set('fProcedencia',s.PAC_INGRESO_TIPO); set('fNombreSocial',s.PAC_NOMBRE_SOCIAL);
   set('fFC',s.HEMO_FC); set('fPIC',s.HEMO_PIC); set('fPPC',s.HEMO_PPC);
   // Neuromonitoreo: los dispositivos primero, y `false` para que un valor
   // guardado sin su casilla (evoluciones anteriores a 5.72) siga viéndose.
@@ -9034,7 +9104,7 @@ function guardar() {
     PAC_NOMBRE:v('fNombre'), PAC_EDAD:v('fEdad'), PAC_RUT:v('fRut'),
     PAC_SEXO:v('fSexo'), PAC_TALLA:v('fTalla'), PAC_BARTHEL:v('fBarthel'),
     PAC_ECF:v('fEcf'), PAC_DIAGNOSTICO:v('fDx'), PAC_DIAG_REM:v('fRem'),
-    PAC_CHARLSON:v('fCharlson'), PAC_INGRESO_TIPO:v('fIngTipo'),
+    PAC_CHARLSON:v('fCharlson'), PAC_INGRESO_TIPO:v('fProcedencia'), PAC_NOMBRE_SOCIAL:v('fNombreSocial'),
     PAC_HORA_INGRESO:v('fHoraIng'),   // hora del ingreso: base de los bloques de 24 h
     PAC_FECHA_INGRESO:v('fFechaIng'), // transitorio como PAC_RUT: fecha de ingreso escrita a mano (11-sep-2026)
     PAC_APACHE2:v('fApache'),   // transitorio como PAC_RUT: persiste en la cama, no en EVOLUCIONES

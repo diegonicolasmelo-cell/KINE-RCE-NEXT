@@ -487,6 +487,7 @@ function _limpiarCamaInterno(idCama) {
     // ANTERIOR, y el siguiente lo heredaba. Lo cazó `alta_no_deja_rastro.js`
     // apenas nació la columna: exactamente para eso existe.
     PRONO_DESDE: '',
+    NOMBRE_SOCIAL: '',   // identidad del paciente: se va con el alta como el resto
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }

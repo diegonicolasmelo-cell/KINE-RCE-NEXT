@@ -54,7 +54,19 @@ si('★ existe la columna SED_VIGILIA', /\['SED_VIGILIA'/.test(esq));
   // sistema viejo.
   const bloque = esq.slice(esq.indexOf('const _COLS_EVOLUCIONES'), esq.indexOf('const ESQUEMA'));
   const cols = [...bloque.matchAll(/\['([A-Z0-9_]+)','[a-z]+'(?:,'[^']*')?\]/g)].map(m => m[1]);
-  eq('★ y es la ÚLTIMA de EVOLUCIONES', cols[cols.length - 1], 'SED_VIGILIA');
+  /* 🗂️ 20-sep-2026 · Ya no es la última: detrás entró PAC_NOMBRE_SOCIAL, y esa
+     es justamente la regla funcionando —las columnas nuevas van AL FINAL—. Lo
+     que hay que exigir no es que SED_VIGILIA sea la última para siempre, sino
+     que se haya agregado al final y no INSERTADO en medio, que es lo que
+     desalinea los datos ya guardados. Se mide contra una columna vieja. */
+  /* 🪤 La columna vieja de referencia tiene que ser DE ESTA HOJA: la primera
+     que elegí (FIRMA_KINE) vive en CAMAS_ESTADO y daba -1, así que la
+     comparación se cumplía sola y la guardia no probaba nada. */
+  const _iVig = cols.indexOf('SED_VIGILIA'), _iVieja = cols.indexOf('PAC_CHARLSON');
+  eq('★ SED_VIGILIA se agregó al final, no en medio de las viejas',
+     _iVig > _iVieja && _iVieja >= 0, true);
+  eq('★ …y sigue en la zona final de EVOLUCIONES',
+     _iVig >= cols.length - 5, true);
   si('   con su rótulo legible en castellano',
      /\['SED_VIGILIA','[a-z]+','[^']{4,42}'\]/.test(esq));
 }

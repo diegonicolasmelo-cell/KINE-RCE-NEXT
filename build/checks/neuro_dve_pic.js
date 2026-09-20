@@ -177,11 +177,12 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
   // extubar) sumó 2 ⇒ 396. Esta guardia acompaña al total.
   // 🗂️ 397 desde el 16-sep-2026 (VENT_INTERFAZ).
   si('el total escrito a mano de testEsquema acompaña a las columnas',
+    // 🗂️ 20-sep-2026 · 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7).
     // 🗂️ 17-sep-2026 · 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación).
   // 406 = 405 + HEMO_PAM_MED (la PPC pasó a calcularse: PAM − PIC).
   // 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
   // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-    /TOTAL_COLS\.EVOLUCIONES !== 408/.test(esq));
+    /TOTAL_COLS\.EVOLUCIONES !== 409/.test(esq));
 
   eq('sin errores JS', errs.join(' | '), '');
   await b.close();

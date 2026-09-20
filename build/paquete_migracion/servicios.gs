@@ -1253,6 +1253,7 @@ function _limpiarCamaInterno(idCama) {
     // ANTERIOR, y el siguiente lo heredaba. Lo cazó `alta_no_deja_rastro.js`
     // apenas nació la columna: exactamente para eso existe.
     PRONO_DESDE: '',
+    NOMBRE_SOCIAL: '',   // identidad del paciente: se va con el alta como el resto
   };
   repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
 }
@@ -5539,6 +5540,8 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
        Se supina → se limpia; se prona → queda el momento de ESTA fila; si no
        pasó nada en el turno, se conserva lo que la cama ya traía, que es lo
        que hace que el estado ARRASTRE aunque un turno no se registre. */
+    // 🔵 El nombre social viaja a la cama como el resto de la identidad.
+    NOMBRE_SOCIAL: val(evo.PAC_NOMBRE_SOCIAL, cama.NOMBRE_SOCIAL),
     PRONO_DESDE: esVerdadero(evo.RESP_SUPINO_EVENTO) ? ''
                : (esVerdadero(evo.RESP_PRONO_EVENTO)
                     ? (evo.PRONO_INICIO_TS || _tsEventoTurno(fecha, turno, evo.RESP_PRONO_HORA))

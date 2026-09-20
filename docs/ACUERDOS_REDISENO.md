@@ -32,14 +32,29 @@ lleva derecho al turno (el paso 2).
 
 | # | Acuerdo | Estado |
 |---|---|---|
-| 1 | RUT **obligatorio** | por programar |
-| 2 | «Ingreso» pasa a **Procedencia** | por programar |
+| 0 | **El ingreso es un paso propio** y lleva derecho al turno | ✅ **hecho** 20-sep |
+| 1 | RUT **obligatorio** | ✅ **hecho** 20-sep |
+| 2 | «Ingreso» pasa a **Procedencia** | ✅ **hecho** 20-sep |
 | 3 | Fecha y hora a mano; día de estadía calculado y bloqueado | por programar |
 | 4 | Diagnóstico libre **con autocompletado** | por programar |
 | 5 | Grupo REM **sugerido** desde tabla editable | por programar |
 | 6 | ECF, Barthel y Charlson al ingreso, **ninguna obligatoria** | por programar |
-| 7 | **Nombre social** opcional, y manda en pantalla | por programar |
+| 7 | **Nombre social** opcional | ✅ **hecho** 20-sep (falta que mande en pantalla) |
 | 8 | Recordatorio a los 3 días + **% de cumplimiento** de escalas | por programar |
+
+🔴 **El paso 0 se había quedado en papel, y Diego lo reclamó el 20-sep:**
+
+> *«Revisé el módulo de turno y me di cuenta que está igual que antes, me sigue
+> mostrando toda la planilla, no inicia el modal de identificación al inicio,
+> que sería el paso 0. Recuerda que esto se rediseñó y no debería ir así.»*
+
+Tenía razón: el acuerdo estaba cerrado desde el 19-sep y lo que hacía el código
+en modo ingreso era un `show('fcId')` — la misma planilla entera con una tarjeta
+más arriba. **No existía ningún paso 0.** Ahora sí: el ingreso abre en su propio
+paso, no se ve nada del turno, y de ahí va **derecho al paso 2** (se salta la
+prevención: un paciente que acaba de llegar todavía no tiene circuito que
+revisar). En una evolución normal el paso 0 no existe.
+Lo cuida `build/checks/ingreso_paso_cero.js`.
 
 ### 1.1 · El RUT se vuelve obligatorio
 

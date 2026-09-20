@@ -2698,3 +2698,44 @@ encuentra la batería y no yo.
 **192 guardias · 192 verdes.** Sello de entrega: `NEXT-3.5-gases`.
 Verificado decodificando el base64 del cohete: los once campos de medición
 llegan sin sugerencia dentro de la app real.
+
+---
+
+## 20-sep-2026 · El paso 0 del ingreso, que se había quedado en papel
+
+Diego, después de pegar: *«revisé el módulo de turno y me di cuenta que está
+igual que antes, me sigue mostrando toda la planilla, no inicia el modal de
+identificación al inicio, que sería el paso 0. Recuerda que esto se rediseñó y
+no debería ir así.»*
+
+**Tenía razón y el reproche es justo.** El acuerdo 1 se cerró el 19-sep y yo
+seguí construyendo otras cosas —evaluaciones, prono, cierre, los cinco
+módulos— sin volver a él. Lo que hacía el código en modo ingreso era un
+`show('fcId')`: la planilla entera con la identificación arriba. `data-paso="0"`
+no existía en ninguna parte.
+
+Hecho ahora: **el ingreso abre en su propio paso**, no se ve nada del turno, y
+de ahí va **derecho al paso 2** —se salta la prevención, porque un paciente que
+acaba de llegar todavía no tiene circuito que revisar—. En una evolución normal
+el paso 0 no existe: a un paciente ya ingresado no se le vuelve a ingresar.
+
+Con él entraron tres acuerdos más del ingreso: **RUT obligatorio** (1.1),
+**Procedencia** con sus siete opciones en vez de «electivo o urgencia» (1.2) y
+el **nombre social** (1.7), conectado de punta a punta —columna, guardado,
+carga y barrido al alta—, porque un campo que no se guarda es justo lo que
+acabábamos de limpiar.
+
+🪤 **Una columna nueva toca más sitios de los que parece.** `PAC_NOMBRE_SOCIAL`
+puso en rojo **ocho guardias**: el contador de columnas escrito a mano en
+`esquema.gs`, su comentario en cadena, y cinco guardias que llevan ese total
+copiado. Todas se actualizaron con la razón; ninguna se aflojó. Y
+`vigilia_sin_sedacion` exigía que SED_VIGILIA fuera **la última** de EVOLUCIONES:
+eso dejó de ser cierto, pero lo que protege —que las columnas nuevas se agreguen
+al final y no se inserten en medio— sigue entero y ahora se mide así.
+
+🪤 **Y en esa misma corrección elegí mal la columna de referencia**: puse
+`FIRMA_KINE`, que vive en CAMAS_ESTADO, no en EVOLUCIONES. Daba -1, la
+comparación se cumplía sola y la guardia no probaba nada. La caché al correrla.
+
+**193 guardias · 193 verdes.** Nueva: `ingreso_paso_cero.js`.
+Sello de entrega: `NEXT-3.6-paso-cero`.

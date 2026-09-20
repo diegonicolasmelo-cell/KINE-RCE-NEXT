@@ -84,7 +84,16 @@ const no = (l, g) => eq(l, !!g, 'false');
 
   console.log('\n1 · El armazón');
   si('existe la barra de pasos', await ver('#spPasos'));
-  eq('★ hay CUATRO pasos', await p.evaluate(() => document.querySelectorAll('#spPasos [data-p]').length), 4);
+  /* 🗂️ 20-sep-2026 · AHORA SON CINCO PESTAÑAS, y la nueva es el PASO 0 · el
+     ingreso (acuerdo 1, que se había quedado en papel: Diego lo reclamó con
+     «me sigue mostrando toda la planilla, no inicia el modal de
+     identificación»). El 0 solo se VE mientras se ingresa; a un paciente ya
+     ingresado no se le vuelve a ingresar, y eso lo mide ingreso_paso_cero.js.
+     Lo que esta guardia protege —que cada paso muestre lo suyo— no cambió. */
+  eq('★ hay cinco pasos: el ingreso y los cuatro del turno',
+     await p.evaluate(() => document.querySelectorAll('#spPasos [data-p]').length), 5);
+  eq('★ …y el del ingreso es el 0',
+     await p.evaluate(() => !!document.querySelector('#spPasos [data-p="0"]')), true);
   // Esta cama está con TQT y en VM, así que SÍ hay algo que prevenir y el
   // camino arranca en el paso 1. (Sin vía aérea artificial ni ventilación la
   // pestaña se esconde y se abre directo en el turno — lo fija

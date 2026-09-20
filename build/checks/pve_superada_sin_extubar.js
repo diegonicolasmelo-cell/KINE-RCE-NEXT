@@ -47,11 +47,12 @@ si('…van juntas y en ese orden',
 si('★ …y entraron DESPUÉS de ANOTACIONES_JSON, no al medio',
   iCol('PVE_SUP_SIN_EXT') > iCol('ANOTACIONES_JSON'));
 // 🗂️ 397 desde el 16-sep-2026: entró VENT_INTERFAZ (los tres ejes).
+// 🗂️ 20-sep-2026 · 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7).
 // 🗂️ 17-sep-2026 · 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación).
   // 406 = 405 + HEMO_PAM_MED (la PPC pasó a calcularse: PAM − PIC).
   // 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
   // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-si('testEsquema exige el total al día', /TOTAL_COLS\.EVOLUCIONES !== 408/.test(esq));
+si('testEsquema exige el total al día', /TOTAL_COLS\.EVOLUCIONES !== 409/.test(esq));
 
 /* ══ 2 · SERVIDOR: texto, validación, estadística, entrega ══════════════ */
 console.log('\n2 · Servidor');

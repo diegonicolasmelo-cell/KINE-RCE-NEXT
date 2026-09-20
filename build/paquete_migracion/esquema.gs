@@ -117,7 +117,7 @@ const _COLS_EVOLUCIONES = [
   ['EVAL_T_HECKMATT','texto','Heckmatt (ecografía muscular)'],                                // S4: índice de Heckmatt I-IV
   ['EVAL_T_FED_D','decimal','Engrosamiento diafragma derecho (%)'],['EVAL_T_FED_I','decimal','Engrosamiento diafragma izquierdo (%)'],      // S4: fracción de engrosamiento diafragmático % (>30% predice éxito weaning)
   ['EVAL_T_EXC_D','decimal','Excursión diafragma derecho (cm)'],['EVAL_T_EXC_I','decimal','Excursión diafragma izquierdo (cm)'],      // S4: excursión diafragmática cm (>1.1 predice éxito)
-  ['PAC_CHARLSON','entero','Charlson (comorbilidad)'],['PAC_INGRESO_TIPO','texto','Ingreso electivo o de urgencia'],     // S5: índice de Charlson; Electivo/Urgencia (hoja RHB)
+  ['PAC_CHARLSON','entero','Charlson (comorbilidad)'],['PAC_INGRESO_TIPO','texto','Procedencia del paciente'],     // S5: índice de Charlson; Electivo/Urgencia (hoja RHB)
   ['EXT_VISAGE','entero','VISAGE'],['EXT_SCORE_VA','entero','Score de cuidados de vía aérea'],          // S7: VISAGE (≥3 éxito) y Score cuidados de VA (<6 adecuado) — neuro
   ['LAB_PH','decimal','pH (laboratorio)'],['LAB_PACO2','decimal','PaCO₂ (laboratorio)'],['LAB_PAO2','decimal','PaO₂ (laboratorio)'],['LAB_HCO3','decimal','Bicarbonato (laboratorio)'],['LAB_LACTATO','decimal','Lactato (laboratorio)'],['LAB_PAFI','decimal','PaFiO₂ (laboratorio)'], // S8: GSA
   // HEMO_FC: categórico (Eucárdico/Taquicárdico/Bradicárdico), ya no numérico.
@@ -358,7 +358,10 @@ const _COLS_EVOLUCIONES = [
      letras y preguntarlo dos veces fue lo que Diego desarmó —«esta vigilia
      casi te discuto, se pisa casi entero con un SAS»—. Las palabras son las
      suyas. Lo fija vigilia_sin_sedacion.js. */
-  ['SED_VIGILIA','texto','Estado de vigilia (sin sedación)']
+  ['SED_VIGILIA','texto','Estado de vigilia (sin sedación)'],
+  // 🔵 Nombre social (20-sep-2026, acuerdo 1.7). Opcional; el legal sigue
+  // siendo el obligatorio.  — SIEMPRE AL FINAL
+  ['PAC_NOMBRE_SOCIAL','texto','Nombre social']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -467,6 +470,12 @@ const ESQUEMA = {
     // vacío si el paciente no está en prono. Lo escribe el guardado del turno,
     // igual que los ULT_* de arriba.  — SIEMPRE AL FINAL
     ['PRONO_DESDE','texto','Pronación en curso desde'],
+    // 🔵 Nombre social (20-sep-2026, acuerdo 1.7): «se añade solamente para
+    // fines de provocar cercanía; algunas personas se identifican más por su
+    // nombre social que por su nombre de pila». Opcional, y con las mismas
+    // reglas que el resto: se queda en la planilla, no viaja a informes ni al
+    // REM.  — SIEMPRE AL FINAL
+    ['NOMBRE_SOCIAL','texto','Nombre social'],
   ]},
   EVOLUCIONES:         { headerRows: 3, cols: _COLS_EVOLUCIONES },
   EVOLUCIONES_ARCHIVO: { headerRows: 3, cols: _COLS_EVOLUCIONES },
@@ -1104,6 +1113,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7, 20-sep-2026);
   // 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación, 17-sep-2026);
   // 407 = 406 + KTM_SESIONES_JSON (cada sesión lleva lo suyo, 17-sep-2026);
   // 406 = 405 + HEMO_PAM_MED (la PPC se calcula, 17-sep-2026);
@@ -1113,7 +1123,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 408) errs.push("EVOLUCIONES != 408 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 409) errs.push("EVOLUCIONES != 409 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

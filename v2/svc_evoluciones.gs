@@ -895,6 +895,8 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
        Se supina → se limpia; se prona → queda el momento de ESTA fila; si no
        pasó nada en el turno, se conserva lo que la cama ya traía, que es lo
        que hace que el estado ARRASTRE aunque un turno no se registre. */
+    // 🔵 El nombre social viaja a la cama como el resto de la identidad.
+    NOMBRE_SOCIAL: val(evo.PAC_NOMBRE_SOCIAL, cama.NOMBRE_SOCIAL),
     PRONO_DESDE: esVerdadero(evo.RESP_SUPINO_EVENTO) ? ''
                : (esVerdadero(evo.RESP_PRONO_EVENTO)
                     ? (evo.PRONO_INICIO_TS || _tsEventoTurno(fecha, turno, evo.RESP_PRONO_HORA))
