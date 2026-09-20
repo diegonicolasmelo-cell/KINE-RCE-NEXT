@@ -2392,3 +2392,45 @@ agujero abierto por el otro lado.
 
 **186 guardias · 186 verdes.** Nueva: `prono_hora_se_elige.js`.
 Sello de entrega: `NEXT-2.9-hora-se-elige`.
+
+---
+
+## 20-sep-2026 · El turno no se podía cerrar
+
+Iba a hacer el mockup del paso 4 y, como ahora hago siempre, fui a mirar el
+código primero. Apareció un bloqueante duro.
+
+**La firma es obligatoria para guardar, el guardado ocurre al salir del paso 3,
+y el selector de firma vivía en el paso 4.** Al tocar guardar salía «⚠️ Debes
+seleccionar la firma», el código le hacía `focus()` y le pintaba un borde rojo a
+un campo invisible. El sistema exigía firmar y no había dónde firmar.
+
+Es exactamente lo que Diego reportó del turno real —«no aparece firma, así que
+no puedo avanzar al relato»—. Yo lo había cerrado como «el roster estaba vacío».
+Era cierto y estaba arreglado, **pero era solo la mitad**: con el equipo cargado
+el turno tampoco se podía cerrar.
+
+🪤 **Y arrastraba otros tres campos.** En la misma tarjeta viven el Plan
+Kinésico, la Nota del Turno y los pendientes del turno, y los tres viajan en el
+guardado. Al mostrarse después, en un turno nuevo **se guardaban siempre
+vacíos**. Tres campos que el equipo cree que existen y que nunca se pudieron
+llenar.
+
+### La regla, no el caso
+
+La guardia no mira la firma: **saca del código la lista de campos del payload**
+—no una lista a mano, que envejece— y exige que ninguno viva en un paso
+posterior al que guarda. Si un dato viaja en el guardado, tiene que poder
+escribirse antes.
+
+🪤 `cuatro_pasos.js` exigía lo contrario y se puso roja. Se actualizó con la
+razón escrita, y al hacerlo apareció que **ya defendía esta regla sin notarlo**:
+su punto 4 dice que el guardado ocurre al salir de las evaluaciones.
+
+🪤 Y un tropiezo mío que conviene no repetir: la primera versión de la guardia
+llamaba a `setRoster(...)` suelto. No es global —vive en el módulo `Turnos`— así
+que no hacía nada y el selector se quedaba con el placeholder, que es **justo el
+síntoma que la guardia investigaba**. Confundirlos habría sido cómodo y falso.
+
+**187 guardias · 187 verdes.** Nueva: `nada_del_guardado_despues.js`.
+Sello de entrega: `NEXT-3.0-firma-alcanzable`.

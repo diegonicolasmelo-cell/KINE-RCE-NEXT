@@ -554,3 +554,62 @@ cuándo» **también dejó de ser tooltip** y se lee escrito al lado.
 y la evidencia actual no lo respalda como rutina*. El caso excepcional va en
 texto libre. Queda escrito acá porque es justo el tipo de cosa que alguien vuelve
 a proponer en tres meses sin saber que ya se decidió.
+
+---
+
+## 5 · El cierre del turno — un bloqueante encontrado el 20-sep-2026
+
+No salió de un mockup: salió de ir a mirar el paso 4 antes de dibujarlo.
+
+### 5.1 · 🔴 El turno no se podía cerrar
+
+> *«Otra cosa no aparece firma, así que no puedo avanzar al relato.»*
+
+Le había atribuido esto al equipo que faltaba en la planilla —cierto, y ya
+arreglado—, pero **ése no era el único motivo**, y el otro es peor:
+
+- El guardado ocurre **al avanzar desde el paso 3** («💾 Guardar y ver el
+  relato»).
+- La firma es **obligatoria** para guardar.
+- Pero el selector de firma vivía en «Planes y Pendientes», marcada como
+  **paso 4**.
+
+Al tocar guardar salía «⚠️ Debes seleccionar la firma», el código le hacía
+`focus()` y le pintaba un borde rojo **a un campo que no se ve**. Un callejón
+sin salida: el sistema exige firmar y no hay dónde firmar.
+
+🪤 **Y arrastraba otros tres.** En la misma tarjeta viven el **Plan Kinésico**,
+la **Nota del Turno** y los **pendientes del turno**, y los tres viajan en el
+guardado. Al mostrarse recién después, en un turno nuevo **se guardaban siempre
+vacíos**: tres campos que el equipo cree que existen y que no se podían llenar
+nunca.
+
+**Arreglado:** la tarjeta pasa al paso 3, que es donde se guarda.
+
+### 5.2 · La regla que queda
+
+🔴 **Si un dato viaja en el guardado, tiene que poder escribirse antes de
+guardar.** Un campo del payload en un paso posterior es, por construcción, un
+campo que nadie puede llenar.
+
+La guardia `nada_del_guardado_despues.js` no mira solo la firma: **saca del
+código la lista de campos del payload** —no una lista escrita a mano, que
+envejece— y comprueba que ninguno viva en el paso 4.
+
+🪤 `cuatro_pasos.js` exigía lo contrario y se puso roja. Se actualizó con la
+razón escrita, y resultó que **ya defendía esta regla sin notarlo**: su punto 4
+dice que el guardado ocurre al salir de las evaluaciones. Lo que se guarda ahí
+se escribe ahí.
+
+### 5.3 · Lo que queda por mirar del paso 4
+
+Sin acuerdo todavía, anotado al pasar:
+
+- **Tres listas con nombres parecidos** conviven en el cierre: «⏳ Pendientes
+  del turno» (para la entrega de hoy), «📌 Anotaciones del turno» (hechos que se
+  narran) y «📌 Dejar pendiente para el turno que viene» (encargos del
+  episodio). Son tres cosas distintas de verdad, pero se llaman casi igual.
+- **¿Se usan el Plan Kinésico y la Nota del Turno, o alguno está muerto?** Es la
+  pregunta 9 de `GUIA_DE_ACUERDOS.md` («¿qué no se llena nunca?»), y ahora tiene
+  un matiz: hasta hoy **no se podían llenar**, así que su historial no sirve para
+  contestarla.

@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-2.9-hora-se-elige">
+<meta name="rce-version" content="NEXT-3.0-firma-alcanzable">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -4964,7 +4964,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="plant-pop" id="plantPop"></div>
         </div>
       </div>
-      <div class="fcard fc-g" id="fcPlanes" data-paso="4">
+      <!-- 🔴 20-sep-2026 · ESTA TARJETA ES DEL PASO 3, NO DEL 4.
+           Todo lo que hay acá adentro —el Plan Kinésico, la Nota del Turno, los
+           pendientes y LA FIRMA— viaja en el guardado, y el guardado ocurre al
+           avanzar DESDE el paso 3 («💾 Guardar y ver el relato»). Marcada como
+           paso 4 se mostraba DESPUÉS de guardar, así que en un turno nuevo los
+           tres campos se guardaban siempre vacíos… y la firma, que es
+           OBLIGATORIA, no tenía dónde ponerse: salía «⚠️ Debes seleccionar la
+           firma», el código le hacía focus() a un campo invisible y el turno no
+           se podía cerrar. Es lo que frenó a Diego en el turno real («no
+           aparece firma, así que no puedo avanzar al relato»).
+           Lo fija nada_del_guardado_despues.js, que ya no mira solo la firma:
+           recorre TODOS los campos del payload. -->
+      <div class="fcard fc-g" id="fcPlanes" data-paso="3">
         <div class="fcard-hdr"><span class="fcard-title">📋 Planes y Pendientes</span></div>
         <div class="fcard-body">
           <!-- Pendientes predefinidos: recordatorios del turno (sin fecha, NO se
@@ -5365,7 +5377,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-2.9-hora-se-elige]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.0-firma-alcanzable]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}

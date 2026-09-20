@@ -132,7 +132,18 @@ const no = (l, g) => eq(l, !!g, 'false');
   eq('★ avanzar lleva a las evaluaciones', await paso(), '3');
   si('evaluaciones: se ven', await ver('#fcEval'));
   no('evaluaciones: ya NO se ve el bloque respiratorio', await ver('#fcRespCard'));
-  no('evaluaciones: tampoco los planes', await ver('#fcPlanes'));
+  /* 🔴 20-sep-2026 · ACÁ SE DIO VUELTA LA REGLA, a propósito. Hasta hoy esta
+     guardia exigía que «Planes y Pendientes» NO estuviera en evaluaciones y SÍ
+     en el relato. Eso era el bug: adentro de esa tarjeta viven el Plan
+     Kinésico, la Nota del Turno y LA FIRMA, y los tres viajan en el guardado —
+     que, como dice el punto 4 de esta misma guardia, ocurre AL SALIR DE LAS
+     EVALUACIONES. Mostrarlos después era pedirle al colega que llenara campos
+     ya guardados, y con la firma era peor: es obligatoria, así que el turno no
+     se podía cerrar («no aparece firma, así que no puedo avanzar al relato»).
+     La regla nueva es la que esta guardia ya defendía sin notarlo: lo que se
+     guarda al salir de evaluaciones se escribe EN evaluaciones.
+     Lo general lo cuida nada_del_guardado_despues.js. */
+  si('evaluaciones: ★ los planes y la firma SÍ están (se guardan al salir)', await ver('#fcPlanes'));
   si('…y ahora sí se ofrece «atrás»', await ver('#pasoAtras'));
 
   console.log('\n3 · Volver atrás conserva lo escrito');
@@ -172,7 +183,7 @@ const no = (l, g) => eq(l, !!g, 'false');
 
   console.log('\n6 · El último paso es el relato y el plan');
   si('relato: se ve', await ver('#rarea'));
-  si('relato: se ven los planes', await ver('#fcPlanes'));
+  no('relato: ★ los planes ya NO están acá (se llenaron antes de guardar)', await ver('#fcPlanes'));
   no('relato: ya no se ven las evaluaciones', await ver('#fcEval'));
   no('relato: ni el respiratorio', await ver('#fcRespCard'));
 
