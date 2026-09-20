@@ -72,6 +72,10 @@ const no = (l, g) => eq(l, !!g, 'false');
        equipo»), así que ese truco dejaba el selector sin la firma y el guardado
        no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
     const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó. */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     /* 🪤 TURNO CONGELADO. Desde el 19-sep («KTM A») la pantalla cambia según
        el turno: de noche la KTM se apaga y los chips del pool quedan en solo
        lectura. Sin fijar SHIFT esta guardia sale verde de día y roja de
@@ -134,6 +138,8 @@ const no = (l, g) => eq(l, !!g, 'false');
     $('fSop').value = 'VM'; cascadeSop();
     $('fModo').value = 'CPAP/PS'; renderParams();
     const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó. */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     // KTM nivel 3 (sedente al borde de la cama) SIN ningún FSS en el episodio
     if (typeof setKTMstate === 'function') setKTMstate('r');
     const n = $('fKTMniv'); if (n) { n.value = '3'; n.dispatchEvent(new Event('change')); }

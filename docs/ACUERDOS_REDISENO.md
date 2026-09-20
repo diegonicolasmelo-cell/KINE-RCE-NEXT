@@ -707,3 +707,73 @@ Sin acuerdo todavía, anotado al pasar:
   pregunta 9 de `GUIA_DE_ACUERDOS.md` («¿qué no se llena nunca?»), y ahora tiene
   un matiz: hasta hoy **no se podían llenar**, así que su historial no sirve para
   contestarla.
+
+---
+
+## 6 · Los cinco módulos — CERRADO el 20-sep-2026
+
+Mockup: `claude.ai/artifact/WDwHEu1zHiiMqe86rRMM7q`
+
+Revisión de UPOT, Hemodinamia, Neurología, Auscultación y Procedimientos.
+
+### 6.1 · 🔴 La hemodinamia se pide; ya no se afirma sola
+
+> *«HDN pedir antes de avanzar. Si no se anota.»*
+
+**El hallazgo.** Los dos campos nacían puestos —Estado **«Estable»**, DVA **«Sin
+requerimientos»**— y **ninguno tenía opción vacía**: no existía la forma de decir
+«no lo miré». Y no se quedaba en la pantalla: la evolución escribía **«HDN
+estable s/DVA»** aunque nadie hubiera bajado hasta ahí.
+
+Es la afirmación **clínica** más fuerte que el sistema hacía por su cuenta. Un
+paciente inestable cuyo turno no revisó hemodinamia quedaba con una evolución
+que decía que estaba estable.
+
+🪤 **Eran DOS redes empujando la misma mentira**: además de los valores por
+defecto, los dos generadores de texto —servidor y cliente— decían «si no viene
+estado, usa Estable». Arreglar solo la pantalla habría dejado el agujero abierto
+por el otro lado, igual que con la hora del prono.
+
+**Ahora:** nacen vacíos, se piden al guardar como la firma, y una fila vieja sin
+el dato **no lleva la línea** en vez de inventarla.
+
+🔵 **Y salió algo que sirve para todo el formulario:** el aviso **lleva al
+campo**. El guardado ocurre al salir del paso 3 y la hemodinamia vive en el 2;
+avisar y enfocar algo de otro paso deja al colega mirando un aviso sin nada que
+tocar —lo mismo que pasaba con la firma—. Ahora el aviso salta al paso donde vive
+el campo. La vía aérea usa el mismo camino.
+
+### 6.2 · 🧿 El UPOT se reparte donde vive cada cosa
+
+> *«UPOT podríamos marcar "en seguimiento por UPOT" en neuro, y el test de apnea,
+> al ser una evaluación, que quede en evaluaciones en estos casos.»*
+
+La tarjeta propia desaparece:
+
+- **«Paciente en seguimiento por UPOT»** y las medidas de protección de órganos
+  → dentro de **Neurología**. El seguimiento es estado neurológico.
+- **El test de apnea** → a **Evaluaciones**, con las demás mediciones. Solo
+  aparece con el paciente en seguimiento por UPOT.
+
+🪤 **Y había una trampa que cubrir.** Neurología aparece por diagnóstico neuro o
+por la fase de neuroprotección, y las condiciones de UPOT no las implican —un
+paro cardiorrespiratorio recuperado no dice «TEC» en ninguna parte—. Sin sumar
+ese disparador, la casilla se habría mudado a un lugar que no se ve y el
+seguimiento UPOT habría desaparecido del sistema. Ahora Neurología aparece
+**también** con las condiciones de UPOT.
+
+🔴 **Ninguna columna cambió**: `UPOT_ACTIVO`, `UPOT_MEDIDAS` y `APNEA_TEST` se
+siguen escribiendo igual. Lo que cambió es dónde se tocan.
+
+### 6.3 · Lo que quedó sano
+
+**Neurología** y **Auscultación** están bien. La PPC se calcula (PAM − PIC) y no
+se puede escribir una que no cuadre.
+
+### 6.4 · Lo chico, todavía sin respuesta
+
+- **Auscultación** tiene dos campos muertos —calidad y localización del
+  murmullo— que nadie lee ni escribe.
+- **RCP** sugiere **3** en «N° de ciclos»: la trampa de la fijación del TOT.
+
+Los dos quedan a la espera de que Diego diga si se tocan.

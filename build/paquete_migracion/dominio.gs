@@ -658,13 +658,20 @@ function generarTextoEvolucion(d) {
   txt.push(sedStr);
 
   // 4. Hemodinamia
-  const hEst = v('HEMO_ESTADO') || 'Estable';
+  /* 🔴 SIN DATO NO SE NARRA (20-sep-2026). Acá decía «|| 'Estable'», así que
+     la evolución afirmaba estabilidad hemodinámica aunque nadie la hubiera
+     mirado — y encima los campos de la pantalla nacían puestos, así que eran
+     DOS redes empujando la misma mentira. Ahora la hemodinamia se pide antes
+     de guardar; una fila vieja sin ella simplemente no lleva la línea.
+     Espejo en index.html (genTexto) — mantener en paridad. */
+  const hEst = v('HEMO_ESTADO');
   const dva  = v('HEMO_DVA');
   const mDVA = esVerdadero(d.HEMO_MULTI_DVA), nDVA = v('HEMO_NUM_DVA');
   const tend = esVerdadero(d.HEMO_TENDENCIA), tendT = v('HEMO_TEND_TIPO');
   // Formato pedido por Diego (ago-2026): «HDN estable c/DVA en dosis bajas
   // para meta PAM 65» — corto, y la meta PAM (que JAMÁS llegaba al texto,
   // reporte de Álvaro) inmediatamente después de la HDN.
+  if (hEst) {
   let hemoStr = `HDN ${hEst === 'Estable' ? 'estable' : 'inestable'}`;
   if (!dva || dva === 'Sin requerimientos' || dva === 'sin DVA') hemoStr += ' s/DVA';
   else {
@@ -674,6 +681,7 @@ function generarTextoEvolucion(d) {
   if (esVerdadero(d.HEMO_META_PAM) && v('HEMO_PAM')) hemoStr += ` para meta PAM ${v('HEMO_PAM')} mmHg`;
   if (tend && tendT) hemoStr += `, con tendencia a ${tendT}`;
   txt.push(hemoStr + '.');
+  }
   const pic = vn('HEMO_PIC'), ppc = vn('HEMO_PPC');
   if (pic > 0 || ppc > 0) {
     const nm = [];

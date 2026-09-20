@@ -66,6 +66,8 @@ const no = (l, g) => eq(l, !!g, 'false');
        equipo»), así que ese truco dejaba el selector sin la firma y el guardado
        no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
     const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     pasoIr(3);   // 🗂️ evaluaciones: del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(200);

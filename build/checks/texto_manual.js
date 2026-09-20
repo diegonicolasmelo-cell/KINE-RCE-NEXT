@@ -57,6 +57,8 @@ const MANUAL = 'EVOLUCION REDACTADA A MANO POR EL COLEGA - no debe perderse.';
     $('rarea').classList.remove('hidden');
     $('cBed').value = '4'; $('gDate').value = '2026-08-04';
     $('fFirma').innerHTML = '<option value="DMV">DMV</option>'; $('fFirma').value = 'DMV';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     $('fVA').value = 'TOT';
     setKTMstate('s'); $('fKTMraz').value = 'inestabilidad hemodinámica';
     $('rtxt').value = genTexto(); _marcarTextoGenerado($('rtxt').value);

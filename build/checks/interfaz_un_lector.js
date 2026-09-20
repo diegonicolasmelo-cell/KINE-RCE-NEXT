@@ -178,6 +178,8 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
       _vmHistFlag = false; _diasVMPrevios = 0; _diasVMEpisodio = 0; _nReintub = 0; _transIntubEsteTurno = false;
       const opt = document.createElement('option'); opt.value = 'DMV'; opt.textContent = 'DMV';
       $('fFirma').appendChild(opt); $('fFirma').value = 'DMV';
+      /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+      {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
       $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('', 'NRC');
       $('r_litros').value = '4'; $('r_fr').value = '30'; $('r_spo2').value = '88';
       updateVAUI();

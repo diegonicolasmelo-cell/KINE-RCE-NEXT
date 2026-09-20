@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.2-pendiente-dura">
+<meta name="rce-version" content="NEXT-3.3-hdn-upot">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3445,31 +3445,30 @@ document.documentElement.setAttribute('data-piel', 'inst');
           </div>
         </div>
 
-        <!-- UPOT / PROCURAMIENTO — visible SOLO si (TOT|TQT) + GCS ≤ 7 + sin sedación -->
-        <div class="fcard fc-upot hidden" id="fcUpot">
-          <div class="fcard-hdr"><span class="fcard-title">🧿 UPOT — Procuramiento</span></div>
-          <div class="fcard-body">
-            <div class="check wa" style="margin-bottom:6px;"><input type="checkbox" id="cUPOT" onchange="if(this.checked)show('dUpotDet');else hide('dUpotDet');"><label for="cUPOT" style="font-weight:700;">Paciente en seguimiento por UPOT</label></div>
-            <div id="dUpotDet" class="hidden" style="padding:8px 10px;background:#fff1f2;border:1px solid #fecdd3;border-radius:7px;">
-              <div class="row" style="align-items:center;margin-bottom:6px;flex-wrap:wrap;">
-                <div class="col wa"><label>Test de apnea</label>
-                  <select id="fApneaTest" style="height:30px;"><option value="">— no realizado —</option><option>Positivo</option><option>Negativo</option></select></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="cUPOTmed"><label for="cUPOTmed">Se mantienen medidas de protección de órganos</label></div>
-              </div>
-              <div style="font-size:.7rem;color:#9f1239;">El test de apnea se agrega solo a los procedimientos del turno y al histórico del episodio.</div>
-            </div>
-          </div>
-        </div>
+        <!-- 🗂️ 20-sep-2026 · LA TARJETA DE UPOT SE REPARTIÓ. Diego: «UPOT
+             podríamos marcar "en seguimiento por UPOT" en neuro, y el test de
+             apnea, al ser una evaluación, que quede en evaluaciones en estos
+             casos». El seguimiento es estado neurológico y el test de apnea es
+             una MEDICIÓN: cada cosa se fue a donde pertenece y la tarjeta
+             propia dejó de existir. Las columnas no cambiaron. -->
 
         <!-- HEMODINAMIA -->
         <div class="fcard fc-h">
           <div class="fcard-hdr"><span class="fcard-title">❤️ Hemodinamia</span></div>
           <div class="fcard-body">
             <div class="row">
-              <div class="col wa"><label>Estado</label><select id="fHEst"><option>Estable</option><option>Inestable</option></select></div>
+              <!-- 🔴 20-sep-2026 · «HDN pedir antes de avanzar. Si no se anota»
+                   (Diego). Los dos nacían PUESTOS —«Estable» y «Sin
+                   requerimientos»— y sin opción vacía, así que no existía la
+                   forma de decir «no lo miré»: la evolución escribía «HDN
+                   estable s/DVA» aunque nadie hubiera bajado hasta acá. Es la
+                   afirmación clínica más fuerte que el sistema hacía por su
+                   cuenta. Ahora nacen vacíos y se piden al guardar, como la
+                   firma. Lo fija hdn_y_upot.js. -->
+              <div class="col wa"><label>Estado</label><select id="fHEst"><option value="">-- sin registrar --</option><option>Estable</option><option>Inestable</option></select></div>
               <div class="col wa"><label>DVA</label>
                 <select id="fDVA" onchange="hMultiDVA()">
-                  <option>Sin requerimientos</option><option>DVA dosis baja</option><option>DVA dosis media</option><option>DVA dosis alta</option>
+                  <option value="">-- sin registrar --</option><option>Sin requerimientos</option><option>DVA dosis baja</option><option>DVA dosis media</option><option>DVA dosis alta</option>
                 </select></div>
               <div id="wMultiDVA" class="hidden" style="display:flex;align-items:center;gap:8px;">
                 <div class="check cr wa"><input type="checkbox" id="cMultiDVA" onchange="hMultiDVA()"><label for="cMultiDVA">Multi-DVA</label></div>
@@ -3524,6 +3523,24 @@ document.documentElement.setAttribute('data-piel', 'inst');
                    existía era la META de PAM del bloque hemodinámico, que es
                    otra cosa. Con captor, la PAM se pide siempre. -->
               <div class="col ws hidden" id="gPPC"><label>PPC</label><input type="number" id="fPPC" readonly tabindex="-1" title="PAM − PIC. Se calcula sola." style="width:70px;background:#f7f6f3;color:var(--muted);"></div>
+            </div>
+
+            <!-- 🧿 UPOT — mudado desde su tarjeta propia el 20-sep-2026. El
+                 seguimiento por la Unidad de Procuramiento es estado
+                 neurológico, no un módulo aparte. El TEST DE APNEA se fue a
+                 Evaluaciones: es una medición y vive con las demás.
+                 🪤 Y por eso esta tarjeta ahora aparece TAMBIÉN con las
+                 condiciones de UPOT (vía aérea artificial + GCS ≤ 7 + sin
+                 sedación), que no implican diagnóstico neuro escrito: un paro
+                 cardiorrespiratorio recuperado no dice «TEC» en ninguna parte,
+                 y sin ese disparador la casilla se habría mudado a un lugar
+                 que no se ve. Lo fija hdn_y_upot.js. -->
+            <div id="dUpotEnNeuro" class="hidden" style="margin-top:9px;padding:8px 10px;background:#fff1f2;border:1px solid #fecdd3;border-radius:7px;">
+              <div class="check wa" style="margin-bottom:0;"><input type="checkbox" id="cUPOT" onchange="hUpotNeuro()"><label for="cUPOT" style="font-weight:700;">🧿 Paciente en seguimiento por UPOT</label></div>
+              <div id="dUpotDet" class="hidden" style="margin-top:7px;">
+                <div class="check wa"><input type="checkbox" id="cUPOTmed"><label for="cUPOTmed">Se mantienen medidas de protección de órganos</label></div>
+                <div style="font-size:.7rem;color:#9f1239;margin-top:5px;">El test de apnea se registra en <b>Evaluaciones</b>, con las demás mediciones.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -4931,6 +4948,20 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col grow"><label>Hallazgos ecográficos</label><input type="text" id="fDiaf" placeholder="Descripción..."></div>
               </div>
             </details>
+            <!-- 🧿 TEST DE APNEA — mudado desde la tarjeta de UPOT el
+                 20-sep-2026 (Diego: «el test de apnea, al ser una evaluación,
+                 que quede en evaluaciones en estos casos»). Solo aparece con
+                 el paciente en seguimiento por UPOT: fuera de ese caso no es
+                 una medición que corresponda ofrecer. -->
+            <div id="rowApnea" class="row hidden" style="margin-top:8px;">
+              <div class="col wa"><label>🧿 Test de apnea</label>
+                <select id="fApneaTest" style="height:30px;min-width:170px;">
+                  <option value="">— no realizado —</option><option>Positivo</option><option>Negativo</option>
+                </select></div>
+              <div class="col grow" style="align-self:flex-end;margin-bottom:6px;">
+                <span style="font-size:.7rem;color:#9f1239;">Se suma solo a los procedimientos del turno y al histórico del episodio.</span></div>
+            </div>
+
             <!-- 5) desplegable: TOS Y DEGLUCIÓN -->
             <details id="dxTos" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
               <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">😮‍💨 Tos y deglución</summary>
@@ -5408,7 +5439,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.2-pendiente-dura]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.3-hdn-upot]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -7744,7 +7775,7 @@ function fillForm(s) {
   if($('cSupino')&&$('cSupino').checked){ show('dSupinoHora'); _updateSupinoTip(); }
   hPos();
   set('fDeglucion',s.EVAL_DEGLUCION);
-  chk('cUPOT',s.UPOT_ACTIVO); if(s.UPOT_ACTIVO===true||s.UPOT_ACTIVO==='TRUE') show('dUpotDet');
+  chk('cUPOT',s.UPOT_ACTIVO); if(typeof hUpotNeuro==='function') hUpotNeuro();
   chk('cUPOTmed',s.UPOT_MEDIDAS);
   set('fDias',s.DIA_ESTADIA); set('fDiasVM',s.DIAS_VM);
   if(s.DIAS_VM!==''&&s.DIAS_VM!=null) _diasVMSellado=s.DIAS_VM;
@@ -8159,7 +8190,7 @@ function fillFormReplica(s) {
   calcInsumosDias();
   { const _hme=$('fFecHME'); if(_hme) _hme.disabled=(s.VENT_H_ACTIVA===true||s.VENT_H_ACTIVA==='TRUE'); }
   setRuidosExtra(s.EX_RUIDOS_JSON||'');
-  chk('cUPOT',s.UPOT_ACTIVO); if(s.UPOT_ACTIVO===true||s.UPOT_ACTIVO==='TRUE') show('dUpotDet');
+  chk('cUPOT',s.UPOT_ACTIVO); if(typeof hUpotNeuro==='function') hUpotNeuro();
   chk('cUPOTmed',s.UPOT_MEDIDAS);
   _ktmContraSel(s.KTM_CONTRA_RAZON);
   // La interacción P-VM NO se replica (Diego, 6-sep: «de un turno a otro se
@@ -8792,6 +8823,24 @@ function _herTouch(ev){
   if(c && !c.querySelector('.heredado')) c.querySelector('.her-chip')?.remove();
 }
 
+/** 🔴 EL AVISO LLEVA AL CAMPO (20-sep-2026). El guardado ocurre al salir del
+ *  paso 3, pero muchos campos obligatorios viven en el paso 2 (la hemodinamia,
+ *  la vía aérea). Avisar «registra la hemodinamia» y hacerle `focus()` a algo
+ *  que está en otro paso deja al colega mirando un aviso sin nada que tocar —
+ *  que es exactamente lo que pasaba con la firma antes de moverla.
+ *  Acá el aviso SALTA al paso donde vive el campo y lo enfoca. */
+function _irAlCampo(id){
+  const e=$(id); if(!e) return;
+  const due=e.closest('[data-paso]');
+  const paso=due?parseInt(due.dataset.paso||'2',10):2;
+  if(typeof pasoIr==='function' && paso && paso!==PASO_ACTUAL) pasoIr(paso);
+  setTimeout(function(){
+    try{ e.scrollIntoView({block:'center'}); e.focus(); }catch(x){}
+    e.style.outline='2px solid var(--danger)';
+    setTimeout(()=>{ e.style.outline=''; }, 2500);
+  }, 60);
+}
+
 function guardar() {
   const id=v('cBed'), fecha=v('gDate')||hoy(), tkey=`${fecha}-${SHIFT}`;
   const n=x=>parseFloat(x)||null;
@@ -8804,11 +8853,19 @@ function guardar() {
     if(sel){ sel.focus(); sel.style.outline='2px solid var(--danger)'; setTimeout(()=>{sel.style.outline='';},2500); }
     return;
   }
+  /* ★ HEMODINAMIA OBLIGATORIA (Diego, 20-sep-2026: «HDN pedir antes de
+     avanzar. Si no se anota»). Se pide igual que la firma y la vía aérea: son
+     los tres datos que la evolución afirma sí o sí, y ninguno se puede
+     suponer. */
+  if(!v('fHEst') || !v('fDVA')){
+    toast('⚠️ Registra la hemodinamia (estado y DVA) antes de guardar');
+    _irAlCampo(!v('fHEst') ? 'fHEst' : 'fDVA');
+    return;
+  }
   // ★ Vía aérea OBLIGATORIA — el select parte en "-" (sin estado) ★
   if(!v('fVA')){
     toast('⚠️ Registra la vía aérea del paciente antes de guardar');
-    const va=$('fVA');
-    if(va){ va.focus(); va.style.outline='2px solid var(--danger)'; setTimeout(()=>{va.style.outline='';},2500); }
+    _irAlCampo('fVA');   // vive en el paso 2: hay que llevar al colega hasta allá
     return;
   }
   // ★ PVE OBLIGATORIA DE DECLARAR (ago-2026, Diego): con el paciente en TOT
@@ -11776,14 +11833,22 @@ function genTexto() {
   else if(camicu==='ne') s+=', CAM-ICU no evaluable';
   s+='.';
   _B('sed'); L.push(s);
-  const hEst=gv('fHEst')||'Estable', dva=gv('fDVA')||'Sin requerimientos';
+  /* 🔴 SIN DATO NO SE NARRA. Antes decía «si no viene, usa Estable» y eso
+     afirmaba por su cuenta lo que nadie había mirado. Ahora la hemodinamia es
+     obligatoria, pero una evolución VIEJA puede venir sin ella: en ese caso la
+     línea no se escribe. Espejo en dominio_texto.gs — mantener en paridad. */
+  const hEst=gv('fHEst'), dva=gv('fDVA');
   // Formato de Diego (ago-2026): «HDN estable c/DVA en dosis bajas para meta
   // PAM 65 mmHg» — la meta PAM (que JAMÁS llegaba al texto, reporte de
   // Álvaro) va INMEDIATAMENTE después de la HDN.
-  let h=`HDN ${hEst==='Estable'?'estable':'inestable'}`;
-  h+=dva==='Sin requerimientos'?' s/DVA':' c/DVA en '+dva.replace(/^DVA\s*/i,'').toLowerCase().replace(/dosis (baja|media|alta)/,'dosis $1s');
-  if($('cMetaPAM')?.checked && v('fPAM')) h+=` para meta PAM ${v('fPAM')} mmHg`;
-  if($('cHTrend')?.checked){ const tt=gv('fHTT')||''; h+=`, con tendencia a la ${tt}`; } _B('hdn'); L.push(h+'.');
+  if(hEst){
+    let h=`HDN ${hEst==='Estable'?'estable':'inestable'}`;
+    if(!dva||dva==='Sin requerimientos') h+=' s/DVA';
+    else h+=' c/DVA en '+dva.replace(/^DVA\s*/i,'').toLowerCase().replace(/dosis (baja|media|alta)/,'dosis $1s');
+    if($('cMetaPAM')?.checked && v('fPAM')) h+=` para meta PAM ${v('fPAM')} mmHg`;
+    if($('cHTrend')?.checked){ const tt=gv('fHTT')||''; h+=`, con tendencia a la ${tt}`; }
+    _B('hdn'); L.push(h+'.');
+  }
   const _pic=gv('fPIC'), _ppc=gv('fPPC');
   _B('neuro');
   if(_pic||_ppc) L.push(`Neuromonitoreo: ${[_pic?`PIC ${_pic} mmHg`:null,_ppc?`PPC ${_ppc} mmHg`:null].filter(Boolean).join(', ')}.`);
@@ -13177,6 +13242,16 @@ function _sedFarmSet(arr){
    ocultarlas y limpiarlas les borraría el dato al re-guardar. Es la misma
    familia del rescate de la FiO₂ de la Venturi (5.71). Por eso, al cargar, un
    campo CON valor se muestra aunque su casilla venga apagada. */
+/** 🧿 El seguimiento por UPOT abre sus medidas y, en Evaluaciones, el test de
+ *  apnea. Fuera de ese caso el test no se ofrece: no es una medición que
+ *  corresponda a cualquier paciente. */
+function hUpotNeuro(){
+  const on=!!$('cUPOT')?.checked;
+  const det=$('dUpotDet'); if(det) det.classList.toggle('hidden', !on);
+  const fila=$('rowApnea'); if(fila) fila.classList.toggle('hidden', !on);
+  if(!on){ const at=$('fApneaTest'); if(at) at.value=''; }
+}
+
 function hNeuroDisp(limpiar){
   if(limpiar===undefined) limpiar=true;
   const dve=!!$('cDVE')?.checked, cap=!!$('cPICcaptor')?.checked;
@@ -16815,22 +16890,32 @@ function aplicarGatesNeuro(){
   // UPOT: (TOT|TQT) + GCS ≤ 7 + sin sedación
   const va=v('fVA');
   const upotVisible=(va==='TOT'||va==='TQT') && gcs<=7 && v('fSed')==='Sin sedación';
-  const u=$('fcUpot');
-  if(u){
-    u.classList.toggle('hidden', !upotVisible && !$('cUPOT')?.checked);
+  /* 🧿 20-sep-2026 · La casilla vive DENTRO de Neurología. Si deja de
+     corresponder y nadie la marcó, se limpia lo suyo — igual que antes. */
+  const ub=$('dUpotEnNeuro');
+  if(ub){
+    ub.classList.toggle('hidden', !upotVisible && !$('cUPOT')?.checked);
     if(!upotVisible && !$('cUPOT')?.checked){
       const at=$('fApneaTest'); if(at) at.value='';
       const cm=$('cUPOTmed'); if(cm) cm.checked=false;
       hide('dUpotDet');
     }
   }
+  if(typeof hUpotNeuro==='function') hUpotNeuro();
   // Neurología: por palabras clave del diagnóstico O por la fase clínica
   // «Neuroprotección» (ago-2026). Se SUMA al disparador anterior, no lo
   // reemplaza: un TEC al que nadie le marcó la fase no puede quedarse sin el
   // lugar donde hoy anota la PIC.
   const dx=(v('fDx')||'').toUpperCase();
+  /* 🪤 …Y TAMBIÉN por UPOT (20-sep-2026). Al mudar la casilla de seguimiento
+     acá adentro, esta tarjeta pasó a ser el único lugar donde se marca. Las
+     condiciones de UPOT no implican diagnóstico neuro escrito —un paro
+     cardiorrespiratorio recuperado no dice «TEC» en ninguna parte—, así que
+     sin sumar este disparador la casilla se habría mudado a un lugar que no
+     se ve y el seguimiento UPOT habría desaparecido del sistema. */
   const esNeuro=/HSA|ACV|TEC|MENINGIOMA|POLITRAUMA|SUBARACNOIDEA|CEREBRO|CRANEO|CRÁNEO|NEURO/.test(dx)
-    || (typeof FASES_SEL!=='undefined' && FASES_SEL.has('Neuroprotección'));
+    || (typeof FASES_SEL!=='undefined' && FASES_SEL.has('Neuroprotección'))
+    || upotVisible || !!$('cUPOT')?.checked;
   const nc=$('fcNeuro'); if(nc) nc.classList.toggle('hidden', !esNeuro);
   if(esNeuro) hNeuroDisp(false);   // sin limpiar: puede venir de una evolución cargada
 }
@@ -19165,7 +19250,7 @@ function _episodioAlFormulario(){
   // no tiene nada guardado todavía (si ya guardó, se respeta lo suyo).
   const c=_camaPanel(); if(!c||!c.PATIENT_ID) return;
   if(c.AET_ACTIVA===true||c.AET_ACTIVA==='TRUE'){ const e=$('cAET'); if(e&&!e.checked){ e.checked=true; const n=$('fAETnivel'); if(n&&c.AET_NIVEL) n.value=c.AET_NIVEL; try{ hAET(); }catch(x){} } }
-  if(c.UPOT_ACTIVO===true||c.UPOT_ACTIVO==='TRUE'){ const e=$('cUPOT'); if(e&&!e.checked){ e.checked=true; show('dUpotDet'); const m=$('cUPOTmed'); if(m&&(c.UPOT_MEDIDAS===true||c.UPOT_MEDIDAS==='TRUE')) m.checked=true; } }
+  if(c.UPOT_ACTIVO===true||c.UPOT_ACTIVO==='TRUE'){ const e=$('cUPOT'); if(e&&!e.checked){ e.checked=true; if(typeof hUpotNeuro==='function') hUpotNeuro(); const m=$('cUPOTmed'); if(m&&(c.UPOT_MEDIDAS===true||c.UPOT_MEDIDAS==='TRUE')) m.checked=true; } }
 }
 function renderBannerEpisodio(){
   const b=$('epBanner'); if(!b) return;

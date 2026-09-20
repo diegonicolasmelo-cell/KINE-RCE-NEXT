@@ -90,6 +90,8 @@ const CATALOGO = ['24', '26', '28', '30', '35', '40', '50'];
     $('cBed').value = '3'; DB = [{ ID_CAMA: '3' }];
     const opt = document.createElement('option'); opt.value = 'Klgo. Test'; opt.textContent = 'Klgo. Test';
     $('fFirma').appendChild(opt); $('fFirma').value = 'Klgo. Test';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     $('fVA').value = 'Natural'; cascadeVA('Oxigenoterapia/OAF'); cascadeSop('', 'MMV');   // 🗂️ 16-sep-2026: MMV es interfaz, no modo
     set('r_fio2', '28'); set('r_fr', '22'); set('r_spo2', '95');
     _transAvisoOk = true; window._ll.length = 0; guardar();

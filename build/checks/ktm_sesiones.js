@@ -147,6 +147,8 @@ const { chromium } = require('playwright-core');
     if (hayBoton) $('btnKtmSesion').click();
     await new Promise(r => setTimeout(r, 80));
     const firma = $('fFirma');
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó. */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     /* 🪤 19-sep-2026 · El equipo se SIEMBRA, porque ya no viene en el código:
        los nombres se mudaron a la hoja KINESIOLOGOS y el selector de firma nace
        vacío hasta que el arranque lo llena. Antes bastaba con añadir una opción

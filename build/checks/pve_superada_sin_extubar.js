@@ -193,6 +193,8 @@ const { chromium } = require('playwright-core');
     // el_equipo_no_va_en_el_codigo.js) y sin él no hay firma que elegir.
     if (window.Turnos) Turnos.setRoster([{ f: 'KIN', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]);
     document.getElementById('fFirma').value = 'KIN';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     try { guardar(); } catch (e) { window._toasts.push('ERR ' + e.message); }
     window.toast = _t; window.gs = _gs;
     return { toasts: window._toasts, llamadas: window._llamadas };

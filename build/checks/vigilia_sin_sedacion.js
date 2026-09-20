@@ -149,6 +149,8 @@ const { chromium } = require('playwright-core');
        no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
     if (window.Turnos) Turnos.setRoster([{ f: 'KIN', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]);
     const f = document.getElementById('fFirma'); if (f) f.value = 'KIN';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     window._ll = []; const _t = window.toast; window.toast = () => {};
     try { guardar(); } catch (e) { /* lo dice el assert de abajo */ }
     window.toast = _t;

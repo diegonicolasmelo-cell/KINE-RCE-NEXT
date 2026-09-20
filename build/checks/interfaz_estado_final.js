@@ -117,6 +117,8 @@ const si = (l, c) => eq(l, !!c, true);
     _vmHistFlag = true; _diasVMPrevios = 3; _diasVMEpisodio = 3; _nReintub = 0; _transIntubEsteTurno = false;
     const opt = document.createElement('option'); opt.value = 'DMV'; opt.textContent = 'DMV';
     $('fFirma').appendChild(opt); $('fFirma').value = 'DMV';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     $('fVA').value = cfg.va; cascadeVA(cfg.sop); cascadeSop(cfg.modo || '', cfg.iface || '');
     updateVAUI();
     if (cfg.pasos) await (new Function('cfg', 'return (async()=>{' + cfg.pasos + '})()'))(cfg);

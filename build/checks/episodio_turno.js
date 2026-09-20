@@ -300,6 +300,8 @@ const si = (l, g) => eq(l, !!g, 'true');
     // Lo mínimo que guardar() exige antes de llegar a la regla del SBC: firma
     // vía aérea y la PVE declarada.
     const ff = document.getElementById('fFirma');
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó. */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     let of = Array.from(ff.options).find(o => o.value);
     if (!of) { of = document.createElement('option'); of.value = 'ARM'; of.textContent = 'ARM'; ff.appendChild(of); }
     ff.value = of.value;

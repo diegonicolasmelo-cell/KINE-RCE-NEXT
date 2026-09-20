@@ -151,6 +151,8 @@ const RUT_SEMILLA = '11.111.111-1';
     $('sp').classList.add('on'); $('cBed').value = '6';
     // La firma es obligatoria y es un <select>: hay que sembrarle la opción.
     const sf = $('fFirma');
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó. */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     if (sf) { const o = document.createElement('option'); o.value = 'KTST'; o.textContent = 'KTST'; sf.appendChild(o); sf.value = 'KTST'; }
     guardar();                                   // 1.º intento: sale el aviso, no guarda
     await new Promise(r => setTimeout(r, 120));

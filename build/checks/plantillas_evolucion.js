@@ -146,6 +146,8 @@ const HACE3 = hace(3), HACE1 = hace(1);
       $('fDx').value = 'ACV isquémico'; $('fDias').value = '1'; $('fSed').value = 'Escalón 6'; hSed(); $('fSAS').value = '1'; $('fSASmeta').value = '1';
       document.getElementById('fFirma').innerHTML = '<option value="MCC">MCC</option><option value="DMV">DMV</option>';
       document.getElementById('fFirma').value = 'MCC';
+      /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+      {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
       if (document.getElementById('fPVEval').value !== 'si') hPVEtoggle('si');
       const r = document.querySelector('input[name="pveRes"][value="frustra"]'); r.checked = true; hPVEres();
       const m = document.querySelector('input[name="pveFrMot"]'); if (m) m.checked = true;

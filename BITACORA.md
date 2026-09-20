@@ -2574,3 +2574,52 @@ de evaluaciones desde el ingreso, la KTM y la terapia física apagadas de noche,
 el prono como evento con un solo botón y su hora elegida, el cierre del turno en
 tres bloques, la firma alcanzable y los pendientes que duran, no se duplican y
 viajan con el paciente.
+
+---
+
+## 20-sep-2026 · La hemodinamia se pide, y el UPOT se reparte
+
+Dos decisiones de Diego tras revisar los cinco módulos.
+
+🔴 **«HDN pedir antes de avanzar. Si no se anota.»** Los dos campos nacían
+puestos y sin opción vacía, así que la evolución escribía «HDN estable s/DVA»
+aunque nadie hubiera mirado. Era la afirmación **clínica** más fuerte que el
+sistema hacía por su cuenta. Ahora nacen vacíos y se piden al guardar.
+
+🪤 **Eran dos redes empujando la misma mentira**: los valores por defecto de la
+pantalla y, además, los dos generadores de texto —servidor y cliente— con su «si
+no viene, usa Estable». Arreglar una sola habría dejado el agujero abierto por
+el otro lado. Es el mismo patrón de la hora del prono, y van dos veces en dos
+días: **cuando un dato se inventa, conviene buscar dónde MÁS se inventa.**
+
+🔵 **Y salió algo que sirve para todo el formulario:** el aviso **lleva al
+campo**. El guardado ocurre al salir del paso 3 y la hemodinamia vive en el 2;
+avisar y enfocar algo de otro paso deja al colega mirando un aviso sin nada que
+tocar. `_irAlCampo()` salta al paso donde vive el campo; la vía aérea lo usa
+también.
+
+🧿 **El UPOT se repartió**: el seguimiento a Neurología, el test de apnea a
+Evaluaciones. 🪤 Con una trampa que había que cubrir: las condiciones de UPOT no
+implican diagnóstico neuro escrito, así que sin sumar ese disparador la casilla
+se mudaba a una tarjeta que no aparece y el seguimiento habría desaparecido.
+
+### 🪤 Veinticinco guardias rojas de una vez, y por qué no se aflojó ninguna
+
+Hacer obligatoria la hemodinamia puso **25 guardias en rojo**: todas guardaban
+sin llenarla, así que el payload ya no salía. La tentación era relajar la regla
+o rellenar el campo al cargar la página en el banco. **Las dos cosas habrían
+recreado el bug dentro de las pruebas** — un dato puesto por el programa, que es
+justo lo que se vino a quitar, y las guardias habrían dejado de ver el caso
+«nadie la miró».
+
+Se llenó en cada guardia **donde ya llenaba la firma**, que es lo que hace un
+colega. 19 salieron con el mismo patrón; las 6 restantes y las 2 con doble punto
+de guardado se hicieron una por una.
+
+🪤 **Y la trampa del paso, por tercera vez hoy.** La guardia nueva midió
+«Neurología no aparece» estando en el paso 1, donde la tarjeta está
+`paso-oculto`: decía la verdad por la razón equivocada. Ya había mordido en
+`ktm_de_noche` y en `prono_un_boton`. **Cada cosa se mide donde vive.**
+
+**191 guardias · 191 verdes.** Nueva: `hdn_y_upot.js`.
+Sello de entrega: `NEXT-3.3-hdn-upot`.

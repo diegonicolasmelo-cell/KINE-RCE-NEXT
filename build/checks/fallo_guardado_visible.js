@@ -35,6 +35,8 @@ const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
     window.__viajes = 0;
     $('sp').classList.add('on'); $('cBed').value = '11'; $('cIng').value = 'false';
     const f = $('fFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN';
+    /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
+    {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
     const va = $('fVA'); va.value = [...va.options].map(o => o.value).filter(Boolean)[0];
     $('fPlanes').value = 'bipedestación asistida'; _formDirty = true;
     window.gs = (a, d, ok) => ok([]);
