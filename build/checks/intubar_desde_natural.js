@@ -20,16 +20,26 @@
 // hecho: arriba y abajo terminaban preguntando TOT · VM.
 //
 // LA DECISIÓN DE DIEGO (20-sep-2026), elegida entre dos opciones: UNA SOLA
-// PLANILLA. Declara la intubación arriba y sigue en el mismo módulo de
-// siempre; justo antes de cambiar la vía aérea el sistema le saca una FOTO al
-// estado previo y la guarda solo. El bloque del evento se queda con lo suyo:
-// hora, contexto y el estado previo en solo lectura.
+// PLANILLA. Justo antes de cambiar la vía aérea el sistema le saca una FOTO al
+// estado previo y la guarda solo.
 //
-// 🔴 LOS CAMPOS `po*` NO SE BORRAN, SE ESCONDEN Y SE ESPEJAN — igual que las
-// casillas del prono. Son los que arman el payload (INTUB_VA_POST,
-// VENT_VIA_AEREA_FINAL, TQT_SOP_POST…) y los lee el servidor: borrarlos
-// obligaría a reescribir el guardado entero. Lo que se va es la SEGUNDA
-// PREGUNTA, no el dato.
+// 🗂️ 21-sep-2026 · EL ACUERDO SE AFINÓ, Y ESTA GUARDIA SE REPARTIÓ. Al verlo en
+// pantalla Diego corrigió cuál de las dos planillas sobrevive: «que cada opción
+// que marque un evento desplegara distintos módulos o formas de llenar terapia
+// ventilatoria… tienen el mismo contenido, solamente que se plantea de otra
+// forma». Ahora manda el módulo del EVENTO y el bloque genérico de arriba se
+// anula; el espejo que copiaba arriba → abajo se retiró porque ya no hay dos
+// sitios que llenar.
+// · Lo que esa decisión se llevó —que la planilla buena sea la de arriba, y el
+//   espejo— salió de esta guardia y NO se reemplazó por una versión aflojada:
+//   vive entero, medido al derecho, en `intubacion_modulo_evento.js`.
+// · Lo que esta guardia sigue midiendo es el BUG, que no cambió: el registro no
+//   puede decir que se intubó a un paciente que ya estaba intubado. La foto del
+//   estado previo, las columnas *_PREVIO y el «no hay dos módulos a la vista»
+//   valen igual con una convención y con la otra.
+//
+// 🔴 LOS CAMPOS `po*` NO SE BORRAN. Son los que arman el payload
+// (INTUB_VA_POST, VENT_VIA_AEREA_FINAL, TQT_SOP_POST…) y los lee el servidor.
 //
 // 🪤 El reloj va congelado: la fecha se INVENTA (12-ago-2026, fuera de las
 // ventanas trampa) y el turno se fuerza.
@@ -102,14 +112,16 @@ const no = (l, g) => eq(l, !!g, 'false');
   no('★★ …ni VM', /\bVM\b/.test(prev.txt));
   eq('★★ el soporte previo que se GUARDA es Ambiente', prev.hid, 'Ambiente');
 
-  /* ══ 2 · Una sola planilla ═════════════════════════════════════════════ */
-  console.log('\n2 · 🔴 Una sola planilla: el evento no repregunta el ventilador');
-  si('★ arriba sigue el módulo ventilatorio de siempre', await ver('#paramsBox'));
-  no('★★ el módulo ventilatorio DUPLICADO de la intubación no se ve', await ver('#paramsBoxIntub'));
-  no('★★ …ni su selector de vía aérea', await ver('#poIntubVA'));
-  no('★★ …ni su selector de soporte', await ver('#poIntubSop'));
-  si('★ pero lo propio del evento sí: la hora', await ver('#fIntubHora'));
-  si('★ …y el contexto', await ver('#fIntubDet'));
+  /* ══ 2 · Una sola planilla ═════════════════════════════════════════════
+     🪤 Cuál de las dos sobrevive lo decidió Diego y lo mide
+     `intubacion_modulo_evento.js`. Acá se mide lo que vale con cualquiera de
+     las dos y es lo que él reportó: que NO haya dos. */
+  console.log('\n2 · 🔴 Nunca dos módulos ventilatorios a la vista');
+  const dosIntub = (await ver('#paramsBox')) && (await ver('#paramsBoxIntub'));
+  no('★★ no hay dos módulos ventilatorios a la vista', dosIntub);
+  si('★★ …y hay uno: el del evento', await ver('#paramsBoxIntub'));
+  si('★ lo propio del evento se pide: la hora', await ver('#fIntubHora'));
+  si('★ …y la nota', await ver('#fIntubDet'));
   si('★ …y el estado previo, para leerlo', await ver('#lblIntubPrevio'));
 
   console.log('\n2b · Los campos escondidos SIGUEN en el documento (los lee el guardado)');
@@ -131,12 +143,12 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.evaluate(() => pasoIr(2)); await p.waitForTimeout(200);
 
   /* ══ 4 · El espejo: lo que se llena arriba es lo que se guarda abajo ═══ */
-  console.log('\n4 · 🔴 El espejo — lo escrito ARRIBA viaja como estado posterior');
+  console.log('\n4 · 🔴 Lo llenado en el bloque del evento viaja como estado posterior');
   const pay = await p.evaluate(async () => {
-    $('fSop').value = 'VM'; cascadeSop();
-    $('fModo').value = 'ACVC'; renderParams();
-    $('fTOTn').value = '7.5'; $('fTOTcm').value = '22';
-    ['r_vt:480', 'r_fr:16', 'r_peep:8', 'r_fio2:50', 'r_spo2:96'].forEach(par => {
+    $('poIntubSop').value = 'VM'; renderParamsIntub();
+    $('poIntubModo').value = 'ACVC'; renderParams({ P: 'pi_', L: 'pl_', box: 'paramsBoxIntub' });
+    $('poIntubTotN').value = '7.5'; $('poIntubTotCm').value = '22';
+    ['pi_vt:480', 'pi_fr:16', 'pi_peep:8', 'pi_fio2:50', 'pi_spo2:96'].forEach(par => {
       const [id, val] = par.split(':'); const e = document.getElementById(id); if (e) e.value = val;
     });
     $('fIntubHora').value = '14:20'; $('fIntubDet').value = 'insuficiencia respiratoria';
@@ -159,13 +171,13 @@ const no = (l, g) => eq(l, !!g, 'false');
     return g ? g.d : { error: 'no se mandó nada (faltas: ' + (typeof _faltas === 'function' ? '' : '?') + ')' };
   });
   if (pay.error) { fails.push('el guardado no llegó a mandarse'); console.log('❌ ' + pay.error); }
-  eq('★★ INTUB_VA_POST sale de arriba', pay.INTUB_VA_POST, 'TOT');
-  eq('★★ INTUB_SOP_POST sale de arriba', pay.INTUB_SOP_POST, 'VM');
-  eq('★★ INTUB_MODO_POST sale de arriba', pay.INTUB_MODO_POST, 'ACVC');
-  eq('★★ INTUB_TOT_N sale de arriba', String(pay.INTUB_TOT_N), '7.5');
-  eq('★★ INTUB_TOT_CM sale de arriba', String(pay.INTUB_TOT_CM), '22');
-  eq('★★ INTUB_VT sale del ventilador de arriba', String(pay.INTUB_VT), '480');
-  eq('★★ INTUB_PEEP sale del ventilador de arriba', String(pay.INTUB_PEEP), '8');
+  eq('★★ INTUB_VA_POST sale del bloque', pay.INTUB_VA_POST, 'TOT');
+  eq('★★ INTUB_SOP_POST sale del bloque', pay.INTUB_SOP_POST, 'VM');
+  eq('★★ INTUB_MODO_POST sale del bloque', pay.INTUB_MODO_POST, 'ACVC');
+  eq('★★ INTUB_TOT_N sale del bloque', String(pay.INTUB_TOT_N), '7.5');
+  eq('★★ INTUB_TOT_CM sale del bloque', String(pay.INTUB_TOT_CM), '22');
+  eq('★★ INTUB_VT sale del ventilador del bloque', String(pay.INTUB_VT), '480');
+  eq('★★ INTUB_PEEP sale del ventilador del bloque', String(pay.INTUB_PEEP), '8');
   eq('★★ el soporte PREVIO guardado sigue siendo Ambiente', pay.INTUB_SOP_PREVIO, 'Ambiente');
   eq('★★ la vía aérea previa guardada es Natural', pay.INTUB_VA_PREVIA, 'Natural');
   eq('★ el estado FINAL del turno es TOT', pay.VENT_VIA_AEREA_FINAL, 'TOT');
@@ -197,9 +209,9 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.waitForTimeout(250);
   await p.evaluate(() => { window.confirmarReintubacion = () => Promise.resolve(true); setEventoVA('reintub'); });
   await p.waitForTimeout(450);
-  no('★★ el módulo ventilatorio duplicado de la reintubación no se ve', await ver('#paramsBoxReintub'));
-  no('★★ …ni su selector de soporte', await ver('#poReintubSop'));
-  si('★ y el módulo de arriba sigue siendo el que se llena', await ver('#dVentBloque'));
+  const dosReintub = (await ver('#paramsBox')) && (await ver('#paramsBoxReintub'));
+  no('★★ no hay dos módulos ventilatorios a la vista', dosReintub);
+  si('★★ …y manda el del evento', await ver('#poReintubSop'));
 
   /* ══ 6 · El previo se olvida al deshacer el evento ═════════════════════ */
   console.log('\n6 · Volver a «Nada» olvida la foto (si no, el próximo evento heredaría un previo viejo)');

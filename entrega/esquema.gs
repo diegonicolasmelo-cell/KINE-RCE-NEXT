@@ -361,7 +361,18 @@ const _COLS_EVOLUCIONES = [
   ['SED_VIGILIA','texto','Estado de vigilia (sin sedación)'],
   // 🔵 Nombre social (20-sep-2026, acuerdo 1.7). Opcional; el legal sigue
   // siendo el obligatorio.  — SIEMPRE AL FINAL
-  ['PAC_NOMBRE_SOCIAL','texto','Nombre social']
+  ['PAC_NOMBRE_SOCIAL','texto','Nombre social'],
+  /* 🫁 LA INTUBACIÓN CUENTA POR QUÉ (21-sep-2026, Diego: «la causa de la
+     intubación y una nota adicional… se intubó por mal manejo de secreciones,
+     paciente taquipneico desaturando, se procede a intubar para protección de
+     vía aérea; eso cierra un poco el relato»).
+     Hasta hoy había UN campo libre («Motivo / circunstancias») que hacía de
+     causa y de nota a la vez: servía para leerlo, no para contarlo. Ahora la
+     causa es una lista —se puede contar cuántas intubaciones fueron por cada
+     motivo— y la nota queda libre en INTUB_DET, que ya existía.
+     — SIEMPRE AL FINAL */
+  ['INTUB_CAUSA','texto','Causa de la intubación'],
+  ['INTUB_DIFICIL','bool','Intubación difícil']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1113,6 +1124,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 411 = 409 + INTUB_CAUSA e INTUB_DIFICIL (la intubación cuenta por qué, 21-sep-2026);
   // 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7, 20-sep-2026);
   // 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación, 17-sep-2026);
   // 407 = 406 + KTM_SESIONES_JSON (cada sesión lleva lo suyo, 17-sep-2026);
@@ -1123,7 +1135,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 409) errs.push("EVOLUCIONES != 409 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 411) errs.push("EVOLUCIONES != 411 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

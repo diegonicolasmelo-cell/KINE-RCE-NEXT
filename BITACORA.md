@@ -2859,3 +2859,99 @@ puede quedar contradiciendo al código sin que nada se ponga rojo. Mirar la
 pantalla sigue siendo parte del trabajo.
 
 **194 guardias verdes.** Sello `NEXT-3.7-intubar-natural`.
+
+---
+
+## 21-sep-2026 · El módulo es del evento · Tanda 3.8
+
+Diego, al ver la pantalla de la 3.7: «*marcar intubación podría activar lo mismo
+que "ocurrió intubación este turno"… esto como que estuviera repitiéndose dos
+veces. Lo que yo estaba proponiendo era que cada opción que marque un evento
+desplegara distintos módulos o formas de llenar terapia ventilatoria… tienen el
+mismo contenido, solamente que se plantea de otra forma. Pongo "qué pasó con la
+vía aérea este turno: intubación", entonces sale: ¿con qué lo intubé?, quizás si
+fue intubación difícil o no, los parámetros, en qué modo quedó, la causa de la
+intubación y una nota adicional.*»
+
+### Su duda concreta, y la respuesta
+
+**No había que marcar la casilla: se marcaba sola.** `setEventoVA('intub')` la
+marca por dentro. Pero seguía A LA VISTA y marcada, así que parecía que hubiera
+que marcarla aparte. Es la misma segunda pregunta que el 16-sep-2026 se quitó de
+«Ocurrió TQT este turno» y «Ocurrió decanulación este turno»: a la intubación se
+le quedó fuera, en el único evento donde sobrevivió. Ahora se esconde, viva,
+como las otras dos.
+
+### 🪤 Esto INVIERTE la tanda de ayer, y a propósito
+
+Ayer Diego eligió «una sola planilla: la de ARRIBA», y el panel del evento se
+escondió y se llenaba por espejo. Hoy, al verlo en pantalla, corrigió cuál de
+las dos sobrevive: una sola planilla sí, pero **la del EVENTO**.
+
+No es una guardia que se aflojó: es un acuerdo de producto que cambió con
+veinticuatro horas de uso. Lo que se retiró —el espejo, y «la planilla buena es
+la de arriba»— salió de `intubar_desde_natural.js` con su razón escrita, y no se
+reemplazó por una versión más blanda: vive entero, medido al derecho, en la
+guardia nueva. Lo que NO cambió, porque era el bug y no el acuerdo, es la FOTO
+del estado previo: el registro sigue sin poder decir que se intubó a un paciente
+que ya estaba intubado.
+
+### Lo que se programó
+
+**1 · El módulo es del evento.** `_gateVentPorTqt` se generalizó a
+`_gateVentPorEvento`: declarada una intubación, reintubación o traqueostomía, el
+bloque genérico «Terapia ventilatoria» se anula y manda el panel «Queda con» del
+evento, con su aviso. La traqueostomía lo hacía sola desde la v5.1; ahora los
+tres son iguales — que era una de las dos preguntas abiertas de ayer.
+
+**2 · El espejo se retiró.** Ya no hay dos sitios que llenar, así que no hay nada
+que copiar. Se fue con su razón escrita en el lugar donde vivía.
+
+**3 · La intubación cuenta por qué.** Dos columnas nuevas, al final:
+`INTUB_CAUSA` (lista) e `INTUB_DIFICIL` (sí/no). La nota libre sigue en
+`INTUB_DET`, que ya existía; lo que cambió es que dejó de hacer de causa y de
+nota a la vez. Con la lista se puede **contar** cuántas intubaciones fueron por
+cada motivo; con la nota se puede **leer** lo que pasó. La lista sola no basta
+—«a veces la opción no está y se termina anotando en notas», su propia lección
+de los pendientes—.
+
+**4 · El relato lo narra**, en los dos motores:
+
+> Previo en ambiente, paciente requiere intubación orotraqueal a las 14:20 hrs
+> **por mal manejo de secreciones — taquipneico, desaturando, se procede a
+> intubar para protección de vía aérea. Intubación difícil.** Queda con TOT N°
+> 7.5 a 22 cm de arcada dental, conectado a VM en modo ACVC…
+
+🪤 **Sin causa se conserva la forma vieja** («en contexto de …»): los turnos ya
+guardados solo tienen la nota, y cambiarles la redacción reescribiría hacia
+atrás evoluciones que ya se leyeron y se entregaron.
+
+### 🪤 El signo de pregunta, otra vez
+
+Al anular el módulo de arriba, el N° de tubo y la fijación pasaron a vivir SOLO
+en el bloque del evento — y la línea «VAA mediante TOT N° … a … cm» seguía
+leyéndolos de arriba, que ahora está vacío. La evolución salía **«VAA mediante
+TOT N° ? a ? cm de arcada dental»**. Exactamente el mismo signo de pregunta que
+el 17-sep costó cazar con los días de vía aérea, y se vio igual: **mirando el
+relato**, no con una guardia. La traqueostomía ya lo tenía resuelto
+(`VENT_TQT_CALIBRE`); al TOT le faltaba. Ahora sí hay guardia.
+
+### 🪤 Y dos rótulos que quedaron mintiendo
+
+El del estado previo decía «(de Terapia ventilatoria ↑)» cuando ya salía de la
+foto, y el cartel verde decía que el ventilador se llena «en Terapia
+ventilatoria» cuando pasó a llenarse en el bloque. Los dos se vieron en las
+capturas, ninguno puso nada rojo. **El texto de la interfaz puede quedar
+contradiciendo al código sin que ninguna guardia se entere**: mirar la pantalla
+sigue siendo parte del trabajo.
+
+### La guardia
+
+`intubacion_modulo_evento.js`, escrita **primero** y vista **roja**. Mide las
+dos cosas de Diego: que la segunda pregunta no se haga, y que el módulo sea el
+del evento, con sus preguntas (causa de lista que nace en blanco, intubación
+difícil, nota libre, N° de tubo y fijación dentro del bloque). Más que los tres
+eventos se comporten igual, que el relato cuente la causa y la nota, y que no
+vuelvan los signos de pregunta.
+
+**195 guardias verdes.** Sello `NEXT-3.8-modulo-del-evento`.

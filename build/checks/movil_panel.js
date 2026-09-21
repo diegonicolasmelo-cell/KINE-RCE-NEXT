@@ -215,8 +215,13 @@ const MONTAR = () => {
   // vivir pegado a la traqueostomía y tiene sección propia (no tienen ninguna
   // relación — un prono es una falla respiratoria catastrófica). Lo que esta
   // línea protege no cambió: que agrupar en sub-bloques NO reordene la sábana.
+  // 🗂️ 21-sep-2026 · `avisoVentIntub` entró en la secuencia, hermano de
+  // `avisoVentTqt`: desde hoy la intubación y la reintubación también anulan el
+  // módulo genérico y avisan dónde quedó registrada la ventilación. Nada se
+  // reordenó —que es lo que esta línea protege—: se sumó un aviso al lado del
+  // que ya estaba.
   eq('★ el orden de la sábana NO cambió',
-    R5.orden.indexOf('dTqtSec,avisoVentTqt,dVentBloque'), 0);
+    R5.orden.indexOf('dTqtSec,avisoVentTqt,avisoVentIntub,dVentBloque'), 0);
   eq('…y los eventos van después, como estaban',
     /dDesvincSec,dDecanSec,dExtSec/.test(R5.orden), true);
   eq('Ventilación arranca abierta', R5.ventAbierto, true);

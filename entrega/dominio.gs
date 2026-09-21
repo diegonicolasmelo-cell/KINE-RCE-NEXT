@@ -983,8 +983,17 @@ function generarTextoEvolucion(d) {
   // Intubación nueva este turno (sin historial de VM)
   if (esVerdadero(d.INTUB_OCURRIO)) {
     const ih = v('INTUB_HORA'), idt = v('INTUB_DET'), isp = v('INTUB_SOP_PREVIO');
+    const ica = v('INTUB_CAUSA'), idif = esVerdadero(d.INTUB_DIFICIL);
     const prevTxt = isp ? `Previo en ${_lcIni(isp)}, p` : 'P';
-    txt.push(`${prevTxt}aciente requiere intubación orotraqueal${ih ? ' a las ' + ih + ' hrs' : ''}${idt ? ' en contexto de ' + idt : ''}.`);
+    /* 🫁 21-sep-2026 · LA CAUSA Y LA NOTA SE NARRAN. Espejo de la pantalla
+       (index.html) — mantener en paridad, lo mide `relato_espejo.js`.
+       🪤 Sin causa se conserva la forma vieja («en contexto de …»): los turnos
+       ya guardados solo tienen la nota, y cambiarles la redacción reescribiría
+       hacia atrás evoluciones que ya se leyeron y se entregaron. */
+    const motivo = ica ? ` por ${_lcIni(ica)}${idt ? ' — ' + idt : ''}`
+                       : (idt ? ' en contexto de ' + idt : '');
+    txt.push(`${prevTxt}aciente requiere intubación orotraqueal${ih ? ' a las ' + ih + ' hrs' : ''}${motivo}.` +
+             (idif ? ' Intubación difícil.' : ''));
     // Cómo QUEDA tras el procedimiento (el estado previo vive en las VENT_*)
     const pva = v('INTUB_VA_POST') || 'TOT', psop = v('INTUB_SOP_POST') || 'VM', pmodo = v('INTUB_MODO_POST');
     const ptn = v('INTUB_TOT_N'), ptc = v('INTUB_TOT_CM');

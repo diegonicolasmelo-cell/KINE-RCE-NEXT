@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.7-intubar-natural">
+<meta name="rce-version" content="NEXT-3.8-modulo-del-evento">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3937,6 +3937,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div id="avisoVentTqt" class="hidden" style="margin:10px 0;padding:7px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:7px;font-size:.75rem;color:#64748b;">
                 💨 Terapia ventilatoria — <b>ya registrada arriba</b> en «Queda con (post-traqueostomía)». El estado previo del turno se guarda igual.
               </div>
+              <!-- 🫁 El mismo aviso para la intubación y la reintubación
+                   (21-sep-2026): desde hoy los tres eventos se llenan en SU
+                   módulo y el bloque genérico se anula, en vez de pedir dos
+                   veces lo mismo. -->
+              <div id="avisoVentIntub" class="hidden" style="margin:10px 0;padding:7px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:7px;font-size:.75rem;color:#64748b;">
+                💨 Terapia ventilatoria — <b>ya registrada arriba</b>, en «Queda con» del evento. Cómo estaba el paciente antes se guarda igual, en el estado previo.
+              </div>
 
 
 
@@ -4412,16 +4419,55 @@ document.documentElement.setAttribute('data-piel', 'inst');
                    estado en VM (historial = 0): primera intubación del episodio. -->
               <div id="dIntubSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#1d4ed8;margin-bottom:7px;letter-spacing:.04em;">🫁 Intubación</div>
-                <div class="check wa" style="margin-bottom:6px;">
+                <!-- 🔴 LA SEGUNDA PREGUNTA SE VA (Diego, 21-sep-2026: «además tengo
+                     que marcar ocurrió intubación este turno ¿o no?»). La fila
+                     «¿Qué pasó hoy con la vía aérea?» ya declara el evento y
+                     marca esta casilla por dentro; verla marcada hacía creer
+                     que había que marcarla aparte. Es el mismo cambio que el
+                     16-sep-2026 se hizo con «Ocurrió TQT este turno» y «Ocurrió
+                     decanulación este turno» — a la intubación se le quedó fuera.
+                     🔴 NO SE BORRA, SE ESCONDE: alimenta INTUB_OCURRIO y la lee
+                     el guardado entero. Lo que se va es la PREGUNTA, no el dato. -->
+                <div class="check wa hidden" style="margin-bottom:6px;">
                   <input type="checkbox" id="cIntubO" onchange="hIntub()">
                   <label for="cIntubO" style="font-weight:700;color:var(--primary);">Ocurrió intubación este turno</label>
                 </div>
                 <div id="dIntubDet" class="hidden" style="background:#fff;border:1px solid #bfdbfe;border-radius:7px;padding:8px 10px;">
+                  <!-- 🫁 EL BLOQUE PREGUNTA EN EL IDIOMA DEL EVENTO (21-sep-2026).
+                       Diego: «pongo qué pasó con la vía aérea este turno,
+                       intubación, entonces sale: con qué lo intubé, quizás si
+                       fue difícil o no, los parámetros, en qué modo quedó, la
+                       causa de la intubación y una nota adicional».
+                       🔴 LA CAUSA ES UNA LISTA Y LA NOTA ES LIBRE, las dos. Antes
+                       había UN campo «Motivo / circunstancias» que hacía de las
+                       dos cosas: se podía leer, pero no contar cuántas
+                       intubaciones fueron por cada motivo. Y la lista sola
+                       tampoco basta —«a veces la opción no está y se termina
+                       anotando en notas», su propia lección de los pendientes—. -->
                   <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-                    <label style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Hora:</label>
+                    <label for="fIntubHora" style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Hora:</label>
                     <input type="time" id="fIntubHora" style="height:28px;font-size:.78rem;border:1px solid #bfdbfe;border-radius:5px;padding:0 6px;">
-                    <label style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Contexto:</label>
-                    <input type="text" id="fIntubDet" placeholder="Motivo / circunstancias..." style="height:28px;font-size:.78rem;border:1px solid #bfdbfe;border-radius:5px;padding:0 8px;flex:1;min-width:170px;">
+                    <label for="fIntubCausa" style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Causa:</label>
+                    <select id="fIntubCausa" style="height:28px;font-size:.78rem;border:1px solid #bfdbfe;border-radius:5px;padding:0 6px;min-width:210px;">
+                      <option value="">-- seleccionar --</option>
+                      <option>Insuficiencia respiratoria aguda</option>
+                      <option>Mal manejo de secreciones</option>
+                      <option>Protección de vía aérea</option>
+                      <option>Compromiso de conciencia</option>
+                      <option>Fatiga muscular respiratoria</option>
+                      <option>Inestabilidad hemodinámica</option>
+                      <option>Paro cardiorrespiratorio</option>
+                      <option>Procedimiento / pabellón</option>
+                      <option>Otra</option>
+                    </select>
+                    <div class="check wa" style="margin:0;">
+                      <input type="checkbox" id="cIntubDificil">
+                      <label for="cIntubDificil" style="font-size:.74rem;font-weight:700;color:#b45309;" title="Vía aérea difícil: más de un intento, cambio de operador o necesidad de dispositivo de rescate">Intubación difícil</label>
+                    </div>
+                  </div>
+                  <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+                    <label for="fIntubDet" style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Nota:</label>
+                    <input type="text" id="fIntubDet" placeholder="Con tus palabras: cómo estaba y por qué se intubó..." style="height:28px;font-size:.78rem;border:1px solid #bfdbfe;border-radius:5px;padding:0 8px;flex:1;min-width:240px;">
                   </div>
                   <!-- 🔴 ESTADO PREVIO: sale de la FOTO que se toma al declarar el
                        evento, NO de Terapia Ventilatoria (20-sep-2026). Leerlo de
@@ -4433,19 +4479,17 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <div id="lblIntubPrevio" style="font-size:.78rem;color:#334155;font-weight:600;">—</div>
                     <input type="hidden" id="fIntubSopPrevio">
                   </div>
-                  <!-- 🔴 ESTADO POSTERIOR — ESCONDIDO Y VIVO (Diego, 20-sep-2026:
-                       «me deja 2 historias»). Este panel repetía el módulo
-                       ventilatorio ENTERO que ya está arriba: el colega
-                       declaraba la intubación, la vía aérea de arriba pasaba a
-                       TOT · VM y acá abajo se le volvía a preguntar lo mismo.
-                       Ahora la planilla es UNA: se llena arriba y `_espejarPostEvento()`
-                       copia el resultado a estos campos.
-                       🔴 NO SE BORRAN, SE ESCONDEN — igual que las casillas del
-                       prono. Son los que arman INTUB_VA_POST, INTUB_SOP_POST,
-                       VENT_VIA_AEREA_FINAL y los parámetros `pi_*`, y los lee
-                       el servidor; borrarlos obligaría a reescribir el guardado.
-                       Lo que se va es la SEGUNDA PREGUNTA, no el dato. -->
-                  <div id="dIntubQueda" class="hidden" style="padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;">
+                  <!-- 🔴 ESTADO POSTERIOR — AQUÍ SE LLENA (21-sep-2026). Este es el
+                       módulo del evento: con qué tubo queda, en qué soporte, en
+                       qué modo y con qué parámetros. Mientras esté abierto, el
+                       bloque genérico «Terapia ventilatoria» de arriba se anula
+                       (`_gateVentPorEvento`), así que se llena UNA sola vez —
+                       las «2 historias» que reportó Diego el 20-sep.
+                       🪤 El 20-sep se probó al revés (llenar arriba y copiar acá
+                       por espejo). Al verlo en pantalla Diego corrigió el rumbo:
+                       una sola planilla sí, pero la del EVENTO, «que se plantea
+                       de otra forma». El espejo se retiró con su razón escrita. -->
+                  <div id="dIntubQueda" style="padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;">
                     <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;color:#15803d;margin-bottom:7px;letter-spacing:.04em;">✅ Queda con (post-intubación)</div>
                     <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px;">
                       <div class="col wa"><label style="font-size:.66rem;">Vía aérea</label>
@@ -4470,7 +4514,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <div id="paramsBoxIntub"></div>
                   </div>
                   <div style="font-size:.68rem;color:#166534;background:#dcfce7;padding:4px 8px;border-radius:5px;margin-top:6px;">
-                    💡 Cómo estaba el paciente ya quedó registrado acá arriba. El ventilador con el que queda se llena <b>una sola vez</b>, en «Terapia ventilatoria», como cualquier turno.
+                    💡 Cómo estaba el paciente antes ya quedó registrado acá arriba. Con esto basta: el ventilador se llena <b>una sola vez</b>, acá, y «Terapia ventilatoria» queda anulada mientras dure el evento.
                   </div>
                 </div>
               </div>
@@ -5502,7 +5546,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.7-intubar-natural]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.8-modulo-del-evento]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -7911,6 +7955,7 @@ function fillForm(s) {
   if(_sopFinal) cascadeSop(_modoFinal);
   set('fTOTn',s.VENT_TOT_NUM); set('fTOTcm',s.VENT_TOT_CM);
   chk('cIntubO',s.INTUB_OCURRIO); set('fIntubHora',s.INTUB_HORA); set('fIntubDet',s.INTUB_DET);
+  set('fIntubCausa',s.INTUB_CAUSA); chk('cIntubDificil',s.INTUB_DIFICIL);
   chk('cTqtO',s.TQT_OCURRIO); set('fTqtHora',s.TQT_HORA); set('fTqtTec',s.TQT_TECNICA); set('fTqtDet',s.TQT_DET);
   if(s.TQT_OCURRIO===true||s.TQT_OCURRIO==='TRUE'){ show('dTqtDet'); _gateVentPorTqt(); } else hide('dTqtDet');
   set('fIntubSopPrevio',s.INTUB_SOP_PREVIO);
@@ -8405,7 +8450,7 @@ function _podarEventosPayload(p){
   // también se acepta TQT (paciente que ya llegó traqueostomizado y se recanula).
   const tqtActivo=(va==='TOT'||va==='TQT') && !!$('cTqtO')?.checked;
   if(!tqtActivo) del(['TQT_OCURRIO','TQT_HORA','TQT_TECNICA','TQT_DET']);
-  if(!$('cIntubO')?.checked) del(['INTUB_OCURRIO','INTUB_HORA','INTUB_DET','INTUB_SOP_PREVIO','INTUB_VA_PREVIA','INTUB_MODO_PREVIO','INTUB_VA_POST','INTUB_SOP_POST','INTUB_MODO_POST','INTUB_INTERFAZ_POST','INTUB_TOT_N','INTUB_TOT_CM','INTUB_VT','INTUB_FR','INTUB_PEEP','INTUB_FIO2','INTUB_SPO2']);
+  if(!$('cIntubO')?.checked) del(['INTUB_OCURRIO','INTUB_HORA','INTUB_DET','INTUB_CAUSA','INTUB_DIFICIL','INTUB_SOP_PREVIO','INTUB_VA_PREVIA','INTUB_MODO_PREVIO','INTUB_VA_POST','INTUB_SOP_POST','INTUB_MODO_POST','INTUB_INTERFAZ_POST','INTUB_TOT_N','INTUB_TOT_CM','INTUB_VT','INTUB_FR','INTUB_PEEP','INTUB_FIO2','INTUB_SPO2']);
   if(!$('cTqtO')?.checked) del(['TQT_SOP_POST','TQT_MODO_POST','TQT_INTERFAZ_POST','TQT_PARAMS','TQT_VT','TQT_FR','TQT_PEEP','TQT_FIO2','TQT_SPO2','TQT_PMAX','TQT_PPL','TQT_PS','TQT_PAFI']);
   // EXT_REINTUB va con el grupo reintubación (la ruta standalone ocurre con VA
   // no invasiva, donde el grupo PVE está inactivo — el servidor gatilla el
@@ -9115,11 +9160,6 @@ function guardar() {
     const _avs=_avisosPreGuardado();
     if(_avs.length){ _mostrarTransAviso(_avs); return; }
   }
-  /* 🔴 El espejo corre SIEMPRE antes de armar el payload. El listener de
-     `change` cubre el uso normal, pero un número recién tecleado que todavía no
-     perdió el foco no lo dispara — y ese número es justo el que el colega acaba
-     de escribir cuando aprieta 💾. */
-  try{ _espejarPostEvento(); }catch(e){}
   const datos={
     ID_CAMA:id, TURNO_KEY:tkey, ES_INGRESO:v('cIng')==='true',
     TRANS_MOTIVO:_transMotivo||'',   // 🗂️ razón escrita si la vía aérea cambió sin evento (va al hito, no a EVOLUCIONES)
@@ -9218,7 +9258,20 @@ function guardar() {
     EX_MP:     v('fMPVal'),
     EX_RUIDOS: v('fRuidosVal'), EX_RUIDOS_LOC: v('fRuidosLoc'),
     EX_CULT_RESULTADO: v('fCultVal'),
-    VENT_VIA_AEREA:v('fVA'), VENT_TOT_NUM:v('fTOTn'), VENT_TOT_CM:v('fTOTcm'),
+    VENT_VIA_AEREA:v('fVA'),
+    /* 🫁 21-sep-2026 · EL TUBO SALE DEL EVENTO CUANDO HUBO EVENTO. Desde que el
+       módulo es del evento, el N° y la fijación se piden en su bloque y el
+       genérico de arriba queda anulado y vacío. Sin esta línea la evolución
+       salía «VAA mediante TOT N° ? a ? cm de arcada dental» — el mismo signo de
+       pregunta que el 17-sep costó cazar con los días de vía aérea.
+       🪤 La traqueostomía ya lo resolvía así (VENT_TQT_CALIBRE, dos líneas más
+       abajo); al TOT le faltaba. */
+    VENT_TOT_NUM: bv('cIntubO') ? (v('poIntubTotN')||v('fTOTn'))
+                : ((typeof _extReintub==='function' && _extReintub())||$('cReintubT')?.checked) ? (v('poReintubTotN')||v('fTOTn'))
+                : v('fTOTn'),
+    VENT_TOT_CM:  bv('cIntubO') ? (v('poIntubTotCm')||v('fTOTcm'))
+                : ((typeof _extReintub==='function' && _extReintub())||$('cReintubT')?.checked) ? (v('poReintubTotCm')||v('fTOTcm'))
+                : v('fTOTcm'),
     VENT_TQT_CALIBRE: bv('cTqtO') ? (v('poTqtN')||v('fTQTn')) : v('fTQTn'),
     VENT_TQT_TIPO:    bv('cTqtO') ? (v('poTqtTipo')||v('fTQTt')) : v('fTQTt'), VENT_SOPORTE:v('fSop'), VENT_MODO:v('fModo'), VENT_INTERFAZ:v('fInterfaz'),
     VENT_H_ACTIVA:bv('cHAct'), KTM_UMA:v('r_uma')||'',
@@ -9408,6 +9461,10 @@ function guardar() {
     INTUB_OCURRIO:   bv('cIntubO'),
     INTUB_HORA:      v('fIntubHora'),
     INTUB_DET:       v('fIntubDet'),
+    // 🫁 21-sep-2026 · La causa (lista) y la nota (INTUB_DET) son dos cosas:
+    // la primera se cuenta, la segunda se lee.
+    INTUB_CAUSA:     v('fIntubCausa'),
+    INTUB_DIFICIL:   bv('cIntubDificil'),
     /* 🔴 EL PREVIO SALE DE LA FOTO, NO DE ARRIBA (20-sep-2026). Arriba ya
        cambió: al declarar la intubación la vía aérea pasa a TOT. Leerlo de ahí
        hacía que la evolución afirmara «previo: TOT · VM» de un paciente que
@@ -12000,7 +12057,15 @@ function genTexto() {
   _B('va');
   // Redacción estandarizada (ago-2026, Diego): «a X cm de arcada dental» —
   // el punto de fijación es norma de la unidad, no una elección.
-  if(va==='TOT'){ L.push(`VAA mediante TOT N° ${gv('fTOTn')||'?'} a ${gv('fTOTcm')||'?'} cm de arcada dental (día ${dVA})${$('cCambioTOT')?.checked?' (tubo nuevo)':''}.`); }
+  if(va==='TOT'){
+    // 🫁 21-sep-2026 · Con un evento declarado el tubo vive en SU bloque; sin él,
+    // arriba. Espejo del payload y de dominio_texto.gs — mantener en paridad.
+    const _evN = $('cIntubO')?.checked ? gv('poIntubTotN')
+               : ((typeof _extReintub==='function'&&_extReintub())||$('cReintubT')?.checked) ? gv('poReintubTotN') : '';
+    const _evCm= $('cIntubO')?.checked ? gv('poIntubTotCm')
+               : ((typeof _extReintub==='function'&&_extReintub())||$('cReintubT')?.checked) ? gv('poReintubTotCm') : '';
+    L.push(`VAA mediante TOT N° ${_evN||gv('fTOTn')||'?'} a ${_evCm||gv('fTOTcm')||'?'} cm de arcada dental (día ${dVA})${$('cCambioTOT')?.checked?' (tubo nuevo)':''}.`);
+  }
   else if(va==='TQT'&&!$('cTqtO')?.checked) L.push(`VAA mediante TQT N° ${gv('fTQTn')||'?'}${gv('fTQTt')?' tipo '+gv('fTQTt'):''} (día ${dVA})${$('cCambioTQT')?.checked?' (cánula nueva)':''}.`);
   // TQT instalada ESTE turno (regla de Diego): puede venir de TOT o Natural —
   // lo que llevó a traqueostomizar son los DÍAS DE VM, no el estado del
@@ -12125,8 +12190,18 @@ function genTexto() {
   _B('intub');
   if($('cIntubO')?.checked){
     const _ih=v('fIntubHora'), _idt=v('fIntubDet'), _isp=v('fIntubSopPrevio')||_sopPrevioAuto();
+    const _ica=v('fIntubCausa'), _idif=!!$('cIntubDificil')?.checked;
     const _pv=_isp?`Previo en ${_lcIni(_isp)}, p`:'P';
-    L.push(`${_pv}aciente requiere intubación orotraqueal${_ih?' a las '+_ih+' hrs':''}${_idt?' en contexto de '+_idt:''}.`);
+    /* 🫁 21-sep-2026 · LA CAUSA Y LA NOTA SE NARRAN (Diego: «eso cierra un poco
+       el relato… ahí me está diciendo que el paciente estaba sin tubo, con mal
+       manejo de secreciones, y lo intubé»).
+       🪤 Sin causa se conserva la forma vieja («en contexto de …»): los turnos
+       ya guardados solo tienen la nota, y cambiarles la redacción reescribiría
+       hacia atrás evoluciones que ya se leyeron y se entregaron. */
+    const _motivo = _ica ? ` por ${_lcIni(_ica)}${_idt?` — ${_idt}`:''}`
+                         : (_idt?` en contexto de ${_idt}`:'');
+    L.push(`${_pv}aciente requiere intubación orotraqueal${_ih?' a las '+_ih+' hrs':''}${_motivo}.`+
+           (_idif?' Intubación difícil.':''));
     // Cómo QUEDA tras el procedimiento (panel propio; el estado previo quedó arriba)
     const _pva=v('poIntubVA')||'TOT', _psop=v('poIntubSop')||'VM', _pmodo=v('poIntubModo');
     const _ptn=v('poIntubTotN'), _ptc=v('poIntubTotCm');
@@ -14728,18 +14803,31 @@ function hTqtO(){
   _gateDispositivos();
   if(typeof _renderAutoProcs==='function') _renderAutoProcs();
 }
-/* El día de la TQT el estado ventilatorio que importa es el POSTERIOR: se anota
-   una sola vez en «Queda con» y el módulo de Terapia ventilatoria se oculta
-   (antes había que llenar los parámetros dos veces). Lo ya replicado del turno
-   anterior no se borra: queda guardado como estado previo, solo deja de pedirse. */
-function _gateVentPorTqt(){
-  // Solo anula si la sección de TQT está realmente en juego: si la vía aérea
-  // cambia y la sección se oculta, el módulo ventilatorio debe volver.
-  const secOn=$('dTqtSec') && !$('dTqtSec').classList.contains('hidden');
-  const tqt=!!$('cTqtO')?.checked && secOn;
-  if(tqt) hide('dVentBloque'); else show('dVentBloque');
-  const av=$('avisoVentTqt'); if(av) av.classList.toggle('hidden',!tqt);
+/* 🔴 EL MÓDULO ES DEL EVENTO (21-sep-2026, Diego: «que cada opción que marque
+   un evento desplegara distintos módulos o formas de llenar terapia
+   ventilatoria… tienen el mismo contenido, solamente que se plantea de otra
+   forma»).
+   El día de un evento de vía aérea el estado ventilatorio que importa es el
+   POSTERIOR: se anota una sola vez en «Queda con» y el módulo genérico de
+   Terapia ventilatoria se oculta. Lo ya replicado del turno anterior no se
+   borra: queda guardado como estado previo, solo deja de pedirse.
+   🪤 Esto lo hacía SOLO la traqueostomía desde la v5.1. Al mirarlo en pantalla
+   Diego pidió la misma forma para los tres, y de paso desapareció la razón por
+   la que existía el espejo de la tanda 3.7 (copiar arriba → abajo): ya no hay
+   dos sitios que llenar. */
+function _gateVentPorEvento(){
+  // Solo anula si la sección del evento está realmente en juego: si la vía
+  // aérea cambia y la sección se oculta, el módulo ventilatorio debe volver.
+  const enJuego=id=>{ const e=$(id); return !!e && !e.classList.contains('hidden'); };
+  const tqt    = !!$('cTqtO')?.checked && enJuego('dTqtSec');
+  const intub  = !!$('cIntubO')?.checked && enJuego('dIntubSec');
+  const reintub= ((typeof _extReintub==='function' && _extReintub()) || !!$('cReintubT')?.checked);
+  if(tqt||intub||reintub) hide('dVentBloque'); else show('dVentBloque');
+  const av=$('avisoVentTqt');   if(av) av.classList.toggle('hidden', !tqt);
+  const ai=$('avisoVentIntub'); if(ai) ai.classList.toggle('hidden', !(intub||reintub));
 }
+/** Nombre viejo: lo llaman la carga de un turno guardado y el gate del turno. */
+function _gateVentPorTqt(){ _gateVentPorEvento(); }
 function hAET(){
   if($('cAET')?.checked){show('dAETnivel');hAETtip();}
   else{hide('dAETnivel');_aetKTMsuspend(false);}
@@ -15094,63 +15182,15 @@ function _quedaConEjes(va, sop, ids){
   ver(ids.wModo, modos.length && modos[0]!=='Sin soporte');
   ver(ids.wInterfaz, interfaces.length);
 }
-/* 🔴 EL ESPEJO — UNA SOLA PLANILLA (Diego, 20-sep-2026).
-   Los paneles «Queda con» de la intubación y la reintubación volvían a pedir el
-   módulo ventilatorio ENTERO que ya está arriba: eso eran las «2 historias».
-   Ahora se esconden y esta función copia arriba → abajo, para que el guardado
-   —que lee los `po*` y los parámetros `pi_`/`pr_`— siga viendo exactamente lo
-   mismo que antes. No hay dato nuevo ni columna nueva: cambia DÓNDE se escribe.
-   🪤 La TQT NO entra acá: ella ya resolvió lo mismo al revés (esconde el módulo
-   de arriba y deja el suyo, ver `_gateVentPorTqt`). Unificar las dos formas es
-   una decisión de Diego, no un arreglo; mientras tanto cada una tiene UNA sola
-   planilla, que es lo que importaba.
-   🪤 El orden importa: primero el soporte, después `renderParams*` —que repuebla
-   los selects de interfaz y modo y REGENERA la caja de parámetros—, y recién
-   entonces los valores. Al revés, lo copiado se pierde en el redibujo. */
-function _espejarPostEvento(){
-  const pon=(id,val)=>{ const e=$(id); if(e) e.value=(val==null?'':String(val)); };
-  /* 🔴 EL ESPEJO SOLO ACTÚA SI ARRIBA YA DICE LA VERDAD. El evento se declara en
-     la fila «¿Qué pasó hoy con la vía aérea?», que deja la vía aérea de arriba
-     en TOT/TQT — y recién entonces arriba es el estado posterior y se puede
-     copiar. Si alguien marca la casilla a mano sin declararlo arriba, el
-     paciente sigue figurando en Natural: copiar ESO al panel «queda con» sería
-     guardar que quedó respirando espontáneo tras intubarse. En ese caso el
-     panel vuelve a mostrarse y se llena como antes.
-     🪤 Sin esta puerta, marcar la casilla con el paciente en oxigenoterapia
-     regeneraba la caja de parámetros SIN las variables de VM. Lo cazaron
-     `interfaz_estado_final.js` y `via_aerea_previo.js`. */
-  const arribaInv = (v('fVA')==='TOT' || v('fVA')==='TQT');
-  const cajaI=$('dIntubQueda'); if(cajaI) cajaI.classList.toggle('hidden', arribaInv);
-  const copiarParams=(P)=>{
-    document.querySelectorAll('[id^="'+P+'"]').forEach(e=>{
-      if(!e.id || (e.tagName!=='INPUT'&&e.tagName!=='SELECT')) return;
-      const gemelo=$('r_'+e.id.slice(P.length)); if(gemelo) e.value=gemelo.value;
-    });
-    try{ if(typeof calcResp==='function') calcResp({id:P+'vt'}); }catch(x){}
-  };
-  if($('cIntubO')?.checked && arribaInv){
-    pon('poIntubVA', v('fVA')==='TQT'?'TQT':'TOT');
-    pon('poIntubSop', (v('fSop')==='VM'||v('fSop')==='Oxigenoterapia/OAF')?v('fSop'):'VM');
-    try{ renderParamsIntub(); }catch(x){}
-    pon('poIntubInterfaz', v('fInterfaz'));
-    pon('poIntubModo', v('fModo'));
-    try{ renderParams({P:'pi_',L:'pl_',box:'paramsBoxIntub'}); }catch(x){}
-    pon('poIntubTotN', v('fTOTn')); pon('poIntubTotCm', v('fTOTcm'));
-    copiarParams('pi_');
-  }
-  const hayReintub = (typeof _extReintub==='function' && _extReintub()) || !!$('cReintubT')?.checked;
-  const cajaR=$('dReintubQueda');
-  if(cajaR && !(hayReintub && arribaInv)) cajaR.classList.toggle('hidden', !hayReintub);
-  if(hayReintub && arribaInv){
-    pon('poReintubSop', (v('fSop')==='VM'||v('fSop')==='Oxigenoterapia/OAF')?v('fSop'):'VM');
-    try{ renderParamsReintub(); }catch(x){}
-    pon('poReintubInterfaz', v('fInterfaz'));
-    pon('poReintubModo', v('fModo'));
-    try{ renderParams({P:'pr_',L:'prl_',box:'paramsBoxReintub'}); }catch(x){}
-    pon('poReintubTotN', v('fTOTn')); pon('poReintubTotCm', v('fTOTcm'));
-    copiarParams('pr_');
-  }
-}
+/* 🗂️ 21-sep-2026 · AQUÍ VIVÍA EL ESPEJO de la tanda 3.7, que copiaba «Terapia
+   ventilatoria» a los campos escondidos del panel «queda con». Existía porque
+   ayer la planilla buena era la de ARRIBA y el panel del evento se escondía.
+   Hoy es al revés: el módulo es el del EVENTO y arriba se anula
+   (`_gateVentPorEvento`), así que no hay dos sitios que llenar y no hay nada
+   que copiar. No se cambió de opinión por gusto: Diego lo vio en pantalla y
+   corrigió el rumbo —«que cada opción que marque un evento desplegara
+   distintos módulos… se plantea de otra forma»—. Lo que SÍ se quedó, porque no
+   era del espejo sino del bug, es la FOTO del estado previo. */
 function renderParamsIntub(){
   const va=v('poIntubVA')||'TOT', sop=v('poIntubSop')||'VM';
   if(!$('poIntubModo')) return;
@@ -15205,28 +15245,26 @@ function _panelReintub(destinoId){
   const panel=$('dReintubQueda'); if(!panel) return;
   if(!destinoId){ panel.classList.add('hidden'); return; }
   const dest=$(destinoId); if(dest) dest.appendChild(panel);
-  /* 🔴 UNA SOLA PLANILLA (20-sep-2026): el panel se sigue MUDANDO a la rama
-     activa —para que sus ids vivan en un solo lugar y lo escrito no se pierda
-     al cambiar de camino— pero ya NO se muestra: repetía el módulo ventilatorio
-     de arriba. Lo llena `_espejarPostEvento()` con lo que el colega escribió en
-     «Terapia ventilatoria». */
-  panel.classList.add('hidden');
+  /* El panel se MUDA a la rama activa —para que sus ids vivan en un solo lugar
+     y lo escrito no se pierda al cambiar de camino— y se muestra: desde el
+     21-sep-2026 es ÉL el que se llena, y el bloque genérico de arriba se anula. */
+  panel.classList.remove('hidden');
   renderParamsReintub();
-  _espejarPostEvento();
+  _gateVentPorEvento();
 }
 function hIntub(){
   if($('cIntubO')?.checked){
     show('dIntubDet');
     _pintarPrevios();
     renderParamsIntub();
-    _espejarPostEvento();
     // Circuito nuevo: los dispositivos se fechan hoy (el previo no tenía VM)
     _dispSnapshot={hme:v('fFecHME'),hepa:v('fFecHEPA'),tc:v('fFecSonda')};
     autoFechasDispositivos(true,true);
     toast('🫁 Intubación marcada — arriba queda el estado PREVIO; completa abajo cómo quedó el paciente.', 5000);
   } else {
     hide('dIntubDet');
-    ['fIntubHora','fIntubDet','poIntubTotN','poIntubTotCm'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+    ['fIntubHora','fIntubDet','fIntubCausa','poIntubTotN','poIntubTotCm'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+    { const d=$('cIntubDificil'); if(d) d.checked=false; }
     const _pb=$('paramsBoxIntub'); if(_pb) _pb.innerHTML='';
     if(_dispSnapshot){
       const _ds=_dispSnapshot; _dispSnapshot=null;
@@ -19446,7 +19484,7 @@ function setEventoVA(tipo){
     const e=$('cDecanOcurrio'); if(e&&!e.checked){ e.checked=true; hDecan(); }
     fijarVA('Natural'); scrollA('dDecanDet');
   }
-  _pintarPrevios(); _espejarPostEvento();
+  _pintarPrevios(); _gateVentPorEvento();
   _pintarFilaEventoVA(); _lineaFinaVA();
   if(typeof _renderAutoProcs==='function') _renderAutoProcs();
 }
@@ -19459,7 +19497,7 @@ function _lineaFinaVA(){
   s.title=libre?'':'La vía aérea la cambia un evento: decláralo arriba en «¿Qué pasó hoy con la vía aérea?»';
   s.style.opacity=libre?'':'.75';
 }
-try{ document.getElementById('kf')?.addEventListener('change', ()=>{ try{ _lineaFinaVA(); _pintarFilaEventoVA(); _espejarPostEvento(); }catch(e){} }); }catch(e){}
+try{ document.getElementById('kf')?.addEventListener('change', ()=>{ try{ _lineaFinaVA(); _pintarFilaEventoVA(); _gateVentPorEvento(); }catch(e){} }); }catch(e){}
 
 // ── El banner del episodio y el estado que no se hereda ──────────────────
 function _episodioAlFormulario(){
