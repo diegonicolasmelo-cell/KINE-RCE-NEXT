@@ -4423,11 +4423,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <label style="font-size:.72rem;font-weight:700;color:#1d4ed8;white-space:nowrap;">Contexto:</label>
                     <input type="text" id="fIntubDet" placeholder="Motivo / circunstancias..." style="height:28px;font-size:.78rem;border:1px solid #bfdbfe;border-radius:5px;padding:0 8px;flex:1;min-width:170px;">
                   </div>
-                  <!-- ESTADO PREVIO: se toma solo de Terapia Ventilatoria (arriba),
-                       que NO se toca — describir cómo estaba el paciente para ser
-                       intubado es parte esencial del registro. -->
+                  <!-- 🔴 ESTADO PREVIO: sale de la FOTO que se toma al declarar el
+                       evento, NO de Terapia Ventilatoria (20-sep-2026). Leerlo de
+                       arriba era el bug: al declarar la intubación la vía aérea de
+                       arriba ya pasó a TOT, así que el registro afirmaba que se
+                       intubó a un paciente que ya estaba intubado. -->
                   <div style="margin-bottom:8px;padding:7px 9px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:7px;">
-                    <div style="font-size:.66rem;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:.04em;margin-bottom:3px;">📍 Estado previo (de Terapia ventilatoria ↑)</div>
+                    <div style="font-size:.66rem;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:.04em;margin-bottom:3px;">📍 Estado previo (así estaba antes de intubar)</div>
                     <div id="lblIntubPrevio" style="font-size:.78rem;color:#334155;font-weight:600;">—</div>
                     <input type="hidden" id="fIntubSopPrevio">
                   </div>

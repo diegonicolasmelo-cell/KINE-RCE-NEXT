@@ -2845,4 +2845,17 @@ Con el paciente ya en TOT, el guardado **exige declarar la PVE del turno** —un
 prueba de ventilación espontánea a alguien recién intubado—. Pasa desde antes de
 esta tanda y no es lo que Diego reportó, así que queda anotado, no arreglado.
 
+### Un rótulo que quedó mintiendo, cazado mirando la pantalla
+
+Al sacarle capturas a la app para mostrarle a Diego cómo quedó, el recuadro
+seguía titulado «📍 Estado previo **(de Terapia ventilatoria ↑)**». Ya no sale
+de ahí: sale de la foto. Un rótulo que describe mal de dónde viene un dato es
+la clase de detalle que después se defiende en una reunión. Ahora dice
+«así estaba antes de intubar», y el comentario del código de julio que decía lo
+contrario se reescribió con la razón.
+
+🪤 La captura mostró algo que ninguna guardia mide: el texto de la interfaz
+puede quedar contradiciendo al código sin que nada se ponga rojo. Mirar la
+pantalla sigue siendo parte del trabajo.
+
 **194 guardias verdes.** Sello `NEXT-3.7-intubar-natural`.
