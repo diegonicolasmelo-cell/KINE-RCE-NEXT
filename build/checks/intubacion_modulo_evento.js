@@ -112,6 +112,30 @@ si('★ …y si fue difícil', /INTUB_DIFICIL/.test(dom));
      await p.evaluate(() => !!document.getElementById('cIntubO').checked));
   no('★★ …y sigue sin verse', await ver('#cIntubO'));
 
+  /* 🪤 Y LA ÚLTIMA QUE QUEDABA. Al revisar los cinco eventos apareció que
+     «↩️ Ocurrió reintubación este turno» (`cReintubT`) seguía a la vista: el
+     mismo defecto que Diego reportó en la intubación, en el único sitio donde
+     sobrevivía. Se ve además con extubación y decanulación, porque el bloque
+     de reintubación se ofrece en cuanto hay historial de VM.
+     🔴 `cReintub` —la reintubación ANIDADA en el flujo PVE— NO entra acá: ahí
+     la fila de arriba ya está declarando la extubación, así que esa casilla es
+     el ÚNICO lugar donde el hecho se anota. Esconderla perdería el dato. */
+  console.log('\n1b · 🔴 …y la reintubación tampoco se pregunta dos veces');
+  await abrir('Natural', 'Oxigenoterapia/OAF');
+  await p.evaluate(() => { _diasVMPrevios = 4; updateVAUI(); window.confirmarReintubacion = () => Promise.resolve(true); });
+  await p.waitForTimeout(250);
+  no('★★ «Ocurrió reintubación este turno» no se ofrece', await ver('#cReintubT'));
+  si('★ …pero sigue en el documento', await p.evaluate(() => !!document.getElementById('cReintubT')));
+  await p.evaluate(() => setEventoVA('reintub'));
+  await p.waitForTimeout(500);
+  si('★★ declarada arriba, queda marcada por dentro',
+     await p.evaluate(() => !!document.getElementById('cReintubT').checked));
+  si('★ la casilla ANIDADA en el flujo PVE sigue existiendo (ahí no hay doble pregunta)',
+     await p.evaluate(() => !!document.getElementById('cReintub')));
+  await abrir('Natural', 'Ambiente');
+  await p.evaluate(() => setEventoVA('intub'));
+  await p.waitForTimeout(400);
+
   /* ══ 2 · El módulo es el del evento ═══════════════════════════════════ */
   console.log('\n2 · 🔴 Declarada la intubación, manda SU módulo');
   no('★★ «Terapia ventilatoria» de arriba se anula', await ver('#dVentBloque'));

@@ -2954,4 +2954,34 @@ difícil, nota libre, N° de tubo y fijación dentro del bloque). Más que los t
 eventos se comporten igual, que el relato cuente la causa y la nota, y que no
 vuelvan los signos de pregunta.
 
+### La última segunda pregunta, y la trampa que escondió
+
+Diego aclaró después el malentendido: cuando yo decía «arriba» él entendía los
+chips de eventos, no el bloque «Terapia ventilatoria» —de ahí que la pregunta
+del día anterior no le calzara—. Y confirmó el fondo: **cada evento despliega su
+módulo, y con «Nada» queda la terapia ventilatoria estándar.**
+
+Al revisar los cinco eventos uno por uno apareció que **«↩️ Ocurrió reintubación
+este turno» (`cReintubT`) seguía a la vista**: el mismo defecto, en el único
+sitio donde sobrevivía. Se escondió.
+
+🔴 **No se tocó `cReintub`**, la reintubación ANIDADA en el flujo PVE: allá la
+fila de arriba está declarando la EXTUBACIÓN, así que esa casilla es el único
+lugar donde el hecho se anota. Esconderla habría perdido el dato.
+
+🪤 **Y esconderla rompió la declaración, en silencio.** `setEventoVA('reintub')`
+elegía entre las dos casillas preguntando si `cReintubT` estaba *dentro de un
+.hidden*. Al esconder la segunda pregunta, la condición se dio vuelta sola y el
+botón empezó a marcar la casilla EQUIVOCADA: una reintubación declarada arriba
+se anotaba como ocurrida dentro de una extubación que nadie declaró. Ahora la
+decisión la toma la SECCIÓN en juego, que es lo que de verdad distingue los dos
+casos y no cambia al esconder un control. Lo cazó la guardia en el acto.
+
+### Lo que queda anotado y NO se tocó
+
+La extubación y la decanulación **no** anulan el módulo genérico: su «queda con»
+vive en el bloque PVE y en el suyo, y el de arriba sigue a la vista. Diego no lo
+reportó y ampliarlo por cuenta propia sería alcance que no pidió; queda como
+pregunta para él.
+
 **195 guardias verdes.** Sello `NEXT-3.8-modulo-del-evento`.
