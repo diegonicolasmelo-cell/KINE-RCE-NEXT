@@ -2985,3 +2985,74 @@ reportó y ampliarlo por cuenta propia sería alcance que no pidió; queda como
 pregunta para él.
 
 **195 guardias verdes.** Sello `NEXT-3.8-modulo-del-evento`.
+
+---
+
+## 21-sep-2026 · Lo registrado vuelve al reabrir el turno · Tanda 3.9
+
+Diego, contando lo que le pasó en la unidad: «*ayer una extubación… yo no había
+registrado una extubación porque mi plan no era extubarlo y terminé extubando un
+paciente igual dos horas después de haber evolucionado la primera vez, y pasó
+que ya no me ofrecía el modal de extubación, y eso me causó cuidado; y luego
+cuando logré entre comillas registrar, no me aparecía en la extubación contada.
+Lo que yo necesito es un flujo en que lo que anote pueda seguir registrando
+después.*»
+
+### Lo que se encontró
+
+`fillForm()` —el camino que carga un turno YA GUARDADO para re-editarlo—
+reponía la intubación y la traqueostomía **enteras**, pero del bloque
+PVE/EXTUBACIÓN y del de DECANULACIÓN **no reponía nada**. Se reprodujo con un
+turno que traía la extubación completa (PVE superada, hora 19:10, motivo,
+evaluación post, queda con CNAF). Al reabrirlo:
+
+| | |
+|---|---|
+| el bloque de extubación | oculto |
+| la PVE declarada | vacía |
+| hora, motivo, evaluación post | vacíos |
+| `_extOcurrio()` | **false** |
+
+Encadenado: sin la PVE no se abre su rama, sin la rama no existe la casilla
+«hubo extubación sin PVE», y sin ella no hay dónde declarar nada. Eso es el
+«ya no me ofrecía el modal».
+
+### 🪤 Por qué nadie lo vio antes: el dato NO se perdía
+
+El cliente quita esos campos del payload (`del()`), y el servidor fusiona con la
+fila anterior (`if (!(k in datos)) datos[k] = _prev[k]`), así que la extubación
+**sobrevive en la planilla**. Lo que se perdía era la PANTALLA — que es donde el
+colega decide si quedó registrado y desde donde lo corrige. Una pérdida
+invisible en la hoja y total para quien la usa.
+
+### Lo que se programó
+
+`_reponerExtYDecan(s)`: repone la PVE y su rama, el resultado, la hora, el tipo,
+el motivo, la evaluación post, el «queda con», y la decanulación entera con su
+tipo, dispositivo, detalle y recanulación. Y **muestra el bloque de extubación
+aunque la vía aérea ya sea natural** — tras extubar lo es, y la regla «solo con
+TOT» escondía justo el sitio donde vivía lo registrado. La decanulación ya tenía
+esa excepción; a la extubación le faltaba.
+
+### Dos trampas que costaron media guardia en rojo cada una
+
+🪤 **La llamada va AL FINAL de `fillForm`.** Puesta junto a donde se repone la
+intubación, lo que escribía lo barrían las cascadas y el `updateVAUI()` que
+corren después. Lo último que toca el bloque tiene que ser quien lo repone.
+
+🪤 **Los ayudantes van propios, no prestados.** `set` y `chk` son LOCALES de
+`fillForm`; fuera de ella el nombre `set` lo toma otro global que escribe
+`textContent` en vez de `value`. No reventaba: escribía en el sitio equivocado y
+la reposición fallaba **en silencio** — once assertions en rojo sin un solo
+error de JavaScript. Dos funciones con el mismo nombre y distinto trabajo es la
+misma familia del problema que `escapado_unico.js` vigila.
+
+### La guardia
+
+`evento_vuelve_al_reabrir.js`, escrita **primero** y vista **roja con 19
+fallos**. Mide los cuatro escenarios: extubación con protocolo, extubación sin
+protocolo con su tipo, decanulación completa, y el caso exacto de Diego —
+evolucionar sin extubar, reabrir, y poder declarar la extubación que ocurrió dos
+horas más tarde, con la app contándola.
+
+**196 guardias verdes.** Sello `NEXT-3.9-vuelve-al-reabrir`.

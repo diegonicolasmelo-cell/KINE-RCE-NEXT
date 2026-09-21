@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.8-modulo-del-evento">
+<meta name="rce-version" content="NEXT-3.9-vuelve-al-reabrir">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -5557,7 +5557,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.8-modulo-del-evento]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.9-vuelve-al-reabrir]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -7885,6 +7885,87 @@ function _fillParamsVent(s){
     });
 }
 
+/* 🔴 LO REGISTRADO VUELVE A LA PANTALLA (Diego, 21-sep-2026, contando lo que
+   le pasó en la unidad): «una extubación… yo no había registrado una
+   extubación porque mi plan no era extubarlo y terminé extubando un paciente
+   igual dos horas después de haber evolucionado, y pasó que ya no me ofrecía
+   el modal de extubación… y luego cuando logré entre comillas registrar, no me
+   aparecía en la extubación contada. Lo que yo necesito es un flujo en que lo
+   que anote pueda seguir registrando después.»
+
+   EL HALLAZGO: `fillForm()` —el camino que carga un turno YA GUARDADO para
+   re-editarlo— reponía la intubación y la traqueostomía enteras, pero del
+   bloque PVE/EXTUBACIÓN y del de DECANULACIÓN no reponía NADA. Al reabrir, la
+   extubación registrada desaparecía de la pantalla: sin la PVE no se abre su
+   rama, sin la rama no está la casilla, y `_extOcurrio()` volvía false.
+
+   🪤 EL DATO NO SE PERDÍA EN LA PLANILLA, y por eso nadie lo vio antes: el
+   cliente quita esos campos del payload (`del()`), el servidor fusiona con la
+   fila anterior (`if (!(k in datos)) datos[k] = _prev[k]`) y la extubación
+   sobrevive en la hoja. Lo que se perdía es la PANTALLA — que es donde el
+   colega decide si quedó registrado o no, y desde donde lo corrige.
+
+   🪤 El orden importa: la PVE va PRIMERO, porque `hPVEtoggle` es quien abre la
+   rama donde viven los demás campos. Escribirlos antes los borra el toggle. */
+function _reponerExtYDecan(s){
+  const esT=x=>x===true||x==='TRUE'||x==='true';
+  /* 🪤 LOS AYUDANTES VAN PROPIOS, NO PRESTADOS. `set` y `chk` son LOCALES de
+     `fillForm`; acá fuera el nombre `set` lo toma otro global que escribe
+     `textContent` en vez de `value`. No reventaba: escribía en el sitio
+     equivocado y la reposición fallaba EN SILENCIO — media guardia en rojo sin
+     un solo error de JavaScript. */
+  const set=(id,val)=>{ const e=$(id); if(e&&val!==undefined&&val!==null&&val!=='') e.value=String(val); };
+  const chk=(id,val)=>{ const e=$(id); if(e) e.checked=esT(val); };
+  // ── PVE y extubación ──────────────────────────────────────────────────
+  const pve=String(s.PVE_VAL||'');
+  if(pve){
+    try{ hPVEtoggle(pve); }catch(e){}
+    if(pve==='si'){
+      const res=String(s.PVE_RESULTADO||'');
+      const r=res?document.querySelector('input[name="pveRes"][value="'+res+'"]'):null;
+      if(r){ r.checked=true; try{ hPVEres(); }catch(e){} }
+      set('fExtHora',s.EXT_HORA);
+      chk('cPveSupSinExt',s.PVE_SUP_SIN_EXT);
+      set('fPveSupRaz',s.PVE_SUP_SIN_EXT_RAZ);
+      try{ if(typeof hPveSupExt==='function') hPveSupExt(); }catch(e){}
+    } else if(pve==='no'){
+      set('fPveSCraz',s.PVE_SC_RAZON); set('fPveSCdet',s.PVE_SC_DET);
+      if(esT(s.EXT_OCURRIO)){
+        const c=$('cExtSinPve'); if(c){ c.checked=true; try{ hExtSinPve(); }catch(e){} }
+        const t=String(s.EXT_TIPO||'');
+        const r=t?document.querySelector('input[name="extTipo"][value="'+t+'"]'):null;
+        if(r){ r.checked=true; try{ hExtTipo(); }catch(e){} }
+        set('fExtHoraNo',s.EXT_HORA);
+      }
+      try{ if(typeof hPveSCraz==='function') hPveSCraz(); }catch(e){}
+    }
+    // El motivo (estadística) y el «queda con» viven en el panel post, que
+    // `hExtSinPve`/`hPVEres` ya mudaron a la rama activa.
+    if(esT(s.EXT_OCURRIO)){
+      const _m=String(s.EXT_MOTIVO||''); const _cat=_m.split(' — ')[0];
+      set('fExtMotivoCat',_cat); set('fExtMotivo',_m.indexOf(' — ')>-1?_m.split(' — ').slice(1).join(' — '):'');
+      set('peModo',s.EXT_PE_MODO); try{ renderParamsPE(); }catch(e){}
+      set('fPostExtDet',s.EXT_POST_DET);
+    }
+  }
+  // ── Decanulación ──────────────────────────────────────────────────────
+  if(esT(s.DECAN_OCURRIO)){
+    const c=$('cDecanOcurrio'); if(c){ c.checked=true; try{ hDecan(); }catch(e){} }
+    set('fDecanHora',s.DECAN_HORA);
+    const t=String(s.DECAN_TIPO||'');
+    const r=t?document.querySelector('input[name="decanTipo"][value="'+t+'"]'):null;
+    if(r) r.checked=true;
+    set('fDecanQueda',s.DECAN_QUEDA_DISP); set('fDecanFlujo',s.DECAN_QUEDA_FLUJO);
+    set('fDecanSpo2',s.DECAN_QUEDA_SPO2); set('fDecanDet',s.DECAN_DET);
+    chk('cRecanul',s.DECAN_RECANUL);
+  }
+  /* 🔴 Y el bloque se MUESTRA aunque la vía aérea ya no sea la de antes: tras
+     extubar la vía aérea es natural, y la regla «solo con TOT» escondía el
+     bloque donde vivía lo registrado. La decanulación ya tenía esta excepción
+     (ver `evento_sin_doble_pregunta.js`); a la extubación le faltaba. */
+  try{ updateVAUI(); }catch(e){}
+  if(pve) show('dExtSec');
+}
 function fillForm(s) {
   window._vfonHoras = parseInt(s && s._VFON_HORAS) || 0;
   const set=(id,val)=>{ const e=$(id); if(e&&val!==undefined&&val!=='') e.value=String(val); };
@@ -8152,6 +8233,11 @@ function fillForm(s) {
   updateVAUI();
   aplicarGatesEval();
   if(v('fVA')==='TOT' && v('fTOTn') && !$('cCambioTOT')?.checked) _lockTOT(true);
+  /* 🪤 VA AL FINAL, Y NO DONDE SE REPONE LA INTUBACIÓN. Puesto antes, lo que
+     escribe lo barren las cascadas y `updateVAUI()` que corren después — se
+     probó y la PVE volvía vacía igual. Lo último que toca el bloque tiene que
+     ser quien lo repone. */
+  _reponerExtYDecan(s);
   _renderAutoProcs();
 }
 
