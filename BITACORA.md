@@ -3056,3 +3056,55 @@ evolucionar sin extubar, reabrir, y poder declarar la extubación que ocurrió d
 horas más tarde, con la app contándola.
 
 **196 guardias verdes.** Sello `NEXT-3.9-vuelve-al-reabrir`.
+
+---
+
+## 25-sep-2026 · El ventilador se anota en Prevención de NAVM · Tanda 4.0
+
+Diego: «*que se pueda anotar el VM en el apartado de prevención de NAVM si es
+que aplica VM*». Y antes, explicando por qué ahí: «*medida de prevención de
+neumonía asociada a ventilación mecánica con el ventilador que tiene… el
+ventilador que tiene no predispone a la neumonía, sin embargo es como un buen
+lugar para anotarlo; aquí se van a anotar los filtros y todo eso*».
+
+### 🔴 El equipo no se inventa ni se duplica
+
+El inventario ya existe: hoja `VENTILADORES` con 33 equipos y su ubicación por
+cama, la cama sabe cuál tiene (`VM_TAG`) y la grilla ya lo mostraba como chip.
+Lo que faltaba era poder anotarlo **sin salir del turno** a la pestaña
+Ventiladores.
+
+Así que la fila nueva **no guarda un dato nuevo**: mueve el equipo en el MISMO
+inventario con `MOVER_VENTILADOR`, y el movimiento queda en su libro con fecha y
+firma. Un segundo lugar donde escribir «qué ventilador tiene» sería la copia que
+después se contradice — el mismo modo de fallo que el desajuste 119≠132.
+
+### Tres decisiones, con su razón
+
+**Va ARRIBA de los filtros.** El HEPA fijo depende del EQUIPO
+(`_hepaFijoEquipo`), así que saber cuál es viene antes que preguntar por su
+filtro.
+
+**Solo con VM invasiva.** El esquema ya lo dice: un VM «es parte de la sala y
+OCUPA la cama», mientras el VNI y el CNAF «van al PACIENTE — queda en una cama
+pero no vive ahí». Ofrecer la fila sin VM sería pedir que se asigne a la cama un
+equipo que no es de la cama. Con TQT en VM sí aparece: sigue ocupando uno.
+
+**El que está en otra cama lo dice en su propia opción** («PB 1 · en cama 7»), y
+al elegirlo pide confirmación: traerlo deja sin ventilador asignado a otro
+paciente, y eso no se hace sin verlo.
+
+🪤 El inventario se pide **una vez** y queda en memoria: el paso 1 se repinta
+muchas veces por turno y no vale un viaje al servidor cada vez.
+
+### La guardia
+
+`ventilador_en_prevencion.js`, escrita **primero** y vista **roja**. Mide que la
+fila aparezca solo con VM, que vaya antes de los filtros, que ofrezca los
+equipos de cama y NO los de apoyo (un Aerogen no ocupa cama), que muestre el que
+la cama ya tiene, que avise cuál está en otra cama, y que al elegir uno mande
+`MOVER_VENTILADOR` a esta cama con la fecha del turno.
+
+🪤 El reloj va congelado: fecha inventada y turno forzado.
+
+**197 guardias verdes.** Sello `NEXT-4.0-ventilador-en-navm`.

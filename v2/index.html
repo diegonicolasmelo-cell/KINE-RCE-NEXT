@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-3.9-vuelve-al-reabrir">
+<meta name="rce-version" content="NEXT-4.0-ventilador-en-navm">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3087,6 +3087,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <div class="fcard fc-nav" id="fcPrevNavm" data-paso="1">
         <div class="fcard-hdr"><span class="fcard-title">Prevención de NAVM</span></div>
         <div class="fcard-body">
+          <!-- 🔧 CON QUÉ VENTILADOR ESTÁ (Diego, 25-sep-2026: «que se pueda
+               anotar el VM en el apartado de prevención de NAVM si es que
+               aplica VM»). Va ARRIBA de los filtros a propósito: el HEPA fijo
+               depende del EQUIPO (`_hepaFijoEquipo`), así que saber cuál es
+               viene antes que preguntar por su filtro.
+               🔴 NO GUARDA UN DATO NUEVO: mueve el equipo en el MISMO
+               inventario (`MOVER_VENTILADOR`), y el movimiento queda en su
+               libro con fecha y firma. Un segundo lugar donde escribir «qué
+               ventilador tiene» sería la copia que se contradice. -->
+          <div class="pv-fila hidden" id="pvVM">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#787066" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M7 20h10"></path><path d="M7 9h3"></path><path d="M14 13l2-4 2 4"></path></svg>
+            <div class="pv-nom"><b id="pvVMlbl">Ventilador</b><span id="pvVMsub">sin asignar</span></div>
+            <span class="pv-esp"></span>
+            <select id="fPrevVM" data-nodirty aria-labelledby="pvVMlbl" onchange="prevVMelegir()" style="height:32px;font-size:.82rem;border:1px solid #cbd5e1;border-radius:6px;padding:0 8px;background:#fff;min-width:190px;"></select>
+          </div>
           <div id="pvLista"></div>
           <div class="pv-sep" id="pvSepTerapia"><span>Antes de la terapia</span><i></i></div>
           <div class="pv-fila" id="pvf_cab">
@@ -5557,7 +5572,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-3.9-vuelve-al-reabrir]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-4.0-ventilador-en-navm]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6691,7 +6706,86 @@ function prevNoPude(){
   setTimeout(() => $('fPrevRazon') && $('fPrevRazon').focus(), 40);
 }
 
+/* ══ 🔧 EL VENTILADOR DE LA CAMA, EN EL PASO 1 (25-sep-2026) ══════════════
+   Diego: «que se pueda anotar el VM en el apartado de prevención de NAVM si es
+   que aplica VM». El inventario ya existe y la cama ya sabe cuál tiene
+   (`VM_TAG`); lo que faltaba era poder anotarlo SIN salir del turno.
+   🔴 Solo con VM invasiva. El esquema lo dice: un VM «es parte de la sala y
+   OCUPA la cama», mientras el VNI y el CNAF «van al PACIENTE». Ofrecer la fila
+   sin VM sería pedir que se asigne a la cama un equipo que no es de la cama. */
+let _PREV_VM = null;        // inventario en memoria (se pide una vez por sesión)
+let _PREV_VM_PID = false;   // ya se pidió
+function prevVMaplica(){
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  return (v('fSop') || c.SOPORTE || '') === 'VM';
+}
+function prevVMpintar(){
+  const fila = $('pvVM'); if(!fila) return;
+  const aplica = prevVMaplica();
+  fila.classList.toggle('hidden', !aplica);
+  if(!aplica) return;
+  // El inventario se pide UNA vez y se guarda; el paso 1 se repinta muchas
+  // veces por turno y no vale un viaje cada vez.
+  if(!_PREV_VM && !_PREV_VM_PID){
+    _PREV_VM_PID = true;
+    try{ gs('GET_VENTILADORES', {}, r => { _PREV_VM = r || []; prevVMpintar(); }, () => { _PREV_VM_PID = false; }); }catch(e){ _PREV_VM_PID = false; }
+  }
+  const cama = String(v('cBed') || '');
+  const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
+  const tag = String(c.VM_TAG || '');
+  const sel = $('fPrevVM'); if(!sel) return;
+  const lista = (_PREV_VM || []).filter(x => x && x.activo && x.deCama);
+  const mio = lista.find(x => String(x.ubicTipo) === 'CAMA' && String(x.ubicDetalle) === cama)
+           || lista.find(x => String(x.nombre) === tag);
+  sel.innerHTML = '<option value="">— sin asignar —</option>' + lista.map(x => {
+    // 🔴 El que está en OTRA cama lo dice en su propia opción: moverlo de ahí
+    // deja sin ventilador a un paciente, y eso no se hace sin verlo.
+    const donde = (String(x.ubicTipo) === 'CAMA' && String(x.ubicDetalle) !== cama)
+      ? ' · en cama ' + x.ubicDetalle
+      : (String(x.ubicTipo) === 'PRESTAMO' ? ' · en préstamo' : '');
+    const mal = (x.estado && x.estado !== 'Operativo') ? ' · ' + x.estado : '';
+    return '<option value="' + escapeHtml(String(x.id)) + '">' +
+      escapeHtml(String(x.nombre) + donde + mal) + '</option>';
+  }).join('');
+  sel.value = mio ? String(mio.id) : '';
+  const sub = $('pvVMsub');
+  if(sub) sub.textContent = mio
+    ? (String(mio.marca || '') + ' ' + String(mio.modelo || '')).trim() + (mio.estado && mio.estado !== 'Operativo' ? ' · ' + mio.estado : '')
+    : (_PREV_VM ? 'sin asignar' : 'cargando el inventario…');
+}
+function prevVMelegir(){
+  const sel = $('fPrevVM'); if(!sel) return;
+  const cama = String(v('cBed') || '');
+  const id = sel.value;
+  if(!id){ prevVMpintar(); toast('Para sacar un ventilador de la cama, muévelo desde Ventiladores'); return; }
+  const x = (_PREV_VM || []).find(k => String(k.id) === String(id)); if(!x) return;
+  const enOtra = String(x.ubicTipo) === 'CAMA' && String(x.ubicDetalle) !== cama;
+  const mandar = () => {
+    const d = { idVm: id, tipo: 'CAMA', detalle: cama,
+                fecha: v('gDate') || (typeof hoy === 'function' ? hoy() : ''),
+                motivo: 'Asignado desde el turno (prevención de NAVM)' };
+    gs('MOVER_VENTILADOR', d, () => {
+      // El inventario en memoria y la cama siguen al movimiento, para que la
+      // pantalla no quede diciendo lo de antes hasta la próxima recarga.
+      (_PREV_VM || []).forEach(k => { if(String(k.ubicTipo)==='CAMA' && String(k.ubicDetalle)===cama && String(k.id)!==String(id)){ k.ubicTipo='BODEGA'; k.ubicDetalle=''; } });
+      x.ubicTipo = 'CAMA'; x.ubicDetalle = cama;
+      const cc = (typeof _camaPanel === 'function') ? _camaPanel() : null;
+      if(cc){ cc.VM_TAG = x.nombre; cc.VM_TAG_ESTADO = x.estado || ''; }
+      prevVMpintar(); prevPintar();
+      toast('🔧 ' + x.nombre + ' asignado a la cama ' + cama);
+      if(typeof recargarSilencioso === 'function') recargarSilencioso();
+    }, m => { toast('❌ No se pudo asignar: ' + (m || 'sin conexión')); prevVMpintar(); });
+  };
+  if(enOtra){
+    uiConfirm({ icono:'🔧', titulo:'Ese ventilador está en otra cama',
+      mensaje:'<b>' + escapeHtml(x.nombre) + '</b> está en la <b>cama ' + escapeHtml(String(x.ubicDetalle)) + '</b>.',
+      detalle:'Si lo traes acá, esa cama queda sin ventilador asignado. El movimiento queda registrado en el libro del equipo.',
+      confirmar:'🔁 Traerlo a la cama ' + cama, tono:'rojo' })
+      .then(okC => { if(okC) mandar(); else prevVMpintar(); });
+  } else mandar();
+}
 function prevPintar(){
+  prevVMpintar();
   const caja = $('pvLista'); if (!caja) return;
   const filas = prevFilas(_prevCtx()).filter(f => f.aplica);
   if (!filas.length){
