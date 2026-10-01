@@ -829,3 +829,80 @@ medición en el paciente.
 ⏳ **Quedan en duda, sin tocar:** los tiempos de sesión —KTM 30 min, válvula de
 fonación 30 min, IMT 10 min—. No son mediciones en el paciente sino cuánto duró
 lo que hizo el kinesiólogo, pero sí se informan. Si Diego quiere, entran.
+
+---
+
+## 7 · Ecografía pulmonar y pruebas de traqueostomía — 1-oct-2026
+
+### 7.1 · Las pruebas de TQT son un bloque propio — CERRADO
+
+> *«Las pruebas son presión mantenida de la vía aérea, Blood Eye Test [Blue
+> Dye Test] y eso principalmente, porque por ejemplo, tolerancia, eso es, no es
+> una prueba, eso es como es, eso es de describir o describiría cómo está
+> aguantando el uso, pero no es una prueba en sí, no es un test. En cambio, la
+> presión mantenida de la vía aérea sí es un test. El Blood Eye Test, su nombre
+> lo dice, es una prueba.»*
+
+> *«Sería otro bloque que aparecería solamente en caso de que el paciente esté
+> traqueostomizado.»*
+
+La distinción que cierra el bloque: **test es lo que arroja un resultado; uso
+es lo que se describe.** La válvula de fonación —minutos y tolerancia— se queda
+donde está, en lo que se hizo durante el turno.
+
+**Nombre:** Diego ofreció tres —«pruebas de TQT», «pruebas de vía aérea TQT»,
+«evaluación de traqueostomía»—. Propuesta: **«Pruebas de traqueostomía»**, que
+dice *prueba* (que es su distinción) y dice de qué. Pendiente de su visto bueno.
+
+🔵 **Las dos pruebas YA EXISTEN, en el cajón equivocado:**
+
+| Prueba | Dónde vive hoy | Qué le falta |
+|---|---|---|
+| Presión mantenida de la VA | desplegable «Tos y deglución», rotulada «P. transtraqueal · válv. fonación» | salir a la luz con su nombre. La puerta por TQT y el semáforo ya están |
+| Test de azul (BDT) | mismo desplegable, dos casillas sueltas | la puerta por TQT: hoy se ofrece en pacientes sin cánula, donde no se puede hacer |
+
+🪤 El BDT **ya guarda su serie** (`BDT_JSON` con turno y fecha, `BDT_ULTIMO` con
+el más reciente) y es idempotente por turno: repetirlo el mismo turno reemplaza
+en vez de agregar. En pantalla esa serie no se ve en ninguna parte.
+
+🪤 Renombrar la presión mantenida arrastra el indicador del tablero, que hoy se
+llama «P. transtraqueal (VF)».
+
+### 7.2 · Ecografía pulmonar — ABIERTO, esperando su decisión
+
+Dos formas sobre la mesa, con mockup en el canvas del 1-oct:
+
+- **A · El puntaje (LUS).** 12 zonas de 0 a 3, total 0–36. Da un número
+  comparable, graficable y con cortes publicados (Soummer 2012: <13 al final de
+  la PVE predice éxito, >17 predice distrés tras extubar). Cuesta 12 toques.
+- **B · La ficha focalizada.** 4 zonas con el patrón dominante (líneas A ·
+  B separadas · B coalescentes · consolidación · derrame). Cuesta 4 toques y no
+  da número.
+
+Propuesta: **las dos en escalera** —la ficha siempre visible, el puntaje
+completo tras un desplegable—, con marca de cuál de los dos se hizo.
+
+🪤 **Nombre:** en la literatura **FoCUS** es la ecografía **cardíaca**
+focalizada. Para pulmón son **BLUE** (diagnóstico de disnea aguda) y el
+**puntaje LUS** de 12 zonas (aireación). Conviene no bautizar FOCUS a la ficha
+corta.
+
+### 7.3 · Del turno, y además serie
+
+> *«En realidad no, esta información es del turno. Es más del turno que una
+> evaluación seriada, aunque no estoy seguro, no sé qué opinas tú.»*
+
+No hay que elegir: **se anota en el turno y se guarda como serie.** La serie es
+la consecuencia de guardarla con su fecha y su turno, que es justo lo que ya
+hacen el BDT y el test de apnea.
+
+La distinción que sí importa es otra:
+
+| | Qué hace | Ejemplos |
+|---|---|---|
+| **Estado que arrastra** | si nadie lo cambia sigue valiendo; se replica en ámbar | AET, vía aérea, fase clínica, filtro HME |
+| **Acto que queda fechado** | pasó ese día en ese turno; no se arrastra | BDT, test de apnea, **ecografía pulmonar** |
+
+Y hay un motivo clínico para la serie, no solo administrativo: **sin el valor
+anterior no existe la reaireación.** «22 → 18 después del prono» es el dato que
+vale; «18» solo no dice nada.
