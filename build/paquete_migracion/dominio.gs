@@ -378,7 +378,18 @@ function validarPVE(d) {
     if (vv(d.EXT_OCURRIO)) errs.push('PVE superada sin extubar: no puede venir marcada una extubación en el mismo turno.');
     return errs;
   }
-  if (String(d.PVE_VAL || '') !== 'no') return errs;   // ausente o 'si'/'nc': nada que validar
+  // «No corresponde» TAMBIÉN dice por qué (Diego, 1-oct-2026): VM domiciliaria,
+  // AET, causa de base no resuelta u otra. «Otra» exige el motivo, igual que en
+  // «no». 🪤 Solo se exige al GUARDAR: un turno viejo con 'nc' sin razón se
+  // reabre y se narra como siempre, no se rechaza.
+  if (String(d.PVE_VAL || '') === 'nc') {
+    const rnc = String(d.PVE_SC_RAZON || '').trim();
+    if (!rnc) { errs.push('PVE: indica por qué NO corresponde la prueba de ventilación espontánea.'); return errs; }
+    if (_PVE_RAZON_EXIGE_MOTIVO.indexOf(rnc) !== -1 && !String(d.PVE_SC_DET || '').trim())
+      errs.push('PVE: «' + rnc + '» necesita que describas el motivo.');
+    return errs;
+  }
+  if (String(d.PVE_VAL || '') !== 'no') return errs;   // ausente o 'si': nada que validar
   // Extubación sin PVE: el evento del turno es otro y el formulario manda los
   // PVE_SC_* vacíos a propósito.
   // 🪤 Salvo `sin_condiciones`, que NO es una extubación (decisión clínica
@@ -873,7 +884,14 @@ function generarTextoEvolucion(d) {
     // todavía no está sobre la mesa, y por eso el turno no cuenta como
     // candidato a PVE ni suma a la racha de la alerta.
     if (pveVal === 'nc') {
-      txt.push('No procede PVE ni extubación en este turno: causa de base no resuelta. Mantiene soporte ventilatorio.');
+      // 1-oct-2026 · dice la razón elegida. Un turno viejo (nc sin razón) y la
+      // razón «Causa de base no resuelta» se narran como siempre. Paridad con
+      // el cliente (genTexto).
+      const ncR = (v('PVE_SC_RAZON') || '').trim(), ncD = (v('PVE_SC_DET') || '').trim();
+      const ncT = (!ncR || ncR === 'Causa de base no resuelta') ? ': causa de base no resuelta'
+        : ncR === 'Otra' ? (ncD ? ': ' + ncD : '')
+        : ': paciente con ' + _lcIni(ncR);
+      txt.push('No procede PVE ni extubación en este turno' + ncT + '. Mantiene soporte ventilatorio.');
       return;
     }
     if (pveVal === 'si') {

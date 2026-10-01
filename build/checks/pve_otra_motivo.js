@@ -102,7 +102,12 @@ console.log('\n3 · Nada de esto se puede quedar sin poder guardar');
 // servidor preserva lo guardado. Un turno viejo re-guardado llega SIN PVE_VAL.
 eq('payload SIN PVE_VAL → no valida nada', hayPVE(val({ PLAN_FIRMA_KINE: 'MFB' })), []);
 eq('PVE = sí → no valida nada', hayPVE(val({ PVE_VAL: 'si', PVE_RESULTADO: 'superada' })), []);
-eq('PVE = no corresponde → no valida nada', hayPVE(val({ PVE_VAL: 'nc' })), []);
+// 1-oct-2026 · CAMBIÓ LA CONVENCIÓN (Diego): «no corresponde» TAMBIÉN pide razón.
+// Antes no validaba nada. Sale del denominador de destete, y para distinguir
+// «no corresponde porque es crónico» de «porque la causa aguda sigue» hay que
+// saber por qué. Un turno viejo con nc sin razón se reabre igual: solo se exige al guardar.
+eq('PVE = no corresponde SIN razón → exige la razón', hayPVE(val({ PVE_VAL: 'nc' })).length, 1);
+eq('PVE = no corresponde CON razón → pasa', hayPVE(val({ PVE_VAL: 'nc', PVE_SC_RAZON: 'Adecuación del esfuerzo terapéutico' })), []);
 // Extubación sin PVE: el formulario manda razón y detalle vacíos a propósito.
 eq('extubación sin PVE → no se le exige razón',
   hayPVE(val({ PVE_VAL: 'no', EXT_OCURRIO: true, EXT_TIPO: 'sin_protocolo', PVE_SC_RAZON: '' })), []);
@@ -227,7 +232,8 @@ eq('y la regla es solo «Otra»', enFront, ['Otra']);
 const bloquePVE = idx.slice(idx.indexOf('id="fPveSCraz"'), idx.indexOf('id="fPveSCdet"'));
 const opcPVE = (bloquePVE.match(/<option>([^<]+)<\/option>/g) || []).map(o => o.replace(/<\/?option>/g, ''));
 si('el desplegable de PVE ofrece «Otra»', opcPVE.indexOf('Otra') !== -1);
-eq('las nueve razones siguen en el catálogo', opcPVE.length, 9);
+// 1-oct-2026 · diez: se sumó «Causa aguda no resuelta» (Diego).
+eq('las diez razones siguen en el catálogo', opcPVE.length, 10);
 // El campo dejó de anunciarse como opcional, que era la mitad del problema.
 si('el detalle ya no se llama «(opcional)» a secas',
   /id="fPveSCdet"[^>]*oninput="hPveSCraz\(\)"/.test(idx));

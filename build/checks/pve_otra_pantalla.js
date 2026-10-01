@@ -78,7 +78,8 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
     return [...sel.options].map(o => o.value).filter(Boolean);
   });
   si('«Otra» está en el desplegable, con esa grafía', cat.indexOf('Otra') !== -1);
-  eq('y son nueve razones', cat.length, 9);
+  // 1-oct-2026 · diez: se sumó «Causa aguda no resuelta» (Diego).
+  eq('y son diez razones', cat.length, 10);
 
   /* ══ 2 · LA RUTA REAL ══════════════════════════════════════════════════ */
   // 🪤 El color se mide DESPUÉS de la transición: leer `getComputedStyle` en el

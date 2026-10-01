@@ -127,6 +127,8 @@ const { chromium } = require('playwright-core');
        no salía. Se usa la puerta de verdad: Turnos.setRoster(). */
     if (firma) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); firma.value = 'DMV'; }
     if (typeof hPVEtoggle === 'function') hPVEtoggle('nc');
+    // 1-oct-2026 · «no corresponde» TAMBIÉN pide razón (Diego): el atajo para declarar la PVE ya no basta sin ella.
+    { const _r = document.getElementById('fPveNcRaz'); if (_r) { _r.value = 'Ventilación mecánica domiciliaria'; if (typeof hPveNcRaz === 'function') hPveNcRaz(); } }
     const txt = (typeof genTexto === 'function') ? String(genTexto() || '') : '';
     window._ll.length = 0;
     if (typeof guardar === 'function') { try { guardar(); } catch (e) {} }

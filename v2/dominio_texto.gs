@@ -371,7 +371,14 @@ function generarTextoEvolucion(d) {
     // todavía no está sobre la mesa, y por eso el turno no cuenta como
     // candidato a PVE ni suma a la racha de la alerta.
     if (pveVal === 'nc') {
-      txt.push('No procede PVE ni extubación en este turno: causa de base no resuelta. Mantiene soporte ventilatorio.');
+      // 1-oct-2026 · dice la razón elegida. Un turno viejo (nc sin razón) y la
+      // razón «Causa de base no resuelta» se narran como siempre. Paridad con
+      // el cliente (genTexto).
+      const ncR = (v('PVE_SC_RAZON') || '').trim(), ncD = (v('PVE_SC_DET') || '').trim();
+      const ncT = (!ncR || ncR === 'Causa de base no resuelta') ? ': causa de base no resuelta'
+        : ncR === 'Otra' ? (ncD ? ': ' + ncD : '')
+        : ': paciente con ' + _lcIni(ncR);
+      txt.push('No procede PVE ni extubación en este turno' + ncT + '. Mantiene soporte ventilatorio.');
       return;
     }
     if (pveVal === 'si') {

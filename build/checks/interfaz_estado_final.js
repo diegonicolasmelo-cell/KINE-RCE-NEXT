@@ -114,6 +114,11 @@ const si = (l, c) => eq(l, !!c, true);
   console.log('\n3 · Lo que se guarda tras cada evento');
   const guardar = cfg => p.evaluate(async cfg => {
     $('kf').reset(); $('cBed').value = '3'; DB = [{ ID_CAMA: '3' }];
+    /* 🪤 1-oct-2026 · `reset()` NO limpia el campo OCULTO fPVEval (en un input
+       hidden, .value ES el atributo): el «no corresponde» de un escenario se
+       filtraba al siguiente y, con la razón ahora obligatoria, lo frenaba sin
+       que ese escenario tuviera nada que ver con la PVE. Se aísla el escenario. */
+    { const pv = $('fPVEval'); if (pv) pv.value = ''; if (typeof _pveBtnReset === 'function') _pveBtnReset(); hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); }
     _vmHistFlag = true; _diasVMPrevios = 3; _diasVMEpisodio = 3; _nReintub = 0; _transIntubEsteTurno = false;
     const opt = document.createElement('option'); opt.value = 'DMV'; opt.textContent = 'DMV';
     $('fFirma').appendChild(opt); $('fFirma').value = 'DMV';
@@ -136,6 +141,8 @@ const si = (l, c) => eq(l, !!c, true);
     // declarado, así que el aviso de cambio sin evento frena el guardado.
     const d = await guardar({ va: 'TOT', sop: 'VM', modo: 'CPAP/PS', pasos: `
       hPVEtoggle('nc');   // con TOT el turno exige declarar la PVE
+      // 1-oct-2026 · «no corresponde» TAMBIÉN pide razón (Diego): el atajo para declarar la PVE ya no basta sin ella.
+      { const _r = document.getElementById('fPveNcRaz'); if (_r) { _r.value = 'Ventilación mecánica domiciliaria'; if (typeof hPveNcRaz === 'function') hPveNcRaz(); } }
       await new Promise(x => setTimeout(x, 60));
       $('cTqtO').click();
       $('fTqtHora').value = '11:00'; $('fTqtTec').value = 'Percutánea';

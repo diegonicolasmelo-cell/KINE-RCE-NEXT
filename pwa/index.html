@@ -4181,8 +4181,25 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
                 <!-- ── Rama NO CORRESPONDE ── -->
                 <div id="dPVEncRama" class="hidden" style="padding:8px 10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:7px;margin-bottom:6px;font-size:.74rem;color:#475569;line-height:1.45;">
-                  <b style="color:#334155;">Causa no resuelta.</b> No procede PVE ni extubación en este turno; el paciente mantiene soporte ventilatorio.
-                  <div style="font-size:.67rem;color:#94a3b8;margin-top:3px;">Queda registrado en la evolución. Vale solo para este turno — el próximo vuelve a preguntar.</div>
+                  <b style="color:#334155;">No corresponde PVE ni extubación en este turno;</b> el paciente mantiene soporte ventilatorio.
+                  <!-- 1-oct-2026 (Diego): «no corresponde» TAMBIÉN dice por qué. Evaluar la PVE es
+                       responder una de las tres: se hizo, no se hizo (y por qué), o no corresponde
+                       (y por qué). El que no corresponde sale del denominador de destete. -->
+                  <div style="margin-top:7px;padding:7px 9px;background:#fff;border:1px solid #cbd5e1;border-radius:7px;">
+                    <label id="lblPveNcRaz" style="font-size:.7rem;font-weight:700;color:#475569;display:block;margin-bottom:5px;">¿Por qué no corresponde? (obligatorio)</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                      <select id="fPveNcRaz" onchange="hPveNcRaz()" style="height:28px;font-size:.78rem;border:1px solid #cbd5e1;border-radius:5px;padding:0 6px;flex:1;min-width:200px;background:#fff;">
+                        <option value="">-- Seleccionar razón --</option>
+                        <option>Ventilación mecánica domiciliaria</option>
+                        <option>Adecuación del esfuerzo terapéutico</option>
+                        <option>Causa de base no resuelta</option>
+                        <option>Otra</option>
+                      </select>
+                      <input type="text" id="fPveNcDet" oninput="hPveNcRaz()" placeholder="Detalle (opcional)" style="height:28px;border:1px solid #cbd5e1;border-radius:6px;padding:0 10px;flex:1;min-width:160px;font-size:.78rem;background:#fff;">
+                    </div>
+                    <div id="dPveNcOtra" class="hidden" style="margin-top:5px;font-size:.72rem;font-weight:700;color:#b91c1c;">↑ «Otra» no dice por sí sola por qué no corresponde: descríbelo.</div>
+                  </div>
+                  <div style="font-size:.67rem;color:#94a3b8;margin-top:5px;">Queda registrado en la evolución. Vale solo para este turno — el próximo vuelve a preguntar.</div>
                 </div>
 
                 <!-- ── Rama SÍ PVE ── -->
@@ -4258,6 +4275,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
                       <select id="fPveSCraz" onchange="hPveSCraz()" style="height:28px;font-size:.78rem;border:1px solid #fecaca;border-radius:5px;padding:0 6px;flex:1;min-width:200px;background:#fff;">
                         <option value="">-- Seleccionar razón --</option>
+                        <option>Causa aguda no resuelta</option>
                         <option>Sin condiciones ventilatorias</option>
                         <option>Inestabilidad hemodinámica</option>
                         <option>Sedación profunda / BNM</option>
@@ -6374,7 +6392,7 @@ function _resetHiddenYEventos(){
     if(e.id==='cBed'||e.id==='cIng') return;
     e.value='';
   });
-  if(typeof _pveBtnReset==='function'){ _pveBtnReset(); hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi(); _pveCleanNo(); }
+  if(typeof _pveBtnReset==='function'){ _pveBtnReset(); hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi(); _pveCleanNo(); _pveCleanNc(); }
   const _decR=$('cDecanOcurrio'); if(_decR){ _decR.checked=false; if(typeof hDecan==='function') hDecan(); }
   const _tqR=$('cTqtO'); if(_tqR){ _tqR.checked=false; hide('dTqtDet'); }
   const _rtR=$('cReintubT'); if(_rtR) _rtR.checked=false;
@@ -6416,7 +6434,7 @@ function rielRender(){
   // Obligatorias nuevas (ago-2026, Diego): declarar la PVE con TOT y la
   // razón cuando la KTM no se realiza o está contraindicada.
   if($('dExtSec') && $('dExtSec').offsetParent!==null && !v('fPVEval')) faltas.push('PVE sí / no / no corresponde');
-  if(_pveRazonFalta()) faltas.push('razón de la PVE no realizada');
+  if(_pveRazonFalta()) faltas.push(v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada');
   if(_pveOtraSinMotivo()) faltas.push('motivo de la «Otra» razón de PVE');
   if(_pveExtSinTipo()) faltas.push('tipo de la extubación sin PVE');
   if($('bKTMn')?.classList.contains('on') && $('bKTMn').offsetParent!==null && !v('fKTMnoRaz')) faltas.push('razón de KTM no realizada');
@@ -8051,6 +8069,10 @@ function _reponerExtYDecan(s){
       chk('cPveSupSinExt',s.PVE_SUP_SIN_EXT);
       set('fPveSupRaz',s.PVE_SUP_SIN_EXT_RAZ);
       try{ if(typeof hPveSupExt==='function') hPveSupExt(); }catch(e){}
+    } else if(pve==='nc'){
+      // 1-oct-2026 · un turno VIEJO trae 'nc' sin razón: no se inventa ninguna.
+      set('fPveNcRaz',s.PVE_SC_RAZON); set('fPveNcDet',s.PVE_SC_DET);
+      try{ hPveNcRaz(); }catch(e){}
     } else if(pve==='no'){
       set('fPveSCraz',s.PVE_SC_RAZON); set('fPveSCdet',s.PVE_SC_DET);
       if(esT(s.EXT_OCURRIO)){
@@ -8305,7 +8327,7 @@ function fillForm(s) {
   })();
   // Extubación / Decanulación / TQT — ACCIÓN DIARIA: siempre desmarcada
   (function(){
-    const fpve=$('fPVEval'); if(fpve) fpve.value=''; _pveBtnReset?.(); hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi?.(); _pveCleanNo?.();
+    const fpve=$('fPVEval'); if(fpve) fpve.value=''; _pveBtnReset?.(); hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi?.(); _pveCleanNo?.(); _pveCleanNc?.();
     const dec=$('cDecanOcurrio'); if(dec) dec.checked=false; hDecan();
     const dsv=$('cDesvinc'); if(dsv) dsv.checked=false; hDesvinc();
     const gsa=$('cGSA'); if(gsa) gsa.checked=false; hGSA();
@@ -9261,14 +9283,14 @@ function guardar() {
   // de ese turno; hasta hoy se podía guardar en blanco y ya no se recuperaba.
   const _prG=_pveRazonFalta();
   if(_prG){
-    toast('⚠️ Indica por qué NO se realizó la PVE en este turno');
+    toast(v('fPVEval')==='nc' ? '⚠️ Indica por qué NO corresponde la PVE en este turno' : '⚠️ Indica por qué NO se realizó la PVE en este turno');
     _prG.scrollIntoView({behavior:'smooth',block:'center'}); _prG.focus();
     _prG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_prG.style.outline='';},2500);
     return;
   }
   const _poG=_pveOtraSinMotivo();
   if(_poG){
-    toast('⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no se hizo la PVE');
+    toast(v('fPVEval')==='nc' ? '⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no corresponde la PVE' : '⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no se hizo la PVE');
     _poG.scrollIntoView({behavior:'smooth',block:'center'}); _poG.focus();
     _poG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_poG.style.outline='';},2500);
     return;
@@ -9657,8 +9679,13 @@ function guardar() {
     PVE_SUP_SIN_EXT: _pveSupSinExt(),
     PVE_SUP_SIN_EXT_RAZ: _pveSupRazon(),
     PVE_FR_MOTIVOS:  JSON.stringify(Array.from(document.querySelectorAll('input[name="pveFrMot"]:checked')).map(c=>c.value)),
-    PVE_SC_RAZON:    v('fPVEval')==='no' && !$('cExtSinPve')?.checked ? v('fPveSCraz') : '',
-    PVE_SC_DET:      v('fPVEval')==='no' && !$('cExtSinPve')?.checked ? v('fPveSCdet') : '',
+    // 1-oct-2026 · «No corresponde» también manda su razón (en las mismas
+    // columnas: la PVE no hecha y la que no corresponde son dos respuestas
+    // distintas a la misma pregunta, y PVE_VAL dice cuál de las dos fue).
+    PVE_SC_RAZON:    v('fPVEval')==='nc' ? v('fPveNcRaz')
+                   : (v('fPVEval')==='no' && !$('cExtSinPve')?.checked ? v('fPveSCraz') : ''),
+    PVE_SC_DET:      v('fPVEval')==='nc' ? v('fPveNcDet')
+                   : (v('fPVEval')==='no' && !$('cExtSinPve')?.checked ? v('fPveSCdet') : ''),
     // ★ Extubación / PVE
     PVE_VAL:         v('fPVEval'),
     EXT_OCURRIO:     _extOcurrio(),
@@ -12723,7 +12750,14 @@ function genTexto() {
     // contar (ago-2026). Paridad con dominio_texto.gs.
     if(_pve==='nc'){
       _B('pve');
-      L.push('No procede PVE ni extubación en este turno: causa de base no resuelta. Mantiene soporte ventilatorio.');
+      /* 1-oct-2026 · dice la razón elegida. 🪤 Un turno viejo (nc sin razón) y la
+         razón «Causa de base no resuelta» se narran como siempre. Paridad con
+         dominio_texto.gs. */
+      const _ncR=String(v('fPveNcRaz')||'').trim(), _ncD=String(v('fPveNcDet')||'').trim();
+      const _ncT=!_ncR||_ncR==='Causa de base no resuelta' ? ': causa de base no resuelta'
+        : _ncR==='Otra' ? (_ncD?`: ${_ncD}`:'')
+        : `: paciente con ${_lcIni(_ncR)}`;
+      L.push(`No procede PVE ni extubación en este turno${_ncT}. Mantiene soporte ventilatorio.`);
       return;
     }
     const _et=_extTipo();
@@ -15126,14 +15160,14 @@ function hPVEtoggle(val){
     $('fPVEval').value='';
     _pveBtnReset();
     hide('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama');
-    _pveCleanSi(); _pveCleanNo();
+    _pveCleanSi(); _pveCleanNo(); _pveCleanNc();
     return;
   }
   $('fPVEval').value=val;
   _pveBtnReset();
   if(val==='si'){
     $('btnPVESi').style.cssText='padding:3px 14px;border-radius:20px;border:1.5px solid #7c3aed;background:#7c3aed;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;';
-    show('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanNo();
+    show('dPVESiRama'); hide('dPVENoRama'); hide('dPVEncRama'); _pveCleanNo(); _pveCleanNc();
     // extTipo implícito protocolo en rama SÍ
     $('fPVEval') && ($('fPVEval').dataset.extTipo='protocolo');
   } else if(val==='nc'){
@@ -15143,9 +15177,10 @@ function hPVEtoggle(val){
     $('btnPVEnc').style.cssText='padding:3px 14px;border-radius:20px;border:1.5px solid #475569;background:#475569;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;';
     hide('dPVESiRama'); hide('dPVENoRama'); show('dPVEncRama');
     _pveCleanSi(); _pveCleanNo();
+    hPveNcRaz();   // la rama recién abierta ya tiene que mostrar que pide razón
   } else {
     $('btnPVENo').style.cssText='padding:3px 14px;border-radius:20px;border:1.5px solid #dc2626;background:#dc2626;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;';
-    hide('dPVESiRama'); show('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi();
+    hide('dPVESiRama'); show('dPVENoRama'); hide('dPVEncRama'); _pveCleanSi(); _pveCleanNc();
     hPveSCraz();   // la rama recién abierta ya tiene que mostrar qué se exige
   }
   // marca cExtOcurrio como compatibilidad con guardar() ('nc' no es extubación)
@@ -15246,12 +15281,25 @@ function _pveNoPideRazon(){
   if(!d || d.classList.contains('hidden') || d.offsetParent===null) return false;
   return v('fPVEval')==='no' && !$('cExtSinPve')?.checked;
 }
+/* 1-oct-2026 · «No corresponde» TAMBIÉN pide razón (Diego). Misma idea que la
+   rama «No»: la razón es obligatoria y «Otra» exige el motivo. El predicado
+   vive una vez y lo usan el riel, el guardado y el pintado. */
+function _pveNcPideRazon(){
+  const d=$('dPVEncRama');
+  if(!d || d.classList.contains('hidden') || d.offsetParent===null) return false;
+  return v('fPVEval')==='nc';
+}
 /* Devuelve el elemento que hay que enfocar, o null si no falta nada. */
 function _pveRazonFalta(){
+  if(_pveNcPideRazon()) return String(v('fPveNcRaz')||'').trim()==='' ? $('fPveNcRaz') : null;
   if(!_pveNoPideRazon()) return null;
   return String(v('fPveSCraz')||'').trim()==='' ? $('fPveSCraz') : null;
 }
 function _pveOtraSinMotivo(){
+  if(_pveNcPideRazon()){
+    if(PVE_RAZONES_CON_MOTIVO.indexOf(String(v('fPveNcRaz')||'').trim())===-1) return null;
+    return String(v('fPveNcDet')||'').trim()==='' ? $('fPveNcDet') : null;
+  }
   if(!_pveNoPideRazon()) return null;
   if(PVE_RAZONES_CON_MOTIVO.indexOf(String(v('fPveSCraz')||'').trim())===-1) return null;
   return String(v('fPveSCdet')||'').trim()==='' ? $('fPveSCdet') : null;
@@ -15314,6 +15362,24 @@ function hPveSCraz(){
     box.style.borderRadius= sinTipo ? '7px' : '';
     box.style.padding     = sinTipo ? '7px 9px' : '';
   }
+}
+/* Pinta la rama «No corresponde»: mismo trato que hPveSCraz. */
+function hPveNcRaz(){
+  const pide  = _pveNcPideRazon();
+  const esOtra= pide && PVE_RAZONES_CON_MOTIVO.indexOf(String(v('fPveNcRaz')||'').trim())!==-1;
+  const falta = esOtra && String(v('fPveNcDet')||'').trim()==='';
+  const inp=$('fPveNcDet'), sel=$('fPveNcRaz'), hint=$('dPveNcOtra');
+  if(inp){
+    inp.placeholder = esOtra ? '¿Cuál? — obligatorio' : 'Detalle (opcional)';
+    inp.style.borderColor = falta ? 'var(--danger)' : '#cbd5e1';
+    inp.style.background  = falta ? '#fef2f2' : '#fff';
+  }
+  if(sel) sel.style.borderColor = (pide && !String(v('fPveNcRaz')||'').trim()) ? 'var(--danger)' : '#cbd5e1';
+  if(hint) hint.classList.toggle('hidden', !falta);
+}
+function _pveCleanNc(){
+  ['fPveNcRaz','fPveNcDet'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+  hPveNcRaz();
 }
 function hPVEres(){
   const res=document.querySelector('input[name="pveRes"]:checked')?.value;

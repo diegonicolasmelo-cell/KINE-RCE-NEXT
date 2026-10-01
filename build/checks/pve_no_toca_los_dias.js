@@ -216,7 +216,7 @@ const CAMA = { ID_CAMA: '17', OCUPADA: true, NOMBRE: 'PACIENTE 17', PATIENT_ID: 
 
   si('★ PVE «no» (destete diferido) deja los dos relojes intactos',
     intacto(guardar(1, { PVE_VAL: 'no', PVE_SC_RAZON: 'Sedación profunda' })));
-  si('★ PVE «no corresponde» también', intacto(guardar(2, { PVE_VAL: 'nc' })));
+  si('★ PVE «no corresponde» también', intacto(guardar(2, { PVE_VAL: 'nc', PVE_SC_RAZON: 'Ventilación mecánica domiciliaria' })));  // 1-oct-2026: «no corresponde» trae su razón
   si('★ PVE fracasada también', intacto(guardar(3, { PVE_VAL: 'si', PVE_RESULTADO: 'frustra', PVE_FR_MOTIVOS: '["FR > 35 rpm"]' })));
   si('★ PVE superada SIN extubar también (el paciente sigue conectado)',
     intacto(guardar(4, { PVE_VAL: 'si', PVE_RESULTADO: 'superada',
