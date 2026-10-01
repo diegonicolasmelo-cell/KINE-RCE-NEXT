@@ -5148,6 +5148,16 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <select id="fDeglPres" onchange="hDegl()"><option value="">--</option><option value="presente">Presente</option><option value="ausente">Ausente</option><option value="no_evaluable">No evaluable</option></select></div>
                 <div class="col wa hidden" id="dDeglCal"><label>Calidad</label>
                   <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option></select></div>
+              </div>
+            </details>
+            <!-- 6) desplegable: PRUEBAS DE TRAQUEOSTOMÍA — 1-oct-2026 (Diego).
+                 «Las pruebas son presión mantenida de la vía aérea y Blue Dye Test; la
+                 tolerancia no es una prueba, describe cómo aguanta el uso.» Aparece SOLO
+                 con traqueostomía (tqtPruebasGate). La válvula de fonación y su
+                 tolerancia NO entran: son USO, y siguen en lo hecho durante el turno. -->
+            <details id="dxTqt" class="hidden" style="margin-top:8px;border:1px solid #fed7aa;border-radius:7px;padding:6px 10px;background:#fffaf5;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:#9a3412;cursor:pointer;">🔧 Pruebas de traqueostomía</summary>
+              <div class="row" style="margin-top:6px;">
                 <div class="col wa" id="dBdt">
                   <label>Test de azul (BDT)</label>
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -5165,7 +5175,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <input type="checkbox" id="fBDTn" class="hidden" tabindex="-1" aria-hidden="true">
                   <input type="hidden" id="fBDTmom" value="">
                 </div>
-                <div class="col wa" id="dPmantVA" style="display:none;"><label>P. transtraqueal · válv. fonación (cmH₂O)</label>
+                <div class="col wa" id="dPmantVA"><label>P. transtraqueal · válv. fonación (cmH₂O)</label>
                   <div style="display:flex;align-items:center;gap:6px;">
                     <input type="number" id="fPVA" oninput="interpPTT()" style="width:82px;">
                     <span id="pttChip" class="disp-chip disp-none">—</span>
@@ -7077,7 +7087,7 @@ const _PASO_SERIE = [
   { k:'fem',    lbl:'FEmáx',     col:'',           fec:'',              fir:'',              campo:'fFEM',       abre:'dxTos',     tip:'Flujo espiratorio máximo de la tos' },
   { k:'ims',    lbl:'IMS',       col:'',           fec:'',              fir:'',              campo:'fIMS',       tip:'Escala de Movilidad UCI' },
   { k:'eco',    lbl:'Ecografía', col:'',           fec:'',              fir:'',              campo:'fCuadD',     abre:'dxEco',     tip:'Ecografía muscular y diafragmática' },
-  { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglPres', abre:'dxTos',     tip:'Deglución y test de azul' },
+  { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglPres', abre:'dxTos',     tip:'Deglución' },
 ];
 
 function pasoEvalPintar(){
@@ -13264,7 +13274,7 @@ function cascadeVA(preSop) {
   _vaAnterior=va;
   updateVAUI(); calcGCS();
   // P. transtraqueal (válvula de fonación): solo TQT
-  const _pm=$('dPmantVA'); if(_pm) _pm.style.display=(va==='TQT'?'':'none');
+  tqtPruebasGate();
   // Cuff: solo con vía aérea artificial (TOT o TQT)
   cuffGate();
   // «Tose, moviliza y deglute»: solo con vía aérea artificial
@@ -13319,6 +13329,18 @@ function interpPTT(){
    mientras el bloque se dibujaba dentro del generador de parámetros por modo.
    Acá hay que escribirla: VM en CPAP/PS. Son maniobras de oclusión del
    ventilador, así que necesitan al paciente EN VM asistida (no desconectado). */
+/* ── Pruebas de traqueostomía (presión mantenida · test de azul) ──────────────
+   Diego, 1-oct-2026: «sería otro bloque que aparecería solamente en caso de que
+   el paciente esté traqueostomizado». 🪤 UN EVENTO DECLARADO MANTIENE SU BLOQUE:
+   la presión mantenida es de las pruebas que se hacen ANTES de decanular, y
+   declarar la decanulación deja la vía aérea en natural; si el bloque dependiera
+   solo de la vía aérea final, se llevaría las pruebas que se acaban de anotar. */
+function tqtPruebasGate(){
+  const d=$('dxTqt'); if(!d) return;
+  const evAnun=(typeof _evVAAnunciado!=='undefined')?_evVAAnunciado:'';
+  const ver = v('fVA')==='TQT' || !!$('cDecanOcurrio')?.checked || evAnun==='decan';
+  d.classList.toggle('hidden', !ver);
+}
 function esfActivo(){ return v('fSop')==='VM' && v('fModo')==='CPAP/PS'; }
 function esfGate(){
   const d=$('dxEsf'); if(!d) return;
@@ -17192,13 +17214,14 @@ function _auscRuidos(){
 //  Desplegables de Evaluaciones Funcionales: se abren solos si traen datos
 //  guardados (recarga de turno / réplica) y se cierran cuando están vacíos.
 function _abrirDetailsEval(){
-  try{ esfGate(); }catch(e){}
+  try{ esfGate(); tqtPruebasGate(); }catch(e){}
   const conDato=ids=>ids.some(id=>{ const e=$(id); if(!e) return false;
     return e.type==='checkbox' ? e.checked : String(e.value||'')!==''; });
   const map={ dxFzaResp:['fPIM','fPEM'],
               dxEco:['fCuadD','fCuadI','fHeckmatt','fGrosor','fFedD','fFedI','fExcD','fExcI','fDiaf'],
               dxEsf:['fP01','fDPocc','fPmusc'],
-              dxTos:['fFEM','fDeglPres','fDeglucion','fBDTp','fBDTn','fPVA'] };
+              dxTos:['fFEM','fDeglPres','fDeglucion'],
+              dxTqt:['fBDTp','fBDTn','fPVA'] };
   Object.keys(map).forEach(id=>{ const d=$(id); if(d) d.open=conDato(map[id]); });
 }
 

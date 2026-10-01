@@ -174,7 +174,8 @@ eq('★ …y es el último', serie('2026-08-12-Dia')[0].resultado, '-');
   await abrir(null);
   /* 🪤 Las evaluaciones viven tras «Se evaluó este turno» (cEgr): hasta marcarla
      la tarjeta está oculta. Se abre como lo haría un colega. */
-  await p.evaluate(() => { const c = $('cEgr'); c.checked = true; hEgr(); const d = $('dxTos'); if (d) d.open = true; });
+  // 1-oct-2026 · el BDT se mudó de «Tos y deglución» a «Pruebas de traqueostomía» (Diego).
+  await p.evaluate(() => { const c = $('cEgr'); c.checked = true; hEgr(); const d = $('dxTqt'); if (d) d.open = true; });
   await p.waitForTimeout(200);
   if (process.env.DEPURAR) console.log('ANCESTROS', JSON.stringify(await p.evaluate(() => {
     const r = []; let e = $('btnBdtNeg');
