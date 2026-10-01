@@ -45,11 +45,12 @@ const si = (l, g) => eq(l, !!g, 'true');
   // respiratorio. Esta línea sigue protegiendo lo mismo: que la rama
   // episodio/turno no haya tocado las columnas del turno.
   // 🗂️ 20-sep-2026 · 411 = 409 + INTUB_CAUSA e INTUB_DIFICIL (la intubación cuenta por qué, 21-sep-2026).
+// 🗂️ 412 = 411 + EVAL_T_BDT_MOMENTO (el test de azul positivo, precoz o tardío, 1-oct-2026).
   // 🗂️ 17-sep-2026 · 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación).
   // 406 = 405 + HEMO_PAM_MED (la PPC pasó a calcularse: PAM − PIC).
   // 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
   // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-  si('★ EVOLUCIONES sigue con su total declarado a mano', /TOTAL_COLS\.EVOLUCIONES !== 411/.test(esq));
+  si('★ EVOLUCIONES sigue con su total declarado a mano', /TOTAL_COLS\.EVOLUCIONES !== 412/.test(esq));
   si('la entrega imprime la firma junto a la fecha', /ULT_MRC_FIRMA/.test(fs.readFileSync(path.join(V2, 'svc_entrega.gs'), 'utf8')));
 
   console.log('\n2 · Servidor (simulador con hojas en memoria)');

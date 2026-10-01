@@ -5045,6 +5045,15 @@ function guardarEvolucion(datos, ctx) {
       // BDT (test de azul) — repetible: cada resultado marcado en el turno se
       // acumula en BDT_JSON del episodio y BDT_ULTIMO refleja el más reciente.
       const bdtRes = esVerdadero(datos.EVAL_T_BDT_POS) ? '+' : (esVerdadero(datos.EVAL_T_BDT_NEG) ? '-' : '');
+      /* 1-oct-2026 · El BDT es UNA elección (Diego). La pantalla ya no deja
+         marcar las dos, pero el servidor no se fía: si llegan las dos, GANA EL
+         POSITIVO (lo más prudente) y se guarda solo esa marca, para que la
+         planilla no diga «positivo y negativo» a la vez. El momento (precoz o
+         tardío) solo existe con un positivo. */
+      if (bdtRes === '+') datos.EVAL_T_BDT_NEG = false;
+      const bdtMom = (bdtRes === '+' && /^(precoz|tardio)$/.test(String(datos.EVAL_T_BDT_MOMENTO || '')))
+        ? String(datos.EVAL_T_BDT_MOMENTO) : '';
+      datos.EVAL_T_BDT_MOMENTO = bdtMom;
       if (bdtRes) {
         // Continuidad del histórico: fila de este turno (la que la fusión ya
         // trajo — volver a pedirla era otra bajada de la hoja) o turno previo.
@@ -5057,9 +5066,10 @@ function guardarEvolucion(datos, ctx) {
         try { hist = JSON.parse((base && base.BDT_JSON) || '[]') || []; } catch (e) {}
         // idempotente por turno: reemplaza el registro de este mismo turnoKey
         hist = hist.filter(function (h) { return h && h.turnoKey !== turnoKey; });
-        hist.push({ turnoKey: turnoKey, fecha: fecha, resultado: bdtRes });
+        hist.push(bdtMom ? { turnoKey: turnoKey, fecha: fecha, resultado: bdtRes, momento: bdtMom }
+                         : { turnoKey: turnoKey, fecha: fecha, resultado: bdtRes });
         datos.BDT_JSON = JSON.stringify(hist);
-        datos.BDT_ULTIMO = bdtRes + ' (' + fecha + ')';
+        datos.BDT_ULTIMO = bdtRes + (bdtMom ? ' ' + bdtMom : '') + ' (' + fecha + ')';
       }
 
       // Test de apnea — repetible (mismo patrón que BDT)

@@ -1204,10 +1204,15 @@ function generarTextoEvolucion(d) {
     if (v('CPAX_TOTAL')) ev.push(`CPAx ${v('CPAX_TOTAL')}/50`);
     if (v('EVAL_T_PIM')) ev.push(`PIM ${v('EVAL_T_PIM')} cmH2O`);
     if (v('EVAL_T_PEM')) ev.push(`PEM ${v('EVAL_T_PEM')} cmH2O`);
-    if (v('EVAL_T_FEM')) ev.push(`FEM ${v('EVAL_T_FEM')} L/min`);
+    if (v('EVAL_T_FEM')) ev.push(`FEM ${v('EVAL_T_FEM')} L/s`);   // 1-oct-2026: se mide y se corta en L/s; decía L/min
     if (v('EVAL_T_GROSOR')) ev.push(`Grosor diafragmático ${v('EVAL_T_GROSOR')} mm`);
     if (v('EVAL_T_HALLAZGOS')) ev.push(`Ecografía: ${v('EVAL_T_HALLAZGOS')}`);
     if (v('EVAL_T_CUAD_D') || v('EVAL_T_CUAD_I')) ev.push(`Grosor cuádriceps D/I ${v('EVAL_T_CUAD_D') || '—'}/${v('EVAL_T_CUAD_I') || '—'} mm`);
+    // Test de azul (1-oct-2026): una elección; el momento solo existe con un positivo.
+    if (esVerdadero(d.EVAL_T_BDT_POS)) {
+      const bm = v('EVAL_T_BDT_MOMENTO');
+      ev.push('BDT positivo' + (bm === 'precoz' ? ' precoz' : bm === 'tardio' ? ' tardío' : ''));
+    } else if (esVerdadero(d.EVAL_T_BDT_NEG)) ev.push('BDT negativo');
     if (v('EVAL_DEGLUCION')) ev.push(`Deglución: ${v('EVAL_DEGLUCION')}`);
     if (v('EVAL_IMS')) ev.push(`IMS ${v('EVAL_IMS')}/10`);
     else if (v('EVAL_NIVEL_MOTOR')) ev.push(`Hito motor ${v('EVAL_NIVEL_MOTOR')}/6`); // legacy

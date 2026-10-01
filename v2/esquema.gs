@@ -372,7 +372,12 @@ const _COLS_EVOLUCIONES = [
      motivo— y la nota queda libre en INTUB_DET, que ya existía.
      — SIEMPRE AL FINAL */
   ['INTUB_CAUSA','texto','Causa de la intubación'],
-  ['INTUB_DIFICIL','bool','Intubación difícil']
+  ['INTUB_DIFICIL','bool','Intubación difícil'],
+  /* 1-oct-2026 · El BDT positivo se parte en precoz o tardío (Diego): precoz =
+     el azul sale en la aspiración inmediata; tardío = aparece a los 30, 60
+     minutos o más tarde. Vacío si el resultado no es positivo.
+     — SIEMPRE AL FINAL */
+  ['EVAL_T_BDT_MOMENTO','texto','Momento del BDT positivo (precoz o tardío)']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1124,6 +1129,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 412 = 411 + EVAL_T_BDT_MOMENTO (el test de azul positivo, precoz o tardío, 1-oct-2026);
   // 411 = 409 + INTUB_CAUSA e INTUB_DIFICIL (la intubación cuenta por qué, 21-sep-2026);
   // 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7, 20-sep-2026);
   // 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación, 17-sep-2026);
@@ -1135,7 +1141,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 411) errs.push("EVOLUCIONES != 411 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 412) errs.push("EVOLUCIONES != 412 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

@@ -1447,6 +1447,13 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .interp-pill{font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:99px;display:inline-block;}
 /* chips de vencimiento de dispositivos de circuito VM */
 .disp-chip{font-size:.72rem;padding:4px 9px;border-radius:6px;font-weight:700;white-space:nowrap;display:inline-block;}
+/* Test de azul (BDT, 1-oct-2026): una sola elección. Cada botón se apaga al
+   volver a tocarlo (no existe «no realizado»: no marcar ya lo es). */
+.bdtb{height:30px;padding:0 14px;border-radius:20px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;}
+.bdtb[aria-pressed="true"]{color:#fff;}
+.bdtb-neg[aria-pressed="true"]{background:#15803d;border-color:#15803d;}
+.bdtb-pos[aria-pressed="true"]{background:#991b1b;border-color:#991b1b;}
+.bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
 /* ── Hoja UCI (historial): la hoja de registro de la unidad, día a día ── */
 .hj-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
 .hj-seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -5108,8 +5115,23 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col wa"><label>FEM (L/s)</label><input type="number" id="fFEM" step="0.1"></div>
                 <div class="col wa"><label>Deglución</label>
                   <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option><option>No evaluable</option></select></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTp"><label for="fBDTp">BDT +</label></div>
-                <div class="check wa" style="align-self:flex-end;"><input type="checkbox" id="fBDTn"><label for="fBDTn">BDT -</label></div>
+                <div class="col wa" id="dBdt">
+                  <label>Test de azul (BDT)</label>
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <button type="button" id="btnBdtNeg" class="bdtb bdtb-neg" aria-pressed="false" onclick="bdtElegir('neg')" title="Sin azul en la aspiración. Tocar de nuevo lo desmarca.">Negativo</button>
+                    <button type="button" id="btnBdtPos" class="bdtb bdtb-pos" aria-pressed="false" onclick="bdtElegir('pos')" title="Azul en la aspiración. Tocar de nuevo lo desmarca.">Positivo</button>
+                    <span id="dBdtMom" class="hidden" style="align-items:center;gap:6px;">
+                      <span style="color:#94a3b8;">&#8594;</span>
+                      <button type="button" id="btnBdtPrecoz" class="bdtb bdtb-mom" aria-pressed="false" onclick="bdtMomento('precoz')" title="El azul sale en la aspiración inmediata">Precoz</button>
+                      <button type="button" id="btnBdtTardio" class="bdtb bdtb-mom" aria-pressed="false" onclick="bdtMomento('tardio')" title="El azul aparece a los 30, 60 minutos o más tarde">Tardío</button>
+                    </span>
+                  </div>
+                  <!-- Estado real del BDT: lo leen el guardado, el relato y la
+                       recarga del turno. Los botones solo lo dibujan. -->
+                  <input type="checkbox" id="fBDTp" class="hidden" tabindex="-1" aria-hidden="true">
+                  <input type="checkbox" id="fBDTn" class="hidden" tabindex="-1" aria-hidden="true">
+                  <input type="hidden" id="fBDTmom" value="">
+                </div>
                 <div class="col wa" id="dPmantVA" style="display:none;"><label>P. transtraqueal · válv. fonación (cmH₂O)</label>
                   <div style="display:flex;align-items:center;gap:6px;">
                     <input type="number" id="fPVA" oninput="interpPTT()" style="width:82px;">
@@ -7250,6 +7272,7 @@ function abrirPanel(id, esIng, verFicha) {
   const _cdv=$('cDesvinc'); if(_cdv){ _cdv.checked=false; hDesvinc(); }
   const _cgs=$('cGSA'); if(_cgs){ _cgs.checked=false; hGSA(); }
   const _cvf=$('cVfon'); if(_cvf){ _cvf.checked=false; hVfon(); }
+  try{ bdtPintar(); }catch(e){}   // el reset() suelta las marcas; los botones se redibujan
   const _cqt=$('cCambioTQT'); if(_cqt) _cqt.checked=false; _tqtSnapshot=null;
   hide('dCambioTQTmot'); hide('dCambioTQTdet');
   setRuidosExtra(''); calcInsumosDias();
@@ -8224,6 +8247,7 @@ function fillForm(s) {
     set('fDiaf',    _ex.EVAL_T_HALLAZGOS);
     chk('fBDTp',   _ex.EVAL_T_BDT_POS);
     chk('fBDTn',   _ex.EVAL_T_BDT_NEG);
+    set('fBDTmom', _ex.EVAL_T_BDT_MOMENTO); bdtPintar();
     set('fPVA',     _ex.EVAL_T_PMANT_VA);
     set('fCuadD',   _ex.EVAL_T_CUAD_D);  set('fCuadI', _ex.EVAL_T_CUAD_I);
     set('fFssIt1',_ex.EVAL_FSS_IT1); set('fFssIt2',_ex.EVAL_FSS_IT2); set('fFssIt3',_ex.EVAL_FSS_IT3); set('fFssIt4',_ex.EVAL_FSS_IT4); set('fFssIt5',_ex.EVAL_FSS_IT5);
@@ -8290,6 +8314,7 @@ function fillForm(s) {
     // la cama ANTERIOR abierta en la misma sesión. Parte vacío siempre.
     const _sa=$('sAdapt'); if(_sa){ _sa.value=''; hAdapt(); }
     const vfo=$('cVfon'); if(vfo) vfo.checked=false; hVfon();
+    try{ bdtPintar(); }catch(e){}
     const tq=$('cTqtO'); if(tq) tq.checked=false; hide('dTqtDet');
     const rin=$('cReintubT'); if(rin) rin.checked=false; hide('dReintubDetT');
     const inb=$('cIntubO'); if(inb) inb.checked=false; hide('dIntubDet');
@@ -9581,6 +9606,7 @@ function guardar() {
     EVAL_T_HALLAZGOS: v('fDiaf'),
     EVAL_T_BDT_POS:   bv('fBDTp'),
     EVAL_T_BDT_NEG:   bv('fBDTn'),
+    EVAL_T_BDT_MOMENTO: bv('fBDTp') ? v('fBDTmom') : '',
     EVAL_T_PMANT_VA:  v('fPVA'),
     // Cuff: verificación del turno (vacío si la vía aérea no es artificial)
     VENT_CUFF_EST:    (v('fVA')==='TOT'||v('fVA')==='TQT') ? v('fCuffEst') : '',
@@ -12673,11 +12699,11 @@ function genTexto() {
     if(gv('fFSS'))      ev.push(`FSS-ICU ${gv('fFSS')}/35 (${$('lblFSS')?.textContent||''})`);
     if(gv('fPIM'))      ev.push(`PIM ${gv('fPIM')} cmH2O (${$('lblPIM')?.textContent||''})`);
     if(gv('fPEM'))      ev.push(`PEM ${gv('fPEM')} cmH2O`);
-    if(gv('fFEM'))      ev.push(`FEM ${gv('fFEM')} L/min`);
+    if(gv('fFEM'))      ev.push(`FEM ${gv('fFEM')} L/s`);
     if(gv('fGrosor'))   ev.push(`Grosor diafragmático ${gv('fGrosor')} mm`);
     if(gv('fDiaf'))     ev.push(`Ecografía: ${gv('fDiaf')}`);
-    if($('fBDTp')?.checked) ev.push('BDT positivo');
-    if($('fBDTn')?.checked) ev.push('BDT negativo');
+    if($('fBDTp')?.checked){ const _bm=v('fBDTmom'); ev.push('BDT positivo'+(_bm==='precoz'?' precoz':_bm==='tardio'?' tardío':'')); }
+    else if($('fBDTn')?.checked) ev.push('BDT negativo');
     if(gv('fPVA'))      ev.push(`Pmant VA ${gv('fPVA')} cmH2O`);
     if(gv('fCpaxTotal')) ev.push(`CPAx ${gv('fCpaxTotal')}/50`);
     if(gv('fCuadD')||gv('fCuadI')) ev.push(`Grosor cuádriceps D/I ${gv('fCuadD')||'—'}/${gv('fCuadI')||'—'} mm`);
@@ -13224,6 +13250,35 @@ function interpPTT(){
   if(n<=ok){ c.className='disp-chip disp-ok'; c.textContent='✓ Permeable'; }
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
+}
+/* ── Test de azul (BDT): UNA elección, que se puede desmarcar ───────────────
+   Diego, 1-oct-2026: «es positivo o negativo, con la fecha, pero no poner "no
+   realizado" porque no tiene sentido: si no se realiza, no lo anoto». Y si es
+   positivo, «tardío o precoz».
+   🔴 Antes eran dos casillas y se podían marcar las dos: el relato decía
+   «positivo» y «negativo» juntos y el servidor guardaba el positivo en
+   silencio. Ahora el estado vive en fBDTp / fBDTn / fBDTmom (los de siempre,
+   así guardado, relato y recarga no cambian) y estos botones SOLO lo dibujan. */
+function bdtPintar(){
+  const pos=!!$('fBDTp')?.checked, neg=!!$('fBDTn')?.checked, mom=v('fBDTmom');
+  const pr=(id,on)=>{ const e=$(id); if(e) e.setAttribute('aria-pressed', on?'true':'false'); };
+  pr('btnBdtPos',pos); pr('btnBdtNeg',neg);
+  pr('btnBdtPrecoz',pos&&mom==='precoz'); pr('btnBdtTardio',pos&&mom==='tardio');
+  const m=$('dBdtMom'); if(m){ m.classList.toggle('hidden',!pos); m.style.display=pos?'inline-flex':''; }
+}
+function bdtElegir(cual){
+  const p=$('fBDTp'), n=$('fBDTn'); if(!p||!n) return;
+  const yaEstaba = cual==='pos' ? p.checked : n.checked;
+  p.checked = !yaEstaba && cual==='pos';
+  n.checked = !yaEstaba && cual==='neg';
+  if(!p.checked){ const m=$('fBDTmom'); if(m) m.value=''; }   // un negativo no es «tardío»
+  bdtPintar();
+}
+function bdtMomento(cual){
+  if(!$('fBDTp')?.checked) return;                              // solo existe con un positivo
+  const m=$('fBDTmom'); if(!m) return;
+  m.value = (m.value===cual) ? '' : cual;                       // tocarlo de nuevo lo suelta
+  bdtPintar();
 }
 function cascadeSop(preModo, preInterfaz) {
   const va=v('fVA'), sop=v('fSop'); const r=VMAPS[va]||VMAPS[''];

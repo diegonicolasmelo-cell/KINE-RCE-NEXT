@@ -178,11 +178,12 @@ const v2 = path.resolve(__dirname, '..', '..', 'v2');
   // 🗂️ 397 desde el 16-sep-2026 (VENT_INTERFAZ).
   si('el total escrito a mano de testEsquema acompaña a las columnas',
     // 🗂️ 20-sep-2026 · 411 = 409 + INTUB_CAUSA e INTUB_DIFICIL (la intubación cuenta por qué, 21-sep-2026).
+// 🗂️ 412 = 411 + EVAL_T_BDT_MOMENTO (el test de azul positivo, precoz o tardío, 1-oct-2026).
     // 🗂️ 17-sep-2026 · 408 = 407 + SED_VIGILIA (el estado de vigilia sin sedación).
   // 406 = 405 + HEMO_PAM_MED (la PPC pasó a calcularse: PAM − PIC).
   // 405 = 401 + NAVM_HME/HEPA/TC y NAVM_RAZON (el paso 1 de prevención de NAVM).
   // 401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST y VENT_INTERFAZ_FINAL (el tercer eje también después del evento).
-    /TOTAL_COLS\.EVOLUCIONES !== 411/.test(esq));
+    /TOTAL_COLS\.EVOLUCIONES !== 412/.test(esq));
 
   eq('sin errores JS', errs.join(' | '), '');
   await b.close();
