@@ -975,3 +975,46 @@ lo hace imposible.
 desaparece el «no realizado» que servía de escape: o los botones son
 interruptores que se apagan al volver a tocarlos, o hace falta un «borrar»
 chico al lado.
+
+### 7.6 · El POCUS son los puntos del BLUE: 1, 2 y PLAPS — CERRADO
+
+> *«Que dé opción entre POCUS y LUS. POCUS que marque 1, 2 y PLAPS, esto en
+> contexto UCI.»*
+
+Seis puntos, tres por lado, que son los del **protocolo BLUE**:
+
+- **Punto 1** — bajo la clavícula, en la raíz del dedo medio y anular con la
+  mano puesta con las puntas en la línea media.
+- **Punto 2** — una mano más abajo, en el centro de la palma. El borde inferior
+  del meñique marca la **línea frénica**: bajo eso ya es abdomen.
+- **PLAPS** — en la línea axilar posterior, **al mismo nivel horizontal que el
+  punto 2**.
+
+**Por qué estos y no otros, y por qué «en contexto UCI» es la clave:** son los
+que se alcanzan **sin mover al paciente**. En UCI está supino, intubado y con
+líneas; las zonas posteriores no se ven. El PLAPS existe exactamente para eso —
+es el punto más atrás al que se llega deslizando la mano por debajo, y es donde
+caen por gravedad la consolidación y el derrame.
+
+🔴 **El POCUS NO rellena el LUS en silencio.** Los puntos del BLUE son
+*referencias anatómicas*; las zonas del LUS son *regiones*. Se parecen pero no
+son lo mismo: el punto 1 cae sobre la anterior superior y calza; el punto 2
+cae algo más lateral que la anterior inferior; y el PLAPS queda **en el borde**
+entre la lateral inferior y la posterior inferior, sin ser ninguna de las dos
+del todo.
+
+Por eso, al pasar de POCUS a LUS los valores llegan **en ámbar, como
+sugerencia**, igual que lo replicado del turno anterior, y hay que
+confirmarlos. Copiarlos callado metería un valor aproximado dentro de un
+puntaje que tiene cortes publicados: es la misma regla del 6.6, por la que los
+gases nacen en blanco.
+
+🪤 Esto **corrige** lo que decía 7.4 sobre la equivalencia directa A=0, B=1,
+B+=2, C=3. Eso valía mientras las dos pruebas compartían las mismas 12 zonas;
+con los puntos del BLUE la correspondencia es aproximada, no exacta. La figura
+sigue siendo la misma, la conversión automática no.
+
+⏳ **El nombre, por tercera y última vez:** estos tres puntos se llaman
+**protocolo BLUE**. «POCUS» abarca todo lo que se mire al lado de la cama,
+corazón incluido. Un botón que diga «BLUE · 1, 2 y PLAPS» no deja dudas de qué
+se hizo. Si en la unidad le dicen POCUS, va POCUS — el terreno manda.
