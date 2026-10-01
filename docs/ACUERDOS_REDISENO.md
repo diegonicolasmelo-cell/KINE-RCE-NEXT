@@ -1060,3 +1060,83 @@ cortes del código son de `L/s`, pero el **relato del turno escribe «L/min»**.
 Un 3,5 correcto queda narrado como «3,5 L/min», que serían 210 L/min. El número
 está bien; la unidad miente. Queda anotado en `PENDIENTES.md`, sin arreglar,
 porque no se está tocando código.
+
+### 7.8 · La PVE se evalúa todos los días, aunque no se haga — CERRADO
+
+> *«Debería pedirse porque uno puede poner causa aguda no resuelta. O no
+> corresponde, ya estaría evaluando la PVE. Por eso en modalidad controlada, si
+> lleva más de 24 horas de ventilación mecánica, debería poder aparecer la PVE.
+> Y poder realizarse una PVE. O sea, o más que realizarse, sino que evaluarse.
+> Las razones es se hace, no se hace, y por qué no se hace, o no corresponde
+> hacerla.»*
+
+**La puerta cambia:** aparece con **más de 24 h de VM, en cualquier modalidad,
+controlada incluida**. Hoy solo sale con tubo. Un paciente en ACVC al cuarto
+día no recibe la pregunta, que es justo donde más falta hace.
+
+**Responder por qué no se hizo YA ES evaluarla.** Ésa es la idea de fondo: el
+registro no pregunta «¿hiciste la PVE?» sino «¿la evaluaste hoy?», y a eso
+siempre hay respuesta.
+
+🔵 **Casi todo ya está construido.** Los tres botones existen (`btnPVESi`,
+`btnPVENo`, `btnPVEnc`). La lista de razones existe con pabellón, indicación
+médica de mantener soporte, sedación profunda, secreciones y las demás. Y la
+razón **ya bloquea el cierre** cuando se elige «no» y se deja vacía, con
+«Otra» exigiendo el detalle escrito.
+
+**Falta:**
+- La puerta de las 24 h en modalidad controlada.
+- Tres razones nuevas, de las que él nombró: **causa aguda no resuelta**,
+  **ventilación mecánica domiciliaria**, **adecuación del esfuerzo terapéutico**.
+- 🔴 Que **«no corresponde» también pida razón**: hoy `PVE_SC_RAZON` solo se
+  guarda cuando la respuesta es «no», así que el «no corresponde» queda vacío.
+
+🔵 **Y una razón que sobra:** la lista ofrece «Menos de 24 h de VM». Con la
+puerta en «más de 24 h», esa opción deja de poder ocurrir.
+
+**Por qué separar «no se hizo» de «no corresponde» no es una distinción de
+palabras:** el que «no corresponde» **tiene que salir del denominador**. Un
+paciente con ventilación domiciliaria crónica contado como «PVE no realizada»
+todos los días durante dos meses hunde el indicador de la unidad y hace parecer
+que nadie destete a nadie. El que espera porque la causa aguda no se resolvió
+sí cuenta: está en la fila.
+
+🔵 **Sobre el flujo por etapas** que describió —seleccionar campos, estructurar,
+y el texto automático al final—: **es exactamente la forma que ya tiene**.
+Ingreso, prevención, turno, evaluaciones y cierre, y el relato recién en el
+paso 4, armado con lo marcado.
+
+### 7.9 · Los cajones de evaluaciones, como los iconos del celular — CERRADO
+
+> *«Revisé los cajones de la familia, están bastante buenos. Me gustaría que
+> fuera como iconos cuadrados con un icono al medio y con el nombre abajo, así
+> como los iconos del celular.»*
+
+Seis cuadrados redondeados con su icono y el nombre debajo, en vez de la lista.
+Los iconos son **SVG propios**, no emojis: la regla de 2019 vale para elegir
+íconos nuevos y acá son todos nuevos.
+
+**Y un numerito en la esquina, como las notificaciones del teléfono:** rojo si
+el cajón debe algo que se pide, gris si tiene campos sin llenar pero
+opcionales, visto verde si está al día.
+
+> *«Podríamos pedir algunos campos obligatorios. Por ejemplo, las evaluaciones
+> de MRC, FSS… Probablemente va a pasar lo mismo que cuando están ocultas.»*
+
+Tiene razón en el diagnóstico —**lo que no se ve, no se llena**— y el numerito
+es la respuesta: un cajón que debe algo se nota desde fuera, sin abrirlo.
+
+**«Obligatorio» en tres niveles, no en uno:**
+
+| Nivel | Qué hace | Para qué |
+|---|---|---|
+| **Bloquea el cierre** | no deja guardar | solo donde SIEMPRE hay respuesta posible: la PVE evaluada |
+| **Pendiente que vence** | numerito rojo, molesta a la vista | MRC y FSS, cuando el paciente coopera y no se miden hace días |
+| **Opcional** | nada | el resto |
+
+🪤 **El MRC no se puede exigir siempre:** necesita un paciente que coopere. Si
+bloquea el cierre, el turno de un paciente sedado queda trancado y el equipo
+aprende a poner cualquier cosa para salir — que es peor que no tener el dato.
+
+⏳ **Por aclarar:** en la lista de obligatorias dictó «MRC, FSS, IQ». ¿«IQ» era
+el *ICU* de FSS-ICU, o se refería al **IMS**?

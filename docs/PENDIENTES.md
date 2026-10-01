@@ -27,6 +27,10 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
 | 10 | Al pasar de POCUS a LUS, los valores llegan **en ámbar** para confirmar | 7.6 |
 | 11 | Pruebas de traqueostomía como bloque propio, con puerta por TQT | 7.1 |
 | 12 | BDT sin «no realizado», y el positivo se parte en precoz o tardío | 7.5 |
+| 13 | La PVE se pregunta con más de 24 h de VM, en cualquier modalidad | 7.8 |
+| 14 | «No corresponde» pide razón, y sale del denominador | 7.8 |
+| 15 | Evaluaciones como iconos de celular, con numerito de pendientes | 7.9 |
+| 16 | «Obligatorio» en tres niveles: bloquea · vence · opcional | 7.9 |
 
 ## 2 · Falta decidir — necesita respuesta de Diego
 
@@ -37,10 +41,8 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
    realizado» que sirva de escape: ¿interruptor que se apaga, o un «borrar»?
 4. **Los pacientes que ya están sin fecha de ingreso**: hoy salen con signo de
    interrogación. ¿Se les pide al reabrir, se deja en blanco, o se infiere?
-5. **PVE obligatoria: ¿cuándo?** Siempre bloquearía el turno de pacientes donde
-   no corresponde. Propuesta: obligatoria **en modo espontáneo**, y se responde
-   con el resultado **o** con la razón de por qué no se hizo — el campo de la
-   razón ya existe (`PVE_SC_RAZON`).
+5. ~~PVE obligatoria: ¿cuándo?~~ **RESUELTO 1-oct (acuerdo 7.8):** con más de
+   24 h de VM, en cualquier modalidad, controlada incluida.
 6. **Deglución presente/ausente: ¿reemplaza o se antepone?** Hoy hay cuatro
    opciones (adecuada · alterada leve · alterada severa · no evaluable).
    Propuesta: presente/ausente primero, y si está presente, la calidad después.
@@ -53,8 +55,10 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
 8. **El diafragma: ¿ecográficas o respiratorias?** Diego lo puso en
    «ecográficas musculares». Clínicamente la FED y la excursión son
    predictores de destete. Es el único que no se deja clasificar.
-9. **Seis familias, ¿son muchas?** Eran tres. Las dos últimas tienen puerta, así
-   que en un paciente sedado sin cánula solo se ven cuatro.
+9. ~~Seis familias, ¿son muchas?~~ **RESUELTO 1-oct (acuerdo 7.9):** quedan
+   seis, como iconos de celular con numerito de pendientes.
+10. **¿«IQ» era el ICU de FSS-ICU, o el IMS?** Lo dictó en la lista de
+    evaluaciones obligatorias.
 
 ## 3 · Pendientes viejos, de antes del rediseño
 
@@ -75,6 +79,7 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
 | 🔴 **El FEM se narra en la unidad equivocada** | relato del turno | El rótulo dice `L/s` y los cortes del código son de `L/s` (4,5 y 2,7, que son los 270 y 160 L/min clásicos), pero el relato escribe **«L/min»**. Un 3,5 correcto queda escrito como «3,5 L/min», que son 210 L/min. El número está bien y la unidad miente. |
 | 🔴 **El BDT admite las dos casillas a la vez** | «Tos y deglución» | Nada impide marcar «BDT +» y «BDT −» juntas. Si pasa, el relato escribe las dos y la planilla guarda el positivo, en silencio. Lo arregla el acuerdo 7.5. |
 | ⚪ **Falta el PMI** | — | De los índices de esfuerzo, P0.1, ΔPocc y Pmusc existen; el PMI no. |
+| 🔴 **El «no corresponde» de la PVE se guarda sin razón** | paso 2 | `PVE_SC_RAZON` solo se escribe cuando la respuesta es «no». Con «no corresponde» queda vacío, así que no se puede sacar a ese paciente del denominador de los indicadores de destete. |
 
 ## 5 · Antes del primer dato real — seguridad
 
