@@ -868,7 +868,7 @@ en vez de agregar. En pantalla esa serie no se ve en ninguna parte.
 🪤 Renombrar la presión mantenida arrastra el indicador del tablero, que hoy se
 llama «P. transtraqueal (VF)».
 
-### 7.2 · Ecografía pulmonar — ABIERTO, esperando su decisión
+### 7.2 · Ecografía pulmonar — las dos formas que se le mostraron (ver 7.4)
 
 Dos formas sobre la mesa, con mockup en el canvas del 1-oct:
 
@@ -906,3 +906,72 @@ La distinción que sí importa es otra:
 Y hay un motivo clínico para la serie, no solo administrativo: **sin el valor
 anterior no existe la reaireación.** «22 → 18 después del prono» es el dato que
 vale; «18» solo no dice nada.
+
+### 7.4 · No se elige entre A y B: van las dos, en un solo mapa — CERRADO
+
+> *«Quizás lo que podríamos hacer es anotar las dos, pero como pruebas
+> separadas dentro del módulo de ecografía pulmonar. O sea, evaluación de LUS y
+> evaluación según POCUS. Entonces podríamos poner LUS y POCUS. Entonces, uno
+> aprieta POCUS y despliega POCUS, uno aprieta LUS y despliega LUS.»*
+
+> *«Podríamos, para que se vea más gráfico también, cuando se haga POCUS, poner
+> la imagen de un pulmón y los puntos. 1, 2, 3, 4 creo que son. Y que al
+> seleccionarlo yo anote en el 1, en la zona 1 y así.»*
+
+Dos pruebas dentro de un módulo, cada una con su botón. **La figura es la
+misma para las dos**: un torso de frente y uno de espalda con los 12 puntos
+marcados. En POCUS se encienden 4 y los otros 8 quedan punteados; en LUS se
+encienden los 12.
+
+🔵 **Lo que eso arregla sin que estuviera buscado:** si comparten mapa, la letra
+y el número son lo mismo —**A=0, B=1, B+=2, C=3**—, así que un POCUS no es un
+registro huérfano sino **un LUS a medio llenar**. Completar los 8 puntos que
+faltan deja el puntaje sin empezar de nuevo. Dos formularios separados no se
+habrían podido comparar jamás.
+
+**Los 4 puntos del POCUS:** los dos anteriores superiores y los dos
+posterobasales. Arriba se ve la congestión, abajo la atelectasia. Un POCUS que
+no mire las bases no le sirve al kinesiólogo. Los protocolos publicados usan 4,
+6 (BLUE) u 8; quedó en 4 porque es lo que pidió.
+
+🪤 **El lado se dibuja, no se deduce.** En la figura de frente la derecha del
+paciente queda a la izquierda de quien mira; en la de espalda, a la derecha.
+Cada torso lleva su **D** y su **I** escritas. Sin eso el lado se anota al
+revés y nadie lo nota hasta que el informe dice la base equivocada.
+
+🪤 **12 toques no pueden ser 12 modales.** Apretar un punto muestra las cuatro
+opciones ahí mismo y se cierra al elegir. Si cada zona abre una ventana que hay
+que aceptar, la prueba pasa de dos minutos a seis y nadie la repite. Es la
+misma trampa del cierre de turno.
+
+⏳ **Reparo pendiente sobre el nombre:** POCUS quiere decir «ecografía al lado
+de la cama» y abarca todo —pulmón, corazón, diafragma, vejiga—. Funciona si en
+la unidad se entiende así, pero leyendo la planilla en seis meses «POCUS» no
+dirá de qué órgano. Alternativas ofrecidas: «Pulmonar rápido» o «4 puntos».
+Diego decide; el terreno manda.
+
+### 7.5 · El test de azul: sin «no realizado», y con precoz o tardío — CERRADO
+
+> *«Respecto a test de azul, es positivo o negativo, con la fecha obviamente,
+> pero no poner no realizado porque no tiene sentido. Si es que no se realiza,
+> no lo anoto solamente. Pero si lo realizo, anoto el resultado. Y podríamos
+> poner si es positivo el test, tardío o es precoz.»*
+
+**No marcar ES no realizado.** Una tercera opción explícita solo agrega un
+toque que no dice nada.
+
+**Precoz o tardío** aparece únicamente si el resultado es positivo, y se apoya
+en cómo se hace la prueba: se aspira inmediatamente y después a los 30 y 60
+minutos, vigilando las secreciones durante el día. Que el azul salga en la
+aspiración inmediata o que aparezca horas después no significan lo mismo.
+
+🔴 **Bug que esto arregla de raíz.** Hoy son dos casillas sueltas, «BDT +» y
+«BDT −», y **nada impide marcar las dos a la vez**. Si pasa, el relato del
+turno escribe «BDT positivo» y «BDT negativo» uno detrás del otro, y lo que se
+guarda en la planilla es el positivo, en silencio. Una sola elección entre dos
+lo hace imposible.
+
+⏳ **Queda por resolver cómo se desmarca** un resultado puesto por error, ya que
+desaparece el «no realizado» que servía de escape: o los botones son
+interruptores que se apagan al volver a tocarlos, o hace falta un «borrar»
+chico al lado.
