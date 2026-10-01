@@ -1018,3 +1018,45 @@ sigue siendo la misma, la conversión automática no.
 **protocolo BLUE**. «POCUS» abarca todo lo que se mire al lado de la cama,
 corazón incluido. Un botón que diga «BLUE · 1, 2 y PLAPS» no deja dudas de qué
 se hizo. Si en la unidad le dicen POCUS, va POCUS — el terreno manda.
+
+### 7.7 · Tos, deglución y esfuerzo respiratorio — 1-oct-2026
+
+> *«Tenía pensado en dónde meter tos y deglución, que también son pruebas.
+> Nosotros evaluamos la tos con flujo, con la curva de flujo tiempo. Y también
+> faltan las pruebas del esfuerzo respiratorio. Cuando el paciente, esto sí,
+> solamente aparecería en ventilación espontánea, que serían Pmusc y ΔPocc o
+> PMI. Entonces pensaba igual en ventilación espontánea, prueba de ventilación
+> espontánea PVE, pero esta tendríamos que pedirla como obligatorio. Y
+> deglución también presente, ausente.»*
+
+🔵 **Tres de las cuatro ya existen, y una de ellas con la puerta ya puesta.**
+
+| Lo que pidió | Estado real |
+|---|---|
+| Tos con flujo | `EVAL_T_FEM` (`fFEM`), con cortes 4,5 y 2,7 L/s, que son los 270 y 160 L/min clásicos. Alimenta la sugerencia del ítem de tos. |
+| Pmusc · ΔPocc | `VENT_PMUSC` y `VENT_DPOCC`, más `VENT_P01`. Están en el desplegable «📈 Monitoreo avanzado», y **solo salen en CPAP/PS** |
+| PMI | No existe |
+| PVE | `PVE_VAL`, `PVE_RESULTADO` y `PVE_SC_RAZON` |
+| Deglución | `EVAL_DEGLUCION`, con cuatro opciones de calidad |
+
+🪤 **«Ventilación espontánea» quiere decir dos cosas distintas.** El ΔPocc y el
+PMI son **maniobras de oclusión que hace el ventilador**: necesitan al paciente
+*en* VM, en modo asistido o espontáneo. No se pueden hacer en un paciente
+desconectado. La puerta correcta es **modo espontáneo (CPAP/PS)**, no «sin
+ventilador» — y así está puesta hoy, por suerte.
+
+**Las familias quedan en seis**, con las dos últimas con puerta: preingreso ·
+funcionales · de fuerza · ecográficas · respiratorias (solo en modo
+espontáneo) · protección de vía aérea (la deglución siempre, el resto solo con
+TQT).
+
+⏳ **Lo que falta decidir** quedó en `docs/PENDIENTES.md`, punto 2: dónde viven
+los índices de esfuerzo, si el diafragma es ecográfico o respiratorio, cuándo
+exactamente es obligatoria la PVE, y si «presente/ausente» reemplaza las cuatro
+opciones de deglución o se le antepone.
+
+🔴 **Bug encontrado al revisar la tos:** el rótulo del FEM dice `L/s`, los
+cortes del código son de `L/s`, pero el **relato del turno escribe «L/min»**.
+Un 3,5 correcto queda narrado como «3,5 L/min», que serían 210 L/min. El número
+está bien; la unidad miente. Queda anotado en `PENDIENTES.md`, sin arreglar,
+porque no se está tocando código.
