@@ -710,6 +710,11 @@ function generarTextoEvolucion(d) {
     if (v('EVAL_T_PIM')) ev.push(`PIM ${v('EVAL_T_PIM')} cmH2O`);
     if (v('EVAL_T_PEM')) ev.push(`PEM ${v('EVAL_T_PEM')} cmH2O`);
     if (v('EVAL_T_FEM')) ev.push(`FEM ${v('EVAL_T_FEM')} L/s`);   // 1-oct-2026: se mide y se corta en L/s; decía L/min
+    // 1-oct-2026 · Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc): evaluaciones puntuales,
+    // agrupadas con las demás. El cliente manda null fuera de ventilación espontánea.
+    if (v('VENT_P01')) ev.push(`P0.1 ${v('VENT_P01')} cmH2O`);
+    if (v('VENT_DPOCC')) ev.push(`ΔPocc ${v('VENT_DPOCC')} cmH2O`);
+    if (v('VENT_PMUSC')) ev.push(`Pmusc ${v('VENT_PMUSC')} cmH2O`);
     if (v('EVAL_T_GROSOR')) ev.push(`Grosor diafragmático ${v('EVAL_T_GROSOR')} mm`);
     if (v('EVAL_T_HALLAZGOS')) ev.push(`Ecografía: ${v('EVAL_T_HALLAZGOS')}`);
     if (v('EVAL_T_CUAD_D') || v('EVAL_T_CUAD_I')) ev.push(`Grosor cuádriceps D/I ${v('EVAL_T_CUAD_D') || '—'}/${v('EVAL_T_CUAD_I') || '—'} mm`);

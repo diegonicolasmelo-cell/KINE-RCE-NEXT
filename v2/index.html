@@ -5088,6 +5088,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col wa"><label>PEM (cmH₂O)</label><input type="number" id="fPEM"></div>
               </div>
             </details>
+            <!-- 3b) desplegable: ESFUERZO RESPIRATORIO (P0.1 · ΔPocc · Pmusc) — 1-oct-2026.
+                 Se mudó desde Terapia ventilatoria (Diego): son evaluaciones puntuales.
+                 SOLO con ventilación espontánea (CPAP/PS): son maniobras de oclusión
+                 que hace el ventilador, así que necesitan al paciente EN VM asistida. -->
+            <details id="dxEsf" class="hidden" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">🫁 Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc)</summary>
+              <div class="row" style="margin-top:6px;">
+                <div class="col wa"><label>P0.1 (cmH₂O)</label><input type="number" id="fP01" step="0.1"></div>
+                <div class="col wa"><label>ΔPocc (cmH₂O)</label><input type="number" id="fDPocc" step="0.1"></div>
+                <div class="col wa"><label>Pmusc (cmH₂O)</label><input type="number" id="fPmusc" step="0.1"></div>
+              </div>
+              <div style="font-size:.7rem;color:#64748b;margin-top:2px;">Solo con ventilación espontánea (CPAP/PS). Son de este turno: no se arrastran al siguiente.</div>
+            </details>
             <!-- 4) desplegable: ECOGRAFÍA muscular y diafragmática -->
             <details id="dxEco" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
               <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">📡 Ecografía muscular y diafragmática</summary>
@@ -5126,7 +5139,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <div class="row" style="margin-top:6px;">
                 <div class="col wa"><label>FEM (L/s)</label><input type="number" id="fFEM" step="0.1"></div>
                 <div class="col wa"><label>Deglución</label>
-                  <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option><option>No evaluable</option></select></div>
+                  <select id="fDeglPres" onchange="hDegl()"><option value="">--</option><option value="presente">Presente</option><option value="ausente">Ausente</option><option value="no_evaluable">No evaluable</option></select></div>
+                <div class="col wa hidden" id="dDeglCal"><label>Calidad</label>
+                  <select id="fDeglucion"><option value="">--</option><option>Adecuada</option><option>Alterada leve</option><option>Alterada severa</option></select></div>
                 <div class="col wa" id="dBdt">
                   <label>Test de azul (BDT)</label>
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -7056,7 +7071,7 @@ const _PASO_SERIE = [
   { k:'fem',    lbl:'FEmáx',     col:'',           fec:'',              fir:'',              campo:'fFEM',       abre:'dxTos',     tip:'Flujo espiratorio máximo de la tos' },
   { k:'ims',    lbl:'IMS',       col:'',           fec:'',              fir:'',              campo:'fIMS',       tip:'Escala de Movilidad UCI' },
   { k:'eco',    lbl:'Ecografía', col:'',           fec:'',              fir:'',              campo:'fCuadD',     abre:'dxEco',     tip:'Ecografía muscular y diafragmática' },
-  { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglucion', abre:'dxTos',     tip:'Deglución y test de azul' },
+  { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglPres', abre:'dxTos',     tip:'Deglución y test de azul' },
 ];
 
 function pasoEvalPintar(){
@@ -8006,7 +8021,7 @@ function _fillParamsVent(s){
    ['r_pmedia','VENT_PMEDIA'],['r_ppl','VENT_PPL'],['r_fio2','VENT_FIO2'],['r_spo2','VENT_SPO2'],['r_pafi','VENT_PAFI'],
    ['r_flujo','VENT_FLUJO'],['r_ti','VENT_TI'],['r_ps','VENT_PS'],['r_ipap','VENT_IPAP'],['r_ipapmax','VENT_IPAP_MAX'],
    ['r_epap','VENT_EPAP'],['r_pinsp','VENT_PINSP'],['r_litros','VENT_LITROS'],['r_temp','VENT_TEMP'],
-   ['r_autopeep','VENT_AUTOPEEP'],['r_p01','VENT_P01'],['r_dpocc','VENT_DPOCC'],['r_pmusc','VENT_PMUSC'],
+   ['r_autopeep','VENT_AUTOPEEP'],
    ['r_uma','KTM_UMA']]
     .forEach(([id,k])=>{
       const e=$(id); if(!e||s[k]===undefined||s[k]==='') return;
@@ -8151,7 +8166,7 @@ function fillForm(s) {
   if($('cProno')&&$('cProno').checked){ show('dPronoHora'); _updatePronoTip(); }
   if($('cSupino')&&$('cSupino').checked){ show('dSupinoHora'); _updateSupinoTip(); }
   hPos();
-  set('fDeglucion',s.EVAL_DEGLUCION);
+  deglCargar(s.EVAL_DEGLUCION);
   chk('cUPOT',s.UPOT_ACTIVO); if(typeof hUpotNeuro==='function') hUpotNeuro();
   chk('cUPOTmed',s.UPOT_MEDIDAS);
   set('fDias',s.DIA_ESTADIA); set('fDiasVM',s.DIAS_VM);
@@ -8259,6 +8274,7 @@ function fillForm(s) {
     set('fPIM',     _ex.EVAL_T_PIM);     interpPIM();
     set('fPEM',     _ex.EVAL_T_PEM);
     set('fFEM',     _ex.EVAL_T_FEM);
+    set('fP01',_ex.VENT_P01); set('fDPocc',_ex.VENT_DPOCC); set('fPmusc',_ex.VENT_PMUSC); esfGate();
     set('fGrosor',  _ex.EVAL_T_GROSOR);
     set('fDiaf',    _ex.EVAL_T_HALLAZGOS);
     chk('fBDTp',   _ex.EVAL_T_BDT_POS);
@@ -9054,7 +9070,7 @@ const _HER_CAMPOS=['fSed','fSAS','fSASmeta','fVigilia','fS5Q','fGCSO','fGCSV','f
   'fMPVal','fRuidosVal','fRuidosLoc',                                       // auscultación
   'r_vt','r_fr','r_peep','r_pmax','r_pmedia','r_ppl','r_fio2','r_spo2','r_pafi',
   'r_flujo','r_ti','r_ps','r_ipap','r_ipapmax','r_epap','r_pinsp','r_litros','r_temp',
-  'r_autopeep','r_p01','r_dpocc','r_pmusc','r_uma',                         // terapia ventilatoria (soporte/modo)
+  'r_autopeep','r_uma',                         // terapia ventilatoria (soporte/modo)
   'fKTRcnt',                                                                // KTR respiratorio
   'fSecrCar','fSecrReol'];                                                  // permeabilización — secreciones
 function _herPendientes(){
@@ -9521,8 +9537,11 @@ function guardar() {
     VENT_PINSP:n(v('r_pinsp')), VENT_FIO2:n(v('r_fio2')), VENT_SPO2:n(v('r_spo2')), VENT_PAFI:n(v('r_pafi')),
     VENT_FLUJO:n(v('r_flujo')), VENT_TI:n(v('r_ti')), VENT_TEMP:n(v('r_temp')),
     VENT_LITROS:n(v('r_litros')),
-    VENT_AUTOPEEP:n(v('r_autopeep')), VENT_P01:n(v('r_p01')), VENT_DPOCC:n(v('r_dpocc')),
-    VENT_PMUSC:n(v('r_pmusc')),
+    VENT_AUTOPEEP:n(v('r_autopeep')),
+    // 1-oct-2026 · mudados a Evaluaciones; solo viajan con ventilación espontánea:
+    // un valor tecleado antes de pasar a un modo controlado no se cuela.
+    VENT_P01:esfActivo()?n(v('fP01')):null, VENT_DPOCC:esfActivo()?n(v('fDPocc')):null,
+    VENT_PMUSC:esfActivo()?n(v('fPmusc')):null,
     // 🔴 17-sep-2026 · SE CORTÓ LA SEGUNDA PUERTA. El turno ya no manda las
     // fechas del HME, del HEPA ni del Trach Care: las mandaba a la vez que el
     // evento ➕, o sea dos caminos escribiendo el mismo reloj. Ahora el paso 1
@@ -9539,7 +9558,7 @@ function guardar() {
     // NAVM, pero NADIE la escribía: el indicador salía vacío. Ahora se escribe.
     VENT_CAB_RSS:v('fCabRss'),
     EX_RUIDOS_JSON: ruidosExtraJSON(),
-    EVAL_DEGLUCION:v('fDeglucion'),
+    EVAL_DEGLUCION:deglValor(),
     APNEA_TEST:v('fApneaTest'),
     UPOT_ACTIVO:bv('cUPOT'), UPOT_MEDIDAS:bv('cUPOTmed'),
     REINTUB_TOT_N:  _rSuf()?v('poReintubTotN'):'',
@@ -12721,6 +12740,14 @@ function genTexto() {
     if(gv('fPIM'))      ev.push(`PIM ${gv('fPIM')} cmH2O (${$('lblPIM')?.textContent||''})`);
     if(gv('fPEM'))      ev.push(`PEM ${gv('fPEM')} cmH2O`);
     if(gv('fFEM'))      ev.push(`FEM ${gv('fFEM')} L/s`);
+    // 1-oct-2026 · Esfuerzo respiratorio: evaluaciones puntuales, agrupadas con las demás.
+    // Solo si la ventilación sigue siendo espontánea: un valor tecleado antes de pasar a
+    // un modo controlado no se narra.
+    if(esfActivo()){
+      if(gv('fP01'))   ev.push(`P0.1 ${gv('fP01')} cmH2O`);
+      if(gv('fDPocc')) ev.push(`ΔPocc ${gv('fDPocc')} cmH2O`);
+      if(gv('fPmusc')) ev.push(`Pmusc ${gv('fPmusc')} cmH2O`);
+    }
     if(gv('fGrosor'))   ev.push(`Grosor diafragmático ${gv('fGrosor')} mm`);
     if(gv('fDiaf'))     ev.push(`Ecografía: ${gv('fDiaf')}`);
     if($('fBDTp')?.checked){ const _bm=v('fBDTmom'); ev.push('BDT positivo'+(_bm==='precoz'?' precoz':_bm==='tardio'?' tardío':'')); }
@@ -12731,7 +12758,7 @@ function genTexto() {
     if(gv('fHeckmatt')) ev.push(`Heckmatt ${gv('fHeckmatt')}`);
     if(gv('fFedD')||gv('fFedI')) ev.push(`FED D/I ${gv('fFedD')||'—'}/${gv('fFedI')||'—'} %`);
     if(gv('fExcD')||gv('fExcI')) ev.push(`Excursión diafragmática D/I ${gv('fExcD')||'—'}/${gv('fExcI')||'—'} cm`);
-    if(gv('fDeglucion')) ev.push(`Deglución: ${gv('fDeglucion')}`);
+    if(deglValor()) ev.push(`Deglución: ${deglValor()}`);
     { const _ims=$('fIMS')?.value; if(_ims!==''&&_ims!=null) ev.push(`IMS ${_ims}/10`); }
     _B('evalf');
     if(ev.length) L.push('Evaluaciones funcionales: ' + ev.join('; ') + '.');
@@ -13279,6 +13306,44 @@ function interpPTT(){
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
 }
+/* ── Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc) en Evaluaciones ───────────
+   Diego, 1-oct-2026: «P0.1 y ΔPocc podrían evaluarse a Evaluaciones… y en el
+   texto agrupar todo, porque son evaluaciones puntuales».
+   🪤 LA PUERTA NO SE MUDÓ SOLA. «Solo con ventilación espontánea» salía GRATIS
+   mientras el bloque se dibujaba dentro del generador de parámetros por modo.
+   Acá hay que escribirla: VM en CPAP/PS. Son maniobras de oclusión del
+   ventilador, así que necesitan al paciente EN VM asistida (no desconectado). */
+function esfActivo(){ return v('fSop')==='VM' && v('fModo')==='CPAP/PS'; }
+function esfGate(){
+  const d=$('dxEsf'); if(!d) return;
+  d.classList.toggle('hidden', !esfActivo());
+}
+/* ── Deglución: primero presente o ausente ───────────────────────────────────
+   EVAL_DEGLUCION guarda UN valor legible (Ausente · Presente · Adecuada ·
+   Alterada leve · Alterada severa · No evaluable): sin columna nueva. La
+   pantalla lo parte en dos preguntas al abrirlo. */
+function deglValor(){
+  const pr=v('fDeglPres');
+  if(pr==='ausente') return 'Ausente';
+  if(pr==='no_evaluable') return 'No evaluable';
+  if(pr==='presente') return v('fDeglucion') || 'Presente';
+  return '';
+}
+function deglCargar(val){
+  const x=String(val||'').trim();
+  const pr=$('fDeglPres'), cal=$('fDeglucion'); if(!pr||!cal) return;
+  if(x==='Ausente'){ pr.value='ausente'; cal.value=''; }
+  else if(x==='No evaluable'){ pr.value='no_evaluable'; cal.value=''; }
+  else if(x==='Presente'){ pr.value='presente'; cal.value=''; }
+  else if(x){ pr.value='presente'; cal.value=x; }            // un turno VIEJO: «Adecuada» ⇒ presente · adecuada
+  else { pr.value=''; cal.value=''; }
+  hDegl();
+}
+function hDegl(){
+  const pre=v('fDeglPres')==='presente';
+  const c=$('dDeglCal'); if(c) c.classList.toggle('hidden', !pre);
+  if(!pre){ const q=$('fDeglucion'); if(q) q.value=''; }
+}
 /* ── Test de azul (BDT): UNA elección, que se puede desmarcar ───────────────
    Diego, 1-oct-2026: «es positivo o negativo, con la fecha, pero no poner "no
    realizado" porque no tiene sentido: si no se realiza, no lo anoto». Y si es
@@ -13599,10 +13664,9 @@ function renderParams(o) {
   } else if(modo==='CPAP/PS'){
     h+=`<div class="row">${fld(P+'ps','PS',70)}${fld(P+'peep','PEEP',70)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${mon(L+'tobin','I.Tobin',true)}${esPost?'':_umaFld()}</div>`;
     h+=`<div class="row">${fld(P+'pmax','Pmax',70)}${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;
-    h+=`<details style="margin-top:6px;border:1px solid #e2e8f0;border-radius:7px;padding:6px 10px;background:#f8fafc;">
-      <summary style="font-size:.75rem;font-weight:700;color:#475569;cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">📈 Monitoreo avanzado (P0.1 · ΔPocc · Pmusc) ⓘ</summary>
-      <div class="row" style="margin-top:6px;">${fld(P+'p01','P0.1',70)}${fld(P+'dpocc','ΔPocc',70)}${fld(P+'pmusc','Pmusc',70)}</div>
-    </details>`;
+    /* 1-oct-2026 · P0.1, ΔPocc y Pmusc se mudaron a EVALUACIONES (Diego): son
+       evaluaciones puntuales, no parámetros. Viven en #dxEsf y se muestran solo
+       con ventilación espontánea (esfGate). */
   } else if(modo==='S/T'){
     h+=`<div class="row">${fld(P+'ipap','IPAP',80)}${fld(P+'epap','EPAP',80)}${mon(L+'pscalc','PS calc.',true)}${fld(P+'vt','VT ml',80)}${fld(P+'fr','FR rpm',75)}${mon(L+'vm','Vol.min')}${fld(P+'ti','Ti seg',68)}${mon(L+'ie','I:E')}${esPost?'':_umaFld()}</div>`;
     if(sop==='VNI'){h+=`<div class="row">${fld(P+'fio2','FiO₂ %',80)}${fld(P+'spo2','SpO₂ %',80)}${fld(P+'pafi','PaFiO₂',80)}</div>`;}
@@ -13642,6 +13706,7 @@ function renderParams(o) {
   }
   // Dispositivos de circuito: visibles solo en VM; al quedar en VM se fechan solos
   if(!esPost) _gateDispositivos();
+  if(!esPost) esfGate();   // 1-oct-2026 · el bloque de esfuerzo sale solo con ventilación espontánea
 }
 
 //  HANDLERS UI
@@ -17121,11 +17186,13 @@ function _auscRuidos(){
 //  Desplegables de Evaluaciones Funcionales: se abren solos si traen datos
 //  guardados (recarga de turno / réplica) y se cierran cuando están vacíos.
 function _abrirDetailsEval(){
+  try{ esfGate(); }catch(e){}
   const conDato=ids=>ids.some(id=>{ const e=$(id); if(!e) return false;
     return e.type==='checkbox' ? e.checked : String(e.value||'')!==''; });
   const map={ dxFzaResp:['fPIM','fPEM'],
               dxEco:['fCuadD','fCuadI','fHeckmatt','fGrosor','fFedD','fFedI','fExcD','fExcI','fDiaf'],
-              dxTos:['fFEM','fDeglucion','fBDTp','fBDTn','fPVA'] };
+              dxEsf:['fP01','fDPocc','fPmusc'],
+              dxTos:['fFEM','fDeglPres','fDeglucion','fBDTp','fBDTn','fPVA'] };
   Object.keys(map).forEach(id=>{ const d=$(id); if(d) d.open=conDato(map[id]); });
 }
 
