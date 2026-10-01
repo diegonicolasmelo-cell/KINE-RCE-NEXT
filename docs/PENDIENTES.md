@@ -31,6 +31,8 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
 | 14 | «No corresponde» pide razón, y sale del denominador | 7.8 |
 | 15 | Evaluaciones como iconos de celular, con numerito de pendientes | 7.9 |
 | 16 | «Obligatorio» en tres niveles: bloquea · vence · opcional | 7.9 |
+| 17 | P0.1, ΔPocc y Pmusc se mudan a Evaluaciones, con su puerta reescrita | 7.10 |
+| 18 | El relato narra los índices de esfuerzo, que hoy no nombra | 7.10 |
 
 ## 2 · Falta decidir — necesita respuesta de Diego
 
@@ -48,13 +50,12 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
    Propuesta: presente/ausente primero, y si está presente, la calidad después.
    🪤 Cambiar las opciones es **gratis ahora y caro después**: en NEXT todavía
    no hay datos reales con los que romper la comparación.
-7. **¿Dónde viven P0.1, ΔPocc y Pmusc?** Hoy están en Terapia ventilatoria. El
-   precedente del test de apnea dice que una evaluación va en Evaluaciones; el
-   argumento en contra es que se miran junto a los parámetros, que es donde se
-   decide subir o bajar la asistencia.
-8. **El diafragma: ¿ecográficas o respiratorias?** Diego lo puso en
-   «ecográficas musculares». Clínicamente la FED y la excursión son
-   predictores de destete. Es el único que no se deja clasificar.
+7. ~~¿Dónde viven P0.1, ΔPocc y Pmusc?~~ **RESUELTO 1-oct (acuerdo 7.10):** se
+   mudan a Evaluaciones, Pmusc incluido.
+8. ~~El diafragma: ¿ecográficas o respiratorias?~~ **RESUELTO 1-oct (acuerdo
+   7.10):** ecográficas musculares. «Es un músculo, es muscular».
+8b. **¿Se renombran `VENT_P01`, `VENT_DPOCC` y `VENT_PMUSC` a `EVAL_T_*`?**
+    Gratis ahora, caro después. Los mide el ventilador, pero son evaluaciones.
 9. ~~Seis familias, ¿son muchas?~~ **RESUELTO 1-oct (acuerdo 7.9):** quedan
    seis, como iconos de celular con numerito de pendientes.
 10. **¿«IQ» era el ICU de FSS-ICU, o el IMS?** Lo dictó en la lista de
@@ -79,6 +80,7 @@ Todo esto está acordado y con mockup. Ninguno está escrito en código.
 | 🔴 **El FEM se narra en la unidad equivocada** | relato del turno | El rótulo dice `L/s` y los cortes del código son de `L/s` (4,5 y 2,7, que son los 270 y 160 L/min clásicos), pero el relato escribe **«L/min»**. Un 3,5 correcto queda escrito como «3,5 L/min», que son 210 L/min. El número está bien y la unidad miente. |
 | 🔴 **El BDT admite las dos casillas a la vez** | «Tos y deglución» | Nada impide marcar «BDT +» y «BDT −» juntas. Si pasa, el relato escribe las dos y la planilla guarda el positivo, en silencio. Lo arregla el acuerdo 7.5. |
 | ⚪ **Falta el PMI** | — | De los índices de esfuerzo, P0.1, ΔPocc y Pmusc existen; el PMI no. |
+| 🔴 **Los índices de esfuerzo no llegan al relato** | paso 4 | P0.1, ΔPocc y Pmusc se miden y se guardan, pero la evolución no los nombra en ninguna parte. |
 | 🔴 **El «no corresponde» de la PVE se guarda sin razón** | paso 2 | `PVE_SC_RAZON` solo se escribe cuando la respuesta es «no». Con «no corresponde» queda vacío, así que no se puede sacar a ese paciente del denominador de los indicadores de destete. |
 
 ## 5 · Antes del primer dato real — seguridad

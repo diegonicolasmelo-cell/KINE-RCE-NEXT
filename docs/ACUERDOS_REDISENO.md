@@ -1140,3 +1140,39 @@ aprende a poner cualquier cosa para salir — que es peor que no tener el dato.
 
 ⏳ **Por aclarar:** en la lista de obligatorias dictó «MRC, FSS, IQ». ¿«IQ» era
 el *ICU* de FSS-ICU, o se refería al **IMS**?
+
+### 7.10 · Los índices de esfuerzo se mudan, y el diafragma es muscular — CERRADO
+
+> *«P0.1 y ΔPocc podrían evaluarse a evaluaciones. Y después en el texto
+> agrupar todo, porque son evaluaciones puntuales. El diafragma es ecográfico
+> muscular o respiratorio. Es un músculo, es muscular.»*
+
+**El diafragma queda en ecográficas musculares**, junto al cuádriceps. Zanjado
+con su argumento, que es el bueno: es un músculo.
+
+**P0.1 y ΔPocc se mudan a Evaluaciones.** 🔵 **Pmusc se va con ellos** aunque no
+lo nombró: se calcula del ΔPocc y separarlos no tendría sentido. El PMI nace
+ahí cuando se construya.
+
+🔴 **Hallazgo al ir a buscarlos para «agrupar en el texto»: el relato no los
+nombra en ninguna parte.** P0.1, ΔPocc y Pmusc se miden, se guardan en la
+planilla y **no aparecen en la evolución**. Agruparlos no es mover una línea de
+sitio — es escribirlos por primera vez, en el mismo bloque donde ya van el MRC,
+el FSS, la dinamometría y la ecografía.
+
+**Tres trampas de la mudanza, para no perderlas:**
+
+1. 🪤 **La puerta no se muda sola.** Hoy «solo en CPAP/PS» sale **gratis**,
+   porque el bloque se dibuja dentro del generador de parámetros por modo. En
+   Evaluaciones hay que volver a escribir esa condición, o el bloque aparece
+   siempre, también en un paciente en ACVC donde la maniobra no se puede hacer.
+2. 🪤 **Hay que sacarlos de `_fillParamsVent` y de la lista de limpieza de
+   campos del ventilador**, o quedan cargándose desde dos sitios — que es
+   exactamente cómo nacieron las cascadas que se pisan.
+3. ⏳ **Los nombres de columna.** Se llaman `VENT_P01`, `VENT_DPOCC` y
+   `VENT_PMUSC`, con prefijo de terapia ventilatoria. Si pasan a ser
+   evaluaciones, ¿se renombran a `EVAL_T_*`? Renombrar es **gratis ahora y caro
+   después**: en NEXT todavía no hay datos reales. A favor del renombre: los
+   consumidores agrupan por prefijo y una evaluación con nombre de parámetro
+   confunde a quien lea la planilla. En contra: los valores los **mide el
+   ventilador**, así que el prefijo no miente del todo.
