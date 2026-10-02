@@ -65,8 +65,12 @@ si('★ existe la columna SED_VIGILIA', /\['SED_VIGILIA'/.test(esq));
   const _iVig = cols.indexOf('SED_VIGILIA'), _iVieja = cols.indexOf('PAC_CHARLSON');
   eq('★ SED_VIGILIA se agregó al final, no en medio de las viejas',
      _iVig > _iVieja && _iVieja >= 0, true);
-  eq('★ …y sigue en la zona final de EVOLUCIONES',
-     _iVig >= cols.length - 5, true);
+  /* 1-oct-2026 · ANTES: «dentro de las últimas 5 columnas». Era un sustituto de «no se
+     insertó en medio» que envejece con CADA columna que se agrega al final (iba al borde
+     desde el BDT). Lo que no envejece es su POSICIÓN: es la columna 408 (índice 407) y
+     solo cambiaría si alguien insertara antes. */
+  eq('★ …y sigue donde nació (índice 407): nadie insertó nada antes',
+     _iVig, 407);
   si('   con su rótulo legible en castellano',
      /\['SED_VIGILIA','[a-z]+','[^']{4,42}'\]/.test(esq));
 }

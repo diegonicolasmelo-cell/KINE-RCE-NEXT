@@ -574,6 +574,80 @@ function txtInterfazDe(d) {
   return '';
 }
 
+/* ── Ecografía pulmonar (1-oct-2026, Diego) ────────────────────────────────
+   POCUS = los puntos del BLUE (1, 2 y PLAPS por lado, en contexto UCI: son los
+   que se alcanzan sin mover al paciente). LUS = el puntaje de 12 zonas, de 0 a 3
+   cada una. El servidor NO se fía del cliente: sanea el JSON y recalcula el
+   puntaje. El mismo cálculo y el mismo texto viven en index.html (guardia
+   eco_pulmonar.js vigila que digan lo mismo). */
+var _ECO_POCUS_PTS = ['1D', '1I', '2D', '2I', 'PD', 'PI'];
+var _ECO_POCUS_VAL = ['A', 'B', 'B+', 'C'];
+var _ECO_LUS_ZONAS = ['AS_D', 'AS_I', 'AI_D', 'AI_I', 'LS_D', 'LS_I', 'LI_D', 'LI_I', 'PS_D', 'PS_I', 'PI_D', 'PI_I'];
+
+function _ecoPuntaje(z) {
+  let total = 0, n = 0;
+  _ECO_LUS_ZONAS.forEach(function (k) {
+    const x = z && z[k];
+    if (typeof x === 'number' && x >= 0 && x <= 3 && Math.floor(x) === x) { total += x; n++; }
+  });
+  return { total: total, n: n };
+}
+
+function _ecoSanear(raw) {
+  if (!raw) return '';
+  let o;
+  try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { return ''; }
+  if (!o || typeof o !== 'object') return '';
+  const out = {};
+  const z = {};
+  _ECO_LUS_ZONAS.forEach(function (k) {
+    const x = o.lus && o.lus[k];
+    if (typeof x === 'number' && x >= 0 && x <= 3 && Math.floor(x) === x) z[k] = x;
+  });
+  if (Object.keys(z).length) out.lus = z;
+  const p = {}, d = [];
+  _ECO_POCUS_PTS.forEach(function (k) {
+    const x = o.pocus && o.pocus.p && o.pocus.p[k];
+    if (_ECO_POCUS_VAL.indexOf(x) !== -1) p[k] = x;
+  });
+  if (o.pocus && Array.isArray(o.pocus.d)) {
+    _ECO_POCUS_PTS.forEach(function (k) { if (o.pocus.d.indexOf(k) !== -1) d.push(k); });
+  }
+  if (Object.keys(p).length || d.length) out.pocus = { p: p, d: d };
+  return Object.keys(out).length ? JSON.stringify(out) : '';
+}
+
+function _ecoTexto(raw) {
+  const out = [];
+  let o = null;
+  try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; }
+  if (!o) return out;
+  if (o.pocus) {
+    const VT = { 'A': 'normal', 'B': 'líneas B separadas', 'B+': 'líneas B coalescentes', 'C': 'consolidación' };
+    const lado = function (pts) {
+      const partes = [];
+      pts.forEach(function (k) {
+        const val = o.pocus.p && o.pocus.p[k], der = (o.pocus.d || []).indexOf(k) !== -1;
+        if (!val && !der) return;
+        const nom = k.charAt(0) === 'P' ? 'PLAPS' : 'punto ' + k.charAt(0);
+        partes.push(nom + (val ? ' ' + VT[val] : '') + (der ? (val ? ' con derrame' : ' derrame') : ''));
+      });
+      return partes;
+    };
+    const dd = lado(['1D', '2D', 'PD']), ii = lado(['1I', '2I', 'PI']);
+    const trozos = [];
+    if (dd.length) trozos.push('derecho (' + dd.join(', ') + ')');
+    if (ii.length) trozos.push('izquierdo (' + ii.join(', ') + ')');
+    if (trozos.length) out.push('POCUS pulmonar ' + trozos.join(' e '));
+  }
+  if (o.lus) {
+    const r = _ecoPuntaje(o.lus);
+    if (r.n === 12) out.push('LUS ' + r.total + '/36');
+    else if (r.n > 0) out.push('LUS parcial ' + r.total + ' (' + r.n + '/12 zonas)');
+  }
+  return out;
+}
+
 function generarTextoEvolucion(d) {
   const v  = k => (d[k] !== undefined && d[k] !== null && d[k] !== '') ? String(d[k]) : null;
   const vn = k => parseFloat(d[k]) || 0;
@@ -1231,6 +1305,8 @@ function generarTextoEvolucion(d) {
     if (v('EVAL_T_GROSOR')) ev.push(`Grosor diafragmático ${v('EVAL_T_GROSOR')} mm`);
     if (v('EVAL_T_HALLAZGOS')) ev.push(`Ecografía: ${v('EVAL_T_HALLAZGOS')}`);
     if (v('EVAL_T_CUAD_D') || v('EVAL_T_CUAD_I')) ev.push(`Grosor cuádriceps D/I ${v('EVAL_T_CUAD_D') || '—'}/${v('EVAL_T_CUAD_I') || '—'} mm`);
+    // Ecografía pulmonar (1-oct-2026): POCUS y LUS, agrupadas con las evaluaciones.
+    _ecoTexto(v('ECO_PULM_JSON')).forEach(function (t) { ev.push(t); });
     // Test de azul (1-oct-2026): una elección; el momento solo existe con un positivo.
     if (esVerdadero(d.EVAL_T_BDT_POS)) {
       const bm = v('EVAL_T_BDT_MOMENTO');

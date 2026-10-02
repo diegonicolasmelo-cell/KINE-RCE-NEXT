@@ -5088,6 +5088,40 @@ function guardarEvolucion(datos, ctx) {
         datos.APNEA_ULTIMO = apRes + ' (' + fecha + ')';
       }
 
+      /* Ecografía pulmonar (1-oct-2026, Diego): se anota en el TURNO y se guarda
+         como SERIE, igual que el BDT y el test de apnea. 🪤 El servidor sanea el
+         JSON del cliente y recalcula el puntaje. Idempotente por turno y por tipo:
+         volver a guardar reemplaza; quitar la ecografía del turno la saca de la
+         serie. Un turno SIN ecografía hereda la serie anterior, para que la
+         última fila del episodio siempre la lleve completa. */
+      {
+        const ecoJ = _ecoSanear(datos.ECO_PULM_JSON);
+        datos.ECO_PULM_JSON = ecoJ;
+        let fuente = (_prev && _prev.ECO_PULM_SERIE) ? String(_prev.ECO_PULM_SERIE) : '';
+        if (!fuente) fuente = _ecoSerieAnterior(_evosCama(), turnoKey);
+        if (ecoJ || fuente) {
+          let hist = [];
+          try { hist = JSON.parse(fuente || '[]') || []; } catch (e) {}
+          hist = hist.filter(function (h) { return h && h.turnoKey !== turnoKey; });
+          if (ecoJ) {
+            const o = JSON.parse(ecoJ);
+            if (o.lus) {
+              const pz = _ecoPuntaje(o.lus);
+              hist.push({ turnoKey: turnoKey, fecha: fecha, tipo: 'lus', puntaje: pz.total, n: pz.n,
+                z: _ECO_LUS_ZONAS.map(function (k) { return (k in o.lus) ? String(o.lus[k]) : '-'; }).join('') });
+            }
+            if (o.pocus) {
+              hist.push({ turnoKey: turnoKey, fecha: fecha, tipo: 'pocus',
+                p: Object.keys(o.pocus.p || {}).map(function (k) { return k + ':' + o.pocus.p[k]; }).join(','),
+                d: (o.pocus.d || []).join(',') });
+            }
+          }
+          datos.ECO_PULM_SERIE = hist.length ? JSON.stringify(hist) : '';
+        } else {
+          datos.ECO_PULM_SERIE = '';
+        }
+      }
+
       // Horas con válvula de fonación (para la frase de la decanulación):
       // racha consecutiva de turnos previos + el propio turno si va con válvula.
       if (esVerdadero(datos.DECAN_OCURRIO)) {
@@ -5857,6 +5891,16 @@ function obtenerEvolucion(idCama, turnoKey, patientId) {
  * caché — nada sobrevive a la petición — sino no volver a pedir lo mismo dos
  * veces seguidas. Sin el parámetro se comporta exactamente como antes.
  */
+/** La serie de ecografía pulmonar más reciente de los turnos ANTERIORES a `turnoKey`. */
+function _ecoSerieAnterior(evos, turnoKey) {
+  let k0 = '', s0 = '';
+  (evos || []).forEach(function (e) {
+    const k = String(e.TURNO_KEY || '');
+    if (k && k < String(turnoKey) && e.ECO_PULM_SERIE && k > k0) { k0 = k; s0 = String(e.ECO_PULM_SERIE); }
+  });
+  return s0;
+}
+
 function obtenerEvolucionPrevia(idCama, turnoKey, _evos) {
   try {
     const evos = _evos || repoLeerTodos('EVOLUCIONES', 'ID_CAMA', String(idCama));
@@ -5886,6 +5930,16 @@ function obtenerEvolucionPrevia(idCama, turnoKey, _evos) {
         else break;
       }
       mejor._VFON_HORAS = racha * 12;
+      // La serie de ecografía pulmonar viaja con la previa (para «22 → 18»): la
+      // fila inmediata puede no traerla si ese turno no se evaluó.
+      // 🪤 Solo si HAY serie: una previa sin ecografía debe quedar idéntica a como era
+      // (guardado_viajes.js la compara contra el código congelado).
+      // 🪤 EN LÍNEA a propósito: ficha_y_antes.js evalúa ESTA función sola, sin el resto
+      // del archivo, así que no puede llamar a un ayudante externo.
+      let _ecoK = '', _ecoS = '';
+      evos.forEach(e => { const k = String(e.TURNO_KEY || '');
+        if (k && k < objetivo && e.ECO_PULM_SERIE && k > _ecoK) { _ecoK = k; _ecoS = String(e.ECO_PULM_SERIE); } });
+      if (_ecoS) mejor._ECO_SERIE = _ecoS;
     }
     // (Aquí vivía `mejor._PRONO_ABIERTO_TS`, retirado en ago-2026: ningún
     // consumidor lo leía —ni el servidor, ni el index, ni el cohete desplegado—

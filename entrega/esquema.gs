@@ -377,7 +377,15 @@ const _COLS_EVOLUCIONES = [
      el azul sale en la aspiración inmediata; tardío = aparece a los 30, 60
      minutos o más tarde. Vacío si el resultado no es positivo.
      — SIEMPRE AL FINAL */
-  ['EVAL_T_BDT_MOMENTO','texto','Momento del BDT positivo (precoz o tardío)']
+  ['EVAL_T_BDT_MOMENTO','texto','Momento del BDT positivo (precoz o tardío)'],
+  /* 1-oct-2026 · Ecografía pulmonar (Diego): dos pruebas sobre una misma figura.
+     ECO_PULM_JSON = lo de ESTE turno, saneado por el servidor:
+       {"pocus":{"p":{"1D":"A","PD":"C"},"d":["PD"]},"lus":{"AS_D":0,"PI_D":3}}
+     POCUS = los puntos del BLUE (1, 2 y PLAPS por lado); LUS = las 12 zonas.
+     ECO_PULM_SERIE = la serie del EPISODIO (una entrada por turno y por tipo),
+     para poder decir «22 → 18». — SIEMPRE AL FINAL */
+  ['ECO_PULM_JSON','json','Ecografía pulmonar del turno (POCUS y LUS)'],
+  ['ECO_PULM_SERIE','json','Serie de ecografía pulmonar del episodio']
 ];
 
 // ── Definición de todas las hojas ──────────────────────────
@@ -1129,6 +1137,7 @@ function testEsquema() {
   });
   // Salvaguarda contra el borrado accidental de columnas: el número va a mano
   // y HAY QUE SUBIRLO al agregar una (401 = 397 + INTUB/REINTUB/TQT_INTERFAZ_POST
+  // 414 = 412 + ECO_PULM_JSON y ECO_PULM_SERIE (la ecografía pulmonar, POCUS y LUS, con su serie por turno, 1-oct-2026);
   // 412 = 411 + EVAL_T_BDT_MOMENTO (el test de azul positivo, precoz o tardío, 1-oct-2026);
   // 411 = 409 + INTUB_CAUSA e INTUB_DIFICIL (la intubación cuenta por qué, 21-sep-2026);
   // 409 = 408 + PAC_NOMBRE_SOCIAL (el nombre social, acuerdo 1.7, 20-sep-2026);
@@ -1141,7 +1150,7 @@ function testEsquema() {
   // SED_FARMACOS). Si
   // aparece este ❌ tras sumar una columna, la hoja está bien y lo que falta es
   // actualizar esta línea.
-  if (TOTAL_COLS.EVOLUCIONES !== 412) errs.push("EVOLUCIONES != 412 columnas: " + TOTAL_COLS.EVOLUCIONES);
+  if (TOTAL_COLS.EVOLUCIONES !== 414) errs.push("EVOLUCIONES != 414 columnas: " + TOTAL_COLS.EVOLUCIONES);
   console.log(errs.length ? '❌ ' + errs.join(' | ') : '✅ Esquema OK (' + Object.keys(ESQUEMA).length + ' hojas)');
   return errs;
 }

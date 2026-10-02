@@ -1454,6 +1454,23 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bdtb-neg[aria-pressed="true"]{background:#15803d;border-color:#15803d;}
 .bdtb-pos[aria-pressed="true"]{background:#991b1b;border-color:#991b1b;}
 .bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
+/* Ecografía pulmonar (1-oct-2026): una figura, dos pruebas. */
+.ecoTab{height:36px;padding:0 14px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.8rem;font-weight:700;cursor:pointer;}
+.ecoTab[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff;}
+.ecoCnt{font-weight:600;opacity:.85;margin-left:4px;}
+.ecoWrap{overflow-x:auto;}
+.ecoHost{position:relative;width:100%;min-width:560px;max-width:720px;margin:8px auto 0;aspect-ratio:720/470;}
+.ecoHost .ecoFig{position:absolute;left:0;top:0;width:100%;height:100%;}
+.ecoPt{position:absolute;transform:translate(-50%,-50%);min-width:44px;height:44px;padding:0 8px;border-radius:22px;border:2px dashed #cbd5e1;background:#fff;color:#94a3b8;font-weight:700;font-size:.9rem;cursor:pointer;font-family:inherit;}
+.ecoPt.lleno{border-style:solid;color:#fff;}
+.ecoPt.v0{background:#15803d;border-color:#15803d;} .ecoPt.v1{background:#a16207;border-color:#a16207;}
+.ecoPt.v2{background:#c2410c;border-color:#c2410c;} .ecoPt.v3{background:#991b1b;border-color:#991b1b;}
+.ecoPt.der{box-shadow:0 0 0 3px #1d4ed8;}
+.ecoPt.sug{border-style:dashed;border-color:#b45309;background:#fffbeb;color:#92400e;}
+.ecoPop{position:absolute;z-index:20;background:#fff;border:1px solid #94a3b8;border-radius:10px;padding:6px;box-shadow:0 6px 18px rgba(15,23,42,.2);display:flex;gap:5px;flex-wrap:wrap;max-width:270px;}
+.ecoOpt{min-width:44px;height:44px;padding:0 9px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;}
+.ecoOpt.sel{outline:3px solid #b45309;outline-offset:1px;}
+.ecoOpt.act{background:#1d4ed8;border-color:#1d4ed8;color:#fff;}
 /* ── Hoja UCI (historial): la hoja de registro de la unidad, día a día ── */
 .hj-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
 .hj-seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -5099,7 +5116,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  SOLO con ventilación espontánea (CPAP/PS): son maniobras de oclusión
                  que hace el ventilador, así que necesitan al paciente EN VM asistida. -->
             <details id="dxEsf" class="hidden" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
-              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">🫁 Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc)</summary>
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">📈 Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc)</summary>
               <div class="row" style="margin-top:6px;">
                 <div class="col wa"><label>P0.1 (cmH₂O)</label><input type="number" id="fP01" step="0.1"></div>
                 <div class="col wa"><label>ΔPocc (cmH₂O)</label><input type="number" id="fDPocc" step="0.1"></div>
@@ -5124,6 +5141,55 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col wa"><label>Excursión I (cm)</label><input type="number" id="fExcI" step="0.1"></div>
                 <div class="col grow"><label>Hallazgos ecográficos</label><input type="text" id="fDiaf" placeholder="Descripción..."></div>
               </div>
+            </details>
+            <!-- 4b) desplegable: ECOGRAFÍA PULMONAR — 1-oct-2026 (Diego).
+                 Dos pruebas separadas sobre una misma figura: POCUS (los puntos del BLUE: 1, 2 y
+                 PLAPS por lado, los que se alcanzan sin mover al paciente en UCI) y LUS (12 zonas, de 0
+                 a 3, puntaje 0-36). Se anota en el TURNO y se guarda como SERIE del episodio. -->
+            <details id="dxEcoPulm" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">🩺 Ecografía pulmonar (POCUS · LUS)</summary>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+                <button type="button" id="btnEcoPocus" class="ecoTab" aria-pressed="false" onclick="ecoModo('pocus')" title="Los tres puntos del protocolo BLUE por lado: 1, 2 y PLAPS">POCUS · 1, 2 y PLAPS<span class="ecoCnt" id="ecoCntP"></span></button>
+                <button type="button" id="btnEcoLus" class="ecoTab" aria-pressed="false" onclick="ecoModo('lus')" title="Puntaje de aireación de 12 zonas (0-36)">LUS · puntaje completo<span class="ecoCnt" id="ecoCntL"></span></button>
+              </div>
+              <div id="ecoPanel" class="hidden">
+                <div class="ecoWrap">
+                <div id="ecoHost" class="ecoHost">
+                  <svg class="ecoFig" viewBox="0 0 720 470" aria-hidden="true">
+                    <g fill="#f8fafc" stroke="#94a3b8" stroke-width="2">
+                      <path d="M 128 46 L 192 46 L 198 76 L 256 100 Q 284 112 287 144 L 296 251 Q 299 294 287 336 L 270 418 Q 267 434 250 434 L 70 434 Q 53 434 50 418 L 33 336 Q 21 294 24 251 L 33 144 Q 36 112 64 100 L 122 76 Z"/>
+                      <path transform="translate(400 0)" d="M 128 46 L 192 46 L 198 76 L 256 100 Q 284 112 287 144 L 296 251 Q 299 294 287 336 L 270 418 Q 267 434 250 434 L 70 434 Q 53 434 50 418 L 33 336 Q 21 294 24 251 L 33 144 Q 36 112 64 100 L 122 76 Z"/>
+                    </g>
+                    <g stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 6" fill="none"><path d="M 160 76 L 160 432"/><path d="M 560 76 L 560 432"/></g>
+                    <g id="ecoNivel" stroke="#0f766e" stroke-width="2" stroke-dasharray="7 6" fill="none"><path d="M 14 222 L 706 222"/></g>
+                    <g font-family="inherit" font-size="12" font-weight="700" fill="#475569" text-anchor="middle" letter-spacing="1">
+                      <text x="160" y="20">Frente</text>
+                      <text x="560" y="20">Espalda</text>
+                    </g>
+                    <g font-family="inherit" font-size="15" font-weight="700" fill="#64748b" text-anchor="middle">
+                      <text x="78" y="124">D</text>
+                      <text x="242" y="124">I</text>
+                      <text x="478" y="124">I</text>
+                      <text x="642" y="124">D</text>
+                    </g>
+                  </svg>
+                  <div id="ecoPop" class="ecoPop hidden" role="group" aria-label="Elegir el hallazgo"></div>
+                </div>
+                </div>
+                <div id="ecoSugBar" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px dashed #b45309;border-radius:8px;">
+                  <button type="button" id="btnEcoSug" class="ecoTab" onclick="ecoAceptarSug()" style="border-color:#b45309;color:#92400e;">Aceptar las sugeridas</button>
+                  <span style="font-size:.74rem;color:#92400e;">Vienen del POCUS (en ámbar): los puntos del BLUE <b>no son las zonas del LUS</b>, así que hay que confirmarlas. El PLAPS cae en el borde entre dos zonas.</span>
+                </div>
+                <div id="ecoRes" style="margin-top:8px;">
+                  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;">
+                    <span id="ecoScore" style="font-size:1.05rem;font-weight:800;color:#0f172a;"></span>
+                    <span id="ecoInterp" class="disp-chip disp-none hidden" title="En destete: LUS menor de 13 al final de la PVE se asoció a extubación exitosa y mayor de 17 a distrés post-extubación (Soummer, Crit Care Med 2012)."></span>
+                  </div>
+                  <div id="ecoAnt" style="font-size:.78rem;color:#475569;margin-top:3px;"></div>
+                </div>
+                <div id="ecoLey" style="font-size:.72rem;color:#64748b;margin-top:6px;"></div>
+              </div>
+              <input type="hidden" id="fEcoPulm" value="">
             </details>
             <!-- 🧿 TEST DE APNEA — mudado desde la tarjeta de UPOT el
                  20-sep-2026 (Diego: «el test de apnea, al ser una evaluación,
@@ -7316,6 +7382,7 @@ function abrirPanel(id, esIng, verFicha) {
   const _cgs=$('cGSA'); if(_cgs){ _cgs.checked=false; hGSA(); }
   const _cvf=$('cVfon'); if(_cvf){ _cvf.checked=false; hVfon(); }
   try{ bdtPintar(); }catch(e){}   // el reset() suelta las marcas; los botones se redibujan
+  try{ ecoLimpiar(); }catch(e){}  // la ecografía pulmonar parte vacía: es de ESE turno
   const _cqt=$('cCambioTQT'); if(_cqt) _cqt.checked=false; _tqtSnapshot=null;
   hide('dCambioTQTmot'); hide('dCambioTQTdet');
   setRuidosExtra(''); calcInsumosDias();
@@ -7356,6 +7423,7 @@ function abrirPanel(id, esIng, verFicha) {
       // Pronación ABIERTA del episodio (puede ser de otro turno y otro colega):
       // con ella se narra «tras X h en prono» al supinar.
       window._pronoAbierto=(r&&r.pronoAbierto)||'';
+      window._ecoSeriePrev=(r&&r.previa&&(r.previa._ECO_SERIE||r.previa.ECO_PULM_SERIE))||'';   // serie de ecografía pulmonar de los turnos anteriores
       const c=DB.find(x=>String(x.ID_CAMA)===String(id));
       if(r && r.actual) {
         // ─── Turno YA guardado: carga exactamente lo que se registró ───
@@ -8283,6 +8351,10 @@ function fillForm(s) {
   const _evalHoy = _isoDia(_ex.EVAL_FECHA) === new Date().toISOString().slice(0,10);
   chk('cEgr', _evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE'));
   if(_evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE')) show('dEgr');
+  /* 🪤 La ecografía pulmonar es un campo OCULTO: reset() no lo limpia, y si el turno
+     que se abre no es de hoy, nadie lo tocaría y se quedaría la del paciente anterior.
+     Se limpia SIEMPRE y ANTES de cargar (el IIFE de más abajo corre después). */
+  try{ ecoLimpiar(); }catch(e){}
   if(_evalHoy){
     set('fMRC',     _ex.EVAL_T_MRC);     interpMRC();
     set('fPrension',_ex.EVAL_T_DINAMO);  interpDinamo();
@@ -8291,6 +8363,7 @@ function fillForm(s) {
     set('fPEM',     _ex.EVAL_T_PEM);
     set('fFEM',     _ex.EVAL_T_FEM);
     set('fP01',_ex.VENT_P01); set('fDPocc',_ex.VENT_DPOCC); set('fPmusc',_ex.VENT_PMUSC); esfGate();
+    { const _he=$('fEcoPulm'); if(_he){ _he.value=_ex.ECO_PULM_JSON?String(_ex.ECO_PULM_JSON):''; ecoPintar(); } }
     set('fGrosor',  _ex.EVAL_T_GROSOR);
     set('fDiaf',    _ex.EVAL_T_HALLAZGOS);
     chk('fBDTp',   _ex.EVAL_T_BDT_POS);
@@ -8673,7 +8746,7 @@ function _autoProcs(){
   if(v('fVA')==='TQT' && $('cDesvinc')?.checked) auto.push('DESVINCULACIÓN');
   if(v('fVA')==='TQT' && $('cDecanOcurrio')?.checked) auto.push('DECANULACIÓN');
   if(v('fVA')==='TQT' && $('cRecanul')?.checked) auto.push('RECANULACIÓN');
-  if(['fGrosor','fDiaf','fHeckmatt','fCuadD','fCuadI','fFedD','fFedI','fExcD','fExcI'].some(id=>v(id))) auto.push('ECOGRAFÍA');
+  if(['fGrosor','fDiaf','fHeckmatt','fCuadD','fCuadI','fFedD','fFedI','fExcD','fExcI','fEcoPulm'].some(id=>v(id))) auto.push('ECOGRAFÍA');
   if($('cIMT')?.checked) auto.push('IMT');
   if($('cEMS')?.checked) auto.push('EMS');
   if($('cProcImagen')?.checked) auto.push('IMAGENOLOGÍA');
@@ -9658,6 +9731,7 @@ function guardar() {
     EVAL_T_BDT_POS:   bv('fBDTp'),
     EVAL_T_BDT_NEG:   bv('fBDTn'),
     EVAL_T_BDT_MOMENTO: bv('fBDTp') ? v('fBDTmom') : '',
+    ECO_PULM_JSON:    v('fEcoPulm'),
     EVAL_T_PMANT_VA:  v('fPVA'),
     // Cuff: verificación del turno (vacío si la vía aérea no es artificial)
     VENT_CUFF_EST:    (v('fVA')==='TOT'||v('fVA')==='TQT') ? v('fCuffEst') : '',
@@ -12766,6 +12840,8 @@ function genTexto() {
     }
     if(gv('fGrosor'))   ev.push(`Grosor diafragmático ${gv('fGrosor')} mm`);
     if(gv('fDiaf'))     ev.push(`Ecografía: ${gv('fDiaf')}`);
+    // 1-oct-2026 · Ecografía pulmonar: POCUS y LUS, agrupadas con las demás evaluaciones.
+    ecoTexto(ecoLeer()).forEach(t=>ev.push(t));
     if($('fBDTp')?.checked){ const _bm=v('fBDTmom'); ev.push('BDT positivo'+(_bm==='precoz'?' precoz':_bm==='tardio'?' tardío':'')); }
     else if($('fBDTn')?.checked) ev.push('BDT negativo');
     if(gv('fPVA'))      ev.push(`Pmant VA ${gv('fPVA')} cmH2O`);
@@ -13322,6 +13398,217 @@ function interpPTT(){
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
 }
+/* ── Ecografía pulmonar: POCUS y LUS sobre una misma figura ──────────────────
+   Diego, 1-oct-2026. Dos pruebas separadas dentro de un módulo: POCUS = los
+   puntos del protocolo BLUE (1, 2 y PLAPS por lado: en UCI son los que se
+   alcanzan sin mover al paciente) y LUS = el puntaje de 12 zonas (0-3 c/u,
+   total 0-36). Se anota en el TURNO y el servidor lo guarda como SERIE.
+   🔴 El POCUS NO rellena el LUS en silencio: los puntos del BLUE son
+   referencias anatómicas, las zonas del LUS son regiones, y el PLAPS cae en el
+   borde entre dos de ellas. Al pasar a LUS los valores llegan EN ÁMBAR como
+   sugerencia y hay que confirmarlos (misma regla que los gases en blanco).
+   🪤 El puntaje solo se interpreta completo (12/12): un subtotal no es un puntaje.
+   🪤 El estado vive UNA vez en #fEcoPulm (JSON); todo lo demás lo dibuja.
+   El cálculo y el texto son los de dominio_texto.gs (la guardia vigila que digan lo mismo). */
+const ECO_PUNTOS = {
+  pocus:[ {id:'1D',x:108,y:142,n:'Punto 1 derecho'}, {id:'1I',x:212,y:142,n:'Punto 1 izquierdo'},
+          {id:'2D',x:94,y:222,n:'Punto 2 derecho'}, {id:'2I',x:226,y:222,n:'Punto 2 izquierdo'},
+          {id:'PI',x:452,y:222,n:'PLAPS izquierdo'}, {id:'PD',x:668,y:222,n:'PLAPS derecho'} ],
+  lus:[ {id:'AS_D',x:100,y:166,n:'Anterior superior derecha'}, {id:'AS_I',x:220,y:166,n:'Anterior superior izquierda'},
+        {id:'AI_D',x:100,y:251,n:'Anterior inferior derecha'}, {id:'AI_I',x:220,y:251,n:'Anterior inferior izquierda'},
+        {id:'LS_D',x:42,y:196,n:'Lateral superior derecha'}, {id:'LS_I',x:278,y:196,n:'Lateral superior izquierda'},
+        {id:'LI_D',x:46,y:281,n:'Lateral inferior derecha'}, {id:'LI_I',x:274,y:281,n:'Lateral inferior izquierda'},
+        {id:'PS_I',x:500,y:166,n:'Posterior superior izquierda'}, {id:'PS_D',x:620,y:166,n:'Posterior superior derecha'},
+        {id:'PI_I',x:500,y:266,n:'Posterior inferior izquierda'}, {id:'PI_D',x:620,y:266,n:'Posterior inferior derecha'} ] };
+const ECO_POCUS_A_LUS = {'1D':'AS_D','1I':'AS_I','2D':'AI_D','2I':'AI_I','PD':'PI_D','PI':'PI_I'};
+const ECO_POCUS_NUM = {'A':0,'B':1,'B+':2,'C':3};
+const ECO_POCUS_TXT = {'A':'normal','B':'líneas B separadas','B+':'líneas B coalescentes','C':'consolidación'};
+const ECO_LUS_TXT = ['normal (líneas A)','líneas B separadas','líneas B coalescentes','consolidación'];
+let _ecoModo='', _ecoAbierto='';
+function ecoLeer(){
+  let o=null; try{ o=JSON.parse(v('fEcoPulm')||'null'); }catch(e){ o=null; }
+  o=o&&typeof o==='object'?o:{};
+  const pocus=o.pocus&&typeof o.pocus==='object'?o.pocus:{};
+  return { pocus:{ p:Object.assign({},pocus.p||{}), d:Array.isArray(pocus.d)?pocus.d.slice():[] }, lus:Object.assign({},o.lus||{}) };
+}
+function ecoEscribir(o){
+  const out={};
+  if(Object.keys(o.lus).length) out.lus=o.lus;
+  if(Object.keys(o.pocus.p).length||o.pocus.d.length) out.pocus=o.pocus;
+  const h=$('fEcoPulm'); if(h) h.value=Object.keys(out).length?JSON.stringify(out):'';
+  ecoPintar();
+}
+function ecoPuntaje(z){
+  let total=0,n=0;
+  ECO_PUNTOS.lus.forEach(q=>{ const x=z&&z[q.id]; if(typeof x==='number'&&x>=0&&x<=3&&Math.floor(x)===x){ total+=x; n++; } });
+  return {total,n};
+}
+function ecoTexto(o){
+  const out=[]; if(!o) return out;
+  const pc=o.pocus;
+  if(pc&&((Object.keys(pc.p||{}).length)||(pc.d||[]).length)){
+    const lado=pts=>pts.map(k=>{
+      const val=pc.p&&pc.p[k], der=(pc.d||[]).indexOf(k)!==-1;
+      if(!val&&!der) return '';
+      return (k.charAt(0)==='P'?'PLAPS':'punto '+k.charAt(0))+(val?' '+ECO_POCUS_TXT[val]:'')+(der?(val?' con derrame':' derrame'):'');
+    }).filter(Boolean);
+    const dd=lado(['1D','2D','PD']), ii=lado(['1I','2I','PI']), tr=[];
+    if(dd.length) tr.push('derecho ('+dd.join(', ')+')');
+    if(ii.length) tr.push('izquierdo ('+ii.join(', ')+')');
+    if(tr.length) out.push('POCUS pulmonar '+tr.join(' e '));
+  }
+  if(o.lus){ const r=ecoPuntaje(o.lus);
+    if(r.n===12) out.push('LUS '+r.total+'/36');
+    else if(r.n>0) out.push('LUS parcial '+r.total+' ('+r.n+'/12 zonas)'); }
+  return out;
+}
+function ecoSugeridas(o){
+  const s={};
+  Object.keys(ECO_POCUS_A_LUS).forEach(k=>{
+    const val=o.pocus.p[k], z=ECO_POCUS_A_LUS[k];
+    if(val && !(z in o.lus)) s[z]=ECO_POCUS_NUM[val];
+  });
+  return s;
+}
+function ecoConstruir(){
+  const host=$('ecoHost'); if(!host || host.querySelector('.ecoPt')) return;
+  ['pocus','lus'].forEach(m=>ECO_PUNTOS[m].forEach(q=>{
+    const b=document.createElement('button');
+    b.type='button'; b.id='ecoPt_'+q.id; b.className='ecoPt hidden'; b.dataset.modo=m; b.dataset.id=q.id;
+    b.style.left=(q.x/720*100)+'%'; b.style.top=(q.y/470*100)+'%';
+    b.setAttribute('aria-label',q.n);
+    b.addEventListener('click',ev=>{ ev.stopPropagation(); ecoPunto(q.id); });
+    host.appendChild(b);
+  }));
+}
+function ecoModo(m){
+  _ecoModo=(_ecoModo===m)?'':m;
+  ecoCerrar(); ecoPintar();
+}
+function ecoPintar(){
+  ecoConstruir();
+  const o=ecoLeer();
+  const nP=Object.keys(o.pocus.p).length, nL=ecoPuntaje(o.lus).n;
+  const set1=(id,txt)=>{ const e=$(id); if(e) e.textContent=txt; };
+  set1('ecoCntP', nP?` · ${nP}/6`:''); set1('ecoCntL', nL?` · ${nL}/12`:'');
+  const tp=$('btnEcoPocus'), tl=$('btnEcoLus');
+  if(tp) tp.setAttribute('aria-pressed',_ecoModo==='pocus'?'true':'false');
+  if(tl) tl.setAttribute('aria-pressed',_ecoModo==='lus'?'true':'false');
+  const panel=$('ecoPanel'); if(panel) panel.classList.toggle('hidden',!_ecoModo);
+  const host=$('ecoHost'); if(host) host.dataset.modo=_ecoModo;
+  const niv=$('ecoNivel'); if(niv) niv.style.display=(_ecoModo==='pocus')?'':'none';
+  const sug=_ecoModo==='lus'?ecoSugeridas(o):{};
+  document.querySelectorAll('#ecoHost .ecoPt').forEach(b=>{
+    const m=b.dataset.modo, id=b.dataset.id;
+    b.classList.toggle('hidden', m!==_ecoModo);
+    b.classList.remove('lleno','v0','v1','v2','v3','der','sug');
+    let txt='';
+    if(m==='pocus'){
+      const val=o.pocus.p[id];
+      if(val){ b.classList.add('lleno','v'+ECO_POCUS_NUM[val]); txt=val; }
+      if(o.pocus.d.indexOf(id)!==-1){ b.classList.add('der'); txt=(txt||'·')+' ≈'; }
+    } else {
+      if(id in o.lus){ b.classList.add('lleno','v'+o.lus[id]); txt=String(o.lus[id]); }
+      else if(id in sug){ b.classList.add('sug'); txt=String(sug[id]); }
+    }
+    b.textContent=txt;
+    const nom=(ECO_PUNTOS[m].find(q=>q.id===id)||{}).n||id;
+    b.setAttribute('aria-label', nom+': '+(txt?txt.replace('≈','con derrame'):'sin dato'));
+  });
+  const bar=$('ecoSugBar'); if(bar){ const hay=Object.keys(sug).length>0; bar.classList.toggle('hidden',!hay); bar.style.display=hay?'flex':''; }
+  const res=$('ecoRes');
+  if(res) res.classList.toggle('hidden', _ecoModo!=='lus');
+  if(_ecoModo==='lus'){
+    const r=ecoPuntaje(o.lus);
+    set1('ecoScore', r.n===12 ? `${r.total} / 36 · 12/12 zonas` : `${r.total} / 36 · parcial (${r.n}/12 zonas)`);
+    const ip=$('ecoInterp');
+    if(ip){
+      if(r.n===12){
+        const t=r.total, txt=t===0?'Aireación normal':t<=12?'Pérdida de aireación leve':t<=17?'Pérdida de aireación moderada':'Pérdida de aireación importante';
+        ip.textContent=txt; ip.classList.remove('hidden');
+        ip.className='disp-chip '+(t<=12?'disp-ok':t<=17?'disp-warn':'disp-bad');
+      } else { ip.textContent=''; ip.classList.add('hidden'); }
+    }
+    let ant='';
+    try{
+      const ser=JSON.parse(window._ecoSeriePrev||'[]')||[];
+      const u=ser.filter(x=>x&&x.tipo==='lus'&&x.n===12).sort((a,b)=>String(a.turnoKey).localeCompare(String(b.turnoKey))).pop();
+      if(u && r.n===12){
+        const [yy,mm,dd,tt]=String(u.turnoKey).split('-');
+        const cuando=`${dd}-${mm} · ${tt==='Dia'?'Día':'Noche'}`;
+        const d=r.total-u.puntaje;
+        ant=`Anterior: ${u.puntaje} (${cuando}) → hoy ${r.total}: `+(d<0?`ganó aireación (${d})`:d>0?`perdió aireación (+${d})`:'sin cambio');
+      }
+    }catch(e){}
+    set1('ecoAnt',ant);
+  } else { set1('ecoAnt',''); }
+  set1('ecoLey', _ecoModo==='pocus'
+    ? 'POCUS: A normal · B líneas B separadas · B+ coalescentes · C consolidación · ≈ derrame. El PLAPS va en la línea axilar posterior, al mismo nivel del punto 2.'
+    : _ecoModo==='lus' ? 'LUS: 0 normal · 1 líneas B separadas · 2 coalescentes · 3 consolidación. Suma 0-36; solo se interpreta con las 12 zonas.' : '');
+}
+function ecoCerrar(){
+  _ecoAbierto='';
+  const pop=$('ecoPop'); if(pop){ pop.classList.add('hidden'); pop.innerHTML=''; }
+}
+function ecoPunto(id){
+  if(_ecoAbierto===id){ ecoCerrar(); return; }
+  _ecoAbierto=id;
+  const pop=$('ecoPop'), host=$('ecoHost'), btn=$('ecoPt_'+id); if(!pop||!host||!btn) return;
+  const o=ecoLeer(), m=_ecoModo, sug=m==='lus'?ecoSugeridas(o):{};
+  let h='';
+  if(m==='pocus'){
+    ['A','B','B+','C'].forEach(x=>{ h+=`<button type="button" class="ecoOpt" data-v="${x}" title="${ECO_POCUS_TXT[x]}" onclick="ecoElegir('${x}')">${x}</button>`; });
+    const der=o.pocus.d.indexOf(id)!==-1;
+    h+=`<button type="button" id="btnEcoDerr" class="ecoOpt${der?' act':''}" aria-pressed="${der?'true':'false'}" onclick="ecoDerrame()">Derrame</button>`;
+  } else {
+    [0,1,2,3].forEach(x=>{ h+=`<button type="button" class="ecoOpt${sug[id]===x?' sel':''}" data-v="${x}" title="${ECO_LUS_TXT[x]}" onclick="ecoElegir('${x}')">${x}</button>`; });
+  }
+  h+=`<button type="button" id="btnEcoQuitar" class="ecoOpt" onclick="ecoQuitar()">Quitar</button>`;
+  pop.innerHTML=h; pop.classList.remove('hidden');
+  // Junto al punto, dentro de la figura; si no cabe abajo, arriba.
+  const hr=host.getBoundingClientRect(), br=btn.getBoundingClientRect();
+  let left=br.left+br.width/2-hr.left-pop.offsetWidth/2;
+  left=Math.max(4,Math.min(left,hr.width-pop.offsetWidth-4));
+  let top=br.bottom-hr.top+6;
+  if(top+pop.offsetHeight>hr.height) top=br.top-hr.top-pop.offsetHeight-6;
+  pop.style.left=left+'px'; pop.style.top=Math.max(0,top)+'px';
+}
+function ecoElegir(val){
+  const id=_ecoAbierto; if(!id) return;
+  const o=ecoLeer();
+  if(_ecoModo==='pocus') o.pocus.p[id]=String(val);
+  else o.lus[id]=parseInt(val,10);
+  ecoCerrar(); ecoEscribir(o);
+}
+function ecoDerrame(){
+  const id=_ecoAbierto; if(!id||_ecoModo!=='pocus') return;
+  const o=ecoLeer(), i=o.pocus.d.indexOf(id);
+  if(i===-1) o.pocus.d.push(id); else o.pocus.d.splice(i,1);
+  ecoEscribir(o);
+  const b=$('btnEcoDerr'); if(b){ const on=o.pocus.d.indexOf(id)!==-1; b.classList.toggle('act',on); b.setAttribute('aria-pressed',on?'true':'false'); }
+}
+function ecoQuitar(){
+  const id=_ecoAbierto; if(!id) return;
+  const o=ecoLeer();
+  if(_ecoModo==='pocus'){ delete o.pocus.p[id]; o.pocus.d=o.pocus.d.filter(x=>x!==id); } else delete o.lus[id];
+  ecoCerrar(); ecoEscribir(o);
+}
+function ecoAceptarSug(){
+  const o=ecoLeer(), s=ecoSugeridas(o);
+  Object.keys(s).forEach(z=>{ o.lus[z]=s[z]; });
+  ecoCerrar(); ecoEscribir(o);
+}
+function ecoLimpiar(){
+  const h=$('fEcoPulm'); if(h) h.value='';
+  _ecoModo=''; ecoCerrar(); ecoPintar();
+}
+document.addEventListener('click',e=>{
+  if(!_ecoAbierto) return;
+  if(e.target.closest&&(e.target.closest('#ecoPop')||e.target.closest('.ecoPt'))) return;
+  ecoCerrar();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&_ecoAbierto) ecoCerrar(); });
+
 /* ── Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc) en Evaluaciones ───────────
    Diego, 1-oct-2026: «P0.1 y ΔPocc podrían evaluarse a Evaluaciones… y en el
    texto agrupar todo, porque son evaluaciones puntuales».
@@ -17220,6 +17507,7 @@ function _abrirDetailsEval(){
   const map={ dxFzaResp:['fPIM','fPEM'],
               dxEco:['fCuadD','fCuadI','fHeckmatt','fGrosor','fFedD','fFedI','fExcD','fExcI','fDiaf'],
               dxEsf:['fP01','fDPocc','fPmusc'],
+              dxEcoPulm:['fEcoPulm'],
               dxTos:['fFEM','fDeglPres','fDeglucion'],
               dxTqt:['fBDTp','fBDTn','fPVA'] };
   Object.keys(map).forEach(id=>{ const d=$(id); if(d) d.open=conDato(map[id]); });
