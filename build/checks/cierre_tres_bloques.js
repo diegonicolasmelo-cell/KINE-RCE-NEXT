@@ -68,7 +68,7 @@ const { chromium } = require('playwright-core');
     renderGrid(); abrirPanel('3', false, false);
     await new Promise(r => setTimeout(r, 420));
     if (nota) fillForm({ PLAN_NOTA_TURNO: nota, ANOTACIONES_JSON: '[]', VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM' });
-    pasoIr(3);
+    pasoIr(5);   // 🗂️ 2-oct-2026 · seis pasos: el cierre («Cerrar el turno», con la firma) pasó del 3 al 5 (Planes) y el relato del 4 al 6.
     await new Promise(r => setTimeout(r, 200));
     window.__api = [];
   }, nota || '');

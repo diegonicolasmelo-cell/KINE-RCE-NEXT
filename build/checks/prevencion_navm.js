@@ -32,11 +32,12 @@ const eq = (l, g, w) => {
 /* ══ A · El camino pasa de tres pasos a cuatro ══════════════════════════ */
 
 const barra = (idx.match(/<div id="spPasos"[\s\S]*?<\/div>\s*<div class="pcontent">/) || [''])[0];
-eq('A1 · la barra tiene CUATRO pestañas', (barra.match(/class="paso-t"/g) || []).length, 4);
+// 🗂️ 2-oct-2026 · seis pasos (Terapia física y Planes se separaron): 6 pestañas fijas + la del ingreso, que nace oculta.
+eq('A1 · la barra tiene SEIS pestañas', (barra.match(/class="paso-t"/g) || []).length, 6);
 eq('A2 · la primera es Prevención', /data-p="1"[\s\S]{0,220}?Prevención/.test(barra), true);
 eq('A3 · el turno pasó a ser el paso 2', /data-p="2"[\s\S]{0,220}?Turno/.test(barra), true);
 eq('A4 · evaluaciones el 3', /data-p="3"[\s\S]{0,220}?Evaluaciones/.test(barra), true);
-eq('A5 · el relato el 4', /data-p="4"[\s\S]{0,220}?Relato/.test(barra), true);
+eq('A5 · el relato el 6 (4 es Terapia física y 5 Planes desde el 2-oct)', /data-p="6"[\s\S]{0,220}?Relato/.test(barra), true);
 
 // 🪤 LA TRAMPA DE LA RENUMERACIÓN. `pasoIr` reparte las tarjetas por
 // `data-paso`, y la que no lo declara «cae en el turno». Mientras el turno fue
@@ -47,7 +48,7 @@ eq('A5 · el relato el 4', /data-p="4"[\s\S]{0,220}?Relato/.test(barra), true);
 eq('A6 · 🪤 la tarjeta sin dueño cae en el TURNO (ahora el 2), no en el paso 1',
    /dataset\.paso\s*\|\|\s*'2'/.test(idx), true);
 const cuerpoPasoIr = (idx.match(/function pasoIr\(n\)\{[\s\S]{0,400}/) || [''])[0];
-eq('A7 · pasoIr acepta hasta el paso 4', /Math\.min\(\s*4\s*,/.test(cuerpoPasoIr), true);
+eq('A7 · pasoIr acepta hasta el paso 6', /Math\.min\(\s*6\s*,/.test(cuerpoPasoIr), true);
 
 /* ══ B · Una sola puerta al reloj ═══════════════════════════════════════ */
 

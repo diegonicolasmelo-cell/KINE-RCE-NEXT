@@ -85,7 +85,7 @@ const GUARDADO = 'TEXTO QUE QUEDO GUARDADO AYER EN LA EVOLUCION.';
     const btns = [...act.querySelectorAll('button')].filter(x => x.offsetParent !== null);
     const av = document.getElementById('pasoAvanza');
     let enPaso2 = '';
-    if (typeof pasoIr === 'function') { pasoIr(3); enPaso2 = (av || {}).textContent || ''; pasoIr(1); }
+    if (typeof pasoIr === 'function') { pasoIr(5); enPaso2 = (av || {}).textContent || ''; pasoIr(1); }   // 🗂️ 2-oct-2026 · seis pasos: el botón que guarda es el de salir de Planes (5)
     return { textos: btns.map(x => x.textContent.trim()), n: btns.length,
              esDelCamino: !!(btns.length === 1 && av && btns[0] === av), enPaso2: enPaso2 };
   });

@@ -61,11 +61,19 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     Es una decisión de diseño que nunca se tomó.
 11. **¿Se renombran `VENT_P01`, `VENT_DPOCC` y `VENT_PMUSC` a `EVAL_T_*`?** No
     se tocó. Gratis ahora, caro cuando haya datos reales.
-12. ~~El «Previo a la UCI» de noche~~ **RESUELTO 2-oct (acuerdo 8.5):** los chips
-    se apagan de noche, igual que el resto, y Evaluaciones muestra los mismos
-    cajones del día, apagados.
-13. **El P0.1 también se pierde de noche**, por lo mismo: antes vivía en el
-    desplegable «Monitoreo avanzado», que se veía siempre.
+12. ~~El «Previo a la UCI» de noche~~ **RESUELTO 2-oct (acuerdo 8.6):** las
+    evaluaciones se hacen de noche igual que de día, incluido el Previo a la
+    UCI. Apagarlas fue un error mío y se deshizo.
+13. ~~El P0.1 se pierde de noche~~ **RESUELTO 2-oct:** las evaluaciones se hacen
+    de noche, así que el P0.1 también.
+14. **El IMS vive dentro de la tarjeta de KTM** (paso 4) pero cuenta como
+    evaluación funcional. Hoy el chip de Evaluaciones te lleva hasta él; si se
+    prefiere, se muda a Evaluaciones → Funcionales. No lo toqué.
+15. **Las estadísticas de KTM que mezclen turnos** deben mirar que de noche ahora
+    puede haber sesiones (antes eran cero por definición). Las que se hagan de
+    noche entran al REM y a las atenciones.
+16. **La válvula de fonación de noche** ahora se puede llenar y suma sus horas
+    para la decanulación (12 h por turno con válvula). ¿Es lo que quieres?
 
 ## 3 · Pendientes viejos, de antes del rediseño
 
@@ -102,11 +110,18 @@ No se creó ningún campo y no falta ninguno.
 - 🔒 **La hoja `KINESIOLOGOS` nace vacía a propósito.** Diego tiene que escribir
   al equipo ahí para que puedan firmar.
 
+## 5b · Lo que se encontró y se arregló el 2-oct
+
+- 🔴 **Los obligatorios de otro paso no bloqueaban el guardado** (PVE, razón de
+  KTM no realizada, contraindicación, fundamento de «Otro»). Medido y arreglado
+  (acuerdo 8.6). **La PVE obligatoria no bloqueaba en el flujo real hasta hoy.**
+- El chip «IMS» de Evaluaciones nunca llevaba a su control. Arreglado.
+
 ## 6 · Al pegar el paquete
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.2-noche-apagada`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.3-seis-pasos`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 🕗 **Esa misma corrida corrige el horario de turno** en CONFIG: si
   `TURNO_DIA_INICIO` y `TURNO_NOCHE_INICIO` dicen 9 y 21, pasan a 8 y 20, una

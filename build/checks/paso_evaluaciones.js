@@ -116,15 +116,22 @@ const no = (l, g) => eq(l, !!g, 'false');
   }));
   await p.evaluate(() => { const m = document.getElementById('mMrc'); if (m) m.classList.remove('on'); });
 
-  console.log('\n3 · ★ «No medí nada este turno» cruza en UN clic, y guarda');
-  si('el botón está a la vista en el paso 2', await ver('#pasoEvalNada'));
+  console.log('\n3 · ★ «No medí nada este turno» cruza en UN clic, y el turno se guarda sin medir nada');
+  // 🗂️ 2-oct-2026 · seis pasos. Antes este botón guardaba y llevaba al relato; ahora sigue a la TERAPIA FÍSICA
+  // (paso 4) y el guardado ocurre al salir de Planes (paso 5). Lo que se protege no cambió: se puede pasar sin
+  // medir nada, y eso no escribe nada en la serie.
+  si('el botón está a la vista en el paso de las evaluaciones', await ver('#pasoEvalNada'));
   si('…y dice lo que hace', /no med/i.test(await txt('#pasoEvalNada')));
   await p.evaluate(() => { window.__llamadas.length = 0; $('pasoEvalNada').click(); });
+  await p.waitForTimeout(400);
+  eq('★★ cruza UN paso, a la terapia física (el 4)', await p.evaluate(() => PASO_ACTUAL), '4');
+  eq('★★ …sin guardar todavía', await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length), '0');
+  await p.evaluate(() => { pasoAvanzar(); pasoAvanzar(); });   // 4 → 5 → guardar
   await p.waitForTimeout(700);
-  si('★★ guarda', (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);
-  eq('★★ …y lleva al relato (paso 4 desde el 17-sep-2026)', await p.evaluate(() => {
+  si('★★ guarda al salir de Planes', (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);
+  eq('★★ …y lleva al relato (paso 6)', await p.evaluate(() => {
     const t = document.querySelector('#spPasos [aria-selected="true"]'); return t ? t.dataset.p : '';
-  }), '4');
+  }), '6');
   no('★ …sin escribir NADA en la serie (no midió nada)',
      (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'EVAL_REGISTRAR').length)) > 0);
 
@@ -153,7 +160,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     pasoIr(3);   // 🗂️ las evaluaciones pasaron del 2 al 3 (entró la prevención)
   });
   await p.waitForTimeout(200);
-  await p.evaluate(() => $('pasoEvalNada').click());
+  await p.evaluate(() => { $('pasoEvalNada').click(); pasoAvanzar(); pasoAvanzar(); });   // 🗂️ 2-oct · seis pasos: 3 → 4 → 5 → guardar
   await p.waitForTimeout(700);
   si('★★ guarda igual, sin exigir el FSS',
      (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);

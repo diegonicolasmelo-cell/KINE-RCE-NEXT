@@ -1295,6 +1295,10 @@ Cómo quedó:
 
 ### 8.5 · De noche, «No corresponde» — y el horario del turno corregido
 
+> 🔁 **REEMPLAZADO en lo de «No corresponde» por 8.6, el mismo 2-oct.** Lo que sigue valiendo de esta
+> sección es **el horario (08:00 y 20:00)**. Lo de apagar las evaluaciones de noche **fue un error mío**: se
+> deshizo. Se deja escrito para que se vea cómo se llegó.
+
 > *«De noche las evaluaciones se muestran. Quizás para que esto funcione mejor en
 > terapia física de noche que salga no corresponde. Corregir horario.»*
 
@@ -1352,4 +1356,58 @@ sigue tocable de noche: son datos del episodio, no mediciones del turno.
 🪤 **Los puntos de referencia de los días de VM no se movieron**: el ancla fija de 15:00 /
 03:00 que usa `refTurno` sigue dentro de cada turno con el horario nuevo, y moverla
 habría cambiado días ya contados.
+
+### 8.6 · Las evaluaciones SÍ se hacen de noche; la terapia física pasa a ser un paso aparte
+
+Diego, mirando el mensaje que yo había puesto en pantalla:
+
+> *«Algo que puedo ver en la retroalimentación es que dice que las evaluaciones no pueden ser realizadas de
+> turno de noche, pero sí pueden ser realizadas en turno de noche. Lo que no puede hacerse o registrarse de
+> noche es la terapia física. Y [I]MT sí puede hacerse de noche incluso. Así que eso lo podríamos dejar como
+> aparte. […] Quizás poner como otro paso, KTM, que sea como modular. La terapia física, la rehabilitación.
+> Que sea como aparte de las evaluaciones. O sea, sea como ingreso, turno, evaluaciones, terapia física,
+> planes y después el texto.»*
+
+🔴 **Mi error, dos tandas seguidas:** había entendido que las evaluaciones no corresponden de noche y las
+apagué —rótulo «No corresponde de noche», cajones desactivados, chips apagados—. **Se deshizo todo:** de noche
+las evaluaciones funcionan **igual que de día**. El horario 08:00 / 20:00 se queda.
+
+**Seis pasos.** `0 Ingreso` (solo al ingresar) · `1 Prevención` · `2 Turno` · `3 Evaluaciones` ·
+`4 Terapia física` · `5 Planes` · `6 Relato`.
+
+- La **terapia física** son las dos tarjetas de siempre (Rehabilitación: KTM, válvula de fonación e IMS; e
+  IMT/EMS), que se van **juntas** al paso 4.
+- **Planes** es la tarjeta «Cerrar el turno» (qué pasó hoy, plan, pendientes y **firma**). 🔴 **Se guarda al
+  salir de Planes**, no de Evaluaciones: es donde está la firma, que es obligatoria.
+- «No medí nada este turno» (Evaluaciones) sigue de largo a la terapia física y **ya no guarda**.
+- **En el celular** la pestaña activa muestra su nombre y las demás solo su número.
+
+**Terapia física de noche** — la respuesta de Diego a «¿qué se puede llenar?»:
+
+> *«Se puede llenar todo en realidad, podría hacerse KTM aunque no es lo habitual. Pero si se presenta de
+> alguna forma en la que se seleccione y no herede, para que no se registre algo que no se hizo, que se
+> muestre pero no herede.»*
+
+- **Se muestra y se puede llenar todo**: KTM, IMT, EMS y válvula de fonación. (Antes iba apagada.)
+- 🔴 **No hereda**: de noche parte **en blanco**, sin el estado, el nivel, el IMT ni el EMS del día. Una nota
+  lo dice. La razón del acuerdo de julio sigue en pie: si heredara, quedarían sesiones que nadie hizo
+  contadas en el REM.
+- **Sin tocar nada no se declara KTM**, ni «hecha» ni **«no realizada»**: esa entra al denominador de la
+  estadística y nadie decidió que no se hizo. Solo cuenta lo que alguien **elige**.
+- Con **AET grupo IIIC o BNM** la tarjeta se esconde, como de día, pero **no se registra una
+  «contraindicada» sola** (contaría un turno de más cada noche).
+- 🪤 Lo que se llene de noche **se guarda y entra al REM y a las atenciones** como cualquier otra sesión. Lo
+  que cambia es el razonamiento de «KTM de noche = cero por definición»: **ya no vale**, así que las
+  estadísticas de KTM que mezclen noches deben mirarlo.
+
+🔴 **Un fallo real que apareció al medir esto** (no por un reporte): **los obligatorios de otro paso no
+bloqueaban el guardado.** La comprobación preguntaba «¿el campo se ve en pantalla?», y un campo de otro paso
+está oculto por el paso. Medido: con tubo y VM, la PVE sin responder y guardando desde el paso 3, **guardaba**.
+Lo mismo con la razón de «KTM no realizada», la contraindicación y el fundamento de «Otro». Ahora se
+distingue «lo esconde la lógica del formulario» (la rama no aplica) de «lo esconde el paso» (no cuenta), y
+si falta algo **el guardado te lleva al paso del campo**. Esto afecta también a lo que ya se había programado
+de la PVE: **la PVE obligatoria no bloqueaba en el flujo real** hasta hoy.
+
+🪤 Otro latente que se arregló de paso: el chip «IMS» de Evaluaciones nunca llevaba a su control, que vive en
+la tarjeta de KTM. Ahora te lleva al paso donde está.
 

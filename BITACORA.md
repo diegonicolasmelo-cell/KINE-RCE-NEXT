@@ -3236,3 +3236,47 @@ necesito que de noche aparezca en evaluaciones el mismo formato del día.»*
   tocarse: la tarjeta tiene contenido.
 
 **209 guardias verdes.** Sello `NEXT-5.2-noche-apagada`.
+
+### La corrección de rumbo · Tanda 5.3 · Seis pasos
+
+Diego miró el mensaje que yo había puesto y escribió: *«dice que las evaluaciones no pueden ser realizadas de
+turno de noche, pero sí pueden ser realizadas en turno de noche. Lo que no puede hacerse o registrarse de noche
+es la terapia física.»* Y propuso un paso aparte para la terapia física. Le contesté si tenía sentido y era
+viable (sí, con costo en pruebas y en toques) y le pregunté el orden y qué se llena de noche.
+
+**Lo que hice:**
+
+- **Deshice mi error** (dos tandas seguidas apagué las evaluaciones de noche). Se borró
+  `noche_no_corresponde.js`; nació `evaluaciones_de_noche.js`.
+- **Terapia física de noche: se llena, parte en blanco y no hereda.** `ktm_de_noche.js` se reescribió: la
+  convención «KTM A» (se ve y no se llena, 19-sep) quedó reemplazada por la palabra de Diego del 2-oct.
+- **Seis pasos** (`seis_pasos.js`): Terapia física (4) y Planes (5) se separan; se guarda al salir de Planes;
+  Relato pasa al 6. Las dos tarjetas de terapia física salieron de la columna derecha del turno (mismos ids)
+  para que su paso no quedara a media pantalla.
+
+### Lo que se midió por el camino (y no se sabía)
+
+- 🔴 **Los obligatorios de otro paso NO bloqueaban el guardado.** Las comprobaciones usaban `offsetParent`
+  como «¿se ve?», y un campo de otro paso está oculto por el paso. Medido: tubo + VM, PVE sin responder,
+  guardar desde el paso 3 → guardaba. **La PVE obligatoria que se programó en la tanda B no bloqueaba en el
+  flujo real.** Nadie lo vio porque las guardias probaban cada obligatorio parado en SU propio paso, que es el
+  único lugar donde funcionaba. Ahora `_vis()` distingue «lo esconde la lógica» de «lo esconde el paso», y el
+  guardado lleva al paso del campo. Guardia: `validacion_entre_pasos.js`, que prueba cada obligatorio desde
+  OTRO paso.
+- El chip «IMS» de Evaluaciones nunca llevaba a su control (vive en la tarjeta de KTM). Arreglado.
+- `hKTM(esIng ? 'n' : 'r')` en `abrirPanel` era un SEGUNDO valor por defecto de la KTM, que pisaba el neutro de
+  noche. Hay tres lugares que fijan el estado inicial de la KTM; los tres respetan ahora la noche.
+- La regla de ≤740 px ya escondía los nombres de las pestañas en el celular; con seis, la activa muestra el
+  suyo.
+
+### Para no olvidar
+
+- 🪤 **Probar un obligatorio parado en su propio paso es lo que dejó pasar el fallo.**
+- 🪤 **Guardias que dependen de la numeración de pasos:** 43 nombran `pasoIr(n)`; solo 8 se enteraron, y se
+  ajustaron con su razón (`cuatro_pasos`, `cierre_tres_bloques`, `nada_del_guardado_despues`,
+  `paso_evaluaciones`, `paso_relato`, `prevencion_navm`, `plantillas_evolucion`, `texto_congelado`).
+- 🪤 `aplicarGatesEval` cortaba de noche (`if(esNoche) return`): saltaba la cooperación, el SAS 1 y
+  `aplicarGatesNeuro`. Ya no corta.
+
+Sello `NEXT-5.3-seis-pasos`.
+

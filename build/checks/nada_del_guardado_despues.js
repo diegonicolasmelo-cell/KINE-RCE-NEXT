@@ -65,16 +65,17 @@ const { chromium } = require('playwright-core');
   await p.waitForTimeout(700);
 
   const tardios = await p.evaluate((ids) => {
-    // El paso que GUARDA es el 3: `pasoAvanzar` llama a guardar() desde ahí.
+    // El paso que GUARDA es el 5 (Planes): `pasoAvanzar` llama a guardar() desde ahí. Lo que cae en el 6, el
+    // relato, ya se guardó sin él. 🗂️ 2-oct-2026 · seis pasos: antes guardaba el 3 y «después» era el 4.
     return ids.map(id => {
       const e = document.getElementById(id);
       if (!e) return null;
       const due = e.closest('[data-paso]');
       const paso = due ? String(due.dataset.paso || '') : '';
-      return (paso === '4') ? id : null;
+      return (paso === '6') ? id : null;
     }).filter(Boolean);
   }, ids);
-  eq('★★ campos del guardado escondidos en el paso 4', tardios.join(', ') || '(ninguno)', '(ninguno)');
+  eq('★★ campos del guardado escondidos en el paso 6 (después de guardar)', tardios.join(', ') || '(ninguno)', '(ninguno)');
 
   /* ══ 2 · El caso que lo destapó, de punta a punta ══════════════════════ */
   console.log('\n2 · 🔴 El turno se puede cerrar: la firma está donde se guarda');
@@ -92,7 +93,7 @@ const { chromium } = require('playwright-core');
     DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', VIA_AEREA: 'TOT', SOPORTE: 'VM' }];
     renderGrid(); abrirPanel('3', false, false);
     await new Promise(r => setTimeout(r, 420));
-    pasoIr(3);
+    pasoIr(5);   // 🗂️ 2-oct-2026 · seis pasos: el cierre («Cerrar el turno», con la firma) pasó del 3 al 5 (Planes) y el relato del 4 al 6. Lo que esta guardia protege no cambió: la firma y lo que se guarda viven en el paso que guarda.
     await new Promise(r => setTimeout(r, 200));
     const vis = id => {
       const e = document.getElementById(id); if (!e) return false;

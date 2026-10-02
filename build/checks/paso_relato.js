@@ -68,10 +68,10 @@ const no = (l, g) => eq(l, !!g, 'false');
     const f = $('fFirma'); if (f) { if (window.Turnos) Turnos.setRoster([{ f: 'DMV', n: 'Kinesiólogo de prueba', t: 'Klgo.' }]); f.value = 'DMV'; }
     /* 🔴 20-sep-2026 · La hemodinamia es OBLIGATORIA para guardar (Diego: «HDN pedir antes de avanzar»), así que el banco la llena como la llenaría un colega. 🪤 A propósito NO se rellena sola al cargar la página: eso recrearía dentro del banco justo el bug que se quitó —el dato puesto por el programa— y las guardias dejarían de ver el caso «nadie la miró». */
     {const _he=document.getElementById('fHEst'); if(_he&&!_he.value){_he.value='Estable';} const _hd=document.getElementById('fDVA'); if(_hd&&!_hd.value){_hd.value='Sin requerimientos';}}
-    pasoIr(3);   // 🗂️ evaluaciones: del 2 al 3 (entró la prevención)
+    pasoIr(5);   // 🗂️ 2-oct-2026 · seis pasos: se guarda al salir de Planes (5); antes era el 3
   });
   await p.waitForTimeout(200);
-  await p.evaluate(() => $('pasoEvalNada').click());
+  await p.evaluate(() => pasoAvanzar());   // 🗂️ 2-oct-2026 · seis pasos: en Planes, avanzar es GUARDAR
   await p.waitForTimeout(700);
 
   const ver = sel => p.evaluate(s => { const e = document.querySelector(s); return !!e && e.offsetParent !== null; }, sel);
@@ -87,7 +87,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   });
 
   console.log('\n1 · Lo primero: quedó guardado');
-  eq('se llegó al relato', await paso(), '4');   // 🗂️ era el 3 hasta que entró la prevención
+  eq('se llegó al relato', await paso(), '6');   // 🗂️ 2-oct-2026 · seis pasos: el relato es el 6 (era el 4)
   si('★ el paso 3 dice que ya quedó guardado', await ver('#pasoGuardado'));
   const g = await txt('#pasoGuardado');
   si('…con la palabra guardado', /guardad/i.test(g));
@@ -105,7 +105,7 @@ const no = (l, g) => eq(l, !!g, 'false');
      Ahora vive en el bloque C del cierre (#cgPend), junto a los atajos y al
      campo libre. Lo que esta guardia protege no cambió —que se sugiera lo que
      faltó medir y que el pendiente vaya al EPISODIO—, solo dónde se mira. */
-  await p.evaluate(() => pasoIr(3));
+  await p.evaluate(() => pasoIr(5));   // 🗂️ 2-oct-2026 · seis pasos: el cierre es Planes (5)
   await p.waitForTimeout(250);
   si('se ofrece dejar pendiente, ya en el cierre', await ver('#cgPend'));
   const sug = await txt('#cgPend');
@@ -137,7 +137,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   /* Vuelta al relato: las secciones 2 y 3 bajaron al paso 3 con el cierre, y lo
      que sigue mide el camino de vuelta DESDE el relato. Sin esto, «atrás»
      saldría del paso 3 al 2 y la medición diría otra cosa. */
-  await p.evaluate(() => pasoIr(4));
+  await p.evaluate(() => pasoIr(6));   // 🗂️ 2-oct-2026 · seis pasos: el relato es el 6
   await p.waitForTimeout(200);
 
   console.log('\n4 · ★ D2 + D3 · el retoque no se pisa en silencio');
@@ -145,7 +145,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.evaluate(() => { window.__avisos = 0; });
   await p.evaluate(() => $('pasoAtras').click());
   await p.waitForTimeout(300);
-  eq('sin retoque a mano, volver atrás no pregunta nada', await paso(), '3');
+  eq('sin retoque a mano, volver atrás no pregunta nada', await paso(), '5');   // 🗂️ 2-oct-2026 · seis pasos: del relato (6) se vuelve a Planes (5)
   no('…y no se abrió ningún aviso', await avisoAbierto());
 
   // Con retoque: avisa antes de pisarlo.
@@ -153,7 +153,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   // evaluate() crea OTRA variable en window y la de adentro sigue en false.
   // El retoque se marca por la vía real, con la función que usa la app.
   await p.evaluate(() => {
-    pasoIr(4);   // 🗂️ el relato: del 3 al 4
+    pasoIr(6);   // 🗂️ 2-oct-2026 · seis pasos: el relato es el 6
     const t = $('rtxt'); t.value = 'Texto escrito a mano por el colega.';
     _setTextoManual(true);
   });
@@ -163,7 +163,7 @@ const no = (l, g) => eq(l, !!g, 'false');
   si('★★ con retoque a mano, avisa antes de volver', await avisoAbierto());
   const aviso = await txt('#ucMsg');
   si('…y dice de qué se trata', /retoc|mano|relato/i.test(aviso));
-  eq('★ …y todavía NO se movió de paso', await paso(), '4');
+  eq('★ …y todavía NO se movió de paso', await paso(), '6');
 
   eq('sin errores de JavaScript', errs.join(' | '), '');
   await b.close();

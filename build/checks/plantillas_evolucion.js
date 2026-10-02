@@ -161,7 +161,7 @@ const HACE3 = hace(3), HACE1 = hace(1);
       // con lo seleccionado» no aparecía nunca — no porque estuviera roto,
       // sino porque esta guardia lo manipulaba desde el paso equivocado.
       // 🗂️ 17-sep-2026 · ese último paso pasó del 3 al 4 (entró la prevención).
-      if (typeof pasoIr === 'function') pasoIr(4);
+      if (typeof pasoIr === 'function') pasoIr(6);   // 🗂️ 2-oct-2026 · seis pasos: el relato pasó del 4 al 6
     });
   };
 

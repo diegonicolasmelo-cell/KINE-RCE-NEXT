@@ -1,6 +1,13 @@
 // cuatro_pasos.js — El modal deja de ser un muro y pasa a ser un camino
 // (tanda B del rediseño; decisiones de Diego del 16-sep-2026).
 //
+// 🗂️ 2-oct-2026 · AHORA SON SEIS (el nombre del archivo ya no cuenta). Diego pidió separar la terapia
+// física de las evaluaciones y los planes del resto: «ingreso, turno, evaluaciones, terapia física, planes
+// y después el texto». El camino es 1 Prevención · 2 Turno · 3 Evaluaciones · 4 Terapia física ·
+// 5 Planes · 6 Relato, y el guardado ocurre al salir de PLANES (donde está la firma), no de Evaluaciones.
+// Lo que esta guardia protege no cambió: cada paso muestra LO SUYO, se guarda antes del relato y volver
+// no borra. Los detalles de los seis los mide seis_pasos.js.
+//
 // 🗂️ 17-sep-2026 · SE LLAMABA tres_pasos.js. La convención cambió de verdad,
 // no se ablandó la guardia: entró el paso 1 de Prevención de NAVM delante del
 // turno, porque ese es el orden real del trabajo (Diego: «llegas, miras: está
@@ -90,8 +97,8 @@ const no = (l, g) => eq(l, !!g, 'false');
      identificación»). El 0 solo se VE mientras se ingresa; a un paciente ya
      ingresado no se le vuelve a ingresar, y eso lo mide ingreso_paso_cero.js.
      Lo que esta guardia protege —que cada paso muestre lo suyo— no cambió. */
-  eq('★ hay cinco pasos: el ingreso y los cuatro del turno',
-     await p.evaluate(() => document.querySelectorAll('#spPasos [data-p]').length), 5);
+  eq('★ hay siete pestañas: el ingreso (0) y los seis del turno',
+     await p.evaluate(() => document.querySelectorAll('#spPasos [data-p]').length), 7);
   eq('★ …y el del ingreso es el 0',
      await p.evaluate(() => !!document.querySelector('#spPasos [data-p="0"]')), true);
   // Esta cama está con TQT y en VM, así que SÍ hay algo que prevenir y el
@@ -154,7 +161,9 @@ const no = (l, g) => eq(l, !!g, 'false');
      La regla nueva es la que esta guardia ya defendía sin notarlo: lo que se
      guarda al salir de evaluaciones se escribe EN evaluaciones.
      Lo general lo cuida nada_del_guardado_despues.js. */
-  si('evaluaciones: ★ los planes y la firma SÍ están (se guardan al salir)', await ver('#fcPlanes'));
+  // 🗂️ 2-oct-2026: ya NO. La regla de fondo sigue en pie —lo que se guarda se escribe en el paso que
+  // guarda—, pero el paso que guarda es ahora Planes (el 5), y los planes y la firma viven ahí.
+  no('evaluaciones: los planes y la firma ya NO están (viven en Planes, el paso que guarda)', await ver('#fcPlanes'));
   si('…y ahora sí se ofrece «atrás»', await ver('#pasoAtras'));
 
   console.log('\n3 · Volver atrás conserva lo escrito');
@@ -181,16 +190,22 @@ const no = (l, g) => eq(l, !!g, 'false');
      JSON.stringify((cerrar[0] || {}).d || {}).replace(/"firma":"[^"]*"/, '"firma":"?"'),
      JSON.stringify({ idCama: '3', id: 'aa1', firma: '?' }));
 
-  console.log('\n5 · ★ El guardado ocurre al SALIR DE LAS EVALUACIONES');
+  console.log('\n5 · ★ El guardado ocurre al SALIR DE PLANES');
+  const nGuardar = () => p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length);
   await p.evaluate(() => { window.__llamadas.length = 0; $('pasoAvanza').click(); });
   await p.waitForTimeout(300);
-  no('en el turno→evaluaciones todavía NO se guarda',
-     (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);
+  eq('del turno a las evaluaciones todavía NO se guarda', await nGuardar(), 0);
+  await p.evaluate(() => $('pasoAvanza').click());
+  await p.waitForTimeout(300);
+  eq('de las evaluaciones a la terapia física tampoco', await nGuardar(), 0);
+  await p.evaluate(() => $('pasoAvanza').click());
+  await p.waitForTimeout(300);
+  eq('de la terapia física a Planes tampoco', await nGuardar(), 0);
+  si('en Planes están los planes y la firma', await ver('#fcPlanes'));
   await p.evaluate(() => $('pasoAvanza').click());
   await p.waitForTimeout(600);
-  si('★★ al salir de las evaluaciones sale GUARDAR_EVOLUCION',
-     (await p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length)) > 0);
-  eq('★ y se llega al relato', await paso(), '4');
+  si('★★ al salir de Planes sale GUARDAR_EVOLUCION', (await nGuardar()) > 0);
+  eq('★ y se llega al relato (paso 6)', await paso(), '6');
 
   console.log('\n6 · El último paso es el relato y el plan');
   si('relato: se ve', await ver('#rarea'));
