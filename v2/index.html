@@ -1448,6 +1448,19 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bdtb-neg[aria-pressed="true"]{background:#15803d;border-color:#15803d;}
 .bdtb-pos[aria-pressed="true"]{background:#991b1b;border-color:#991b1b;}
 .bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
+/* Evaluaciones como cajones del celular (1-oct-2026, Diego): icono cuadrado, nombre debajo,
+   numerito en la esquina. Rojo = pendiente que vence; gris = sin llenar (opcional); verde = al día. */
+#evTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:18px 12px;margin:10px 0 6px;}
+.evTile{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;color:#0f172a;text-align:center;}
+.evIco{position:relative;width:100%;max-width:112px;aspect-ratio:1/1;border:1px solid;border-radius:26px;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s;}
+.evTile[aria-pressed="true"] .evIco{box-shadow:0 0 0 3px #0f172a;}
+.evBadge{position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.82rem;box-shadow:0 0 0 2px #fff;}
+.evBadge[data-nivel="rojo"]{background:#b91c1c;} .evBadge[data-nivel="gris"]{background:#64748b;} .evBadge[data-nivel="verde"]{background:#15803d;}
+.evNom{font-size:.86rem;font-weight:700;} .evSub{font-size:.7rem;color:#64748b;line-height:1.25;}
+#dEgr[data-fam] .evFam{display:none;}
+#dEgr[data-fam="funcionales"] .evFam[data-fam="funcionales"],#dEgr[data-fam="fuerza"] .evFam[data-fam="fuerza"],
+#dEgr[data-fam="ecograficas"] .evFam[data-fam="ecograficas"],#dEgr[data-fam="respiratorias"] .evFam[data-fam="respiratorias"],
+#dEgr[data-fam="via"] .evFam[data-fam="via"]{display:block;}
 /* Ecografía pulmonar (1-oct-2026): una figura, dos pruebas. */
 .ecoTab{height:36px;padding:0 14px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.8rem;font-weight:700;cursor:pointer;}
 .ecoTab[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff;}
@@ -1460,6 +1473,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .ecoPt.v0{background:#15803d;border-color:#15803d;} .ecoPt.v1{background:#a16207;border-color:#a16207;}
 .ecoPt.v2{background:#c2410c;border-color:#c2410c;} .ecoPt.v3{background:#991b1b;border-color:#991b1b;}
 .ecoPt.der{box-shadow:0 0 0 3px #1d4ed8;}
+/* El rótulo de cada punto va DEBAJO, siempre: un punto vacío tiene que decir cuál es (1, 2, PLAPS / la zona). */
+.ecoPt::after{content:attr(data-lbl);position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:1px;font-size:.6rem;font-weight:700;color:#475569;white-space:nowrap;pointer-events:none;}
 .ecoPt.sug{border-style:dashed;border-color:#b45309;background:#fffbeb;color:#92400e;}
 .ecoPop{position:absolute;z-index:20;background:#fff;border:1px solid #94a3b8;border-radius:10px;padding:6px;box-shadow:0 6px 18px rgba(15,23,42,.2);display:flex;gap:5px;flex-wrap:wrap;max-width:270px;}
 .ecoOpt{min-width:44px;height:44px;padding:0 9px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;}
@@ -5053,30 +5068,22 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <!-- EVALUACIONES FUNCIONALES (unificadas) -->
         <div class="sub-sec" id="fcEgrCard">
           <div class="sub-sec-title" style="color:var(--fisico);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <span>📏 Evaluaciones Funcionales</span>
-            <div class="check wa" style="border:none;background:transparent;padding:0;">
+            <span>📏 Evaluaciones</span>
+            <!-- 1-oct-2026 · La casilla «Registrar evaluación este turno» ya no estorba: los
+                 cajones de abajo son la puerta (Diego: «como los iconos del celular»). Sigue
+                 en el DOM porque es el ESTADO (EVAL_T_REALIZAR, hEgr, la recarga del turno). -->
+            <div class="check wa hidden" style="border:none;background:transparent;padding:0;">
               <input type="checkbox" id="cEgr" onchange="hEgr()">
               <label for="cEgr" style="font-size:.78rem;">Registrar evaluación este turno</label>
             </div>
           </div>
+          <div id="evTiles" aria-label="Familias de evaluaciones"></div>
           <div id="dEgr" class="hidden" style="padding-top:6px;">
             <div id="coopGateNota" class="hidden" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:7px;padding:7px 10px;font-size:.76rem;font-weight:600;margin-bottom:8px;">
               🔒 Paciente no cooperador — MRC-SS, FSS-ICU y dinamometría requieren cooperación (SAS 3-4 · S5Q ≥3).
               Disponibles: PIM/PEM con válvula, ecografía diafragmática/cuádriceps y CPAx (observacional).
             </div>
-            <!-- 1) FUERZA MUSCULAR (visible): MRC-SS + prensión manual -->
-            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:4px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">💪 Fuerza muscular</div>
-            <div class="row" id="rowEscalas">
-              <div class="col wa" id="rowMrc"><label>MRC-SS (0-60)</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <input type="number" id="fMRC" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpMRC()">
-                  <span id="lblMRC" class="interp-pill interp-empty">—</span>
-                  <button type="button" id="btnMrc" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('mrc')" title="Completar por ítem">📋</button>
-                </div>
-              </div>
-              <div class="col wa"><label>Prensión / Dinam. (kg)</label><input type="number" id="fPrension" min="0" step="0.5" placeholder="kg" oninput="interpDinamo()"></div>
-              <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPrension" class="interp-pill interp-empty">—</span></div>
-            </div>
+            <div class="evFam" data-fam="funcionales">
             <!-- 2) FUNCIONALIDAD (visible): FSS-ICU + CPAx -->
             <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:10px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">🏃 Funcionalidad</div>
             <div class="row">
@@ -5096,6 +5103,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 </div>
               </div>
             </div>
+            </div>
+            <div class="evFam" data-fam="fuerza">
+            <!-- 1) FUERZA MUSCULAR (visible): MRC-SS + prensión manual -->
+            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:4px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">💪 Fuerza muscular</div>
+            <div class="row" id="rowEscalas">
+              <div class="col wa" id="rowMrc"><label>MRC-SS (0-60)</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <input type="number" id="fMRC" readonly style="width:56px;background:#f8fafc;font-weight:700;" oninput="interpMRC()">
+                  <span id="lblMRC" class="interp-pill interp-empty">—</span>
+                  <button type="button" id="btnMrc" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('mrc')" title="Completar por ítem">📋</button>
+                </div>
+              </div>
+              <div class="col wa"><label>Prensión / Dinam. (kg)</label><input type="number" id="fPrension" min="0" step="0.5" placeholder="kg" oninput="interpDinamo()"></div>
+              <div class="col grow" style="align-self:flex-end;margin-bottom:6px;"><span id="lblPrension" class="interp-pill interp-empty">—</span></div>
+            </div>
             <!-- 3) desplegable: FUERZA MUSCULAR RESPIRATORIA (PIM/PEM) -->
             <details id="dxFzaResp" style="margin-top:10px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
               <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">💨 Fuerza muscular respiratoria (PIM · PEM)</summary>
@@ -5105,19 +5127,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div class="col wa"><label>PEM (cmH₂O)</label><input type="number" id="fPEM"></div>
               </div>
             </details>
-            <!-- 3b) desplegable: ESFUERZO RESPIRATORIO (P0.1 · ΔPocc · Pmusc) — 1-oct-2026.
-                 Se mudó desde Terapia ventilatoria (Diego): son evaluaciones puntuales.
-                 SOLO con ventilación espontánea (CPAP/PS): son maniobras de oclusión
-                 que hace el ventilador, así que necesitan al paciente EN VM asistida. -->
-            <details id="dxEsf" class="hidden" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
-              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">📈 Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc)</summary>
-              <div class="row" style="margin-top:6px;">
-                <div class="col wa"><label>P0.1 (cmH₂O)</label><input type="number" id="fP01" step="0.1"></div>
-                <div class="col wa"><label>ΔPocc (cmH₂O)</label><input type="number" id="fDPocc" step="0.1"></div>
-                <div class="col wa"><label>Pmusc (cmH₂O)</label><input type="number" id="fPmusc" step="0.1"></div>
-              </div>
-              <div style="font-size:.7rem;color:#64748b;margin-top:2px;">Solo con ventilación espontánea (CPAP/PS). Son de este turno: no se arrastran al siguiente.</div>
-            </details>
+            </div>
+            <div class="evFam" data-fam="ecograficas">
             <!-- 4) desplegable: ECOGRAFÍA muscular y diafragmática -->
             <details id="dxEco" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
               <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">📡 Ecografía muscular y diafragmática</summary>
@@ -5185,6 +5196,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
               <input type="hidden" id="fEcoPulm" value="">
             </details>
+            </div>
+            <div class="evFam" data-fam="respiratorias">
+            <!-- 3b) desplegable: ESFUERZO RESPIRATORIO (P0.1 · ΔPocc · Pmusc) — 1-oct-2026.
+                 Se mudó desde Terapia ventilatoria (Diego): son evaluaciones puntuales.
+                 SOLO con ventilación espontánea (CPAP/PS): son maniobras de oclusión
+                 que hace el ventilador, así que necesitan al paciente EN VM asistida. -->
+            <details id="dxEsf" class="hidden" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
+              <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;" title="Índices de esfuerzo inspiratorio en ventilación espontánea: P0.1 (drive), ΔPocc (presión de oclusión) y Pmusc estimada. Útiles para evaluar sobre/sub-asistencia en CPAP/PS.">📈 Esfuerzo respiratorio (P0.1 · ΔPocc · Pmusc)</summary>
+              <div class="row" style="margin-top:6px;">
+                <div class="col wa"><label>P0.1 (cmH₂O)</label><input type="number" id="fP01" step="0.1"></div>
+                <div class="col wa"><label>ΔPocc (cmH₂O)</label><input type="number" id="fDPocc" step="0.1"></div>
+                <div class="col wa"><label>Pmusc (cmH₂O)</label><input type="number" id="fPmusc" step="0.1"></div>
+              </div>
+              <div style="font-size:.7rem;color:#64748b;margin-top:2px;">Solo con ventilación espontánea (CPAP/PS). Son de este turno: no se arrastran al siguiente.</div>
+            </details>
             <!-- 🧿 TEST DE APNEA — mudado desde la tarjeta de UPOT el
                  20-sep-2026 (Diego: «el test de apnea, al ser una evaluación,
                  que quede en evaluaciones en estos casos»). Solo aparece con
@@ -5199,6 +5225,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <span style="font-size:.7rem;color:#9f1239;">Se suma solo a los procedimientos del turno y al histórico del episodio.</span></div>
             </div>
 
+            </div>
+            <div class="evFam" data-fam="via">
             <!-- 5) desplegable: TOS Y DEGLUCIÓN -->
             <details id="dxTos" style="margin-top:8px;border:1px solid #cffafe;border-radius:7px;padding:6px 10px;background:#f8feff;">
               <summary style="font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--fisico);cursor:pointer;">😮‍💨 Tos y deglución</summary>
@@ -5242,6 +5270,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   </div></div>
               </div>
             </details>
+            </div>
           </div>
         </div>
         </div>
@@ -7198,6 +7227,7 @@ function pasoEvalPintar(){
     '<div class="pe2-fila">' + serie + '</div>' +
     (esNoche ? '<div class="pe2-noche">🌙 De noche no se registran mediciones funcionales nuevas: esto es lo último que hay, con la fecha y quién lo midió.</div>' : '') +
     (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
+  try{ evTilesPintar(); }catch(e){}
 }
 
 /**
@@ -7377,6 +7407,7 @@ function abrirPanel(id, esIng, verFicha) {
   const _cvf=$('cVfon'); if(_cvf){ _cvf.checked=false; hVfon(); }
   try{ bdtPintar(); }catch(e){}   // el reset() suelta las marcas; los botones se redibujan
   try{ ecoLimpiar(); }catch(e){}  // la ecografía pulmonar parte vacía: es de ESE turno
+  try{ evReset(); }catch(e){}     // los cajones parten cerrados
   const _cqt=$('cCambioTQT'); if(_cqt) _cqt.checked=false; _tqtSnapshot=null;
   hide('dCambioTQTmot'); hide('dCambioTQTdet');
   setRuidosExtra(''); calcInsumosDias();
@@ -8345,6 +8376,7 @@ function fillForm(s) {
   const _evalHoy = _isoDia(_ex.EVAL_FECHA) === new Date().toISOString().slice(0,10);
   chk('cEgr', _evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE'));
   if(_evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE')) show('dEgr');
+  // (la familia que se abre al reabrir se decide DESPUÉS de cargar los valores: ver evReponer)
   /* 🪤 La ecografía pulmonar es un campo OCULTO: reset() no lo limpia, y si el turno
      que se abre no es de hoy, nadie lo tocaría y se quedaría la del paciente anterior.
      Se limpia SIEMPRE y ANTES de cargar (el IIFE de más abajo corre después). */
@@ -8373,6 +8405,8 @@ function fillForm(s) {
     set('fFedD',    _ex.EVAL_T_FED_D);   set('fFedI',  _ex.EVAL_T_FED_I);
     set('fExcD',    _ex.EVAL_T_EXC_D);   set('fExcI',  _ex.EVAL_T_EXC_I);
   }
+  // Cajones: se abre la PRIMERA familia con datos (no las cinco), ya con todos los valores cargados.
+  try{ evReponer(); }catch(e){}
   // S1: aislamiento
   chk('cAisl',_ex.PAC_AISLAMIENTO); hAisl();
   setAislTags(_ex.PAC_AISL_MICRO||_ex.PAC_AISL_LISTA||'');
@@ -13392,6 +13426,116 @@ function interpPTT(){
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
 }
+/* ── Evaluaciones como cajones del celular (Diego, 1-oct-2026) ───────────────
+   «Iconos cuadrados con un icono al medio y el nombre de abajo, como los iconos
+   del celular.» Y: «podríamos pedir algunos campos obligatorios, por ejemplo MRC
+   y FSS. Probablemente va a pasar lo mismo que cuando están ocultas.»
+   🔴 «OBLIGATORIO» EN TRES NIVELES, NO EN UNO:
+     · BLOQUEA EL CIERRE — solo donde siempre hay respuesta posible (la PVE, que ya existía).
+     · PENDIENTE QUE VENCE — MRC y FSS: numerito ROJO si el paciente coopera y no se miden
+       hace días. Molesta a la vista; NO impide guardar.
+     · OPCIONAL — el resto: gris con lo que falta, o visto verde si está al día.
+   🪤 El MRC no se puede exigir siempre: necesita un paciente que coopere. Si bloqueara
+   el cierre, el turno de un sedado quedaría trancado y el equipo aprendería a poner
+   cualquier cosa para salir (y el 17-sep Diego dijo «no podemos obligar a evaluar el MRC»).
+   🪤 LOS CAJONES FILTRAN SOLO CUANDO SE TOCAN: marcar «registrar» por la vía de siempre
+   (sin familia) sigue mostrando todo, para no romper lo que ya andaba. */
+const EV_VENCE_DIAS = 3;     // días sin medir para que MRC/FSS pasen a rojo (CFG.EVAL_VENCE_DIAS lo cambia)
+const EV_ECO_MUSC = ['fCuadD','fCuadI','fHeckmatt','fGrosor','fFedD','fFedI','fExcD','fExcI','fDiaf'];
+const _evSvg = (c,d)=>`<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const EV_FAM = [
+  { k:'funcionales', nom:'Funcionales', sub:'FSS · CPAx · IMS', bg:'#eff6ff', bd:'#bfdbfe',
+    svg:_evSvg('#1d4ed8','<circle cx="13.5" cy="4" r="2"/><path d="M13.5 9l-3.5 2.5 1.5 4.5"/><path d="M11.5 16l-2.5 5"/><path d="M14.5 15l2 6"/><path d="M13.5 9.5l3.5 2.5"/>'),
+    esc:[ { k:'fss', coop:true, vence:true, hoy:()=>v('fFSS')!=='', col:'ULT_FSS', fec:'ULT_FSS_FECHA' },
+          { k:'cpax', hoy:()=>v('fCpaxTotal')!=='' },
+          { k:'ims', hoy:()=>v('fIMS')!=='' } ] },
+  { k:'fuerza', nom:'De fuerza', sub:'MRC · prensión · PIM', bg:'#fffbeb', bd:'#fde68a',
+    svg:_evSvg('#b45309','<path d="M4 9v6"/><path d="M7.5 6.5v11"/><path d="M16.5 6.5v11"/><path d="M20 9v6"/><path d="M7.5 12h9"/>'),
+    esc:[ { k:'mrc', coop:true, vence:true, hoy:()=>v('fMRC')!=='', col:'ULT_MRC', fec:'ULT_MRC_FECHA' },
+          { k:'dinamo', coop:true, hoy:()=>v('fPrension')!=='', col:'ULT_DINAMO' },
+          { k:'pim', hoy:()=>v('fPIM')!=='', col:'ULT_PIM' },
+          { k:'pem', hoy:()=>v('fPEM')!=='' } ] },
+  { k:'ecograficas', nom:'Ecográficas', sub:'muscular · pulmonar', bg:'#ecfeff', bd:'#a5f3fc',
+    svg:_evSvg('#0e7490','<rect x="9" y="2.5" width="6" height="6" rx="1.2"/><path d="M7.5 12.5a6.5 6.5 0 0 1 9 0"/><path d="M5 16.5a10 10 0 0 1 14 0"/><path d="M2.5 20.5a13.5 13.5 0 0 1 19 0"/>'),
+    esc:[ { k:'ecoM', hoy:()=>EV_ECO_MUSC.some(id=>v(id)!=='') },
+          { k:'ecoP', hoy:()=>v('fEcoPulm')!=='' } ] },
+  { k:'respiratorias', nom:'Respiratorias', sub:'esfuerzo · apnea', bg:'#fdf2f8', bd:'#fbcfe8',
+    svg:_evSvg('#be185d','<path d="M3 3.5v17h18"/><path d="M5 16.5c1.6-8 3.2-8.5 4.8-1.5s3.2 2.5 4.8-1.5 2.8-1.2 4.4 2"/>'),
+    esc:[ { k:'esf', apl:()=>esfActivo(), hoy:()=>['fP01','fDPocc','fPmusc'].some(id=>v(id)!=='') },
+          { k:'apnea', apl:()=>!!$('rowApnea') && !$('rowApnea').classList.contains('hidden'), hoy:()=>v('fApneaTest')!=='' } ] },
+  { k:'via', nom:'Vía aérea', sub:'tos · deglución · TQT', bg:'#fff7ed', bd:'#fed7aa',
+    svg:_evSvg('#9a3412','<path d="M12 2.8l7 2.8v5.6c0 4.4-2.9 7.9-7 9.4-4.1-1.5-7-5-7-9.4V5.6z"/><path d="M9 11.8l2.2 2.2 4-4.2"/>'),
+    esc:[ { k:'tos', hoy:()=>v('fFEM')!=='' },
+          { k:'degl', hoy:()=>v('fDeglPres')!=='' },
+          { k:'tqt', apl:()=>!!$('dxTqt') && !$('dxTqt').classList.contains('hidden'),
+            hoy:()=>!!$('fBDTp')?.checked || !!$('fBDTn')?.checked || v('fPVA')!=='' } ] },
+];
+/* ¿El paciente puede cooperar para MRC, FSS y dinamometría? Una sola fórmula: la usan la
+   puerta de cooperación (que oculta esos campos) y los cajones (que dejan de exigirlos). */
+function _coopBloqueado(){
+  const coop=v('fCoop'), esIngA=v('cIng')==='true';
+  return esIngA ? (coop!=='Cooperador') : (coop==='No cooperador' || coop==='No evaluable' || !!$('cBNM')?.checked);
+}
+function _evDias(desde,hasta){
+  const a=Date.parse(String(desde).slice(0,10)+'T12:00:00'), b=Date.parse(String(hasta).slice(0,10)+'T12:00:00');
+  return (isNaN(a)||isNaN(b)) ? 0 : Math.round((b-a)/864e5);
+}
+function _evVencida(c, fecha){
+  if(v('cIng')==='true') return false;                       // recién llega: no hay nada que vencer
+  const lim=parseFloat((window.CFG&&CFG.EVAL_VENCE_DIAS))||EV_VENCE_DIAS, hoyT=v('gDate')||hoy();
+  if(fecha) return _evDias(_isoDia(fecha),hoyT)>=lim;
+  const ing=c.FECHA_INGRESO?_isoDia(c.FECHA_INGRESO):'';
+  return ing ? _evDias(ing,hoyT)>=2 : false;                 // nunca medido: vence al segundo día
+}
+function evEstado(){
+  const c=(typeof _camaPanel==='function')?(_camaPanel()||{}):{}, bloq=_coopBloqueado();
+  return EV_FAM.map(f=>{
+    const apl=f.esc.filter(s=>(s.apl?s.apl():true) && !(s.coop && bloq));
+    let rojo=0, sin=0;
+    apl.forEach(s=>{
+      const hoyV=s.hoy(), prev=s.col && String(c[s.col]==null?'':c[s.col]).trim()!=='';
+      if(!hoyV && !prev) sin++;
+      if(s.vence && !hoyV && _evVencida(c, s.fec ? String(c[s.fec]||'') : '')) rojo++;
+    });
+    const nivel = rojo>0?'rojo':(sin>0?'gris':'verde');
+    return { f, apl:apl.length, rojo, sin, nivel, n: rojo>0?rojo:sin };
+  });
+}
+function evTilesPintar(){
+  const box=$('evTiles'); if(!box) return;
+  const d=$('dEgr'), abierta=(d && !d.classList.contains('hidden')) ? (d.getAttribute('data-fam')||'') : '';
+  box.innerHTML=evEstado().filter(e=>e.apl>0).map(e=>{
+    const txt=e.nivel==='verde'?'✓':String(e.n);
+    const aria=e.f.nom+': '+(e.nivel==='rojo'?e.n+' pendiente que vence':e.nivel==='gris'?e.n+' sin llenar':'al día');
+    return `<button type="button" class="evTile" data-fam="${e.f.k}" aria-pressed="${abierta===e.f.k?'true':'false'}" aria-label="${aria}" onclick="evFamAbrir('${e.f.k}')">`+
+      `<span class="evIco" style="background:${e.f.bg};border-color:${e.f.bd}">${e.f.svg}<span class="evBadge" data-nivel="${e.nivel}">${txt}</span></span>`+
+      `<span class="evNom">${e.f.nom}</span><span class="evSub">${e.f.sub}</span></button>`;
+  }).join('');
+}
+function _evHayDatos(){ return evEstado().some(e=>e.f.esc.some(s=>s.hoy())); }
+function evFamAbrir(fam){
+  const d=$('dEgr'), c=$('cEgr'); if(!d||!c) return;
+  const abierta=c.checked && !d.classList.contains('hidden') && d.getAttribute('data-fam')===fam;
+  if(abierta){                                   // tocar el mismo otra vez lo cierra
+    d.removeAttribute('data-fam'); window._evCerrado=true;
+    if(!_evHayDatos()) c.checked=false;
+    hEgr(); return;
+  }
+  window._evCerrado=false; c.checked=true; d.setAttribute('data-fam',fam);
+  hEgr();
+}
+/* Reabrir un turno con evaluaciones: se abre la PRIMERA familia con datos (no las cinco). */
+function evReponer(){
+  const d=$('dEgr'); if(!d) return;
+  window._evCerrado=false;
+  const hay=evEstado().find(e=>e.apl>0 && e.f.esc.some(s=>s.hoy()));
+  if($('cEgr')?.checked && hay) d.setAttribute('data-fam',hay.f.k); else d.removeAttribute('data-fam');
+  evTilesPintar();
+}
+function evReset(){ window._evCerrado=false; const d=$('dEgr'); if(d) d.removeAttribute('data-fam'); }
+document.addEventListener('input',e=>{ if(e.target.closest&&e.target.closest('#fcEval')) evTilesPintar(); });
+document.addEventListener('change',e=>{ if(e.target.closest&&e.target.closest('#fcEval')) evTilesPintar(); });
+
 /* ── Ecografía pulmonar: POCUS y LUS sobre una misma figura ──────────────────
    Diego, 1-oct-2026. Dos pruebas separadas dentro de un módulo: POCUS = los
    puntos del protocolo BLUE (1, 2 y PLAPS por lado: en UCI son los que se
@@ -13469,6 +13613,8 @@ function ecoConstruir(){
   ['pocus','lus'].forEach(m=>ECO_PUNTOS[m].forEach(q=>{
     const b=document.createElement('button');
     b.type='button'; b.id='ecoPt_'+q.id; b.className='ecoPt hidden'; b.dataset.modo=m; b.dataset.id=q.id;
+    b.dataset.lbl = m==='pocus' ? (q.id.charAt(0)==='P'?'PLAPS':'Punto '+q.id.charAt(0))
+                  : ({AS:'ant. sup.',AI:'ant. inf.',LS:'lat. sup.',LI:'lat. inf.',PS:'post. sup.',PI:'post. inf.'})[q.id.slice(0,2)];
     b.style.left=(q.x/720*100)+'%'; b.style.top=(q.y/470*100)+'%';
     b.setAttribute('aria-label',q.n);
     b.addEventListener('click',ev=>{ ev.stopPropagation(); ecoPunto(q.id); });
@@ -13621,11 +13767,13 @@ function tqtPruebasGate(){
   const evAnun=(typeof _evVAAnunciado!=='undefined')?_evVAAnunciado:'';
   const ver = v('fVA')==='TQT' || !!$('cDecanOcurrio')?.checked || evAnun==='decan';
   d.classList.toggle('hidden', !ver);
+  try{ evTilesPintar(); }catch(e){}
 }
 function esfActivo(){ return v('fSop')==='VM' && v('fModo')==='CPAP/PS'; }
 function esfGate(){
   const d=$('dxEsf'); if(!d) return;
   d.classList.toggle('hidden', !esfActivo());
+  try{ evTilesPintar(); }catch(e){}
 }
 /* ── Deglución: primero presente o ausente ───────────────────────────────────
    EVAL_DEGLUCION guarda UN valor legible (Ausente · Presente · Adecuada ·
@@ -14606,7 +14754,8 @@ function hEgr(){
      viendo qué lleva medido el episodio. Lo cuida medicion_no_queda_hueca.js. */
   const marco = $('fcEval');
   if (marco) marco.classList.toggle('hidden', esNoche);
-  if (!esNoche && $('cEgr')?.checked) show('dEgr'); else hide('dEgr');
+  if (!esNoche && $('cEgr')?.checked && !window._evCerrado) show('dEgr'); else hide('dEgr');
+  try{ evTilesPintar(); }catch(e){}
 }
 let _nombreTimer=null;
 function _debouncedChkNombre(val){clearTimeout(_nombreTimer);_nombreTimer=setTimeout(()=>chkNombreDB(val),300);}
@@ -17417,7 +17566,7 @@ function aplicarGatesEval(){
   //   turno normal: bloqueado solo si "No cooperador"/"No evaluable"/BNM, como antes)
   const coop=v('fCoop');
   const esIngA=v('cIng')==='true';
-  const bloqueado = esIngA ? (coop!=='Cooperador') : (coop==='No cooperador' || coop==='No evaluable' || !!$('cBNM')?.checked);
+  const bloqueado = _coopBloqueado();
   const e_prens=$('fPrension'); if(e_prens){ e_prens.disabled=bloqueado; if(bloqueado) e_prens.value=''; }
   // MRC/FSS: "ocultar, no congelar" — se repliegan del DOM por completo (no solo disabled).
   ['rowMrc','rowFss'].forEach(id=>{ const e=$(id); if(e) e.classList.toggle('hidden', bloqueado); });
@@ -17430,6 +17579,7 @@ function aplicarGatesEval(){
   // CPAx: SIEMPRE disponible (no requiere cooperación) — excepción explícita.
   _updateEvalBtn('mrc'); _updateEvalBtn('fss'); _updateEvalBtn('cpax');
   const nota=$('coopGateNota'); if(nota) nota.classList.toggle('hidden', !bloqueado);
+  try{ evTilesPintar(); }catch(e){}
   // — KTM bloqueada por AET IIIC o BNM (auto "Contraindicada"; IMT queda disponible) —
   const aetIIIC = !!$('cAET')?.checked && v('fAETnivel')==='IIIC';
   const bnm = !!$('cBNM')?.checked;
