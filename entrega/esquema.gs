@@ -500,6 +500,13 @@ const ESQUEMA = {
     // reglas que el resto: se queda en la planilla, no viaja a informes ni al
     // REM.  — SIEMPRE AL FINAL
     ['NOMBRE_SOCIAL','texto','Nombre social'],
+    // ⚖️ La AET como SERIE de tramos (Diego, 30-sep-2026: «episodio serial»).
+    // Lista de {g, desde, hasta, tk, f}: el grupo (I, II, IIIA, IIIB, IIIC), desde
+    // cuándo, hasta cuándo ('' = vigente), en qué turno se registró y quién. Un
+    // tramo nuevo se abre SOLO si el grupo cambia: confirmar no es cambiar. Sin
+    // AET el grupo vigente es el I. AET_ACTIVA/AET_NIVEL siguen siendo el estado
+    // del momento; esto es su historia.  — SIEMPRE AL FINAL
+    ['AET_SERIE','json','Tramos de la AET por grupo'],
   ]},
   EVOLUCIONES:         { headerRows: 3, cols: _COLS_EVOLUCIONES },
   EVOLUCIONES_ARCHIVO: { headerRows: 3, cols: _COLS_EVOLUCIONES },
@@ -538,6 +545,10 @@ const ESQUEMA = {
     // CAMAS_ESTADO. Aquí importa aún más: los días del archivo están
     // CONGELADOS, así que una corrección de fecha los recalcula.  — AL FINAL
     ['CORRECCIONES_JSON','json','Correcciones de coordinación'],
+    // La serie de AET del episodio, tal como estaba al dar el alta. La AET al
+    // egreso ES su último tramo; si no cambió en toda la estadía, es el del
+    // ingreso.  — AL FINAL
+    ['AET_SERIE','json','Tramos de la AET por grupo'],
   ]},
   // ── Ventiladores de la unidad: inventario vivo + trazabilidad de movimientos ──
   VENTILADORES: { headerRows: 1, cols: [

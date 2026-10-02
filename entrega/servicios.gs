@@ -1030,6 +1030,7 @@ function darAltaPaciente(datos, ctx) {
         REINTUBACION: datos.reintubacion !== undefined ? esVerdadero(datos.reintubacion) : huboReintub,
         BARTHEL_INGRESO: cama.BARTHEL, BARTHEL_EGRESO: datos.barthelEgreso || '',
         FSS_EGRESO: fssEgr, MRC_SS_EGRESO: mrcEgr,
+        AET_SERIE: cama.AET_SERIE || '',
         DINAMO_EGRESO: dinEgr, CPAX_EGRESO: cpaxEgr,
         DAUCI: interp.DAUCI, MRC_INTERP: interp.MRC_INTERP,
         FSS_INTERP: interp.FSS_INTERP, DINAMO_INTERP: interp.DINAMO_INTERP,
@@ -1241,7 +1242,7 @@ function _limpiarCamaInterno(idCama) {
     DISP_CONFIRMADO: false, APACHE2: '', CORRECCIONES_JSON: '',
     ULT_PS: '', ULT_PIM: '', ULT_PIM_FECHA: '',
     ULT_MRC_FIRMA: '', ULT_FSS_FIRMA: '', ULT_PIM_FIRMA: '',
-    AET_ACTIVA: false, AET_NIVEL: '', AET_FECHA: '',
+    AET_ACTIVA: false, AET_NIVEL: '', AET_FECHA: '', AET_SERIE: '',
     UPOT_ACTIVO: false, UPOT_MEDIDAS: '', UPOT_FECHA: '',
     // Los pendientes son del episodio: se van con el paciente. Si quedaran,
     // el siguiente que ocupe la cama heredaría encargos de otra persona.
@@ -5211,6 +5212,22 @@ function guardarEvolucion(datos, ctx) {
         });
       }
 
+      /* ⚖️ AET COMO SERIE DE TRAMOS (Diego, 30-sep-2026). El estado de la AET
+         (AET_ACTIVA/AET_NIVEL) sigue siendo el del momento; la SERIE guarda su
+         historia: un tramo por grupo, y uno nuevo SOLO si el grupo cambia. El
+         hito del cambio nace de la serie, no de la casilla: así «confirmar» no
+         deja rastro y un re-guardado del mismo turno no lo duplica. Lo que sale
+         de aquí viaja a la cama por `evo._AET_SERIE` (transitorio, no es
+         columna de la evolución). */
+      try {
+        const _aet = _aetSerieDelTurno(cama, evo, turnoKey, fecha, turno);
+        if (_aet.serie !== null) evo._AET_SERIE = _aet.serie;
+        if (_aet.hito) {
+          hitosExtra.push({ tipo: 'general', texto: _aet.hito,
+            autor: evo.PLAN_FIRMA_KINE, autorEmail: ctx.email || '' });
+        }
+      } catch (e) { console.warn('_aetSerieDelTurno:', e.message); }
+
       // 📌 NOTA DEL TURNO → hito en la línea de tiempo (Diego, 2-sep-2026).
       // La nota YA era el texto libre propio de ese turno: no se hereda al
       // siguiente y entra a la evolución como «Nota: …». Lo único que le
@@ -5348,6 +5365,76 @@ function guardarEvolucion(datos, ctx) {
 // entero dentro del lock y nada mueve filas de CAMAS_ESTADO en el camino.
 // Sin ellos (anularEvento) se comporta como siempre: repoActualizar clásico
 // y el cache de timeline no se toca.
+/* ── ⚖️ La AET como serie de tramos ────────────────────────────────────────
+   Grupos de soporte (Diego): 1 = soporte total, 2, 3A, 3B, 3C — en el sistema,
+   I, II, IIIA, IIIB, IIIC. SIN AET el grupo vigente es el I: todo paciente
+   parte con soporte total. Los valores GUARDADOS no cambian (AET_ACTIVA,
+   AET_NIVEL); la serie los cuenta en el tiempo. */
+const _AET_GRUPOS = ['I', 'II', 'IIIA', 'IIIB', 'IIIC'];
+
+/**
+ * Serie de AET después de este turno, y el hito del cambio si lo hubo.
+ * Devuelve { serie: <json>|null, hito: <texto>|'' }. `serie` null = no tocar.
+ *
+ *  · Un tramo nuevo se abre SOLO si el grupo es distinto del vigente.
+ *  · Si el tramo vigente es de ESTE turno (re-guardado), se corrige él mismo; y
+ *    si la corrección lo deja igual al anterior, se borra y el anterior se
+ *    reabre — así corregir un error no deja un cambio fantasma.
+ *  · El primer tramo nace en el ingreso, con el grupo que se eligió ahí.
+ *  · Un episodio ANTERIOR a la serie se siembra desde lo que la cama ya decía.
+ */
+function _aetSerieDelTurno(cama, evo, turnoKey, fecha, turno) {
+  const activaCama = esVerdadero(cama.AET_ACTIVA);
+  const activa = (evo.AET_ACTIVA === '' || evo.AET_ACTIVA == null) ? activaCama : esVerdadero(evo.AET_ACTIVA);
+  const nivel = String(evo.AET_NIVEL || cama.AET_NIVEL || '');
+  const g = activa ? nivel : 'I';
+  if (_AET_GRUPOS.indexOf(g) === -1) return { serie: null, hito: '' };   // AET sin grupo: nada que contar
+
+  let serie = [];
+  try { serie = JSON.parse(cama.AET_SERIE || '[]'); } catch (e) { serie = []; }
+  if (!Array.isArray(serie)) serie = [];
+
+  const ing = String(cama.TS_INGRESO || '') || _tsEventoTurno(fecha, turno, '');
+  let ahora = _tsEventoTurno(fecha, turno, '');     // la mitad del turno: determinista al re-guardar
+  const tramo = (grupo, desde) => ({ g: grupo, desde: desde, hasta: '', tk: String(turnoKey), f: String(evo.PLAN_FIRMA_KINE || '') });
+
+  if (!serie.length) {
+    if (esVerdadero(evo.ES_INGRESO)) {
+      serie.push(tramo(g, ing));
+      return { serie: JSON.stringify(serie), hito: '' };
+    }
+    // Episodio anterior a la serie: se siembra con lo que la cama ya decía.
+    const gCama = activaCama && _AET_GRUPOS.indexOf(String(cama.AET_NIVEL || '')) !== -1 ? String(cama.AET_NIVEL) : 'I';
+    const fAet = String(cama.AET_FECHA || '').slice(0, 10);
+    if (gCama !== 'I' && /^\d{4}-\d{2}-\d{2}$/.test(fAet) && fAet + ' 00:00' > ing.slice(0, 16)) {
+      serie.push({ g: 'I', desde: ing, hasta: fAet + ' 00:00', tk: '', f: '' });
+      serie.push({ g: gCama, desde: fAet + ' 00:00', hasta: '', tk: '', f: '' });
+    } else {
+      serie.push({ g: gCama, desde: ing, hasta: '', tk: '', f: '' });
+    }
+  }
+
+  const ult = serie[serie.length - 1];
+  if (String(ult.tk) === String(turnoKey)) {
+    // Re-guardado del mismo turno: se corrige SU tramo.
+    const prev = serie.length > 1 ? serie[serie.length - 2] : null;
+    if (prev && prev.g === g) { serie.pop(); prev.hasta = ''; }
+    else if (ult.g !== g) { ult.g = g; ult.f = String(evo.PLAN_FIRMA_KINE || ult.f || ''); }
+  } else if (ult.g !== g) {
+    if (ahora < String(ult.desde || '').slice(0, 16)) ahora = String(ult.desde).slice(0, 16);
+    ult.hasta = ahora;
+    serie.push(tramo(g, ahora));
+  }
+
+  // El hito dice de qué grupo a cuál, y solo lo deja el turno que hizo el cambio.
+  let hito = '';
+  const fin = serie[serie.length - 1];
+  if (serie.length > 1 && String(fin.tk) === String(turnoKey)) {
+    hito = '⚖️ AET: de grupo ' + serie[serie.length - 2].g + ' a grupo ' + fin.g;
+  }
+  return { serie: JSON.stringify(serie), hito: hito };
+}
+
 function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, patientId, filaCama, timelineJson) {
   const esIngreso = esVerdadero(evo.ES_INGRESO);
   const val = (a, b) => (a !== undefined && a !== null && a !== '') ? a : (b || '');
@@ -5540,6 +5627,7 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
     // turno los apague explícitamente (viene false, no vacío).
     AET_ACTIVA: evo.AET_ACTIVA === '' || evo.AET_ACTIVA == null ? esVerdadero(cama.AET_ACTIVA) : esVerdadero(evo.AET_ACTIVA),
     AET_NIVEL: val(evo.AET_NIVEL, cama.AET_NIVEL),
+    AET_SERIE: evo._AET_SERIE !== undefined ? evo._AET_SERIE : (cama.AET_SERIE || ''),
     AET_FECHA: (esVerdadero(evo.AET_ACTIVA) && !esVerdadero(cama.AET_ACTIVA)) ? fecha : (esVerdadero(evo.AET_ACTIVA) || evo.AET_ACTIVA === '' || evo.AET_ACTIVA == null ? (cama.AET_FECHA || '') : ''),
     UPOT_ACTIVO: evo.UPOT_ACTIVO === '' || evo.UPOT_ACTIVO == null ? esVerdadero(cama.UPOT_ACTIVO) : esVerdadero(evo.UPOT_ACTIVO),
     UPOT_MEDIDAS: val(evo.UPOT_MEDIDAS, cama.UPOT_MEDIDAS),

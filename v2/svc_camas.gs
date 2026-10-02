@@ -264,6 +264,7 @@ function darAltaPaciente(datos, ctx) {
         REINTUBACION: datos.reintubacion !== undefined ? esVerdadero(datos.reintubacion) : huboReintub,
         BARTHEL_INGRESO: cama.BARTHEL, BARTHEL_EGRESO: datos.barthelEgreso || '',
         FSS_EGRESO: fssEgr, MRC_SS_EGRESO: mrcEgr,
+        AET_SERIE: cama.AET_SERIE || '',
         DINAMO_EGRESO: dinEgr, CPAX_EGRESO: cpaxEgr,
         DAUCI: interp.DAUCI, MRC_INTERP: interp.MRC_INTERP,
         FSS_INTERP: interp.FSS_INTERP, DINAMO_INTERP: interp.DINAMO_INTERP,
@@ -475,7 +476,7 @@ function _limpiarCamaInterno(idCama) {
     DISP_CONFIRMADO: false, APACHE2: '', CORRECCIONES_JSON: '',
     ULT_PS: '', ULT_PIM: '', ULT_PIM_FECHA: '',
     ULT_MRC_FIRMA: '', ULT_FSS_FIRMA: '', ULT_PIM_FIRMA: '',
-    AET_ACTIVA: false, AET_NIVEL: '', AET_FECHA: '',
+    AET_ACTIVA: false, AET_NIVEL: '', AET_FECHA: '', AET_SERIE: '',
     UPOT_ACTIVO: false, UPOT_MEDIDAS: '', UPOT_FECHA: '',
     // Los pendientes son del episodio: se van con el paciente. Si quedaran,
     // el siguiente que ocupe la cama heredaría encargos de otra persona.

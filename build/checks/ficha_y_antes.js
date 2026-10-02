@@ -187,7 +187,11 @@ const { chromium } = require('playwright-core');
     r.diasFuera = !$('fDias').closest('#fPreUci');
     r.aetFuera = !$('cAET').closest('#fPreUci');
     r.diasVisible = $('fDias').offsetParent !== null;
-    r.aetVisible = $('cAET').offsetParent !== null;
+    // ⚖️ 30-sep-2026 (AET como serie): la casilla cAET pasó a ser el ESTADO oculto; lo que el
+    // kinesiólogo ve en el turno es la tarjeta #aetTurno. La regla de esta guardia —la adecuación
+    // se decide durante la estadía y NO se pliega con la ficha— se mide ahora sobre ella.
+    DB = [{ ID_CAMA: '1', OCUPADA: true, PATIENT_ID: 'p1' }]; $('cBed').value = '1'; aetPintar();   // la tarjeta existe con un paciente en la cama
+    r.aetVisible = $('aetTurno').offsetParent !== null && !$('aetTurno').closest('#fPreUci');
     // Los plegados sí quedan invisibles
     r.barthelInvisible = $('fBarthel').offsetParent === null;
     return r;

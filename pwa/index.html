@@ -1461,6 +1461,15 @@ table.rhb2 .rl{width:128px;text-align:left;}
 #fcId .oblig{color:#b91c1c;font-weight:700;text-transform:none;letter-spacing:0;}
 .ingSop{height:40px;padding:0 16px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
 .ingSop[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff;}
+/* ⚖️ AET como serie (30-sep-2026): los cinco grupos, en el ingreso y en el turno */
+.aetB{height:40px;min-width:44px;padding:0 14px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
+.aetB[aria-pressed="true"]{background:#6d28d9;border-color:#6d28d9;color:#fff;}
+#aetTurno{margin:6px 0 10px;padding:10px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;}
+#aetTurno .aetT-fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+#aetTurno .aetT-tit{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6d28d9;}
+#aetTurno .aetT-vig{font-size:.86rem;color:#1e293b;}
+#aetTurno .aetT-ch{height:34px;padding:0 12px;border-radius:8px;border:1px solid #c4b5fd;background:#fff;color:#5b21b6;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;}
+#aetTurnoAviso{font-size:.8rem;color:#5b21b6;margin-top:8px;}
 /* Evaluaciones como cajones del celular (1-oct-2026, Diego): icono cuadrado, nombre debajo,
    numerito en la esquina. Rojo = pendiente que vence; gris = sin llenar (opcional); verde = al día. */
 #evTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:18px 12px;margin:10px 0 6px;}
@@ -3330,6 +3339,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
               <div style="font-size:.72rem;color:#64748b;margin-top:5px;">Si llegó con otra combinación (tubo con tubo en T, traqueostomía con alto flujo…), se completa en Respiratorio.</div>
             </div>
+            <!-- ⚖️ Grupo de soporte al ingreso (Diego, 30-sep-2026): «soporte total, que sería el grupo 1,
+                 grupo 2, grupo 3A, 3B, 3C». Todo paciente parte en el 1; lo que se elige acá es el PRIMER
+                 tramo de la serie. NO es un dato nuevo: son los mismos cAET/fAETnivel de siempre, que
+                 siguen siendo la fuente de verdad (la KTM 3C, el banner y el relato los leen). -->
+            <div id="aetIng" class="hidden" style="margin-top:12px;">
+              <label style="font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;display:block;margin-bottom:6px;">Adecuación del esfuerzo terapéutico · grupo con que ingresa</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="aetB" data-g="I" aria-pressed="false" onclick="aetElegir('I')" title="Soporte total">1 · Soporte total</button>
+                <button type="button" class="aetB" data-g="II" aria-pressed="false" onclick="aetElegir('II')" title="Soporte total con orden de no RCP">2</button>
+                <button type="button" class="aetB" data-g="IIIA" aria-pressed="false" onclick="aetElegir('IIIA')" title="No instauración de medidas invasivas">3A</button>
+                <button type="button" class="aetB" data-g="IIIB" aria-pressed="false" onclick="aetElegir('IIIB')" title="No instauración de medidas adicionales de ninguna clase">3B</button>
+                <button type="button" class="aetB" data-g="IIIC" aria-pressed="false" onclick="aetElegir('IIIC')" title="Retiro de todas las medidas">3C</button>
+              </div>
+              <div id="aetIngDesc" style="font-size:.72rem;color:#64748b;margin-top:5px;"></div>
+            </div>
             <div class="bloqueNota">Es <b>cuándo llegó el paciente</b>, no cuándo lo estás anotando: llegó a las 23:00 y lo registras a la 01:00, va 23:00. De acá salen el día de estadía y los bloques de 24 horas de ventilación.</div>
           </div>
         </div>
@@ -3397,7 +3421,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
               </div><!-- /fPreUci — el AET queda FUERA: la adecuación del
                    esfuerzo terapéutico se decide durante la estadía, no antes -->
-              <div class="col wa"><label>⚖️ AET</label>
+              <div class="col wa hidden" aria-hidden="true"><label>⚖️ AET</label>
                 <div style="display:flex;align-items:center;gap:6px;">
                   <input type="checkbox" id="cAET" onchange="hAET()" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;">
                   <div id="dAETnivel" class="hidden" style="display:flex;align-items:center;gap:6px;">
@@ -3412,6 +3436,28 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <span id="aetTip" class="interp-tip" style="font-size:.75rem;"></span>
                   </div>
                 </div>
+              </div>
+            </div>
+            <!-- ⚖️ AET en el turno (Diego, 30-sep-2026): «probablemente lo más adecuado sería escribirlo en
+                 el turno, pero que se guarde como un evento de episodio, como episodio serial». Muestra el
+                 grupo VIGENTE; los cinco botones solo salen con «La cambiaron». CONFIRMAR NO ES CAMBIAR: un
+                 toque sin querer no deja una adecuación nueva en la ficha. -->
+            <div id="aetTurno" class="hidden">
+              <div class="aetT-fila">
+                <span class="aetT-tit">⚖️ Adecuación del esfuerzo terapéutico</span>
+                <span id="aetTurnoTxt" class="aetT-vig"></span>
+                <button type="button" id="btnAetCambio" class="aetT-ch" onclick="aetCambioAbrir()">La cambiaron</button>
+              </div>
+              <div id="aetTurnoPick" class="hidden" style="margin-top:8px;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <button type="button" class="aetB" data-g="I" aria-pressed="false" onclick="aetElegir('I')" title="Soporte total">1 · Soporte total</button>
+                  <button type="button" class="aetB" data-g="II" aria-pressed="false" onclick="aetElegir('II')" title="Soporte total con orden de no RCP">2</button>
+                  <button type="button" class="aetB" data-g="IIIA" aria-pressed="false" onclick="aetElegir('IIIA')" title="No instauración de medidas invasivas">3A</button>
+                  <button type="button" class="aetB" data-g="IIIB" aria-pressed="false" onclick="aetElegir('IIIB')" title="No instauración de medidas adicionales de ninguna clase">3B</button>
+                  <button type="button" class="aetB" data-g="IIIC" aria-pressed="false" onclick="aetElegir('IIIC')" title="Retiro de todas las medidas">3C</button>
+                  <button type="button" id="btnAetDejar" class="aetT-ch" onclick="aetCambioDejar()">Dejar igual</button>
+                </div>
+                <div id="aetTurnoAviso"></div>
               </div>
             </div>
             <!-- Fase clínica del paciente (v2 — FASE_JSON) -->
@@ -8960,7 +9006,7 @@ function _snapIniEstado(){
     _transIntubEsteTurno };
   // 🗂️ Rama episodio/turno: el banner del episodio, la fila de eventos y la
   // línea fina se pintan con el estado de llegada recién fotografiado.
-  try{ _evVAAnunciado='nada'; _episodioAlFormulario(); renderBannerEpisodio(); _pintarFilaEventoVA(); _lineaFinaVA(); }catch(e){ console.warn('episodio/turno:', e); }
+  try{ _evVAAnunciado='nada'; _episodioAlFormulario(); aetPintar(); renderBannerEpisodio(); _pintarFilaEventoVA(); _lineaFinaVA(); }catch(e){ console.warn('episodio/turno:', e); }
 }
 /** ¿Hay algún evento de vía aérea DECLARADO en este turno? */
 function _hayEventoVA(){
@@ -9298,7 +9344,7 @@ function fichaAplicar(abrir){
   }
   // La identificación (nombre/RUT/dx) solo se destapa a pedido.
   if(!esIng){ const fi=$('fcId'); if(fi) fi.classList.toggle('hidden', !_fichaAbierta); }
-  try{ ingSoportePintar(); }catch(e){}   // «Cómo llega» solo existe en el ingreso
+  try{ ingSoportePintar(); aetPintar(); }catch(e){}   // «Cómo llega» y el grupo de AET solo existen en el ingreso
 }
 function fichaToggle(){ fichaAplicar(!_fichaAbierta); }
 
@@ -14262,7 +14308,7 @@ function renderParams(o) {
   // Dispositivos de circuito: visibles solo en VM; al quedar en VM se fechan solos
   if(!esPost) _gateDispositivos();
   if(!esPost) esfGate();   // 1-oct-2026 · el bloque de esfuerzo sale solo con ventilación espontánea
-  if(!esPost) try{ ingSoportePintar(); }catch(e){}   // «Cómo llega» sigue lo que digan los selectores
+  if(!esPost) try{ ingSoportePintar(); aetPintar(); }catch(e){}   // «Cómo llega» sigue lo que digan los selectores
 }
 
 //  HANDLERS UI
@@ -15733,6 +15779,70 @@ function _gateVentPorTqt(){ _gateVentPorEvento(); }
 function hAET(){
   if($('cAET')?.checked){show('dAETnivel');hAETtip();}
   else{hide('dAETnivel');_aetKTMsuspend(false);}
+  try{ aetPintar(); }catch(e){}
+}
+/* ── ⚖️ AET como serie de tramos (Diego, 30-sep-2026) ───────────────────────
+   Los grupos son 1 (soporte total), 2, 3A, 3B, 3C = I, II, IIIA, IIIB, IIIC. SIN AET el
+   grupo es el I: todo paciente parte con soporte total. Lo guardado no cambia (AET_ACTIVA,
+   AET_NIVEL): el servidor es el que lleva la serie, y abre un tramo SOLO si el grupo cambia.
+   🔴 Estos botones NO son una fuente nueva: dibujan y mueven cAET/fAETnivel, que siguen
+   siendo el estado (la KTM 3C, el banner, el relato y la carga de un turno guardado los leen). */
+const _AET_ETQ={I:'1',II:'2',IIIA:'3A',IIIB:'3B',IIIC:'3C'};
+const _AET_NOM={I:'Soporte total',II:'Soporte total con orden de no RCP',IIIA:'No instauración de medidas invasivas',IIIB:'No instauración de medidas adicionales de ninguna clase',IIIC:'Retiro de todas las medidas'};
+let _aetAbierto=false, _aetKey='';
+function _aetActual(){ return $('cAET')?.checked ? (v('fAETnivel')||'') : 'I'; }
+/** El grupo con que SE ABRIÓ el turno, y su tramo. Si este turno ya hizo un cambio (turno
+ *  reabierto), la base es el grupo anterior: «Dejar igual» deshace ese cambio. */
+function _aetBase(){
+  const c=_camaPanel(); let serie=[];
+  try{ serie=JSON.parse(c.AET_SERIE||'[]'); }catch(e){ serie=[]; }
+  if(!Array.isArray(serie)) serie=[];
+  const ult=serie[serie.length-1], tk=_turnoKeyVigente();
+  if(ult && String(ult.tk)===tk && serie.length>1) return {g:serie[serie.length-2].g, tramo:ult, propio:true};
+  if(ult) return {g:ult.g, tramo:ult, propio:false};
+  const act=c.AET_ACTIVA===true||c.AET_ACTIVA==='TRUE';
+  return {g:(act && c.AET_NIVEL)?c.AET_NIVEL:'I', tramo:null, propio:false};
+}
+function aetElegir(g){
+  if(!_AET_ETQ[g]) return;
+  const on=g!=='I';
+  if($('cAET')) $('cAET').checked=on;
+  if($('fAETnivel')) $('fAETnivel').value=on?g:'';
+  hAET();                      // muestra el nivel, suspende la KTM si es 3C y repinta
+}
+function aetCambioAbrir(){ _aetAbierto=true; aetPintar(); }
+function aetCambioDejar(){
+  const b=_aetBase(); _aetAbierto=false;
+  aetElegir(b.g);              // vuelve a lo que decía la cama al abrir el turno
+}
+function aetPintar(){
+  const ing=v('cIng')==='true', g=_aetActual();
+  const marcar=(box)=>box&&box.querySelectorAll('[data-g]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.g===g?'true':'false'));
+  const bi=$('aetIng');
+  if(bi){
+    bi.classList.toggle('hidden', !ing); marcar(bi);
+    const d=$('aetIngDesc'); if(d) d.textContent=_AET_NOM[g]?('Grupo '+_AET_ETQ[g]+' · '+_AET_NOM[g]):'';
+  }
+  const bt=$('aetTurno'); if(!bt) return;
+  const c=_camaPanel();
+  bt.classList.toggle('hidden', ing || !c.PATIENT_ID);
+  if(ing || !c.PATIENT_ID) return;
+  const key=String(v('cBed'))+'|'+_turnoKeyVigente();
+  if(_aetKey!==key){ _aetKey=key; _aetAbierto=false; }    // otro turno u otra cama: el selector vuelve a cerrarse
+  const b=_aetBase(), t=b.tramo;
+  const dsd=!t?'':(String(t.desde||'')===String(c.TS_INGRESO||'') && !b.propio ? 'desde el ingreso' : 'desde '+_fdd(t.desde));
+  const quien=t&&t.f?(' · lo registró '+escapeHtml(t.f)):'';
+  const vig=b.propio
+    ? 'Cambió en este turno: de grupo '+_AET_ETQ[b.g]+' a grupo '+_AET_ETQ[t.g]+quien
+    : 'Grupo '+(_AET_ETQ[b.g]||'—')+' · '+(_AET_NOM[b.g]||'')+(dsd?' · '+dsd:'')+quien;
+  $('aetTurnoTxt').innerHTML='<b>'+vig+'</b>';
+  $('btnAetCambio').classList.toggle('hidden', _aetAbierto);
+  $('aetTurnoPick').classList.toggle('hidden', !_aetAbierto);
+  marcar($('aetTurnoPick'));
+  const av=$('aetTurnoAviso');
+  if(av) av.textContent = !_aetAbierto ? '' : (g!==b.g
+    ? 'Cambia de grupo '+_AET_ETQ[b.g]+' a grupo '+(_AET_ETQ[g]||'—')+'. Queda en el historial con la fecha y tu firma al guardar el turno.'
+    : 'Sin cambio: sigue en el grupo '+_AET_ETQ[b.g]+'. Si fue un toque sin querer, no se registra nada.');
 }
 const _AET_TIPS={
   'I':    ['Soporte Total','interp-ok'],
