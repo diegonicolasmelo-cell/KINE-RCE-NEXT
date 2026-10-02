@@ -3108,3 +3108,67 @@ la cama ya tiene, que avise cuál está en otra cama, y que al elegir uno mande
 🪤 El reloj va congelado: fecha inventada y turno forzado.
 
 **197 guardias verdes.** Sello `NEXT-4.0-ventilador-en-navm`.
+
+---
+
+## 2-oct-2026 · El turno rediseñado · Tanda 5.0 (A a G)
+
+Diego dictó el 30-sep y el 1-oct cómo quería el turno y, el 1-oct, dio la orden:
+**«Programa lo pendiente»** (hasta entonces regía «no programes nada aún»). Se
+hizo en siete tandas, cada una con su guardia escrita **primero** y vista
+**roja**, y la batería completa verde antes de cada commit. Los acuerdos, con sus
+palabras, están en `docs/ACUERDOS_REDISENO.md` (§7 y §8); lo que sigue abierto,
+en `docs/PENDIENTES.md`.
+
+### Qué se programó
+
+| Tanda | Qué | Guardia |
+|---|---|---|
+| A | BDT sin «no realizado», positivo precoz o tardío, FEM narrado en L/s | `bdt_una_eleccion` |
+| B | PVE con más de 24 h de VM en cualquier modalidad; «no corresponde» pide razón | `pve_no_corresponde_razon` |
+| C | P0.1, ΔPocc y Pmusc a Evaluaciones y al relato; deglución presente/ausente | `esfuerzo_en_evaluaciones` |
+| D | «Pruebas de traqueostomía», bloque propio con puerta por TQT | `pruebas_tqt` |
+| E | Ecografía pulmonar: POCUS (1, 2, PLAPS) y LUS (12 zonas) sobre una figura, con serie | `eco_pulmonar` |
+| F | Evaluaciones como iconos de celular; «obligatorio» en tres niveles | `evaluaciones_celular` |
+| G1 | Paso 0 en cuatro bloques; fecha y hora de llegada obligatorias | `ingreso_cuatro_bloques` |
+| G2 | «Cómo llega»: el soporte de ingreso | `ingreso_soporte` |
+| G3 | La AET como **serie de tramos** (1, 2, 3A, 3B, 3C) | `aet_serie` |
+| G4 | «General» se disuelve: Preingreso en Evaluaciones, Fase clínica propia, día de estadía en el banner | `general_disuelta` |
+
+### Lo que se midió y no se sabía
+
+- 🪤 **La hora de ingreso sugerida se borraba sola** al abrir un ingreso
+  (`fillCama`). Estaba así desde antes; no se veía porque la hora no era
+  obligatoria. Lo encontró la guardia de G1.
+- 🪤 **«✏️ Editar ficha» destapaba la identificación y seguía oculta**: desde que
+  existe el paso 0, `fcId` pertenece solo a ese paso. Un RUT mal escrito no se
+  podía corregir fuera del ingreso. Lo encontró la guardia de G4.
+- 🪤 **`#epBannerCaja:has(.hidden)`** escondía la caja entera si CUALQUIER hijo
+  estaba oculto; al compartirla con la línea de la ficha se llevaba el banner.
+  Ahora solo manda el banner.
+- 🔴 **No era «falta el PMI»**: era el P0.1 mal transcrito de la voz. No se creó
+  ningún campo.
+- Un error mío, corregido ante Diego: dije que la PVE no aparecía en modo
+  controlado. Medido: con tubo **siempre** aparece, en cualquier modo y a
+  cualquier hora; con TQT en VM no aparece. Lo que cambió es la puerta de las
+  24 h y que «no corresponde» pida razón.
+
+### Decisiones que tomé yo, para que las confirme (en `PENDIENTES.md` §2)
+
+Nombre «Pruebas de traqueostomía»; el botón se queda «POCUS»; el BDT se desmarca
+tocando el mismo botón; la deglución antepone presente/ausente y conserva la
+calidad; el «obligatorio» vence a los 3 días y no bloquea el guardado (solo la
+PVE bloquea); la adecuación del turno vive dentro de la tarjeta «Fase clínica».
+
+### Reglas que se aplicaron y conviene no olvidar
+
+- **El sello del cohete debe ser ASCII.** `NEXT-5.0-turno-rediseñado` hizo
+  fallar el empaquetado («el cargador contiene caracteres no ASCII»).
+- **El sello vive también en `v2/index.html`** (el `<meta rce-version>` y el aviso
+  de «la app no pudo iniciar»). Subir solo `build/empaquetar_cohete.js` pone roja
+  `paridad_entrega`, `aviso_error_al_centro` y `buzon_campana`.
+- La columna de EVOLUCIONES pasó de 411 a **414**; hay que correr
+  `crearORepararEstructura()` al pegar. CAMAS_ESTADO y ARCHIVO_PACIENTES ganan
+  `AET_SERIE`.
+
+**207 guardias verdes.** Sello `NEXT-5.0-turno-redisenado`.

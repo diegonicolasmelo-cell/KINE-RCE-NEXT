@@ -35,10 +35,10 @@ lleva derecho al turno (el paso 2).
 | 0 | **El ingreso es un paso propio** y lleva derecho al turno | ✅ **hecho** 20-sep |
 | 1 | RUT **obligatorio** | ✅ **hecho** 20-sep |
 | 2 | «Ingreso» pasa a **Procedencia** | ✅ **hecho** 20-sep |
-| 3 | Fecha y hora a mano; día de estadía calculado y bloqueado | por programar |
+| 3 | Fecha y hora a mano; día de estadía calculado y bloqueado | ✅ **hecho** 2-oct (ver 8.1) |
 | 4 | Diagnóstico libre **con autocompletado** | por programar |
 | 5 | Grupo REM **sugerido** desde tabla editable | por programar |
-| 6 | ECF, Barthel y Charlson al ingreso, **ninguna obligatoria** | por programar |
+| 6 | ECF, Barthel y Charlson al ingreso, **ninguna obligatoria** | ✅ **hecho** 2-oct, pero en Evaluaciones y no en el ingreso (ver 8.4) |
 | 7 | **Nombre social** opcional | ✅ **hecho** 20-sep (falta que mande en pantalla) |
 | 8 | Recordatorio a los 3 días + **% de cumplimiento** de escalas | por programar |
 
@@ -1176,3 +1176,117 @@ el FSS, la dinamometría y la ecografía.
    consumidores agrupan por prefijo y una evaluación con nombre de parámetro
    confunde a quien lea la planilla. En contra: los valores los **mide el
    ventilador**, así que el prefijo no miente del todo.
+
+---
+
+## 8 · El paso 0, la adecuación como serie y la tarjeta «General» — 30-sep a 2-oct-2026
+
+Esto salió de que Diego revisó el módulo inicial y fue diciendo, apartado por
+apartado, dónde le hacía más sentido cada cosa. **Todo lo de esta sección está
+programado** y con su guardia, pero **no probado todavía en la planilla de
+NEXT**: eso viene al pegar el paquete.
+
+### 8.1 · El paso 0 son cuatro bloques, y la hora de llegada es obligatoria
+
+> *«Me gustaría que en este módulo también estuviera incluido el horario de
+> ingreso, ya todo este apartado de qué son los datos cuando el paciente
+> ingresa. Por ejemplo: día de estadía, fecha de ingreso, hora de ingreso.»*
+>
+> *«Puede que no sea la misma en la cual yo estoy ingresando al paciente,
+> porque puede que haya llegado, por ejemplo, a las 11 de la noche y yo lo
+> estoy anotando a las 1 de la mañana porque recién me desocupé. En ese
+> sentido, va a priorizar la fecha en que llegó, no en que yo la anoté.»*
+
+Cuatro bloques: **identificación** (nombre, RUT, nombre social) · **demográficos**
+(edad, sexo, talla) · **ingreso clínico** (diagnóstico con su grupo REM,
+procedencia) · **llegada** (fecha y hora de llegada, con qué soporte llegó, y la
+adecuación del esfuerzo terapéutico).
+
+🔴 **La fecha y la hora son obligatorias** —es cuándo llegó, no cuándo se
+anota—. Lo exige la pantalla, igual que el RUT; el servidor no lo repite.
+
+🪤 **Un error que apareció al medirlo:** al abrir un ingreso, la hora sugerida se
+borraba sola. Estaba escrito así desde antes y nadie lo había visto porque la
+hora no era obligatoria. Quedó arreglado.
+
+### 8.2 · Con qué llegó el paciente
+
+Cuatro botones —VM invasiva, VM no invasiva, oxigenoterapia, sin apoyo— y, si
+corresponde, el tipo (tubo o traqueostomía; mascarilla, naricera, alto flujo…).
+🔴 **No es un dato nuevo**: es una puerta a los tres selectores de siempre (vía
+aérea · soporte · interfaz), que siguen siendo la única fuente de verdad. Solo
+existe en el ingreso; después el soporte cambia por eventos.
+
+### 8.3 · La adecuación del esfuerzo terapéutico es una SERIE de tramos
+
+> *«Adecuación del esfuerzo terapéutico podría ir en ingreso. Ahí se podrían
+> definir los distintos grupos de soporte: soporte total, que sería el grupo 1,
+> grupo 2, grupo 3A, 3B, 3C. De esta forma, determinar qué tipo de adecuación
+> se le va a dar al paciente al ingreso. Esto puede ser modificable durante el
+> transcurso de la estadía del paciente en la UCI, ya que pueden pasar
+> distintas cosas o que no responda bien la terapia y se decida cambiar de
+> adecuación de grupo 1 a grupo 3B, por ejemplo.»*
+>
+> *«Probablemente lo más adecuado sería escribirlo en el turno, pero que se
+> guarde como un evento de episodio, como episodio serial. Entonces, que se
+> abra el nivel de adecuación y que se mantenga el mismo hasta que no se
+> modifique.»*
+>
+> *«Al momento del egreso, si no se modificó durante toda la estadía, que se
+> guarde como adecuación al egreso el mismo que se seleccionó al principio.»*
+
+Cómo quedó:
+
+- **Cinco grupos**: 1 (soporte total) · 2 · 3A · 3B · 3C. Todo paciente parte en
+  el 1: **sin adecuación, el grupo es el 1**.
+- **Se elige en el ingreso** (primer tramo) y **se confirma en el turno**: la
+  tarjeta dice el grupo vigente, desde cuándo y quién lo registró. Los cinco
+  botones **solo salen al apretar «La cambiaron»**.
+- 🔴 **Confirmar no es cambiar.** Un tramo nuevo se abre **solo si el grupo es
+  distinto** del vigente. Un toque sin querer no deja una adecuación nueva en
+  la ficha. Es la misma regla del filtro HME.
+- Cada cambio deja su hito en el historial: «AET: de grupo 1 a grupo 3B», con
+  la fecha y la firma.
+- Corregir un error **en el mismo turno** no abre un tramo de más: si el
+  cambio vuelve al grupo anterior, el tramo propio se borra y el anterior se
+  reabre.
+- 🪤 **La adecuación al egreso no se copia: es el último tramo.** Y si no
+  cambió, ese tramo es el del ingreso. La serie viaja al archivo al dar el alta
+  y la cama la suelta para el paciente siguiente.
+- **El 3C sigue suspendiendo la KTM**, y el relato dice lo mismo que antes. Lo
+  guardado no cambió (`AET_ACTIVA`, `AET_NIVEL`): la serie es la historia de
+  esos dos valores.
+- Un paciente **anterior a la serie** se siembra desde lo que la cama ya decía.
+
+### 8.4 · La tarjeta «General» se disolvió
+
+> *«Barthel, Apache, Charlson, escala clínica de fragilidad. Probablemente eso
+> va a ir en evaluaciones. Ya son cosas totalmente distintas.»*
+>
+> *«Lo que puede aparecer quizás en turno puede ser los días de estadía, pero
+> no como una casilla, sino como información. No es algo que se pueda rellenar,
+> sino que es un cálculo que se infiere respecto a la fecha de ingreso y la
+> fecha actual.»*
+>
+> *«Las fases van a ir del turno y podría ser una nueva [tarjeta], en vez de
+> cambiar la general, poner como fases: en qué fase está.»*
+
+- **Barthel, ECF, Charlson y APACHE II** son la sexta familia de Evaluaciones,
+  **«Preingreso»**, y va primera. Mismos campos y mismo guardado.
+  Esto **reemplaza** el acuerdo 1.6 («al ingreso»): lo último que dijo Diego
+  manda. Lo que sí se mantiene de 1.6: **ninguna es obligatoria** y pendiente
+  se ve **en ámbar**, nunca en rojo —el rojo es de lo que vence—.
+- 🪤 **El preingreso no es una medición del turno.** Abrir su cajón no marca «se
+  evaluó este turno», y tenerlo cargado no abre nada solo.
+- El **día de estadía** es información: el banner dice «Día 7 · ingresó 05-08
+  23:00». El campo sigue existiendo, oculto, porque el relato lo lee.
+- **«Fase clínica»** es una tarjeta propia, y la adecuación del turno vive ahí
+  debajo (las dos son estado que arrastra).
+- La **ficha editable** queda en una línea bajo el banner («✏️ Editar ficha»).
+  🪤 Al armarla apareció un fallo viejo: desde el paso 0 la identificación
+  pertenece solo a ese paso, así que el botón la destapaba y seguía oculta. Un
+  RUT mal escrito, otra vez, no se podía corregir. Ahora sí.
+- 🔴 **De noche, el Preingreso no se alcanza**: la tarjeta de mediciones no se
+  muestra de noche (regla de siempre). Es coherente con 1.6 —«a las cuatro de la
+  mañana nadie sabe el Barthel previo»—, pero hay que saberlo.
+
