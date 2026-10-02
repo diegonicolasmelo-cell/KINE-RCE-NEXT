@@ -1448,6 +1448,11 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bdtb-neg[aria-pressed="true"]{background:#15803d;border-color:#15803d;}
 .bdtb-pos[aria-pressed="true"]{background:#991b1b;border-color:#991b1b;}
 .bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
+/* Paso 0: cuatro bloques, cada uno una pregunta (1-oct-2026, Diego). */
+#fcId .bloque + .bloque{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;}
+#fcId .bloqueT{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;}
+#fcId .bloqueNota{margin-top:9px;padding:8px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.76rem;color:#14532d;}
+#fcId .oblig{color:#b91c1c;font-weight:700;text-transform:none;letter-spacing:0;}
 /* Evaluaciones como cajones del celular (1-oct-2026, Diego): icono cuadrado, nombre debajo,
    numerito en la esquina. Rojo = pendiente que vence; gris = sin llenar (opcional); verde = al día. */
 #evTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:18px 12px;margin:10px 0 6px;}
@@ -3196,10 +3201,13 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
       <!-- IDENTIFICACIÓN — solo visible en ingreso -->
       <div class="fcard fc-id" id="fcId" data-paso="0">
-        <div class="fcard-hdr"><span class="fcard-title">👤 Identificación</span></div>
+        <div class="fcard-hdr"><span class="fcard-title">👤 Ingreso del paciente</span></div>
         <div class="fcard-body">
-          <!-- Fila 1: Nombre + Edad + Sexo -->
-          <div class="row">
+          <!-- 1-oct-2026 · EL PASO 0 SON CUATRO BLOQUES, cada uno una pregunta distinta (Diego): quién es, cómo es,
+               por qué está acá y cuándo llegó. Los ids, las columnas y los manejadores NO cambiaron: solo el lugar. -->
+          <div class="bloque" data-bloque="identificacion">
+            <div class="bloqueT">Identificación</div>
+            <div class="row">
             <div class="col grow"><label>Nombre</label>
               <input type="text" id="fNombre" class="bold" placeholder="Nombre completo" oninput="_debouncedChkNombre(this.value); actualizarTituloPanel(this.value);" autocomplete="off">
               <div id="dNombreAlert" class="hidden" style="margin-top:4px;padding:5px 9px;border:1px solid #fde68a;border-radius:5px;font-size:.75rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -3225,13 +3233,20 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <label>Nombre social <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
               <input type="text" id="fNombreSocial" placeholder="Cómo prefiere que le digan" autocomplete="off">
             </div>
+            </div>
+          </div>
+          <div class="bloque" data-bloque="demograficos">
+            <div class="bloqueT">Demográficos</div>
+            <div class="row">
             <div class="col ws"><label>Edad</label><input type="number" id="fEdad" min="0" max="120"></div>
             <div class="col ws"><label>Sexo</label><select id="fSexo" onchange="calcPI()"><option value="" disabled selected>-</option><option value="M">M</option><option value="F">F</option></select></div>
             <div class="col ws"><label>Talla cm</label><input type="number" id="fTalla" oninput="calcPI()"></div>
             <div class="col wa" style="align-self:flex-end;padding-bottom:2px;"><span id="lblPI" style="font-size:.73rem;font-weight:600;padding:3px 7px;border-radius:4px;background:#eff6ff;border:1px solid #bfdbfe;color:var(--primary);white-space:nowrap;">PI: --</span></div>
+            </div>
           </div>
-          <!-- Fila 2: Diagnóstico de ingreso + REM -->
-          <div class="row" style="margin-bottom:0;">
+          <div class="bloque" data-bloque="clinico">
+            <div class="bloqueT">Ingreso clínico</div>
+            <div class="row" style="margin-bottom:0;">
             <div class="col grow"><label>Diagnóstico de Ingreso</label>
               <input type="text" id="fDx" placeholder="Ej: Shock Séptico…" list="listDx" autocomplete="off" oninput="aplicarGatesNeuro()">
               <datalist id="listDx">
@@ -3261,7 +3276,10 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <option>Oncológicos</option><option>Genitourinarias</option><option>Quemados</option><option>Otros</option>
               </select>
             </div>
+            </div>
           </div>
+          <div class="bloque" data-bloque="llegada">
+            <div class="bloqueT">Llegada</div>
           <!-- 🔵 PROCEDENCIA (acuerdo 1.2, Diego 19-sep): «el apartado "ingreso"
                debería cambiarse por procedencia, y en reemplazo de anotar
                electivo o urgencia deberíamos registrar si viene de pabellón,
@@ -3271,7 +3289,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                desde su domicilio por forma electiva, prefiero que diga
                electivo». Sigue escribiendo PAC_INGRESO_TIPO: la columna no
                cambia, cambia lo que se pregunta. -->
-          <div class="row" style="margin-top:2px;margin-bottom:0;">
+            <div class="row" style="margin-bottom:0;align-items:flex-end;">
             <div class="col wa"><label>Procedencia</label>
               <select id="fProcedencia" style="min-width:160px;">
                 <option value="" disabled selected>--</option>
@@ -3284,6 +3302,12 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <option>Otro</option>
               </select>
             </div>
+            <div class="col wa"><label>Fecha de llegada <span class="oblig">· obligatoria</span></label>
+              <input type="date" id="fFechaIng" class="tc" style="width:138px;" title="Día en que ingresó a la unidad. Se sugiere hoy; corrígela si llegó antes."></div>
+            <div class="col wa"><label>Hora de llegada <span class="oblig">· obligatoria</span></label>
+              <input type="time" id="fHoraIng" class="tc" style="width:118px;" title="Hora en que ingresó. Con ella se cuentan los días de VM en bloques de 24 h si llegó ventilado."></div>
+            </div>
+            <div class="bloqueNota">Es <b>cuándo llegó el paciente</b>, no cuándo lo estás anotando: llegó a las 23:00 y lo registras a la 01:00, va 23:00. De acá salen el día de estadía y los bloques de 24 horas de ventilación.</div>
           </div>
         </div>
       </div>
@@ -3314,16 +3338,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
                    corresponde: los campos SIGUEN en el formulario y su valor
                    viaja igual al guardar — solo dejan de verse. -->
               <div id="fPreUci" class="pre-uci">
-              <!-- 📅 FECHA Y HORA DE INGRESO MANUALES (Diego, 11-sep-2026): al
-                   ingresar se sugieren con el momento ACTUAL (no la fecha del
-                   turno) y se corrigen a mano si el paciente llegó antes. De
-                   aquí salen la estadía (calendario) y, si llegó ventilado, el
-                   reloj de la VM (bloques de 24 h). En turnos siguientes la
-                   fecha se muestra y no se edita: eso es de 🔐 COORDINACIÓN. -->
-              <div class="col wa" style="margin-right:6px;"><label>Fecha ingreso</label>
-                <input type="date" id="fFechaIng" class="tc" style="width:138px;" title="Día en que ingresó a la unidad. Se sugiere hoy; corrígela si llegó antes."></div>
-              <div class="col wa" style="margin-right:18px;"><label>Hora ingreso</label>
-                <input type="time" id="fHoraIng" class="tc" style="width:96px;" title="Hora en que ingresó. Con ella se cuentan los días de VM en bloques de 24 h si llegó ventilado."></div>
               <div class="col wa" style="margin-right:34px;"><label>Barthel</label>
                 <div style="display:flex;align-items:center;gap:5px;">
                   <select id="fBarthel" onchange="updBarthelLbl('fBarthel','lblBarthel')" style="width:72px;">
@@ -7278,6 +7292,18 @@ function _ingresoListo(){
     toast('⚠️ El RUT es obligatorio para ingresar: sin él no se puede cruzar al paciente consigo mismo');
     _irAlCampo('fRut'); return false;
   }
+  /* 1-oct-2026 · LA FECHA Y LA HORA DE LLEGADA TAMBIÉN (Diego: «hay que hacer la fecha de
+     ingreso obligatoria en el paso 0»). De ellas salen el día de estadía y los bloques de 24 h
+     de VM. Se SUGIEREN con el momento actual, así que en el caso normal no cuestan un toque:
+     solo frenan si alguien las borra. Igual que el RUT, la exigencia vive acá y no en el servidor. */
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v('fFechaIng')||'').trim())){
+    toast('⚠️ Falta la fecha de llegada: de ella sale el día de estadía');
+    _irAlCampo('fFechaIng'); return false;
+  }
+  if(!/^\d{2}:\d{2}$/.test(String(v('fHoraIng')||'').trim())){
+    toast('⚠️ Falta la hora de llegada: con ella se cuentan los días de ventilación');
+    _irAlCampo('fHoraIng'); return false;
+  }
   return true;
 }
 
@@ -8069,7 +8095,11 @@ function fillCama(c, fecha) {
   s('fDx',c.DIAGNOSTICO); s('fRem',c.DIAG_REM);
   s('fCharlson',c.CHARLSON); s('fProcedencia',c.INGRESO_TIPO); s('fNombreSocial',c.NOMBRE_SOCIAL); s('fApache',c.APACHE2);
   $('fDias').value = diasCal(c.TS_INGRESO, c.FECHA_INGRESO, fecha);
-  if($('fHoraIng')) $('fHoraIng').value = (String(c.TS_INGRESO||'').slice(11,16)) || '';
+  /* 🔴 1-oct-2026 · En un INGRESO la hora se SUGIERE con el momento actual y fillCama corre
+     DESPUÉS: con una cama vacía (sin TS_INGRESO) la dejaba en blanco justo después de sugerirla,
+     así que el colega nunca veía la sugerencia. Con la hora ahora obligatoria habría frenado cada
+     ingreso. La fecha ya estaba protegida con esta misma condición; la hora no. */
+  if($('fHoraIng')){ const _h=String(c.TS_INGRESO||'').slice(11,16); if(_h || v('cIng')!=='true') $('fHoraIng').value=_h||''; }
   if($('fFechaIng') && v('cIng')!=='true') $('fFechaIng').value = _isoDia(c.FECHA_INGRESO) || '';
   _fechaInicioVA=_isoDia(c.FECHA_INICIO_VA)||'';
   // Diagnóstico junto al nombre en la cabecera del panel: al colega le sirve
