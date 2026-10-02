@@ -1453,6 +1453,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
 #fcId .bloqueT{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;}
 #fcId .bloqueNota{margin-top:9px;padding:8px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.76rem;color:#14532d;}
 #fcId .oblig{color:#b91c1c;font-weight:700;text-transform:none;letter-spacing:0;}
+.ingSop{height:40px;padding:0 16px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
+.ingSop[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff;}
 /* Evaluaciones como cajones del celular (1-oct-2026, Diego): icono cuadrado, nombre debajo,
    numerito en la esquina. Rojo = pendiente que vence; gris = sin llenar (opcional); verde = al día. */
 #evTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:18px 12px;margin:10px 0 6px;}
@@ -3306,6 +3308,21 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <input type="date" id="fFechaIng" class="tc" style="width:138px;" title="Día en que ingresó a la unidad. Se sugiere hoy; corrígela si llegó antes."></div>
             <div class="col wa"><label>Hora de llegada <span class="oblig">· obligatoria</span></label>
               <input type="time" id="fHoraIng" class="tc" style="width:118px;" title="Hora en que ingresó. Con ella se cuentan los días de VM en bloques de 24 h si llegó ventilado."></div>
+            </div>
+            <!-- 1-oct-2026 · CÓMO LLEGA (Diego: «el soporte de ingreso: si llega con ventilación mecánica
+                 invasiva o no invasiva, con oxigenoterapia o sin apoyo, y qué tipo»). NO es un dato nuevo:
+                 es una puerta a los tres selectores de siempre (vía aérea · soporte · interfaz), que siguen
+                 siendo la ÚNICA fuente de verdad. Solo en el ingreso: después el soporte cambia por eventos. -->
+            <div id="ingSoporte" class="hidden" style="margin-top:12px;">
+              <label style="font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;display:block;margin-bottom:6px;">Cómo llega · soporte de ingreso</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="ingSop" data-k="vmi" aria-pressed="false" onclick="ingSoporteElegir('vmi')">VM invasiva</button>
+                <button type="button" class="ingSop" data-k="vni" aria-pressed="false" onclick="ingSoporteElegir('vni')">VM no invasiva</button>
+                <button type="button" class="ingSop" data-k="o2" aria-pressed="false" onclick="ingSoporteElegir('o2')">Oxigenoterapia</button>
+                <button type="button" class="ingSop" data-k="ambiente" aria-pressed="false" onclick="ingSoporteElegir('ambiente')">Sin apoyo</button>
+                <select id="fIngSopTipo" class="hidden" onchange="ingSoporteTipo(this.value)" aria-label="Tipo" style="height:36px;font-size:.82rem;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;background:#fff;"></select>
+              </div>
+              <div style="font-size:.72rem;color:#64748b;margin-top:5px;">Si llegó con otra combinación (tubo con tubo en T, traqueostomía con alto flujo…), se completa en Respiratorio.</div>
             </div>
             <div class="bloqueNota">Es <b>cuándo llegó el paciente</b>, no cuándo lo estás anotando: llegó a las 23:00 y lo registras a la 01:00, va 23:00. De acá salen el día de estadía y los bloques de 24 horas de ventilación.</div>
           </div>
@@ -9275,6 +9292,7 @@ function fichaAplicar(abrir){
   }
   // La identificación (nombre/RUT/dx) solo se destapa a pedido.
   if(!esIng){ const fi=$('fcId'); if(fi) fi.classList.toggle('hidden', !_fichaAbierta); }
+  try{ ingSoportePintar(); }catch(e){}   // «Cómo llega» solo existe en el ingreso
 }
 function fichaToggle(){ fichaAplicar(!_fichaAbierta); }
 
@@ -13456,6 +13474,50 @@ function interpPTT(){
   else if(n<=al){ c.className='disp-chip disp-warn'; c.textContent='⚠ Límite'; }
   else { c.className='disp-chip disp-bad'; c.textContent='✕ Sugiere obstrucción / cánula grande'; }
 }
+/* ── Cómo llega: el soporte de ingreso (Diego, 30-sep-2026) ───────────────────
+   «Quiero discriminar si llega con ventilación mecánica invasiva o no invasiva, o con
+   oxigenoterapia o sin apoyo, y qué tipo.» No es un dato nuevo: lee y escribe los tres
+   selectores de siempre (vía aérea · soporte · interfaz). Una sola fuente de verdad: un campo
+   aparte podría contradecir al del turno. Solo en el ingreso. La vía aérea sigue LIBRE
+   (línea fina): acá se registra el estado de llegada. */
+function _ingSoporteActual(){
+  const va=v('fVA'), sop=v('fSop');
+  if(sop==='VM' && (va==='TOT'||va==='TQT')) return 'vmi';
+  if(sop==='VNI' && va==='Natural') return 'vni';
+  if(sop==='Oxigenoterapia/OAF' && va==='Natural') return 'o2';
+  if(sop==='Ambiente' && va==='Natural') return 'ambiente';
+  return '';                       // combinación compuesta: se completa en Respiratorio
+}
+function ingSoportePintar(){
+  const box=$('ingSoporte'); if(!box) return;
+  box.classList.toggle('hidden', v('cIng')!=='true');
+  const act=_ingSoporteActual();
+  box.querySelectorAll('[data-k]').forEach(b=>b.setAttribute('aria-pressed', b.dataset.k===act?'true':'false'));
+  const sel=$('fIngSopTipo'); if(!sel) return;
+  const opts = act==='vmi' ? [['TOT','Tubo (TOT)'],['TQT','Traqueostomía (TQT)']]
+             : act==='vni' ? [['Full Face','Full Face'],['Oronasal','Oronasal']]
+             : act==='o2'  ? [['NRC','NRC (naricera)'],['MMV','MMV (Venturi)'],['MR','MR (reservorio)'],['CNAF','CNAF (alto flujo)']] : [];
+  if(sel.dataset.act!==act){      // 🪤 NO `data-k`: es el atributo con que se buscan los cuatro botones
+    sel.innerHTML='<option value="">— tipo —</option>'+opts.map(([val,et])=>`<option value="${val}">${et}</option>`).join('');
+    sel.dataset.act=act;
+  }
+  sel.classList.toggle('hidden', !opts.length);
+  const actual = act==='vmi' ? v('fVA') : v('fInterfaz');
+  sel.value = opts.some(o=>o[0]===actual) ? actual : '';
+}
+function ingSoporteElegir(k){
+  if(_ingSoporteActual()===k) return;                          // ya está: no se pisa un TQT con un TOT
+  const sop={vmi:'VM',vni:'VNI',o2:'Oxigenoterapia/OAF',ambiente:'Ambiente'}[k]; if(!sop) return;
+  $('fVA').value = (k==='vmi') ? 'TOT' : 'Natural';
+  cascadeVA(sop); updateVAUI(); ingSoportePintar();
+}
+function ingSoporteTipo(val){
+  const act=_ingSoporteActual(); if(!val) return;
+  if(act==='vmi'){ $('fVA').value=val; cascadeVA('VM'); }
+  else if(act==='vni'||act==='o2'){ const i=$('fInterfaz'); if(i){ i.value=val; renderParams(); } }
+  updateVAUI(); ingSoportePintar();
+}
+
 /* ── Evaluaciones como cajones del celular (Diego, 1-oct-2026) ───────────────
    «Iconos cuadrados con un icono al medio y el nombre de abajo, como los iconos
    del celular.» Y: «podríamos pedir algunos campos obligatorios, por ejemplo MRC
@@ -14194,6 +14256,7 @@ function renderParams(o) {
   // Dispositivos de circuito: visibles solo en VM; al quedar en VM se fechan solos
   if(!esPost) _gateDispositivos();
   if(!esPost) esfGate();   // 1-oct-2026 · el bloque de esfuerzo sale solo con ventilación espontánea
+  if(!esPost) try{ ingSoportePintar(); }catch(e){}   // «Cómo llega» sigue lo que digan los selectores
 }
 
 //  HANDLERS UI
