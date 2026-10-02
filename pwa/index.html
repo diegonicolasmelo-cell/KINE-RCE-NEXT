@@ -1220,18 +1220,6 @@ table.rhb2 .rl{width:128px;text-align:left;}
   color:var(--muted);margin:0 0 7px;}
 .pe2-fila{display:flex;gap:6px;flex-wrap:wrap;}
 .pe2-fila .abadge{font-size:.8rem;padding:5px 11px;}
-/* 🌙 «KTM A» (Diego, 19-sep-2026): de noche se ve y no se llena. El chip
-   apagado tiene que VERSE apagado — si se ve igual que uno vivo, el colega lo
-   toca, no pasa nada y cree que la app se colgó. */
-.abadge.solo-lectura{opacity:.6;cursor:default;}
-.pe2-noche{margin-top:8px;font-size:.76rem;color:var(--muted);background:#f1f5f9;
-  border:1px solid #e2e8f0;border-radius:7px;padding:6px 10px;}
-/* 🌙 «No corresponde de noche» (Diego, 2-oct-2026): el rótulo del paso Evaluaciones y la marca de la tarjeta de terapia física */
-.pe2-nocorresp{margin:0 0 10px;padding:9px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-left:5px solid #64748b;border-radius:8px;display:flex;flex-direction:column;gap:3px;}
-.pe2-nocorresp b{font-size:.92rem;color:#1e293b;}
-.pe2-nocorresp span{font-size:.78rem;color:#475569;}
-.hdr-nocorresp{margin-left:auto;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:10px;background:#e2e8f0;color:#334155;border:1px solid #cbd5e1;white-space:nowrap;}
-.fcard.solo-lectura .sub-sec{opacity:.55;}
 /* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
    aprieta. Lo que es interactivo tiene que verse interactivo. */
 #pasoEvalNada{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;
@@ -1480,7 +1468,6 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .evTile{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;color:#0f172a;text-align:center;}
 .evIco{position:relative;width:100%;max-width:112px;aspect-ratio:1/1;border:1px solid;border-radius:26px;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s;}
 .evTile[aria-pressed="true"] .evIco{box-shadow:0 0 0 3px #0f172a;}
-.evTile.evNoche{opacity:.55;cursor:default;}
 .evBadge{position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.82rem;box-shadow:0 0 0 2px #fff;}
 .evBadge[data-nivel="rojo"]{background:#b91c1c;} .evBadge[data-nivel="gris"]{background:#64748b;} .evBadge[data-nivel="verde"]{background:#15803d;} .evBadge[data-nivel="ambar"]{background:#b45309;}
 .evNom{font-size:.86rem;font-weight:700;} .evSub{font-size:.7rem;color:#64748b;line-height:1.25;}
@@ -4801,19 +4788,17 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
         <!-- ▌ REHABILITACIÓN (KTM + válvula de fonación + Evaluaciones) -->
         <div class="fcard fc-k mega-card" id="fcKtmCard">
-          <div class="fcard-hdr"><span class="fcard-title">🏃 REHABILITACIÓN</span><span id="ktmNoCorresp" class="hdr-nocorresp hidden">No corresponde</span></div>
+          <div class="fcard-hdr"><span class="fcard-title">🏃 REHABILITACIÓN</span></div>
           <div class="fcard-body">
 
-            <!-- 🌙 «KTM A» (Diego, 19-sep-2026). Antes la tarjeta entera
-                 desaparecía de noche y el colega la buscaba sin saber que el
-                 sistema la había escondido. Ahora se ve, apagada, y dice por
-                 qué — y de paso aclara la confusión que la escondida provocaba:
-                 la KTR respiratoria SÍ se registra de noche, pero vive arriba,
-                 en Respiratorio. Lo cuida ktm_de_noche.js. -->
+            <!-- 🌙 DE NOCHE SE MUESTRA, SE PUEDE LLENAR Y NO HEREDA (Diego, 2-oct-2026): «se puede llenar todo en
+                 realidad, podría hacerse KTM aunque no es lo habitual. Pero que se muestre y no herede, para que no
+                 se registre algo que no se hizo.» Esta nota dice eso, y de paso aclara que la KTR respiratoria se
+                 registra arriba, en Respiratorio. Lo cuida ktm_de_noche.js. -->
             <div id="dKTMnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
-              🌙 <b>No corresponde: en el turno noche la terapia física no se registra.</b> La tarjeta queda a la vista
-              para que veas en qué va el paciente, pero no se llena.
-              La <b>KTR respiratoria sí</b> se registra de noche, y está arriba, en Respiratorio.
+              🌙 <b>De noche la terapia física no es lo habitual.</b> Esta tarjeta parte en blanco y no hereda lo del día,
+              así que solo queda registrado lo que de verdad elijas y hagas.
+              La <b>KTR respiratoria</b> se registra arriba, en Respiratorio.
             </div>
 
             <!-- VÁLVULA DE FONACIÓN — uso del turno (solo TQT). El modo ventilatorio
@@ -4998,10 +4983,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  El aviso se repite acá a propósito: es OTRA tarjeta, y una
                  apagada sin explicación deja igual de perdido que una que
                  desaparece. Lo cuida ktm_de_noche.js. -->
-            <div id="dIMTnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
-              🌙 <b>No corresponde: en el turno noche no se registra terapia física.</b> El IMT y la EMS son
-              parte del mismo paquete que la KTM, así que se ven y no se llenan.
-            </div>
             <div class="check wa" style="border:none;background:transparent;padding:0;margin-bottom:0;">
                     <input type="checkbox" id="cIMT" onchange="if(this.checked)show('dIMT');else hide('dIMT');">
                     <label for="cIMT" style="font-weight:700;color:#0369a1;">💨 IMT (Entrenamiento muscular inspiratorio)</label>
@@ -5454,8 +5435,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div>
 
       <button type="button" id="pasoEvalNada" data-paso="3" data-nodirty onclick="pasoSinMedir()">
-        <span id="pasoEvalNadaT">No medí nada este turno</span>
-        <small id="pasoEvalNadaS">Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
+        No medí nada este turno
+        <small>Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
       </button>
 
       <!-- 🗂️ 20-sep-2026 · El bloque suelto «Dejar pendiente para el turno que
@@ -6626,13 +6607,13 @@ function rielRender(){
   if(!v('fVA')) faltas.push('vía aérea');
   // Obligatorias nuevas (ago-2026, Diego): declarar la PVE con TOT y la
   // razón cuando la KTM no se realiza o está contraindicada.
-  if($('dExtSec') && $('dExtSec').offsetParent!==null && !v('fPVEval')) faltas.push('PVE sí / no / no corresponde');
+  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) faltas.push('PVE sí / no / no corresponde');
   if(_pveRazonFalta()) faltas.push(v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada');
   if(_pveOtraSinMotivo()) faltas.push('motivo de la «Otra» razón de PVE');
   if(_pveExtSinTipo()) faltas.push('tipo de la extubación sin PVE');
-  if($('bKTMn')?.classList.contains('on') && $('bKTMn').offsetParent!==null && !v('fKTMnoRaz')) faltas.push('razón de KTM no realizada');
-  if($('bKTMs')?.classList.contains('on') && $('bKTMs').offsetParent!==null && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltas.push('contraindicación de KTM');
-  if($('cKTMalert')?.checked && $('cKTMalert').offsetParent!==null && !v('fKTMalertRaz')) faltas.push('criterio de la suspensión de KTM en sesión');
+  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) faltas.push('razón de KTM no realizada');
+  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltas.push('contraindicación de KTM');
+  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) faltas.push('criterio de la suspensión de KTM en sesión');
   if(_ktmOtroSinFundamento()) faltas.push('fundamento de la razón de KTM');
   if(typeof _reintubHoraFalta==='function' && _reintubHoraFalta()) faltas.push('hora de la reintubación');
   const fEl=$('gFalta');
@@ -6644,13 +6625,13 @@ function rielRender(){
   const faltaEls=[];
   if(!v('fFirma')) faltaEls.push($('fFirma'));
   if(!v('fVA')) faltaEls.push($('fVA'));
-  if($('dExtSec') && $('dExtSec').offsetParent!==null && !v('fPVEval')) faltaEls.push($('fPVEval'));
+  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) faltaEls.push($('fPVEval'));
   { const _pr=_pveRazonFalta(); if(_pr) faltaEls.push(_pr); }
   { const _po=_pveOtraSinMotivo(); if(_po) faltaEls.push(_po); }
   { const _pt=_pveExtSinTipo(); if(_pt) faltaEls.push(_pt); }
-  if($('bKTMn')?.classList.contains('on') && $('bKTMn').offsetParent!==null && !v('fKTMnoRaz')) faltaEls.push($('fKTMnoRaz'));
-  if($('bKTMs')?.classList.contains('on') && $('bKTMs').offsetParent!==null && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltaEls.push($('fKTMraz'));
-  if($('cKTMalert')?.checked && $('cKTMalert').offsetParent!==null && !v('fKTMalertRaz')) faltaEls.push($('fKTMalertRaz'));
+  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) faltaEls.push($('fKTMnoRaz'));
+  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltaEls.push($('fKTMraz'));
+  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) faltaEls.push($('fKTMalertRaz'));
   { const _kof=_ktmOtroSinFundamento(); if(_kof) faltaEls.push(_kof); }
   if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) faltaEls.push(_rh); }
   _mPintarSecciones(faltaEls);
@@ -7263,14 +7244,6 @@ const _PASO_SERIE = [
 
 function pasoEvalPintar(){
   const caja = $('pasoEvalChips'); if(!caja) return;
-  /* 🌙 DE NOCHE EL BOTÓN DE SEGUIR NO PUEDE DECIR «NO MEDÍ NADA» (Diego, 2-oct-2026): suena a que se
-     pudo medir y no se hizo. Sigue siendo EL MISMO botón y la misma acción (pasoSinMedir); solo cambia lo que dice. */
-  const _noche = (typeof SHIFT !== 'undefined') && SHIFT === 'Noche';
-  const _bt = $('pasoEvalNadaT'), _bs = $('pasoEvalNadaS');
-  if(_bt) _bt.textContent = _noche ? 'No corresponde de noche' : 'No medí nada este turno';
-  if(_bs) _bs.textContent = _noche
-    ? 'Sigue al relato: las evaluaciones y la terapia física se registran de día.'
-    : 'Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.';
   const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
   /* 🔴 19-sep-2026 · EN EL INGRESO TAMBIÉN SE PINTA. El PATIENT_ID se asigna
      al ocupar la cama, o sea al GUARDAR: mientras se ingresa, la cama todavía
@@ -7282,12 +7255,9 @@ function pasoEvalPintar(){
   const ingresando = (typeof v === 'function') && v('cIng') === 'true';
   if(!c.PATIENT_ID && !ingresando){ caja.innerHTML = ''; return; }
 
-  /* 🌙 «KTM A» (Diego, 19-sep-2026) alcanza también al pool. De noche los
-     chips se SIGUEN VIENDO —viven fuera de la tarjeta que se esconde— pero no
-     se tocan: los que abren un formulario lo abrían DENTRO de la tarjeta de
-     evaluaciones, que de noche no está, así que tocarlos no hacía nada y
-     parecía que la app se había colgado. */
-  const esNoche = (typeof SHIFT !== 'undefined') && SHIFT === 'Noche';
+  /* 🌙 LAS EVALUACIONES SE HACEN DE NOCHE (Diego, 2-oct-2026: «sí pueden ser realizadas en turno de noche;
+     lo que no puede hacerse o registrarse de noche es la terapia física»). Los chips se tocan de día y de
+     noche. Lo que cambia de noche es la terapia física: ver ktm_de_noche.js. */
 
   // Las repetibles, con su procedencia.
   const serie = _PASO_SERIE.map(e => {
@@ -7296,15 +7266,12 @@ function pasoEvalPintar(){
     const fec = e.fec ? String(c[e.fec] || '') : '';
     const fir = e.fir ? String(c[e.fir] || '') : '';
     const detalle = pend ? '' : [val, fec ? _fdd(fec) : '', fir].filter(Boolean).join(' · ');
-    const tit = esNoche
-      ? (pend ? e.tip + ' — sin medir en este episodio. De noche no se registra'
-              : e.tip + ': ' + detalle + '. De noche no se registra')
-      : (pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
-              : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo');
-    return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') + (esNoche ? ' solo-lectura' : '') +
-      '" style="cursor:' + (esNoche ? 'default' : 'pointer') + ';"' +
+    const tit = pend ? e.tip + ' — sin medir en este episodio. Toca para medirlo'
+                     : e.tip + ': ' + detalle + '. Toca para medirlo de nuevo';
+    return '<span class="abadge ' + (pend ? 'a-pend' : 'a-eval') +
+      '" style="cursor:pointer;"' +
       ' data-esc="' + escapeHtml(e.k) + '" data-evk="' + escapeHtml(e.k) + '" title="' + escapeHtml(tit) + '"' +
-      (esNoche ? '' : ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)"') + '>' +
+      ' onclick="pasoEvalMedir(&quot;' + escapeJs(e.k) + '&quot;)">' +
       escapeHtml(e.lbl) + (pend ? ' sin medir' : ' ' + escapeHtml(detalle)) + '</span>';
   }).join('');
 
@@ -7312,11 +7279,7 @@ function pasoEvalPintar(){
   // generador (el mismo de la tarjeta de la cama).
   const preUci = (typeof _escalasEpisodioHTML === 'function') ? _escalasEpisodioHTML(c, true) : '';
 
-  /* 🌙 «No corresponde de noche» (Diego, 2-oct-2026). La lista de lo último medido SE QUEDA (el 19-sep pidió
-     verla): lo que faltaba era decir, con todas sus letras, que de noche nada de esto se llena. Sin el rótulo,
-     «FSS-ICU sin medir» en beige se lee como una tarea que se está debiendo. Es solo pantalla: no se guarda. */
   caja.innerHTML =
-    (esNoche ? '<div class="pe2-nocorresp"><b>No corresponde de noche</b><span>Las evaluaciones y la terapia física se registran de día. Abajo está lo último que se midió, con la fecha y quién lo midió, solo para leer.</span></div>' : '') +
     '<div class="pe2-t">Lo que este episodio lleva medido</div>' +
     '<div class="pe2-fila">' + serie + '</div>' +
     (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
@@ -7481,9 +7444,11 @@ function abrirPanel(id, esIng, verFicha) {
 
   ['lblMRC','lblFSS','lblPIM'].forEach(id=>{ const e=$(id); if(e){e.textContent='—';e.className='interp-pill interp-empty';} });
   const dl=$('lblPrension'); if(dl){ dl.innerHTML='— <span style="opacity:.6;font-size:.65rem;">(usa sexo del paciente)</span>'; dl.className='interp-pill interp-empty'; }
-  if(typeof setKTMstate==='function') setKTMstate('r');
+  // 🌙 De noche la terapia física parte NEUTRA (2-oct-2026): ni «realizada» ni «no realizada» —solo cuenta lo
+  // que alguien elija—, y tampoco el «No realizada: motivo ingreso» del turno de ingreso.
+  if(typeof setKTMstate==='function') setKTMstate(SHIFT==='Noche' ? null : 'r');
   // v2: al ingreso, Terapia Física parte "No realizada: Motivo ingreso" (override manual permitido).
-  if(esIng){ setKTMstate('n'); const _mr=$('fKTMnoRaz'); if(_mr) _mr.value='Motivo ingreso'; }
+  if(esIng && SHIFT!=='Noche'){ setKTMstate('n'); const _mr=$('fKTMnoRaz'); if(_mr) _mr.value='Motivo ingreso'; }
   // Fecha y hora de ingreso: al INGRESAR se sugiere el momento actual (Diego,
   // 11-sep-2026: «la sugerencia es la fecha actual, no la del turno») y queda
   // editable; en una evolución posterior se muestra lo guardado, bloqueado.
@@ -7534,7 +7499,8 @@ function abrirPanel(id, esIng, verFicha) {
   sumFSS(); sumMRC(); sumCPAX();
   if(window.CFG && CFG.CPAX_ACTIVO===false) hide('rowCpax'); else show('rowCpax');
   // defaults
-  cascadeVA(); hSed(); hHTrend(); hMultiDVA(); hKTM(esIng ? 'n' : 'r'); hMue(); hEgr(); calcGCS();
+  cascadeVA(); hSed(); hHTrend(); hMultiDVA(); hKTM(SHIFT==='Noche' ? null : (esIng ? 'n' : 'r')); hMue();   // 🌙 de noche parte neutra (2-oct-2026)
+   hEgr(); calcGCS();
   // Gates al final: si es noche o falta cooperación, mandan sobre los defaults
   // (antes corrían antes de hKTM('r') y este las pisaba — p.ej. ingreso volvía a "Realizada").
   aplicarGatesEval();
@@ -8767,7 +8733,7 @@ function fillFormReplica(s) {
   if(_tf.KTM_REALIZADA===true||_tf.KTM_REALIZADA==='TRUE') setKTMstate('r');
   else if(_tf.KTM_SUSPENDIDA===true||_tf.KTM_SUSPENDIDA==='TRUE') setKTMstate('s');
   else if(!_razIngKTM && (_tf.KTM_NO_REALIZADA===true||_tf.KTM_NO_RAZON)) setKTMstate('n');
-  else setKTMstate('r');
+  else setKTMstate(SHIFT==='Noche' ? null : 'r');   // de noche parte neutra: no se hereda ni se supone
   set('fKTMct',_tf.KTM_CONTRA_TIPO); set('fKTMraz',_tf.KTM_CONTRA_RAZON); set('fKTMman',_tf.KTM_CONTRA_MANUAL);
   _ktmContraSel(_tf.KTM_CONTRA_RAZON);   // el select quedaba vacío con la razón ya cargada en el hidden
   if(_tf.KTM_NIVEL_KTR) setKTMniv(String(_tf.KTM_NIVEL_KTR));
@@ -9464,8 +9430,23 @@ function _herTouch(ev){
  *  que está en otro paso deja al colega mirando un aviso sin nada que tocar —
  *  que es exactamente lo que pasaba con la firma antes de moverla.
  *  Acá el aviso SALTA al paso donde vive el campo y lo enfoca. */
+/* 🔴 «¿SE VE?» TIENE DOS PREGUNTAS (2-oct-2026). Una cosa es que la LÓGICA del formulario esconda un
+   campo (una rama que no aplica: «sin PVE no hay razón de PVE») y otra que lo esconda el PASO en que
+   estoy parado. Un obligatorio solo se salta por la primera. Antes se preguntaba `offsetParent`, que
+   mezcla las dos: con el camino de pasos, la PVE y la razón de KTM —que viven en pasos anteriores al
+   del guardado— daban «no se ve» y el turno se guardaba sin ellas. Medido: tubo + VM, PVE sin
+   responder, guardar desde el paso 3 → guardaba. Lo cuida validacion_entre_pasos.js. */
+function _vis(el){
+  if(!el || !document.contains(el)) return false;
+  for(let a=el; a && a!==document.body; a=a.parentElement){
+    if(a.classList && a.classList.contains('paso-oculto')) continue;     // lo esconde el paso, no la lógica
+    if(getComputedStyle(a).display==='none') return false;
+  }
+  return true;
+}
+/** Lleva a quien guarda hasta el campo que falta, cambiando de paso si hace falta. Acepta el id o el elemento. */
 function _irAlCampo(id){
-  const e=$(id); if(!e) return;
+  const e=(typeof id==='string')?$(id):id; if(!e) return;
   const due=e.closest('[data-paso]');
   const paso=due?parseInt(due.dataset.paso||'2',10):2;
   if(typeof pasoIr==='function' && paso && paso!==PASO_ACTUAL) pasoIr(paso);
@@ -9507,10 +9488,9 @@ function guardar() {
   // hay que decir SÍ se hizo o NO se hizo — sin contestar, el indicador de
   // PVE queda ciego y la evolución no narra la prueba. Desde ago-2026 hay una
   // tercera respuesta válida: «no corresponde» (causa de base no resuelta) ★
-  if($('dExtSec') && $('dExtSec').offsetParent!==null && !v('fPVEval')){
+  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')){
     toast('⚠️ Define la PVE de este turno: Sí, No o No corresponde');
-    const bp=$('btnPVESi');
-    if(bp){ bp.scrollIntoView({behavior:'smooth',block:'center'}); bp.style.outline='2px solid var(--danger)'; setTimeout(()=>{bp.style.outline='';},2500); }
+    _irAlCampo('btnPVESi');
     return;
   }
   // ★ PVE = NO EXIGE RAZÓN, Y «Otra» EXIGE EL MOTIVO (28-ago-2026, Manuel) ★
@@ -9519,15 +9499,13 @@ function guardar() {
   const _prG=_pveRazonFalta();
   if(_prG){
     toast(v('fPVEval')==='nc' ? '⚠️ Indica por qué NO corresponde la PVE en este turno' : '⚠️ Indica por qué NO se realizó la PVE en este turno');
-    _prG.scrollIntoView({behavior:'smooth',block:'center'}); _prG.focus();
-    _prG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_prG.style.outline='';},2500);
+    _irAlCampo(_prG);
     return;
   }
   const _poG=_pveOtraSinMotivo();
   if(_poG){
     toast(v('fPVEval')==='nc' ? '⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no corresponde la PVE' : '⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no se hizo la PVE');
-    _poG.scrollIntoView({behavior:'smooth',block:'center'}); _poG.focus();
-    _poG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_poG.style.outline='';},2500);
+    _irAlCampo(_poG);
     return;
   }
   // ★ La extubación declarada exige su tipo: es la razón de que no hubiera PVE ★
@@ -9536,43 +9514,39 @@ function guardar() {
   const _ptG=_pveExtSinTipo();
   if(_ptG){
     toast('⚠️ Marcaste que hubo extubación: indica de qué tipo (es la razón de que no hubiera PVE)');
-    _ptG.scrollIntoView({behavior:'smooth',block:'center'});
-    _ptG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_ptG.style.outline='';},2500);
+    _irAlCampo(_ptG);
     return;
   }
   // ★ PVE SUPERADA SIN EXTUBAR EXIGE LA RAZÓN (tanda 2a, sep-2026) ★
   if(_pveSupSinExt() && !_pveSupRazon()){
     toast('⚠️ La PVE se superó y no se extubó: indica por qué');
-    const sr=$('fPveSupRaz'); if(sr){ sr.scrollIntoView({behavior:'smooth',block:'center'}); sr.focus(); sr.style.outline='2px solid var(--danger)'; setTimeout(()=>{sr.style.outline='';},2500); }
+    _irAlCampo('fPveSupRaz');
     return;
   }
   if(_pveSupSinExt() && String(v('fPveSupRaz')||'').trim()==='Otra' && !String(v('fPveSupDet')||'').trim()){
     toast('⚠️ Describe el motivo: «Otra» no dice por sí sola por qué no se extubó');
-    const sd=$('fPveSupDet'); if(sd){ sd.scrollIntoView({behavior:'smooth',block:'center'}); sd.focus(); sd.style.outline='2px solid var(--danger)'; setTimeout(()=>{sd.style.outline='';},2500); }
+    _irAlCampo('fPveSupDet');
     return;
   }
   // ★ LA RAZÓN DE NO HACER KTM ES OBLIGATORIA (ago-2026, Diego): «no
   // realizada» o «contraindicada» sin el porqué no dice nada clínicamente ★
-  if($('bKTMn')?.classList.contains('on') && $('bKTMn').offsetParent!==null && !v('fKTMnoRaz')){
+  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')){
     toast('⚠️ Indica la razón por la que NO se realizó KTM este turno');
-    const kr=$('fKTMnoRaz');
-    if(kr){ kr.scrollIntoView({behavior:'smooth',block:'center'}); kr.focus(); kr.style.outline='2px solid var(--danger)'; setTimeout(()=>{kr.style.outline='';},2500); }
+    _irAlCampo('fKTMnoRaz');
     return;
   }
-  if($('bKTMs')?.classList.contains('on') && $('bKTMs').offsetParent!==null && !v('fKTMraz') && !String(v('fKTMman')||'').trim()){
+  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()){
     toast('⚠️ Indica la contraindicación de la KTM (protocolo o descripción)');
-    const kc=$('fKTMcontra');
-    if(kc){ kc.scrollIntoView({behavior:'smooth',block:'center'}); kc.focus(); kc.style.outline='2px solid var(--danger)'; setTimeout(()=>{kc.style.outline='';},2500); }
+    _irAlCampo('fKTMcontra');
     return;
   }
   // ★ LA SUSPENSIÓN EN SESIÓN TAMBIÉN EXIGE SU MOTIVO (4-sep-2026, Diego:
   // «cuando se inició y se suspendió… debería salir el motivo en entrega y
   // evolución y además hacer obligatorio el campo»). Sin esto el texto
   // decía «sin especificar» y la entrega no lo mostraba. ★
-  if($('cKTMalert')?.checked && $('cKTMalert').offsetParent!==null && !v('fKTMalertRaz')){
+  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')){
     toast('⚠️ Indica el criterio por el que se suspendió la KTM durante la sesión');
-    const ka=$('fKTMalertRaz');
-    if(ka){ ka.scrollIntoView({behavior:'smooth',block:'center'}); ka.focus(); ka.style.outline='2px solid var(--danger)'; setTimeout(()=>{ka.style.outline='';},2500); }
+    _irAlCampo('fKTMalertRaz');
     return;
   }
   // ★ «No realizada · Otro» EXIGE EL FUNDAMENTO (28-ago-2026, Manuel) ★
@@ -9581,8 +9555,7 @@ function guardar() {
   const _kofG=_ktmOtroSinFundamento();
   if(_kofG){
     toast(`⚠️ Escribe el fundamento: «${v('fKTMnoRaz')}» no dice por sí solo por qué no se hizo la KTM`);
-    _kofG.scrollIntoView({behavior:'smooth',block:'center'}); _kofG.focus();
-    _kofG.style.outline='2px solid var(--danger)'; setTimeout(()=>{_kofG.style.outline='';},2500);
+    _irAlCampo(_kofG);
     return;
   }
   // ★ LA HORA DE LA REINTUBACIÓN ES OBLIGATORIA (ago-2026, Diego) ★
@@ -9594,8 +9567,7 @@ function guardar() {
   const _rhFalta=_reintubHoraFalta();
   if(_rhFalta){
     toast('⚠️ Anota la hora de la reintubación');
-    _rhFalta.scrollIntoView({behavior:'smooth',block:'center'}); _rhFalta.focus();
-    _rhFalta.style.outline='2px solid var(--danger)'; setTimeout(()=>{_rhFalta.style.outline='';},2500);
+    _irAlCampo(_rhFalta);
     return;
   }
   // ★ El texto editado a mano SE GUARDA TAL CUAL, sin preguntar ★
@@ -9817,7 +9789,9 @@ function guardar() {
     // ★ KTM 3-way — "no realizada" se infiere si ni realizada ni suspendida
     // De NOCHE la KTM no aplica (Diego, ago-2026): ni «no realizada» ni nada —
     // la estadística manual jamás tuvo casilla nocturna. Vacío = no aplica.
-    KTM_NO_REALIZADA: SHIFT==='Noche' ? '' : (($('bKTMn')?.classList.contains('on')) || (!bv('cKTMr') && !bv('cKTMs'))),
+    // 🌙 De noche, «no realizada» solo si alguien la ELIGIÓ: sin tocar nada el turno no declara KTM, porque
+    // «no realizada» entra al denominador de la estadística y nadie decidió que no se hizo.
+    KTM_NO_REALIZADA: SHIFT==='Noche' ? (($('bKTMn')?.classList.contains('on')) ? true : '') : (($('bKTMn')?.classList.contains('on')) || (!bv('cKTMr') && !bv('cKTMs'))),
     KTM_NO_RAZON:        v('fKTMnoRaz'),
     KTM_NO_COMENTARIO:   v('fKTMnoCom'),
     KTM_ALERTA:          bv('cKTMalert'),
@@ -13662,17 +13636,6 @@ function evEstado(){
 }
 function evTilesPintar(){
   const box=$('evTiles'); if(!box) return;
-  /* 🌙 DE NOCHE, EL MISMO FORMATO DEL DÍA, APAGADO (Diego, 2-oct-2026: «de noche aparezca en evaluaciones
-     el mismo formato del día»). Mismos cajones, mismo icono, mismo nombre y mismo orden; pero desactivados
-     y SIN numerito: de noche no se está debiendo nada, y un «2» ámbar lo diría. Antes la tarjeta entera se
-     escondía. Es solo pantalla: no se guarda nada distinto. */
-  if((typeof SHIFT!=='undefined') && SHIFT==='Noche'){
-    box.innerHTML=evEstado().filter(e=>e.apl>0).map(e=>
-      `<button type="button" class="evTile evNoche" data-fam="${e.f.k}" disabled aria-disabled="true" title="No corresponde de noche" aria-label="${e.f.nom}: no corresponde de noche">`+
-      `<span class="evIco" style="background:${e.f.bg};border-color:${e.f.bd}">${e.f.svg}</span>`+
-      `<span class="evNom">${e.f.nom}</span><span class="evSub">${e.f.sub}</span></button>`).join('');
-    return;
-  }
   const d=$('dEgr'), abierta=(d && !d.classList.contains('hidden')) ? (d.getAttribute('data-fam')||'') : '';
   box.innerHTML=evEstado().filter(e=>e.apl>0).map(e=>{
     const txt=e.nivel==='verde'?'✓':String(e.n);
@@ -13687,7 +13650,6 @@ const _evEp=fam=>!!(EV_FAM.find(f=>f.k===fam)||{}).ep;
 function _evHayDatos(){ return evEstado().some(e=>!e.f.ep && e.f.esc.some(s=>s.hoy())); }
 function evFamAbrir(fam){
   const d=$('dEgr'), c=$('cEgr'); if(!d||!c) return;
-  if((typeof SHIFT!=='undefined') && SHIFT==='Noche') return;   // de noche los cajones están apagados
   const abierta=!d.classList.contains('hidden') && d.getAttribute('data-fam')===fam;
   if(abierta){                                   // tocar el mismo otra vez lo cierra
     d.removeAttribute('data-fam'); window._evCerrado=true;
@@ -14916,14 +14878,12 @@ function fillCultRes(arr){
   for(let i=1;i<arr.length;i++){addCultRes(); box.querySelectorAll('.cult-res')[i].value=arr[i];}
 }
 function hEgr(){
-  const esNoche = SHIFT === 'Noche';
-  /* 🌙 LA TARJETA YA NO SE ESCONDE DE NOCHE (Diego, 2-oct-2026: «de noche aparezca en evaluaciones el mismo
-     formato del día»). Antes se escondía entera —y antes de eso quedaba el encabezado «📏 Registrar una
-     medición» flotando sobre nada, que es lo que medicion_no_queda_hueca.js vigila—. Ahora se ve igual que
-     de día, con los cajones APAGADOS (evTilesPintar) y SIN sus campos: de noche #dEgr no se abre. El rótulo
-     «No corresponde de noche» va arriba, en #pasoEvalChips. Lo cuida noche_no_corresponde.js. */
+  /* 🌙 LAS EVALUACIONES SE HACEN DE NOCHE (Diego, 2-oct-2026). Hasta el 19-sep esta tarjeta se escondía de
+     noche («RHB solo se registra de día»): mezclaba las evaluaciones con la terapia física, y lo que no se
+     registra de noche es SOLO la terapia física. Ahora es la misma tarjeta, con los mismos cajones, de día
+     y de noche. */
   const _dE=$('dEgr'), _epAbierta=!!_dE && _evEp(_dE.getAttribute('data-fam')||'');   // el preingreso se abre sin marcar el turno
-  if (!esNoche && ($('cEgr')?.checked || _epAbierta) && !window._evCerrado) show('dEgr'); else hide('dEgr');
+  if (($('cEgr')?.checked || _epAbierta) && !window._evCerrado) show('dEgr'); else hide('dEgr');
   try{ evTilesPintar(); }catch(e){}
 }
 let _nombreTimer=null;
@@ -16028,7 +15988,7 @@ const PVE_RAZONES_CON_MOTIVO = ['Otra'];
    bloque: un campo oculto no se le puede exigir a nadie. */
 function _pveNoPideRazon(){
   const d=$('dPVENoRama');
-  if(!d || d.classList.contains('hidden') || d.offsetParent===null) return false;
+  if(!d || d.classList.contains('hidden') || !_vis(d)) return false;
   return v('fPVEval')==='no' && !$('cExtSinPve')?.checked;
 }
 /* 1-oct-2026 · «No corresponde» TAMBIÉN pide razón (Diego). Misma idea que la
@@ -16036,7 +15996,7 @@ function _pveNoPideRazon(){
    vive una vez y lo usan el riel, el guardado y el pintado. */
 function _pveNcPideRazon(){
   const d=$('dPVEncRama');
-  if(!d || d.classList.contains('hidden') || d.offsetParent===null) return false;
+  if(!d || d.classList.contains('hidden') || !_vis(d)) return false;
   return v('fPVEval')==='nc';
 }
 /* Devuelve el elemento que hay que enfocar, o null si no falta nada. */
@@ -16077,7 +16037,7 @@ function _pveOtraSinMotivo(){
    PVE = No termina con un porqué. */
 function _pveExtSinTipo(){
   const d=$('dPVENoRama');
-  if(!d || d.classList.contains('hidden') || d.offsetParent===null) return null;
+  if(!d || d.classList.contains('hidden') || !_vis(d)) return null;
   if(v('fPVEval')!=='no' || !$('cExtSinPve')?.checked) return null;
   if(document.querySelector('input[name="extTipo"]:checked')) return null;
   return $('dExtTipoBox') || $('cExtSinPve');
@@ -17739,63 +17699,32 @@ function setPendDesde(jsonStr){
   renderPend();
 }
 
-/** 🌙 «KTM A» — de noche la TERAPIA FÍSICA se ve y no se llena.
+/** 🌙 DE NOCHE LA TERAPIA FÍSICA SE MUESTRA, SE LLENA Y NO HEREDA (Diego, 2-oct-2026).
  *
- *  Apaga TODOS los controles de sus tarjetas, las atenúa y saca el aviso que
- *  explica por qué. De día los vuelve a encender: las reglas del día (SAS 1
- *  sobre los niveles, AET IIIC, BNM) corren DESPUÉS en aplicarGatesEval y
- *  vuelven a apagar lo suyo, así que el orden importa y esta función va
- *  primero.
+ *  Hasta el 1-oct esta función APAGABA todos los controles de la tarjeta de KTM y de la de IMT/EMS («KTM A»,
+ *  19-sep: se ve y no se llena). Diego lo cambió: «se puede llenar todo en realidad, podría hacerse KTM
+ *  aunque no es lo habitual; pero que no herede, para que no se registre algo que no se hizo». Ahora solo
+ *  saca la nota que lo explica. La parte de NO HEREDAR vive donde se carga el turno (la réplica de la terapia
+ *  física se salta la noche) y en el estado inicial, que de noche parte neutro.
  *
- *  🔵 SON DOS TARJETAS Y UN SOLO PAQUETE. Diego, 19-sep-2026: «IMT y EMS son
- *  parte de la terapia física, es decir es rehabilitación, parte del paquete.
- *  Movilización precoz (posicionamiento, movilidad pasiva activa), EMS e IMT.
- *  Podría ir de noche apagada.» Por eso el IMT/EMS dejó de esconderse de noche
- *  y se apaga igual que la KTM: lo que es una sola cosa para el equipo tiene
- *  que comportarse como una sola cosa en la pantalla.
- *
- *  🪤 VIVE EN EL ÁMBITO GLOBAL, no dentro de aplicarGatesEval. Una `function`
- *  declarada dentro de otra no cuelga de ninguna parte, y ya nos costó una
- *  sesión: `_coopDerivar` estaba anidada y la réplica del turno reventaba con
- *  «no está definida» sin que nada lo avisara al cargar.
+ *  🪤 VIVE EN EL ÁMBITO GLOBAL, no dentro de aplicarGatesEval. Una `function` declarada dentro de otra no
+ *  cuelga de ninguna parte, y ya nos costó una sesión: `_coopDerivar` estaba anidada y la réplica del turno
+ *  reventaba con «no está definida» sin que nada lo avisara al cargar.
  */
 function _rehabModoNoche(on){
-  [['fcKtmCard','dKTMnoche'], ['fcImtBox','dIMTnoche']].forEach(function(par){
-    const card=$(par[0]); if(!card) return;
-    card.querySelectorAll('input,select,button,textarea').forEach(e=>{ e.disabled=!!on; });
-    card.classList.toggle('solo-lectura', !!on);
-    const av=$(par[1]); if(av) av.classList.toggle('hidden', !on);
-  });
-  const nc=$('ktmNoCorresp'); if(nc) nc.classList.toggle('hidden', !on);   // 2-oct-2026: «No corresponde» a la vista, no solo en el aviso
+  const av=$('dKTMnoche'); if(av) av.classList.toggle('hidden', !on);
 }
 
 //  GATES DE EVALUACIÓN (acordado):
-//  · Noche: Evaluaciones Funcionales y Terapia Física OCULTAS (KTM queda "no realizada").
+//  · Noche (2-oct-2026): las evaluaciones y la terapia física se pueden llenar IGUAL que de día. Lo único
+//    de noche es que la terapia física parte en blanco y no hereda (ver _rehabModoNoche y ktm_de_noche.js).
 //  · Paciente no cooperador / no evaluable / BNM: se bloquean los tests VOLITIVOS
 //    (MRC-SS, FSS-ICU y dinamometría, totales e ítems). PIM/PEM (válvula),
 //    ecografía y CPAx (observacional) siguen disponibles.
 function aplicarGatesEval(){
-  // — Noche —
   const esNoche = SHIFT==='Noche';
-  /* 🌙 «KTM A» (Diego, 19-sep-2026): DE NOCHE SE VE Y NO SE LLENA.
-     Hasta acá la tarjeta se escondía entera —acuerdo de ago-2026— y eso le
-     hizo perder un rato buscando algo que el sistema había guardado sin
-     decirlo: «en turno no aparece KTM aunque lo estoy probando de noche».
-     Le di tres caminos y eligió éste. Se descartó dejarla registrable (la
-     opción B) porque hoy «KTM de noche» significa cero POR DEFINICIÓN: si a
-     veces hay dato y a veces no, el porcentaje de cumplimiento deja de querer
-     decir algo. 🪤 Esto CAMBIA la convención que exigía regresion_ui.js. */
-  const k=$('fcKtmCard'); if(k && esNoche) k.classList.remove('hidden');
-  // 🔵 El IMT/EMS va en el mismo paquete y por eso ya NO se esconde de noche:
-  //    se apaga, igual que la KTM (ver _rehabModoNoche).
-  const imt=$('fcImtBox'); if(imt) imt.classList.remove('hidden');
-  _rehabModoNoche(esNoche);
-  // De noche la KTM NO APLICA (Diego, ago-2026): estado NEUTRO, no «no
-  // realizada» — forzar 'n' hacía que cada evolución nocturna narrara «KTM no
-  // realizada.» y marcara un estado que la estadística manual nunca tuvo.
-  if(esNoche && typeof setKTMstate==='function') setKTMstate('');
-  hEgr(); // oculta/muestra la tarjeta de Evaluaciones según turno
-  if(esNoche) return; // de noche no hay nada más que decidir
+  _rehabModoNoche(esNoche);   // solo la nota de noche; nada se apaga
+  hEgr();
   // — Cooperación — (Ingreso: bloqueado por defecto salvo excepción explícita "Cooperador";
   //   turno normal: bloqueado solo si "No cooperador"/"No evaluable"/BNM, como antes)
   const coop=v('fCoop');
@@ -17819,7 +17748,11 @@ function aplicarGatesEval(){
   const bnm = !!$('cBNM')?.checked;
   const ktmBloq = aetIIIC || bnm;
   const kc=$('fcKtmCard'); if(kc) kc.classList.toggle('hidden', ktmBloq);
-  if(ktmBloq){
+  if(ktmBloq && esNoche){
+    // De noche la tarjeta se esconde igual (no se puede hacer KTM), pero NO se registra una «contraindicada»
+    // sola: contaría un turno de contraindicación más por cada noche y nadie la declaró.
+    setKTMstate(null);
+  } else if(ktmBloq){
     setKTMstate('s');
     const ct=$('fKTMct'); if(ct) ct.value='Absoluta';
     const cc=$('fKTMcat'); if(cc) cc.value = bnm ? 'Nivel de consciencia' : 'Otra';
@@ -18139,7 +18072,7 @@ const KTM_RAZONES_CON_FUNDAMENTO = ['Otro'];
 
 function _ktmOtroSinFundamento(){
   const b=$('bKTMn');
-  if(!b || !b.classList.contains('on') || b.offsetParent===null) return null;
+  if(!b || !b.classList.contains('on') || !_vis(b)) return null;
   if(KTM_RAZONES_CON_FUNDAMENTO.indexOf(String(v('fKTMnoRaz')||'').trim())===-1) return null;
   return String(v('fKTMnoCom')||'').trim()==='' ? $('fKTMnoCom') : null;
 }
@@ -20402,18 +20335,12 @@ function _epRetro(c){ return !c || c._RETRO || !c.PATIENT_ID || !(c.OCUPADA===tr
  *  Pendiente = se ve, y al tocarlo se mide. Hecho = valor con su firma. */
 function _escalasEpisodioHTML(c, enBanner){
   if(_epRetro(c)) return '';
-  /* 🌙 DE NOCHE SE APAGAN (Diego, 2-oct-2026: «que también se apaguen de noche»). Se ven con lo que
-     llevan, pero no se tocan: la misma regla que el resto del pool. Esta función arma TAMBIÉN los chips
-     del banner de arriba, así que se apagan los dos a la vez. */
-  const noche=(typeof SHIFT!=='undefined') && SHIFT==='Noche';
   const chips=_EP_ESCALAS.map(e=>{
     const val=String(c[e.col]==null?'':c[e.col]).trim();
     const pend=val==='';
-    const cls='abadge '+(pend?'a-pend':'a-eval')+(noche?' solo-lectura':'');
-    const tit=noche
-      ? (pend?e.tip+' — pendiente en este episodio. De noche no se registra':e.tip+': '+val+'. De noche no se registra')
-      : (pend?e.tip+' — pendiente en este episodio. Toca para medir':e.tip+': '+val+'. Toca para corregir');
-    return `<span class="${cls}" style="cursor:${noche?'default':'pointer'};" title="${tit}"${noche?'':` onclick="event.stopPropagation();escalaDesdeTarjeta('${c.ID_CAMA}','${e.kind}')"`}>${pend?'📋 ':''}${e.lbl}${pend?' pend.':' '+val}</span>`;
+    const cls='abadge '+(pend?'a-pend':'a-eval');
+    const tit=(pend?e.tip+' — pendiente en este episodio. Toca para medir':e.tip+': '+val+'. Toca para corregir');
+    return `<span class="${cls}" style="cursor:pointer;" title="${tit}" onclick="event.stopPropagation();escalaDesdeTarjeta('${c.ID_CAMA}','${e.kind}')">${pend?'📋 ':''}${e.lbl}${pend?' pend.':' '+val}</span>`;
   }).join('');
   return enBanner?chips:`<div class="ep-escalas" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${chips}</div>`;
 }

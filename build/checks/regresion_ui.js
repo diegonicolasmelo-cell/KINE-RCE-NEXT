@@ -99,7 +99,9 @@ const path = require('path');
     //   el sistema había guardado sin decirlo. Lo que esta guardia sigue
     //   cuidando —que de noche la KTM no quede marcada— no cambió. Lo nuevo
     //   lo mide ktm_de_noche.js.
-    r.nocheApagada=!!$('bKTMr').disabled;
+    // 🗂️ 2-oct-2026: la tarjeta YA NO queda apagada de noche. Diego: «se puede llenar todo en realidad, podría
+    // hacerse KTM aunque no es lo habitual; pero que no herede». Lo que sigue valiendo es que no quede marcada.
+    r.nocheApagada=!$('bKTMr').disabled;
     // Día con previa Noche: la pauta llega desde la última evolución de DÍA adjunta
     SHIFT='Dia'; $('kf').reset();
     fillFormReplica({KTM_IMT:false,KTM_REALIZADA:false,VENT_VIA_AEREA:'TOT',VENT_SOPORTE:'VM',
@@ -108,7 +110,7 @@ const path = require('path');
     return r;
   });
   eq('noche: IMT/EMS NO se arrastran (sin sesión fantasma)', !TF.nocheIMT && !TF.nocheEMS, true);
-  eq('noche: la KTM no queda marcada y la tarjeta queda apagada', !TF.nocheKTMr && TF.nocheApagada, true);
+  eq('noche: la KTM no queda marcada (y la tarjeta se puede llenar)', !TF.nocheKTMr && TF.nocheApagada, true);
   eq('día: la pauta llega de la última evolución de DÍA', TF.diaIMT && TF.diaKTMr, true);
   eq('día: pauta IMT heredada', TF.diaFreq, '3');
 

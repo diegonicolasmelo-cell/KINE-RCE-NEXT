@@ -129,17 +129,17 @@ const no = (l, g) => eq(l, !!g, 'false');
     const o = document.createElement('option'); o.value = 'Klgo. Test'; o.textContent = 'Klgo. Test'; $('fFirma').appendChild(o); $('fFirma').value = 'Klgo. Test';
     const he = $('fHEst'); if (he && !he.value) he.value = 'Estable';
     const hd = $('fDVA'); if (hd && !hd.value) hd.value = 'Sin requerimientos';
-    $('fVA').value = 'TQT'; _transAvisoOk = true;
+    $('fVA').value = 'TQT'; _transAvisoOk = true; setKTMstate('r'); hPVEtoggle('si');   // 🗂️ 2-oct: la KTM «no realizada» y la PVE sin responder bloquean desde cualquier paso, así que el montaje las declara
     $('fBarthel').value = '60'; $('fCharlson').value = '2'; $('fApache').value = '11'; $('fEcf').value = '4';
     window._ll.length = 0; guardar(); await new Promise(r => setTimeout(r, 80));
     const c = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
     return c ? [c.d.PAC_BARTHEL, c.d.PAC_CHARLSON, c.d.PAC_APACHE2, c.d.PAC_ECF].join('|') : null; });
   eq('★★ Barthel, Charlson, APACHE II y ECF viajan en el guardado', viaja, '60|2|11|4');
   await abrir({ noche: true, extra: { BARTHEL: 85 } }, 3);
-  // 🗂️ 2-oct-2026: de noche la tarjeta SÍ se ve (mismo formato del día, con los cajones apagados), pero
-  // sin campos: el Barthel cargado sigue en el formulario y no se puede editar desde ahí.
-  si('★ de noche la tarjeta de mediciones se ve, con los cajones apagados', await ver('#fcEval') && await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).every(t => t.disabled)));
-  no('★ …y sin campos: el de Barthel no se ve', await ver('#fBarthel'));
+  // 🗂️ 2-oct-2026: de noche la tarjeta SE VE y se usa igual que de día (las evaluaciones sí se hacen de noche).
+  // Antes de eso se escondía; el Barthel cargado sigue en el formulario y sus campos salen al tocar su cajón.
+  si('★ de noche la tarjeta de mediciones se ve, con los cajones encendidos', await ver('#fcEval') && await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).every(t => !t.disabled)));
+  no('★ …y los campos solo salen al tocar un cajón: el de Barthel no se ve todavía', await ver('#fBarthel'));
   eq('★★ …pero el Barthel cargado sigue en el formulario', await p.evaluate(() => v('fBarthel')), '85');
 
   console.log('\n6 · 🔴 La fase clínica y la adecuación tienen su propia tarjeta');

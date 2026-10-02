@@ -1,168 +1,157 @@
-// ktm_de_noche.js — Opción A: de noche la KTM SE VE y NO SE LLENA (19-sep-2026).
+// ktm_de_noche.js — De noche la terapia física SE MUESTRA, SE PUEDE LLENAR y NO HEREDA
+// (Diego, 2-oct-2026).
 //
-// LA DECISIÓN ES DE DIEGO. Registró un turno real de noche y avisó: «en turno
-// no aparece KTM aunque lo estoy probando de noche». Le puse tres caminos —
-// A: se ve pero no se llena · B: se puede llenar igual · C: se queda oculta —
-// y eligió: «KTM A».
+// 🔴 ESTO CAMBIA UNA CONVENCIÓN, a propósito y con su palabra. Hasta hoy valía «KTM A» (19-sep):
+// de noche la tarjeta se veía apagada, con todos sus controles desactivados y un aviso. El 2-oct
+// Diego lo cambió: «Se puede llenar todo en realidad, podría hacerse KTM aunque no es lo habitual.
+// Pero si se presenta de alguna forma en la que se seleccione y no herede, para que no se registre
+// algo que no se hizo: que se muestre pero no herede.»
 //
-// 🔴 ESTO CAMBIA UNA CONVENCIÓN ANTERIOR, a propósito. En agosto se acordó que
-// de noche la tarjeta se escondía entera, y `regresion_ui.js` lo exigía
-// («noche: KTM forzada a "no realizada" y tarjeta oculta»). Esconderla le hizo
-// perder tiempo buscando algo que el sistema había guardado sin decirlo. La
-// regla nueva manda; la vieja queda contada acá y en la bitácora.
+// LA REGLA QUE QUEDA
+//   · Se MUESTRA y se puede LLENAR: la KTM, el IMT, el EMS y la válvula de fonación, de noche como
+//     de día. (Antes de esto yo había puesto «No corresponde» en la tarjeta: era un error mío —lo
+//     que no corresponde es que se HEREDE, no que se haga—.)
+//   · NO HEREDA. De noche el bloque parte EN BLANCO: ni estado, ni nivel, ni IMT ni EMS del turno de
+//     día. Si heredara, quedarían registradas sesiones que nadie hizo (el motivo del acuerdo de
+//     jul-2026, que sigue en pie: contadas en REM y en procedimientos). Un aviso lo dice.
+//   · Y NO SE MARCA «NO REALIZADA» SOLA. De noche, sin tocar nada, el turno no declara KTM —ni «hecha»
+//     ni «no hecha»— porque «no realizada» entra en el denominador de la estadística y nadie
+//     decidió que no se hizo. Solo cuenta lo que alguien elige.
+//   · Las reglas que cierran la KTM (AET grupo IIIC, BNM) valen también de noche.
 //
-// LO QUE NO CAMBIA: de noche la KTM sigue sin registrarse. El estado nace
-// NEUTRO —ni «realizada» ni «no realizada»—, porque forzar 'n' hacía que cada
-// evolución nocturna narrara «KTM no realizada.» y marcara un estado que la
-// estadística manual nunca tuvo. La opción B se descartó por eso mismo: si a
-// veces hay dato de noche y a veces no, el porcentaje de cumplimiento deja de
-// querer decir algo.
+// 🪤 «No hereda» NO es «no existe»: lo que se llene de noche se guarda y entra al REM como cualquier
+// otra sesión. La réplica del turno de día sigue saltándose la noche (svc_evoluciones.gs).
 //
-// Y ARRASTRA EL TERCER DEFECTO que quedó anotado sin arreglar: de noche el pool
-// de chips se sigue viendo —vive fuera de la tarjeta que se esconde— pero los
-// que abren un formulario no tenían dónde abrirlo, y tocarlos no hacía nada.
-// Con la opción A quedan apagados y se dice por qué.
+// 🪤 CADA COSA SE MIDE DONDE VIVE: se va al paso que tiene la tarjeta, sea cual sea su número.
+// 🪤 Reloj congelado: la fecha se INVENTA y el turno se fuerza en SHIFT.
 //
-// 🪤 EL RELOJ VA CONGELADO: la fecha se INVENTA y el turno se fuerza en SHIFT.
-
+// Uso: node build/checks/ktm_de_noche.js
 const path = require('path');
+const { chromium } = require('playwright-core');
 const V2 = path.join(__dirname, '..', '..', 'v2');
+
 const fails = [];
-const eq = (l, g, w) => {
-  const okk = String(g) === String(w);
+const eq = (l, g, w) => { const okk = String(g) === String(w);
   console.log((okk ? '✅' : '❌') + ' ' + l + ': ' + JSON.stringify(g));
-  if (!okk) { fails.push(l); console.log('   esperado: ' + JSON.stringify(w)); }
-};
+  if (!okk) { fails.push(l); console.log('   esperado: ' + JSON.stringify(w)); } };
 const si = (l, g) => eq(l, !!g, 'true');
 const no = (l, g) => eq(l, !!g, 'false');
 
-const { chromium } = require('playwright-core');
-
-async function turno(p, cual, extra) {
-  return p.evaluate(async ([cual, extra]) => {
-    $('kf').reset();
-    $('gDate').value = '2026-08-10';      // 🪤 fecha inventada, no la de hoy
-    SHIFT = cual;                         // 🪤 turno forzado, no el del reloj
-    DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', VIA_AEREA: 'TOT', SOPORTE: 'VM',
-            ULT_MRC: '44', ULT_MRC_FECHA: '2026-08-08', ULT_MRC_FIRMA: 'KP' }];
-    renderGrid();
-    abrirPanel('3', false, false);
-    await new Promise(r => setTimeout(r, 420));
-    if (extra === 'aet') { $('cAET').checked = true; $('fAETnivel').value = 'IIIC'; }
-    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
-
-    const visible = el => {
-      if (!el) return false;
-      const cs = getComputedStyle(el), r = el.getBoundingClientRect();
-      return cs.display !== 'none' && cs.visibility !== 'hidden' && !!(r.width || r.height);
-    };
-
-    /* 🪤 CADA COSA SE MIDE DONDE VIVE. La tarjeta de Rehabilitación es del
-       PASO 2 (el turno) y los chips del PASO 3: `pasoIr` le pone
-       `paso-oculto` a lo que no es del paso actual, así que mirar la tarjeta
-       parado en el paso 3 la da por escondida SIEMPRE — y el caso del AET
-       pasaba en verde por la razón equivocada. */
-    if (typeof pasoIr === 'function') pasoIr(2);
-    await new Promise(r => setTimeout(r, 200));
-    const card = document.getElementById('fcKtmCard');
-    const aviso = document.getElementById('dKTMnoche');
-    const imt = document.getElementById('fcImtBox');
-    const avisoImt = document.getElementById('dIMTnoche');
-    const enPaso2 = {
-      imtTarjeta: visible(imt),
-      imtVivos: imt ? [...imt.querySelectorAll('input,select,button,textarea')].filter(e => !e.disabled).length : -1,
-      imtAviso: visible(avisoImt),
-      tarjeta: visible(card),
-      cuerpo: card ? card.querySelector('.fcard-body').innerText.replace(/\s+/g, ' ').trim().length : 0,
-      estados: ['bKTMr', 'bKTMs', 'bKTMn'].map(id => !!document.getElementById(id)?.disabled),
-      estadoElegido: [...document.querySelectorAll('#fcKtmCard .ktm-state.on')].map(b => b.id).join(','),
-      vivos: card ? [...card.querySelectorAll('input,select,button,textarea')].filter(e => !e.disabled).length : -1,
-      aviso: visible(aviso),
-      avisoTxt: aviso ? aviso.innerText.replace(/\s+/g, ' ').trim() : ''
-    };
-
-    if (typeof pasoIr === 'function') pasoIr(3);
-    await new Promise(r => setTimeout(r, 200));
-    const chips = [...document.querySelectorAll('#pasoEvalChips [data-evk]')];
-    return Object.assign(enPaso2, {
-      nChips: chips.length,
-      chipsConClick: chips.filter(c => c.getAttribute('onclick')).length,
-      chipsApagados: chips.filter(c => c.classList.contains('solo-lectura')).length,
-      pieNoche: (document.getElementById('pasoEvalChips') || {}).innerText || ''
-    });
-  }, [cual, extra || '']);
-}
+// El turno de DÍA de ese mismo día, con terapia física hecha: lo que la réplica traería.
+const PREVIA_DIA = { ID_CAMA: '3', TURNO_KEY: '2026-08-12-Dia', TURNO: 'Dia', PATIENT_ID: 'p3', PAC_NOMBRE: 'P', PLAN_FIRMA_KINE: 'K.P.',
+  VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', PLAN_PLANES: 'PLAN-REPLICADO',
+  KTM_REALIZADA: true, KTM_NIVEL_KTR: '3', KTM_IMT: true, KTM_IMT_FREQ: '3', KTM_EMS: true, KTM_EMS_FREQ: '50' };
 
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
-  const p = await b.newPage({ viewport: { width: 1400, height: 950 } });
-  const errs = [];
-  p.on('pageerror', e => errs.push(e.message));
+  const p = await b.newPage({ viewport: { width: 1400, height: 1500 } });
+  const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => {
-    window.google = { script: { run: { withSuccessHandler(okF) { return { withFailureHandler() { return {
-      api(a) { setTimeout(() => okF({ ok: true, data: (a === 'GET_CONFIG_UI' ? { NUM_CAMAS: 12, BANNERS: {} } : null) }), 5); }
-    }; } }; } } } };
+    window._ll = []; window.__previa = null; window.__actual = null;
+    window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
+      api(a, d) { window._ll.push({ a, d }); let data = null; if (a === 'GET_CONFIG_UI') data = { NUM_CAMAS: 12, BANNERS: {} };
+        else if (a === 'GET_EVO_TURNO') data = { actual: window.__actual, previa: window.__previa, pronoAbierto: '' };
+        setTimeout(() => ok({ ok: true, data }), 5); } }; } }; } } } };
   });
-  await p.goto('file://' + path.resolve(V2, 'index.html'));
-  await p.waitForTimeout(600);
+  await p.goto('file://' + path.join(V2, 'index.html'));
+  await p.waitForTimeout(800);
 
-  /* ══ 1 · De noche SE VE ═══════════════════════════════════════════════ */
-  console.log('\n1 · 🔴 «KTM A» — de noche la tarjeta se ve');
-  const N = await turno(p, 'Noche');
-  si('★★ la tarjeta de Rehabilitación está a la vista', N.tarjeta);
-  si('   …y con cuerpo, no un encabezado pelado', N.cuerpo > 0);
+  /* Abre un turno y devuelve lo que se ve en la tarjeta de terapia física. */
+  const turno = (cual, o) => p.evaluate(async ([cual, o]) => {
+    window.__previa = o.previa || null; window.__actual = o.actual || null;
+    $('kf').reset(); $('gDate').value = '2026-08-12'; SHIFT = cual;
+    window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
+    DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', VIA_AEREA: 'TOT', SOPORTE: 'VM', FECHA_INGRESO: '2026-08-05', TS_INGRESO: '2026-08-05 23:00:00',
+      FECHA_INICIO_VA: '2026-08-08', TS_INICIO_VA: '2026-08-08 10:00:00', FECHA_INICIO_SOPORTE: '2026-08-08', TS_INICIO_SOPORTE: '2026-08-08 10:00:00' }];
+    window.recargarSilencioso = () => {}; renderGrid(); abrirPanel('3', false, false);
+    await new Promise(r => setTimeout(r, 800));
+    if (o.aet) { $('cAET').checked = true; $('fAETnivel').value = 'IIIC'; hAET(); }
+    if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
+    const visible = el => { if (!el) return false; const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && !!(r.width || r.height); };
+    const card = $('fcKtmCard'), imt = $('fcImtBox');
+    const dp = card.closest('[data-paso]'); pasoIr(Number(dp ? dp.dataset.paso : 2));
+    await new Promise(r => setTimeout(r, 250));
+    const vivos = el => el ? Array.from(el.querySelectorAll('input,select,button,textarea')).filter(e => !e.disabled).length : -1;
+    const aviso = $('dKTMnoche');
+    return { tarjeta: visible(card), cuerpo: card.querySelector('.fcard-body').innerText.replace(/\s+/g, ' ').trim().length,
+      vivos: vivos(card), estados: ['bKTMr', 'bKTMs', 'bKTMn'].map(id => !!$(id).disabled).join(','),
+      estadoElegido: Array.from(document.querySelectorAll('#fcKtmCard .ktm-state.on')).map(x => x.id).join(','),
+      nivel: v('fKTMniv'), imt: !!$('cIMT').checked, ems: !!$('cEMS').checked, plan: v('fPlanes'),
+      imtTarjeta: visible(imt), imtVivos: vivos(imt),
+      aviso: visible(aviso), avisoTxt: aviso ? aviso.innerText.replace(/\s+/g, ' ').trim() : '',
+      pastilla: !!$('ktmNoCorresp'), avisoImt: !!$('dIMTnoche') };
+  }, [cual, o || {}]);
 
-  /* ══ 2 · …y NO SE LLENA ═══════════════════════════════════════════════ */
-  console.log('\n2 · 🔴 …y no se llena');
-  eq('★★ los tres botones de estado, apagados', N.estados.join(','), 'true,true,true');
-  eq('★★ ningún control de la tarjeta queda vivo', N.vivos, 0);
-  eq('★ el estado nace NEUTRO (ni realizada ni no realizada)', N.estadoElegido, '');
+  /* Guarda desde donde esté y devuelve lo que viajó. */
+  const guarda = armar => p.evaluate(async fn => {
+    $('fFirma').appendChild(Object.assign(document.createElement('option'), { value: 'K.T.', textContent: 'K.T.' })); $('fFirma').value = 'K.T.';
+    const he = $('fHEst'); if (he && !he.value) he.value = 'Estable'; const hd = $('fDVA'); if (hd && !hd.value) hd.value = 'Sin requerimientos';
+    hPVEtoggle('si'); _transAvisoOk = true;
+    new Function('return (' + fn + ')')()();
+    window._ll.length = 0; guardar(); await new Promise(r => setTimeout(r, 400));
+    const c = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
+    return c ? { r: c.d.KTM_REALIZADA, n: c.d.KTM_NO_REALIZADA, s: c.d.KTM_SUSPENDIDA, niv: c.d.KTM_NIVEL_KTR } : null; }, armar);
 
-  /* ══ 3 · Y dice por qué, nombrando la KTR ═════════════════════════════ */
-  console.log('\n3 · 🔴 Dice por qué, y dónde sí se registra de noche');
-  si('★★ sale el aviso', N.aviso);
-  si('★★ …y nombra la KTR, que es la que sí va de noche', /KTR/.test(N.avisoTxt));
-  si('   …y dice dónde está', /[Rr]espiratorio/.test(N.avisoTxt));
+  console.log('\n1 · 🔴 De noche SE MUESTRA y SE PUEDE LLENAR');
+  const N = await turno('Noche', {});
+  si('★★ la tarjeta de terapia física está a la vista', N.tarjeta);
+  si('   …con cuerpo, no un encabezado pelado', N.cuerpo > 0);
+  eq('★★ los tres botones de estado, ENCENDIDOS', N.estados, 'false,false,false');
+  si('★★ y sus controles están vivos', N.vivos > 0);
+  si('★★ el IMT/EMS se ve', N.imtTarjeta);
+  si('★★ …y se puede llenar', N.imtVivos > 0);
 
-  /* ══ 4 · El pool, en solo lectura ═════════════════════════════════════ */
-  console.log('\n4 · 🔴 De noche los chips se ven y no se tocan');
-  eq('★ los diez chips siguen a la vista', N.nChips, 10);
-  eq('★★ ninguno lleva onclick', N.chipsConClick, 0);
-  eq('★★ los diez, marcados de solo lectura', N.chipsApagados, 10);
-  si('★ y una línea lo explica', /no se registran|solo lectura|último/i.test(N.pieNoche));
+  console.log('\n2 · 🔴 NO HEREDA: de noche parte EN BLANCO');
+  const H = await turno('Noche', { previa: PREVIA_DIA });
+  eq('(control: la réplica sí corrió, trajo el plan del día)', H.plan, 'PLAN-REPLICADO');
+  eq('★★ sin estado elegido (ni «realizada» heredada)', H.estadoElegido, '');
+  eq('★★ sin nivel heredado', H.nivel, '');
+  no('★★ el IMT del día NO se hereda', H.imt);
+  no('★★ el EMS del día NO se hereda', H.ems);
+  const D = await turno('Dia', { previa: PREVIA_DIA });
+  eq('(control: de DÍA sí hereda el estado)', D.estadoElegido, 'bKTMr');
+  eq('(control: …y el nivel)', D.nivel, '3');
+  si('(control: …y el IMT)', D.imt);
 
-  /* ══ 4b · El IMT/EMS es del mismo paquete y va igual ══════════════════ */
-  console.log('\n4b · 🔴 El IMT/EMS es terapia física: se apaga, no desaparece');
-  // Diego, 19-sep-2026: «IMT y EMS son parte de la terapia física, es decir es
-  // rehabilitación, parte del paquete. Movilización precoz (posicionamiento,
-  // movilidad pasiva activa), EMS e IMT. Podría ir de noche apagada.»
-  si('★★ la tarjeta de IMT/EMS está a la vista', N.imtTarjeta);
-  eq('★★ y ninguno de sus controles queda vivo', N.imtVivos, 0);
-  si('★ y dice por qué, sin hacer buscar la explicación en la otra tarjeta', N.imtAviso);
+  console.log('\n3 · 🔴 Un aviso lo dice, SIN «No corresponde»');
+  await turno('Noche', {});
+  const A = await turno('Noche', {});
+  si('★★ sale el aviso de noche', A.aviso);
+  si('★★ dice que no es lo habitual', /no es lo habitual/i.test(A.avisoTxt));
+  si('★★ …y que parte en blanco y no hereda', /en blanco/i.test(A.avisoTxt) && /hered/i.test(A.avisoTxt));
+  no('★★ 🔴 NO dice «No corresponde» (sí se puede hacer)', /No corresponde/i.test(A.avisoTxt));
+  si('★ y sigue nombrando la KTR respiratoria, que se registra arriba', /KTR/.test(A.avisoTxt));
+  no('★★ la marca «No corresponde» del encabezado ya no existe', A.pastilla);
+  no('★ ni el aviso aparte de la tarjeta del IMT', A.avisoImt);
+  const Dd = await turno('Dia', {});
+  no('★ de día no sale el aviso de noche', Dd.aviso);
 
-  /* ══ 5 · De día no cambia nada ════════════════════════════════════════ */
-  console.log('\n5 · De día sigue todo como estaba');
-  const D = await turno(p, 'Dia');
-  si('★ la tarjeta se ve', D.tarjeta);
-  eq('★★ los botones de estado, vivos', D.estados.join(','), 'false,false,false');
-  no('★ sin aviso de noche', D.aviso);
-  si('★ el IMT/EMS también se ve', D.imtTarjeta);
-  si('★★ …con sus controles vivos', D.imtVivos > 0);
-  no('★ …y sin aviso de noche', D.imtAviso);
-  eq('★★ los diez chips con onclick', D.chipsConClick, 10);
-  eq('★ ninguno marcado de solo lectura', D.chipsApagados, 0);
+  console.log('\n4 · 🔴 Solo cuenta lo que alguien ELIGE');
+  await turno('Noche', {});
+  let g = await guarda('() => {}');
+  eq('★★ sin tocar nada no se declara KTM (ni hecha…)', g && String(g.r), 'false');
+  eq('★★ …ni «NO realizada»: no se inventa un incumplimiento', g && String(g.n), '');
+  await turno('Noche', {});
+  g = await guarda("() => { setKTMstate('r'); setKTMniv('2'); }");
+  eq('★★ si se elige «realizada» de noche, viaja con su nivel', g && (g.r + '/' + g.niv), 'true/2');
+  await turno('Noche', {});
+  g = await guarda("() => { setKTMstate('n'); _ktmNoRazonSel('Rechazo del paciente'); }");
+  eq('★★ y si se elige «no realizada» con su razón, también viaja', g && String(g.n), 'true');
 
-  /* ══ 6 · El AET IIIC sigue mandando de día ════════════════════════════ */
-  console.log('\n6 · El AET Grupo IIIC sigue escondiendo la tarjeta de día');
-  const A = await turno(p, 'Dia', 'aet');
-  no('★ con AET IIIC la tarjeta se esconde (regla vieja, intacta)', A.tarjeta);
+  console.log('\n5 · Un turno guardado se reabre igual de noche que de día');
+  const ACT = { ID_CAMA: '3', PATIENT_ID: 'p3', PAC_NOMBRE: 'P', PLAN_FIRMA_KINE: 'K.P.', VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM',
+    KTM_REALIZADA: true, KTM_NIVEL_KTR: '2', KTM_CANT: 1 };
+  const sN = await turno('Noche', { actual: Object.assign({ TURNO_KEY: '2026-08-12-Noche', TURNO: 'Noche' }, ACT) });
+  const sD = await turno('Dia', { actual: Object.assign({ TURNO_KEY: '2026-08-12-Dia', TURNO: 'Dia' }, ACT) });
+  eq('★★ el estado con que se reabre es el MISMO de noche y de día', sN.estadoElegido + '|' + sN.nivel, sD.estadoElegido + '|' + sD.nivel);
+
+  console.log('\n6 · Las reglas que cierran la KTM valen también de noche');
+  const Ac = await turno('Noche', { aet: true });
+  no('★★ con AET grupo IIIC la tarjeta se esconde, como de día', Ac.tarjeta);
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();
-  if (fails.length) {
-    console.log('\n❌ ktm_de_noche: ' + fails.length + ' fallo(s):');
-    fails.forEach(f => console.log('   · ' + f));
-    process.exit(1);
-  }
-  console.log('\n✅ ktm_de_noche: se ve y no se llena.');
+  console.log(fails.length ? '\n❌ ktm_de_noche: ' + fails.length + ' FALLO(S): ' + fails.join(' · ') : '\n✅ TODO OK');
+  process.exit(fails.length ? 1 : 0);
 })();

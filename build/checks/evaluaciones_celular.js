@@ -204,13 +204,14 @@ const no = (l, g) => eq(l, !!g, 'false');
   no('★★ y NO las demás familias (no son diecisiete campos de golpe)', await ver('#rowMrc'));
   eq('★ el cajón de las ecográficas queda abierto', await p.evaluate(() => document.querySelector('#evTiles .evTile[data-fam="ecograficas"]').getAttribute('aria-pressed')), 'true');
 
-  console.log('\n11 · De noche los cajones se ven, APAGADOS');
-  // 🗂️ 2-oct-2026 (Diego: «de noche aparezca en evaluaciones el mismo formato del día»). Hasta entonces
-  // esta guardia exigía que de noche NO hubiera cajones. La convención cambió a propósito: se ven, pero
-  // apagados y sin numerito. Lo mide a fondo noche_no_corresponde.js.
+  console.log('\n11 · De noche los cajones se ven y se pueden usar, igual que de día');
+  // 🗂️ 2-oct-2026. Esta guardia exigía que de noche NO hubiera cajones (convención de ago-2026: las
+  // evaluaciones se escondían junto con la terapia física). Diego lo corrigió: «las evaluaciones SÍ pueden ser
+  // realizadas en turno de noche; lo que no se registra de noche es la terapia física». Lo mide a fondo
+  // evaluaciones_de_noche.js.
   await abrir({ va: 'TOT', sop: 'VM', modo: 'CPAP/PS', noche: true });
-  si('★★ de noche los cajones SÍ se ven (el mismo formato del día)', await ver('#evTiles'));
-  eq('★★ …y están todos apagados: de noche no se registran mediciones', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).filter(t => !t.disabled).length), '0');
+  si('★★ de noche los cajones SÍ se ven', await ver('#evTiles'));
+  eq('★★ …y están todos encendidos', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).filter(t => t.disabled).length), '0');
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();

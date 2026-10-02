@@ -146,7 +146,10 @@ const { chromium } = require('playwright-core');
     // ── KTM de noche: estado neutro y sin frase ──
     $('kf').reset(); $('cBed').value = '3';
     $('fVA').value = 'TOT'; cascadeVA(); $('fSop').value = 'VM'; cascadeSop();
-    SHIFT = 'Noche'; aplicarGatesEval();
+    // 🗂️ 2-oct-2026: antes se medía que `aplicarGatesEval()` NEUTRALIZARA la KTM de noche, porque la tarjeta
+    // iba apagada. Ahora la tarjeta se llena de noche (Diego), y lo que garantiza que no se registre algo que
+    // no se hizo es que el turno de noche PARTA neutro: se mide por el camino real de la réplica.
+    SHIFT = 'Noche'; fillFormReplica({ VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM' });
     r.ktmNocheNeutra = !$('bKTMn').classList.contains('on') && !$('bKTMr').classList.contains('on');
     const txtNoche = genTexto();
     r.ktmNocheSinFrase = !/KTM/.test(txtNoche);

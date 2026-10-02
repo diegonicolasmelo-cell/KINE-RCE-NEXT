@@ -126,7 +126,7 @@ si('★★ Pmusc está en ella', /Pmusc 6 cmH2O/.test(linea));
       const hd = $('fDVA'); if (hd && !hd.value) hd.value = 'Sin requerimientos';
       { const pv = $('fPVEval'); if (pv) { pv.value = 'nc'; hPVEtoggle('nc'); const r = $('fPveNcRaz'); if (r) { r.value = 'Ventilación mecánica domiciliaria'; hPveNcRaz(); } } }
       for (const k in t) { const e = $(k); if (e) e.value = t[k]; }
-      _transAvisoOk = true; window._ll.length = 0; guardar();
+      _transAvisoOk = true; setKTMstate('r'); if (typeof hPVEtoggle === 'function' && !v('fPVEval')) hPVEtoggle('si'); window._ll.length = 0; guardar();   // 2-oct: «KTM no realizada» exige razón desde cualquier paso, así que el montaje la declara hecha
       await new Promise(r => setTimeout(r, 90));
       const c = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
       return c ? { p01: c.d.VENT_P01, dp: c.d.VENT_DPOCC, pm: c.d.VENT_PMUSC } : null;
@@ -183,7 +183,7 @@ si('★★ Pmusc está en ella', /Pmusc 6 cmH2O/.test(linea));
     const he = $('fHEst'); if (he && !he.value) he.value = 'Estable';
     const hd = $('fDVA'); if (hd && !hd.value) hd.value = 'Sin requerimientos';
     { const pv = $('fPVEval'); if (pv && !pv.value) { hPVEtoggle('nc'); const r = $('fPveNcRaz'); if (r) { r.value = 'Ventilación mecánica domiciliaria'; hPveNcRaz(); } } }
-    _transAvisoOk = true; window._ll.length = 0; guardar();
+    _transAvisoOk = true; setKTMstate('r'); if (typeof hPVEtoggle === 'function' && !v('fPVEval')) hPVEtoggle('si'); window._ll.length = 0; guardar();   // 2-oct: «KTM no realizada» exige razón desde cualquier paso, así que el montaje la declara hecha
     await new Promise(r => setTimeout(r, 90));
     const c = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
     return c ? c.d.EVAL_DEGLUCION : null;
