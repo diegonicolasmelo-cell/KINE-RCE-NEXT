@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-5.1-horario-y-noche">
+<meta name="rce-version" content="NEXT-5.2-noche-apagada">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1480,6 +1480,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .evTile{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;color:#0f172a;text-align:center;}
 .evIco{position:relative;width:100%;max-width:112px;aspect-ratio:1/1;border:1px solid;border-radius:26px;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s;}
 .evTile[aria-pressed="true"] .evIco{box-shadow:0 0 0 3px #0f172a;}
+.evTile.evNoche{opacity:.55;cursor:default;}
 .evBadge{position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.82rem;box-shadow:0 0 0 2px #fff;}
 .evBadge[data-nivel="rojo"]{background:#b91c1c;} .evBadge[data-nivel="gris"]{background:#64748b;} .evBadge[data-nivel="verde"]{background:#15803d;} .evBadge[data-nivel="ambar"]{background:#b45309;}
 .evNom{font-size:.86rem;font-weight:700;} .evSub{font-size:.7rem;color:#64748b;line-height:1.25;}
@@ -5807,7 +5808,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.1-horario-y-noche]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.2-noche-apagada]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -13661,6 +13662,17 @@ function evEstado(){
 }
 function evTilesPintar(){
   const box=$('evTiles'); if(!box) return;
+  /* 🌙 DE NOCHE, EL MISMO FORMATO DEL DÍA, APAGADO (Diego, 2-oct-2026: «de noche aparezca en evaluaciones
+     el mismo formato del día»). Mismos cajones, mismo icono, mismo nombre y mismo orden; pero desactivados
+     y SIN numerito: de noche no se está debiendo nada, y un «2» ámbar lo diría. Antes la tarjeta entera se
+     escondía. Es solo pantalla: no se guarda nada distinto. */
+  if((typeof SHIFT!=='undefined') && SHIFT==='Noche'){
+    box.innerHTML=evEstado().filter(e=>e.apl>0).map(e=>
+      `<button type="button" class="evTile evNoche" data-fam="${e.f.k}" disabled aria-disabled="true" title="No corresponde de noche" aria-label="${e.f.nom}: no corresponde de noche">`+
+      `<span class="evIco" style="background:${e.f.bg};border-color:${e.f.bd}">${e.f.svg}</span>`+
+      `<span class="evNom">${e.f.nom}</span><span class="evSub">${e.f.sub}</span></button>`).join('');
+    return;
+  }
   const d=$('dEgr'), abierta=(d && !d.classList.contains('hidden')) ? (d.getAttribute('data-fam')||'') : '';
   box.innerHTML=evEstado().filter(e=>e.apl>0).map(e=>{
     const txt=e.nivel==='verde'?'✓':String(e.n);
@@ -13675,6 +13687,7 @@ const _evEp=fam=>!!(EV_FAM.find(f=>f.k===fam)||{}).ep;
 function _evHayDatos(){ return evEstado().some(e=>!e.f.ep && e.f.esc.some(s=>s.hoy())); }
 function evFamAbrir(fam){
   const d=$('dEgr'), c=$('cEgr'); if(!d||!c) return;
+  if((typeof SHIFT!=='undefined') && SHIFT==='Noche') return;   // de noche los cajones están apagados
   const abierta=!d.classList.contains('hidden') && d.getAttribute('data-fam')===fam;
   if(abierta){                                   // tocar el mismo otra vez lo cierra
     d.removeAttribute('data-fam'); window._evCerrado=true;
@@ -14903,18 +14916,12 @@ function fillCultRes(arr){
   for(let i=1;i<arr.length;i++){addCultRes(); box.querySelectorAll('.cult-res')[i].value=arr[i];}
 }
 function hEgr(){
-  // RHB solo se registra de día
   const esNoche = SHIFT === 'Noche';
-  const card = $('fcEgrCard');
-  if (card) card.classList.toggle('hidden', esNoche);
-  /* 🔴 SI SE ESCONDE EL CUERPO, SE ESCONDE LA TARJETA. Antes solo se ocultaba
-     #fcEgrCard y quedaba «📏 Registrar una medición» flotando sobre 26 píxeles
-     de nada: un encabezado que promete algo que no está y no dice por qué.
-     Eso es lo que Diego encontró de noche en el turno real. El pool de chips
-     vive FUERA de esta tarjeta (#pasoEvalChips), así que de noche se sigue
-     viendo qué lleva medido el episodio. Lo cuida medicion_no_queda_hueca.js. */
-  const marco = $('fcEval');
-  if (marco) marco.classList.toggle('hidden', esNoche);
+  /* 🌙 LA TARJETA YA NO SE ESCONDE DE NOCHE (Diego, 2-oct-2026: «de noche aparezca en evaluaciones el mismo
+     formato del día»). Antes se escondía entera —y antes de eso quedaba el encabezado «📏 Registrar una
+     medición» flotando sobre nada, que es lo que medicion_no_queda_hueca.js vigila—. Ahora se ve igual que
+     de día, con los cajones APAGADOS (evTilesPintar) y SIN sus campos: de noche #dEgr no se abre. El rótulo
+     «No corresponde de noche» va arriba, en #pasoEvalChips. Lo cuida noche_no_corresponde.js. */
   const _dE=$('dEgr'), _epAbierta=!!_dE && _evEp(_dE.getAttribute('data-fam')||'');   // el preingreso se abre sin marcar el turno
   if (!esNoche && ($('cEgr')?.checked || _epAbierta) && !window._evCerrado) show('dEgr'); else hide('dEgr');
   try{ evTilesPintar(); }catch(e){}
@@ -20395,12 +20402,18 @@ function _epRetro(c){ return !c || c._RETRO || !c.PATIENT_ID || !(c.OCUPADA===tr
  *  Pendiente = se ve, y al tocarlo se mide. Hecho = valor con su firma. */
 function _escalasEpisodioHTML(c, enBanner){
   if(_epRetro(c)) return '';
+  /* 🌙 DE NOCHE SE APAGAN (Diego, 2-oct-2026: «que también se apaguen de noche»). Se ven con lo que
+     llevan, pero no se tocan: la misma regla que el resto del pool. Esta función arma TAMBIÉN los chips
+     del banner de arriba, así que se apagan los dos a la vez. */
+  const noche=(typeof SHIFT!=='undefined') && SHIFT==='Noche';
   const chips=_EP_ESCALAS.map(e=>{
     const val=String(c[e.col]==null?'':c[e.col]).trim();
     const pend=val==='';
-    const cls='abadge '+(pend?'a-pend':'a-eval');
-    const tit=(pend?e.tip+' — pendiente en este episodio. Toca para medir':e.tip+': '+val+'. Toca para corregir');
-    return `<span class="${cls}" style="cursor:pointer;" title="${tit}" onclick="event.stopPropagation();escalaDesdeTarjeta('${c.ID_CAMA}','${e.kind}')">${pend?'📋 ':''}${e.lbl}${pend?' pend.':' '+val}</span>`;
+    const cls='abadge '+(pend?'a-pend':'a-eval')+(noche?' solo-lectura':'');
+    const tit=noche
+      ? (pend?e.tip+' — pendiente en este episodio. De noche no se registra':e.tip+': '+val+'. De noche no se registra')
+      : (pend?e.tip+' — pendiente en este episodio. Toca para medir':e.tip+': '+val+'. Toca para corregir');
+    return `<span class="${cls}" style="cursor:${noche?'default':'pointer'};" title="${tit}"${noche?'':` onclick="event.stopPropagation();escalaDesdeTarjeta('${c.ID_CAMA}','${e.kind}')"`}>${pend?'📋 ':''}${e.lbl}${pend?' pend.':' '+val}</span>`;
   }).join('');
   return enBanner?chips:`<div class="ep-escalas" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${chips}</div>`;
 }

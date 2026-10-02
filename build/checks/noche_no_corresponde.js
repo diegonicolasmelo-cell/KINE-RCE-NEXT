@@ -15,6 +15,13 @@
 //   · el botón de seguir dice «No corresponde de noche», no «No medí nada»;
 //   · la tarjeta de Terapia física lleva un «No corresponde» a la vista en su encabezado.
 //
+// 🔴 Y LUEGO, EL MISMO 2-OCT, DIEGO COMPLETÓ EL PEDIDO: «que también se apaguen de noche [los chips
+// del Previo a la UCI], además necesito que de noche aparezca en evaluaciones el mismo formato del
+// día». O sea: de noche Evaluaciones muestra los MISMOS cajones que de día —mismo icono, mismo
+// nombre, mismo orden—, pero APAGADOS: sin numerito de pendientes (de noche nada se está debiendo) y
+// sin abrir nada. Los chips «Previo a la UCI» (ECF, Barthel, Charlson) se apagan igual, también en
+// el banner de arriba, que usa los mismos chips. Antes la tarjeta de cajones se escondía entera.
+//
 // 🪤 ES SOLO PANTALLA. No cambia lo que se guarda ni las estadísticas: de noche la KTM sigue
 // naciendo NEUTRA (ni «realizada» ni «no realizada»), porque «No corresponde» no es «No
 // realizada» —este último entra en el denominador y el primero no—. Y el relato no lo nombra.
@@ -114,6 +121,51 @@ const PUENTE = () => {
   });
   no('★★ el relato NO dice «No corresponde de noche»', /No corresponde de noche/i.test(g.relato));
   no('★★ la KTM sigue NEUTRA: no queda marcada como «no realizada»', g.ktmNo);
+
+  console.log('\n6 · 🔴 De noche Evaluaciones tiene el MISMO FORMATO del día: los cajones, apagados');
+  const cajones = () => p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).map(t => t.dataset.fam + ':' + t.querySelector('.evNom').textContent.trim()).join(','));
+  const icono = () => p.evaluate(() => { const i = document.querySelector('#evTiles .evTile .evIco'); if (!i) return ''; const r = i.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height) + '/' + !!i.querySelector('svg'); });
+  await abrir('Dia', 3);
+  const cajonesDia = await cajones(), icoDia = await icono();
+  si('(de día hay cajones: es el formato de referencia)', cajonesDia.length > 10);
+  await abrir('Noche', 3);
+  si('★★ la tarjeta de evaluaciones se ve de noche', await ver('#fcEval'));
+  si('★★ los cajones se ven de noche', await ver('#evTiles'));
+  eq('★★ son LOS MISMOS que de día, con el mismo nombre y el mismo orden', await cajones(), cajonesDia);
+  eq('★★ …y del mismo tamaño, con su icono', await icono(), icoDia);
+  eq('★★ 🔴 todos APAGADOS (botones desactivados)', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).filter(t => !t.disabled).length), '0');
+  eq('★★ …y sin numerito de pendientes (de noche no se debe nada)', await p.evaluate(() => document.querySelectorAll('#evTiles .evBadge').length), '0');
+  eq('★ dicen por qué al pasar el cursor', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).every(t => /No corresponde de noche/.test(t.title))), 'true');
+  const abrio = await p.evaluate(() => { evFamAbrir('fuerza'); return { campos: !!($('dEgr') && !$('dEgr').classList.contains('hidden')), turno: !!$('cEgr').checked }; });
+  no('★★ aunque se los fuerce, NO se abre ningún campo', abrio.campos);
+  no('★★ …ni marca «se evaluó este turno»', abrio.turno);
+  no('★ no hay un solo campo de evaluación a la vista (MRC)', await ver('#fMRC'));
+  await abrir('Dia', 3);
+  eq('★★ pasar de noche a día los vuelve a encender', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).filter(t => t.disabled).length), '0');
+  si('★ …y vuelven los numeritos', await p.evaluate(() => document.querySelectorAll('#evTiles .evBadge').length > 0));
+
+  console.log('\n7 · 🔴 Los chips «Previo a la UCI» también se apagan de noche');
+  const chipsPrev = async () => p.evaluate(() => {
+    const todos = Array.from(document.querySelectorAll('#pasoEvalChips .ep-esc, #pasoEvalChips [onclick*="escalaDesdeTarjeta"], #pasoEvalChips .abadge'))
+      .filter(e => /ECF|Barthel|Charlson/.test(e.textContent));
+    const banner = Array.from(document.querySelectorAll('#epBanner .abadge')).filter(e => /ECF|Barthel|Charlson/.test(e.textContent));
+    const clic = l => l.filter(e => e.getAttribute('onclick')).length;
+    return { pool: todos.length, poolClic: clic(todos), poolApag: todos.filter(e => e.classList.contains('solo-lectura')).length,
+             banner: banner.length, bannerClic: clic(banner), bannerApag: banner.filter(e => e.classList.contains('solo-lectura')).length };
+  });
+  await abrir('Dia', 3);
+  let cp = await chipsPrev();
+  eq('(de día: los tres chips del pool se tocan)', cp.pool + '/' + cp.poolClic, '3/3');
+  eq('(de día: los del banner también)', cp.banner + '/' + cp.bannerClic, '3/3');
+  await abrir('Noche', 3);
+  cp = await chipsPrev();
+  eq('★★ de noche siguen a la vista en el pool', cp.pool, '3');
+  eq('★★ …pero NINGUNO se toca', cp.poolClic, '0');
+  eq('★★ …y quedan marcados de solo lectura', cp.poolApag, '3');
+  eq('★★ el banner de arriba usa los mismos chips: también apagados', cp.banner + '/' + cp.bannerClic + '/' + cp.bannerApag, '3/0/3');
+  await abrir('Dia', 3);
+  cp = await chipsPrev();
+  eq('★ de día vuelven a tocarse', cp.poolClic + '/' + cp.bannerClic, '3/3');
 
   console.log('\n5 · 🔴 El camino entero: a las 20:30 la app arranca en NOCHE y lo dice');
   const reloj = async (h, m) => {

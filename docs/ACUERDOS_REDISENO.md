@@ -1329,6 +1329,21 @@ Le ofrecí dos caminos en cada cosa y eligió:
   tarjeta, y el aviso de abajo empieza por lo mismo. Sigue a la vista y apagada, y
   sigue nombrando la KTR respiratoria, que sí se registra de noche.
 
+**Y el mismo 2-oct completó el pedido** (le había preguntado si los chips del «Previo a la
+UCI» se apagaban de noche):
+
+> *«Que también se apaguen de noche, además necesito que de noche aparezca en
+> evaluaciones el mismo formato del día.»*
+
+- 🌙 **Los chips «Previo a la UCI»** (ECF, Barthel, Charlson) **se apagan de noche**: se ven
+  con lo que llevan y no se tocan. Valen también los del banner de arriba, que son los mismos.
+- 🌙 **Evaluaciones de noche tiene el mismo formato del día**: la tarjeta se ve, con **los
+  mismos cajones** (mismo icono, nombre y orden), pero **apagados y sin numerito** de
+  pendientes —de noche no se está debiendo nada, y un «2» ámbar lo diría—. No se abre ningún
+  campo. Antes la tarjeta entera se escondía.
+- 🪤 Esto **reemplaza** lo que decía 3.2 sobre esconder la tarjeta de evaluaciones de noche;
+  lo que sigue valiendo es «se ve y no se llena».
+
 🪤 **Es solo pantalla.** «No corresponde» **no es** «No realizada»: la segunda entra en el
 denominador de la estadística y la primera no. Por eso la KTM de noche sigue naciendo
 **neutra** y el relato no dice nada nuevo. El «Previo a la UCI» (ECF, Barthel, Charlson)

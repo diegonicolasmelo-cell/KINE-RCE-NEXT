@@ -3216,3 +3216,23 @@ cosa (acuerdo 8.5).
   alcanza», pero los chips «Previo a la UCI» siguen tocables. Queda como pregunta.
 
 **209 guardias verdes.** Sello `NEXT-5.1-horario-y-noche`.
+
+### Y ese mismo día, la segunda mitad · Tanda 5.2
+
+Diego contestó la pregunta que dejé abierta: *«Que también se apaguen de noche, además
+necesito que de noche aparezca en evaluaciones el mismo formato del día.»*
+
+- Los chips **«Previo a la UCI»** (ECF, Barthel, Charlson) se apagan de noche. Los arma una
+  sola función (`_escalasEpisodioHTML`) que usan el pool del paso 3 **y el banner de arriba**,
+  así que se apagan los dos sin tocar nada más.
+- De noche la tarjeta de Evaluaciones **ya no se esconde** (`hEgr`): muestra **los mismos
+  cajones** que de día, desactivados y **sin numerito** de pendientes. `#dEgr`, donde viven los
+  campos, no se abre de noche.
+- 🪤 **Un hueco que apareció al medirlo:** forzar un cajón de noche (`evFamAbrir`) marcaba «se
+  evaluó este turno». Con la tarjeta escondida no se podía llegar; con la tarjeta visible sí
+  habría sido posible. Ahora el cajón se niega a abrir de noche.
+- Se ajustaron con su razón escrita dos guardias que daban por hecho que de noche no había
+  cajones (`evaluaciones_celular`, `general_disuelta`). `medicion_no_queda_hueca` no tuvo que
+  tocarse: la tarjeta tiene contenido.
+
+**209 guardias verdes.** Sello `NEXT-5.2-noche-apagada`.

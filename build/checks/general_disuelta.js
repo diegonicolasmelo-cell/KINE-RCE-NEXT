@@ -136,7 +136,10 @@ const no = (l, g) => eq(l, !!g, 'false');
     return c ? [c.d.PAC_BARTHEL, c.d.PAC_CHARLSON, c.d.PAC_APACHE2, c.d.PAC_ECF].join('|') : null; });
   eq('★★ Barthel, Charlson, APACHE II y ECF viajan en el guardado', viaja, '60|2|11|4');
   await abrir({ noche: true, extra: { BARTHEL: 85 } }, 3);
-  no('★ de noche la tarjeta de mediciones no se ve (como siempre)', await ver('#fcEval'));
+  // 🗂️ 2-oct-2026: de noche la tarjeta SÍ se ve (mismo formato del día, con los cajones apagados), pero
+  // sin campos: el Barthel cargado sigue en el formulario y no se puede editar desde ahí.
+  si('★ de noche la tarjeta de mediciones se ve, con los cajones apagados', await ver('#fcEval') && await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).every(t => t.disabled)));
+  no('★ …y sin campos: el de Barthel no se ve', await ver('#fBarthel'));
   eq('★★ …pero el Barthel cargado sigue en el formulario', await p.evaluate(() => v('fBarthel')), '85');
 
   console.log('\n6 · 🔴 La fase clínica y la adecuación tienen su propia tarjeta');

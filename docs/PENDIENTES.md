@@ -61,11 +61,9 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     Es una decisión de diseño que nunca se tomó.
 11. **¿Se renombran `VENT_P01`, `VENT_DPOCC` y `VENT_PMUSC` a `EVAL_T_*`?** No
     se tocó. Gratis ahora, caro cuando haya datos reales.
-12. **El cajón «Preingreso» no está de noche** (la tarjeta de mediciones no se
-    muestra de noche, regla de siempre), pero **los chips «Previo a la UCI»
-    siguen tocables** en el paso 3 y abren la misma escala. Coherente con «a las
-    cuatro de la mañana nadie sabe el Barthel previo». ¿Te sirve así, o de
-    noche también se apagan?
+12. ~~El «Previo a la UCI» de noche~~ **RESUELTO 2-oct (acuerdo 8.5):** los chips
+    se apagan de noche, igual que el resto, y Evaluaciones muestra los mismos
+    cajones del día, apagados.
 13. **El P0.1 también se pierde de noche**, por lo mismo: antes vivía en el
     desplegable «Monitoreo avanzado», que se veía siempre.
 
@@ -108,7 +106,7 @@ No se creó ningún campo y no falta ninguno.
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.1-horario-y-noche`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.2-noche-apagada`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 🕗 **Esa misma corrida corrige el horario de turno** en CONFIG: si
   `TURNO_DIA_INICIO` y `TURNO_NOCHE_INICIO` dicen 9 y 21, pasan a 8 y 20, una
