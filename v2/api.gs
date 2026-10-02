@@ -228,8 +228,8 @@ function _configUI() {
   return {
     CPAX_ACTIVO: leerConfig('CPAX_ACTIVO', 'TRUE') !== 'FALSE',
     NUM_CAMAS: parseInt(leerConfig('NUM_CAMAS', '18')) || 18,
-    TURNO_DIA_INICIO: parseInt(leerConfig('TURNO_DIA_INICIO', '9')) || 9,
-    TURNO_NOCHE_INICIO: parseInt(leerConfig('TURNO_NOCHE_INICIO', '21')) || 21,
+    TURNO_DIA_INICIO: parseInt(leerConfig('TURNO_DIA_INICIO', '8')) || 8,
+    TURNO_NOCHE_INICIO: parseInt(leerConfig('TURNO_NOCHE_INICIO', '20')) || 20,
     /* Aviso de fin de turno (O4). La HORA DE SALIDA del equipo no es el cambio
        de turno de la app: viaja aparte y el front nunca la deriva de las dos
        de arriba. AVISO_FIN_TURNO_MIN admite 0 = apagado, así que NO se puede

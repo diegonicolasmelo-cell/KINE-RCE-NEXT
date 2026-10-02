@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-5.0-turno-redisenado">
+<meta name="rce-version" content="NEXT-5.1-horario-y-noche">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -1226,6 +1226,11 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .abadge.solo-lectura{opacity:.6;cursor:default;}
 .pe2-noche{margin-top:8px;font-size:.76rem;color:var(--muted);background:#f1f5f9;
   border:1px solid #e2e8f0;border-radius:7px;padding:6px 10px;}
+/* 🌙 «No corresponde de noche» (Diego, 2-oct-2026): el rótulo del paso Evaluaciones y la marca de la tarjeta de terapia física */
+.pe2-nocorresp{margin:0 0 10px;padding:9px 12px;background:#f1f5f9;border:1px solid #cbd5e1;border-left:5px solid #64748b;border-radius:8px;display:flex;flex-direction:column;gap:3px;}
+.pe2-nocorresp b{font-size:.92rem;color:#1e293b;}
+.pe2-nocorresp span{font-size:.78rem;color:#475569;}
+.hdr-nocorresp{margin-left:auto;font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:10px;background:#e2e8f0;color:#334155;border:1px solid #cbd5e1;white-space:nowrap;}
 .fcard.solo-lectura .sub-sec{opacity:.55;}
 /* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
    aprieta. Lo que es interactivo tiene que verse interactivo. */
@@ -4795,7 +4800,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
         <!-- ▌ REHABILITACIÓN (KTM + válvula de fonación + Evaluaciones) -->
         <div class="fcard fc-k mega-card" id="fcKtmCard">
-          <div class="fcard-hdr"><span class="fcard-title">🏃 REHABILITACIÓN</span></div>
+          <div class="fcard-hdr"><span class="fcard-title">🏃 REHABILITACIÓN</span><span id="ktmNoCorresp" class="hdr-nocorresp hidden">No corresponde</span></div>
           <div class="fcard-body">
 
             <!-- 🌙 «KTM A» (Diego, 19-sep-2026). Antes la tarjeta entera
@@ -4805,7 +4810,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  la KTR respiratoria SÍ se registra de noche, pero vive arriba,
                  en Respiratorio. Lo cuida ktm_de_noche.js. -->
             <div id="dKTMnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
-              🌙 <b>En el turno noche la terapia física no se registra.</b> La tarjeta queda a la vista
+              🌙 <b>No corresponde: en el turno noche la terapia física no se registra.</b> La tarjeta queda a la vista
               para que veas en qué va el paciente, pero no se llena.
               La <b>KTR respiratoria sí</b> se registra de noche, y está arriba, en Respiratorio.
             </div>
@@ -4993,7 +4998,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  apagada sin explicación deja igual de perdido que una que
                  desaparece. Lo cuida ktm_de_noche.js. -->
             <div id="dIMTnoche" class="hidden" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:.79rem;color:#334155;">
-              🌙 <b>En el turno noche no se registra terapia física.</b> El IMT y la EMS son
+              🌙 <b>No corresponde: en el turno noche no se registra terapia física.</b> El IMT y la EMS son
               parte del mismo paquete que la KTM, así que se ven y no se llenan.
             </div>
             <div class="check wa" style="border:none;background:transparent;padding:0;margin-bottom:0;">
@@ -5448,8 +5453,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div>
 
       <button type="button" id="pasoEvalNada" data-paso="3" data-nodirty onclick="pasoSinMedir()">
-        No medí nada este turno
-        <small>Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
+        <span id="pasoEvalNadaT">No medí nada este turno</span>
+        <small id="pasoEvalNadaS">Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.</small>
       </button>
 
       <!-- 🗂️ 20-sep-2026 · El bloque suelto «Dejar pendiente para el turno que
@@ -5802,7 +5807,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.0-turno-redisenado]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.1-horario-y-noche]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6150,7 +6155,7 @@ function diasCal(ts, fechaCal, hastaISO){
 function _vmPorHorasCli(){ return !(window.CFG && CFG.VM_POR_HORAS===false); }
 function _tsInicioTurnoCli(fecha, turno){
   const f=_isoDia(fecha||hoy()); if(!f) return '';
-  const h=(turno||SHIFT)==='Noche' ? ((window.CFG&&parseInt(CFG.TURNO_NOCHE_INICIO))||21) : ((window.CFG&&parseInt(CFG.TURNO_DIA_INICIO))||9);
+  const h=(turno||SHIFT)==='Noche' ? ((window.CFG&&parseInt(CFG.TURNO_NOCHE_INICIO))||20) : ((window.CFG&&parseInt(CFG.TURNO_DIA_INICIO))||8);
   return f+' '+String(h).padStart(2,'0')+':00';
 }
 function diasVMCli(ts, fechaCal, hastaISO, tsRef){
@@ -6189,11 +6194,14 @@ function toast(msg, t=3200) {
 
 // ── TURNO LÓGICO: fecha y turno se calculan SIEMPRE como pareja ──
 // Día: H_DIA–(H_NOCHE-1) de hoy · Noche: H_NOCHE–23:59 de hoy · 00:00–(H_DIA-1)
-// sigue siendo la NOCHE DEL DÍA ANTERIOR (ventana de gracia para escribir
-// atrasado). Horarios ajustables en CONFIG (TURNO_DIA_INICIO / TURNO_NOCHE_INICIO).
+// sigue siendo la NOCHE DEL DÍA ANTERIOR. 🕗 Desde el 2-oct-2026 la app cambia
+// a las 08:00 y a las 20:00, que es cuando cambia el EQUIPO (antes 09 y 21: esa
+// hora de gracia para escribir atrasado se cambió por no mostrar el turno de
+// día a quien llega de noche). Horarios ajustables en CONFIG (TURNO_DIA_INICIO /
+// TURNO_NOCHE_INICIO).
 function _horasTurno(){
   const c=window.CFG||{};
-  return { dia: parseInt(c.TURNO_DIA_INICIO)||9, noche: parseInt(c.TURNO_NOCHE_INICIO)||21 };
+  return { dia: parseInt(c.TURNO_DIA_INICIO)||8, noche: parseInt(c.TURNO_NOCHE_INICIO)||20 };
 }
 function _turnoLogico(now){
   now = now || new Date();
@@ -7254,6 +7262,14 @@ const _PASO_SERIE = [
 
 function pasoEvalPintar(){
   const caja = $('pasoEvalChips'); if(!caja) return;
+  /* 🌙 DE NOCHE EL BOTÓN DE SEGUIR NO PUEDE DECIR «NO MEDÍ NADA» (Diego, 2-oct-2026): suena a que se
+     pudo medir y no se hizo. Sigue siendo EL MISMO botón y la misma acción (pasoSinMedir); solo cambia lo que dice. */
+  const _noche = (typeof SHIFT !== 'undefined') && SHIFT === 'Noche';
+  const _bt = $('pasoEvalNadaT'), _bs = $('pasoEvalNadaS');
+  if(_bt) _bt.textContent = _noche ? 'No corresponde de noche' : 'No medí nada este turno';
+  if(_bs) _bs.textContent = _noche
+    ? 'Sigue al relato: las evaluaciones y la terapia física se registran de día.'
+    : 'Sigue al relato sin escribir en la serie. Lo que falta queda a la vista para el turno que viene.';
   const c = (typeof _camaPanel === 'function') ? (_camaPanel() || {}) : {};
   /* 🔴 19-sep-2026 · EN EL INGRESO TAMBIÉN SE PINTA. El PATIENT_ID se asigna
      al ocupar la cama, o sea al GUARDAR: mientras se ingresa, la cama todavía
@@ -7295,10 +7311,13 @@ function pasoEvalPintar(){
   // generador (el mismo de la tarjeta de la cama).
   const preUci = (typeof _escalasEpisodioHTML === 'function') ? _escalasEpisodioHTML(c, true) : '';
 
+  /* 🌙 «No corresponde de noche» (Diego, 2-oct-2026). La lista de lo último medido SE QUEDA (el 19-sep pidió
+     verla): lo que faltaba era decir, con todas sus letras, que de noche nada de esto se llena. Sin el rótulo,
+     «FSS-ICU sin medir» en beige se lee como una tarea que se está debiendo. Es solo pantalla: no se guarda. */
   caja.innerHTML =
+    (esNoche ? '<div class="pe2-nocorresp"><b>No corresponde de noche</b><span>Las evaluaciones y la terapia física se registran de día. Abajo está lo último que se midió, con la fecha y quién lo midió, solo para leer.</span></div>' : '') +
     '<div class="pe2-t">Lo que este episodio lleva medido</div>' +
     '<div class="pe2-fila">' + serie + '</div>' +
-    (esNoche ? '<div class="pe2-noche">🌙 De noche no se registran mediciones funcionales nuevas: esto es lo último que hay, con la fecha y quién lo midió.</div>' : '') +
     (preUci ? '<div class="pe2-t" style="margin-top:9px;">Previo a la UCI</div><div class="pe2-fila">' + preUci + '</div>' : '');
   try{ evTilesPintar(); }catch(e){}
 }
@@ -7892,9 +7911,10 @@ function _borradorRestaurar(idCama){
 
    🔴 La hora del aviso sale de CFG.SALIDA_TURNO_DIA / CFG.SALIDA_TURNO_NOCHE.
    JAMÁS de _horasTurno() ni de TURNO_DIA_INICIO/TURNO_NOCHE_INICIO: ésas son el
-   cambio de turno de la APP (09:00 / 21:00) y el equipo se va a las 20:00 y a
-   las 08:00. Calcularlo con ellas sacaría el aviso a las 20:45 y a las 08:45,
-   con la unidad ya vacía. _turnoLogico() se usa solo para saber QUÉ turno está
+   cambio de turno de la APP y la salida es otra pregunta. Hoy coinciden (08:00 /
+   20:00, desde el 2-oct-2026), pero si la app cambiara de turno a otra hora —como
+   hizo hasta entonces con 09:00 / 21:00— calcularlo con ellas sacaría el aviso con
+   la unidad ya vacía. _turnoLogico() se usa solo para saber QUÉ turno está
    activo, que es otra pregunta.
 
    🔒 Ley 19.628: el modal muestra «Cama N» y el código interno del episodio.
@@ -17739,6 +17759,7 @@ function _rehabModoNoche(on){
     card.classList.toggle('solo-lectura', !!on);
     const av=$(par[1]); if(av) av.classList.toggle('hidden', !on);
   });
+  const nc=$('ktmNoCorresp'); if(nc) nc.classList.toggle('hidden', !on);   // 2-oct-2026: «No corresponde» a la vista, no solo en el aviso
 }
 
 //  GATES DE EVALUACIÓN (acordado):

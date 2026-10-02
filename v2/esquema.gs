@@ -958,8 +958,13 @@ function _sembrar(ss) {
     ['COORD_RECUPERA_CORREO', 'FALSE'],
     // Ventanas de turno (hora en que PARTE cada turno; la madrugada previa al
     // inicio del día sigue contando como la noche del día anterior)
-    ['TURNO_DIA_INICIO', '9'],
-    ['TURNO_NOCHE_INICIO', '21'],
+    // 🕗 2-oct-2026 (Diego: «corregir horario»): la app cambia de turno cuando cambia el
+    // EQUIPO, a las 08:00 y a las 20:00. Antes era 09 y 21, y entre las 20 y las 21 el
+    // kinesiólogo de noche abría la pantalla del turno de día. La marca de abajo la usa
+    // _migrarHorarioTurno() para corregir UNA vez las planillas que ya tenían 9 y 21.
+    ['TURNO_DIA_INICIO', '8'],
+    ['TURNO_NOCHE_INICIO', '20'],
+    ['HORARIO_TURNO_AJUSTADO', ''],
     // Visor de imágenes (2-sep-2026). Vacío = el botón 🩻 no aparece en las
     // tarjetas. Se pone la URL BASE del login, nunca un enlace con token de
     // sesión: ésos caducan. Medido ese día: Synapse manda X-Frame-Options
@@ -1033,6 +1038,7 @@ function _sembrar(ss) {
   ];
   const cfgExist = _valoresCol(hCfg, 1, 2);
   cfgDefaults.forEach(kv => { if (cfgExist.indexOf(kv[0]) === -1) hCfg.appendRow(kv); });
+  _migrarHorarioTurno(hCfg);
 
   // CATALOGOS — fases clínicas: siembra inicial Y agrega las que falten
   // (idempotente: correr crearORepararEstructura suma fases nuevas sin duplicar;
@@ -1116,6 +1122,34 @@ function _sembrar(ss) {
     }
     hCam.getRange(filaDatos, 1, filas.length, total).setValues(filas);
   }
+}
+
+/**
+ * Corrige UNA SOLA VEZ el horario de turno de una planilla armada con el default
+ * viejo (9 y 21) → 8 y 20 (2-oct-2026). Un cambio de default no alcanza a las filas
+ * de CONFIG que ya existen, y esas son las de toda planilla que ya se usó.
+ *
+ *  · Solo si LAS DOS filas siguen con el valor viejo: un horario puesto a propósito
+ *    (10 y 22, por ejemplo) no se toca.
+ *  · Deja la marca HORARIO_TURNO_AJUSTADO=TRUE pase lo que pase, así que si alguien
+ *    decide volver al 9/21 más adelante, correr crearORepararEstructura() no se lo
+ *    pisa otra vez.
+ */
+function _migrarHorarioTurno(hCfg) {
+  const ult = hCfg.getLastRow();
+  if (ult < 2) return;
+  const filas = hCfg.getRange(2, 1, ult - 1, 2).getValues();
+  const buscar = k => filas.findIndex(r => String(r[0]).trim() === k);
+  const iMarca = buscar('HORARIO_TURNO_AJUSTADO');
+  if (iMarca > -1 && String(filas[iMarca][1]).trim().toUpperCase() === 'TRUE') return;
+  const iD = buscar('TURNO_DIA_INICIO'), iN = buscar('TURNO_NOCHE_INICIO');
+  if (iD > -1 && iN > -1 &&
+      String(filas[iD][1]).trim() === '9' && String(filas[iN][1]).trim() === '21') {
+    hCfg.getRange(iD + 2, 2).setValue('8');
+    hCfg.getRange(iN + 2, 2).setValue('20');
+  }
+  if (iMarca > -1) hCfg.getRange(iMarca + 2, 2).setValue('TRUE');
+  else hCfg.appendRow(['HORARIO_TURNO_AJUSTADO', 'TRUE']);
 }
 
 function _valoresCol(h, col, filaInicio) {

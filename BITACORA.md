@@ -3172,3 +3172,47 @@ PVE bloquea); la adecuación del turno vive dentro de la tarjeta «Fase clínica
   `AET_SERIE`.
 
 **207 guardias verdes.** Sello `NEXT-5.0-turno-redisenado`.
+
+---
+
+## 2-oct-2026 · El horario del turno y «No corresponde de noche» · Tanda 5.1
+
+Diego probó «de noche» y escribió: *«De noche las evaluaciones se muestran. Quizás para
+que esto funcione mejor en terapia física de noche que salga no corresponde. Corregir
+horario.»* Era ambiguo, así que **medí antes de tocar** y le di dos caminos en cada
+cosa (acuerdo 8.5).
+
+### Lo que se midió
+
+- La app cambiaba de turno a las **21:00 / 09:00** y el equipo cambia a las **20:00 /
+  08:00**. Entre las 20 y las 21 la app seguía en «Día». El código lo tenía documentado
+  como hora de gracia a propósito; era una decisión que se tomó con otro motivo y ya no
+  sirve.
+- De noche de verdad, el paso Evaluaciones mostraba la lista de lo último medido con
+  «sin medir» en beige y el botón «No medí nada este turno».
+
+### Qué se hizo
+
+- **Horario a 08:00 y 20:00** en el cliente, el servidor, el esquema y la config de la
+  pantalla. `_migrarHorarioTurno()` corrige **una sola vez** las planillas que ya
+  tenían 9 y 21 (solo si las dos siguen con el valor viejo, y deja una marca para no
+  pisar una vuelta atrás). Guardia nueva `horario_turno.js`.
+- **«No corresponde de noche»** en el paso Evaluaciones (rótulo + botón de seguir) y en
+  la tarjeta de terapia física (marca en el encabezado + aviso). La lista de lo último
+  medido se queda. Solo pantalla. Guardia nueva `noche_no_corresponde.js`, que incluye
+  el camino entero reloj → turno → rótulo con la hora congelada a las 20:30.
+- `transicion_hora_retroactiva.js` ajustada con su razón escrita: la ventana del turno
+  Día pasó de 09:00–20:59 a 08:00–19:59. Lo que protege (ni futura, ni de otro turno)
+  no cambió.
+
+### Para no olvidar
+
+- 🪤 **`esquema.gs` trae su propio `leerConfig` y su propio `_tz`**, y al evaluarlo en
+  una guardia pisan los falsos que se definieron antes. Hay que **reasignarlos
+  después del eval**, sobre el mismo nombre.
+- 🪤 **El ancla de `refTurno` (15:00 / 03:00) no se movió**: sigue dentro de cada turno
+  y moverla cambiaría días de VM ya contados.
+- 🪤 Corregí una frase mía de la tanda anterior: dije que de noche el Preingreso «no se
+  alcanza», pero los chips «Previo a la UCI» siguen tocables. Queda como pregunta.
+
+**209 guardias verdes.** Sello `NEXT-5.1-horario-y-noche`.

@@ -32,8 +32,8 @@ function diasEntre(desdeISO, hastaISO) {
  * @return {{fecha:string, turno:string, turnoKey:string}}
  */
 function turnoLogicoServidor(fechaISO, hora) {
-  const dia = parseInt(leerConfig('TURNO_DIA_INICIO', '9'), 10) || 9;
-  const noche = parseInt(leerConfig('TURNO_NOCHE_INICIO', '21'), 10) || 21;
+  const dia = parseInt(leerConfig('TURNO_DIA_INICIO', '8'), 10) || 8;
+  const noche = parseInt(leerConfig('TURNO_NOCHE_INICIO', '20'), 10) || 20;
   const h = parseInt(String(hora || '00:00').slice(0, 2), 10) || 0;
   let f = String(fechaISO || '').slice(0, 10), turno;
   if (h >= dia && h < noche) turno = 'Dia';
@@ -95,8 +95,8 @@ function diasBloques(tsDesde, tsHasta) {
 function _tsInicioTurno(fechaISO, turno) {
   const f = String(fechaISO || '').slice(0, 10);
   if (!f) return '';
-  const dia = parseInt(leerConfig('TURNO_DIA_INICIO', '9'), 10) || 9;
-  const noche = parseInt(leerConfig('TURNO_NOCHE_INICIO', '21'), 10) || 21;
+  const dia = parseInt(leerConfig('TURNO_DIA_INICIO', '8'), 10) || 8;
+  const noche = parseInt(leerConfig('TURNO_NOCHE_INICIO', '20'), 10) || 20;
   const h = String(turno) === 'Noche' ? noche : dia;
   return f + ' ' + (h < 10 ? '0' + h : String(h)) + ':00';
 }
@@ -172,8 +172,9 @@ function _fechaEfectivaTurno(fecha, turno) {
 
 /**
  * Momento de referencia de un TURNO para contar los bloques de 24 h: la
- * mitad del turno (Día 09-21 → 15:00; Noche 21-09 → 03:00 del día siguiente).
- * Es determinista: re-editar una evolución no cambia sus días.
+ * un punto FIJO dentro del turno (Día → 15:00; Noche → 03:00 del día siguiente).
+ * No es la mitad exacta y no se mueve con los horarios de CONFIG: así re-editar
+ * una evolución —o cambiar el horario— no cambia los días ya contados.
  */
 function refTurno(fechaISO, turno) {
   const f = String(fechaISO || '').slice(0, 10);

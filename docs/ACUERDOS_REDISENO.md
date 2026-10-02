@@ -380,6 +380,9 @@ cumplimiento deja de querer decir algo.
 exigía (`regresion_ui.js`, «tarjeta oculta») quedó actualizada con la razón
 escrita. Lo nuevo lo cuida `build/checks/ktm_de_noche.js`.
 
+🔁 **2-oct-2026:** lo de «se ve y no se llena» se completó con un «No corresponde»
+a la vista, y el horario se corrigió. Ver 8.5.
+
 🪤 **Y destapó la trampa del reloj por cuarta vez.** Al hacer que la pantalla
 dependa del turno, **tres guardias que leían la hora real** —`cuatro_pasos`,
 `ktm_sesiones` y `paso_evaluaciones`— se pusieron rojas solas: verdes de día,
@@ -1289,4 +1292,49 @@ Cómo quedó:
 - 🔴 **De noche, el Preingreso no se alcanza**: la tarjeta de mediciones no se
   muestra de noche (regla de siempre). Es coherente con 1.6 —«a las cuatro de la
   mañana nadie sabe el Barthel previo»—, pero hay que saberlo.
+
+### 8.5 · De noche, «No corresponde» — y el horario del turno corregido
+
+> *«De noche las evaluaciones se muestran. Quizás para que esto funcione mejor en
+> terapia física de noche que salga no corresponde. Corregir horario.»*
+
+Medí dos cosas, y las dos podían ser lo que vio:
+
+- **El reloj de la app no era el del equipo.** La app cambiaba a Noche a las 21:00 y
+  a Día a las 09:00; el equipo cambia a las 20:00 y a las 08:00. Entre las 20 y las
+  21 la app seguía en Día y mostraba las evaluaciones completas «de noche».
+- **De noche de verdad**, el paso Evaluaciones seguía mostrando la lista de lo último
+  medido con cosas como «FSS-ICU sin medir» en beige, que se lee como una tarea
+  pendiente, y el botón de seguir decía «No medí nada este turno».
+
+Le ofrecí dos caminos en cada cosa y eligió:
+
+| Pregunta | Elegido |
+|---|---|
+| ¿Cómo corrijo el horario? | **Cambiar a 08:00 y 20:00.** La app cambia junto con el equipo. |
+| ¿Dónde dice «No corresponde»? | **Evaluaciones y terapia física, dejando lo último medido.** |
+
+**Qué cambió:**
+
+- 🕗 **El turno cambia a las 08:00 y a las 20:00.** Se pierde la hora de gracia que tenía
+  el 9/21 para escribir atrasado: quien termina a las 20:15 verá el turno Noche y lo
+  pasa a Día con el botón del turno. Si el horario de una planilla se había escrito en
+  CONFIG, **`crearORepararEstructura()` lo corrige una sola vez** —solo si todavía dice
+  9 y 21—; un horario puesto a propósito no se toca, y si alguien vuelve al 9/21 más
+  adelante, no se le pisa otra vez.
+- 🌙 **Evaluaciones, de noche:** un rótulo **«No corresponde de noche»** arriba. La
+  lista de lo último medido **se queda**, en solo lectura, como se pidió el 19-sep. El
+  botón de seguir dice **«No corresponde de noche»** y no «No medí nada».
+- 🌙 **Terapia física, de noche:** un **«No corresponde»** en el encabezado de la
+  tarjeta, y el aviso de abajo empieza por lo mismo. Sigue a la vista y apagada, y
+  sigue nombrando la KTR respiratoria, que sí se registra de noche.
+
+🪤 **Es solo pantalla.** «No corresponde» **no es** «No realizada»: la segunda entra en el
+denominador de la estadística y la primera no. Por eso la KTM de noche sigue naciendo
+**neutra** y el relato no dice nada nuevo. El «Previo a la UCI» (ECF, Barthel, Charlson)
+sigue tocable de noche: son datos del episodio, no mediciones del turno.
+
+🪤 **Los puntos de referencia de los días de VM no se movieron**: el ancla fija de 15:00 /
+03:00 que usa `refTurno` sigue dentro de cada turno con el horario nuevo, y moverla
+habría cambiado días ya contados.
 

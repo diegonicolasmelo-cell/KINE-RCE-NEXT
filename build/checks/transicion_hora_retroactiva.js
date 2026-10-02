@@ -32,8 +32,11 @@ const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
   await p.goto('file://' + IDX);
   await p.waitForTimeout(500);
 
-  // Turno DÍA del 2026-09-10. Ventana del turno: 09:00–20:59 (TURNO_DIA_INICIO 9,
-  // TURNO_NOCHE_INICIO 21). Reloj FIJADO a las 18:00 de ese mismo día.
+  // Turno DÍA del 2026-09-10. Ventana del turno: 08:00–19:59 (TURNO_DIA_INICIO 8,
+  // TURNO_NOCHE_INICIO 20). Reloj FIJADO a las 18:00 de ese mismo día.
+  // 🕗 2-oct-2026 (Diego: «corregir horario»): la ventana era 09:00–20:59 y pasó a ser la
+  // del EQUIPO, 08:00–19:59. Lo que esta guardia protege no cambió —ni futura, ni de otro
+  // turno—; cambiaron los bordes.
   const RELOJ_DIA = [2026, 8, 10, 18, 0];
   await p.evaluate(() => { SHIFT = 'Dia'; $('gDate').value = '2026-09-10'; window.CFG = window.CFG || {}; });
 
@@ -42,15 +45,15 @@ const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
 
   /* ── 1 · Turno día: qué se acepta ── */
   eq('14:30 (dentro del turno y ya pasó) se acepta', (await probar('14:30', RELOJ_DIA)).ok, true);
-  eq('09:00 (borde de entrada del turno) se acepta', (await probar('09:00', RELOJ_DIA)).ok, true);
+  eq('08:00 (borde de entrada del turno) se acepta', (await probar('08:00', RELOJ_DIA)).ok, true);
   eq('18:00 (justo ahora) se acepta', (await probar('18:00', RELOJ_DIA)).ok, true);
 
   /* ── 2 · NO puede ser futura — el corazón de esta guardia ── */
   const fut = await probar('18:01', RELOJ_DIA);
   eq('18:01 con el reloj en 18:00 se RECHAZA', fut.ok, false);
   eq('…y lo dice por ser futura', /futura|todavía no ocurre/i.test(fut.motivo || ''), true);
-  const fut2 = await probar('20:30', RELOJ_DIA);
-  eq('20:30 (aún dentro del turno, pero futura) se RECHAZA', fut2.ok, false);
+  const fut2 = await probar('19:30', RELOJ_DIA);
+  eq('19:30 (aún dentro del turno, pero futura) se RECHAZA', fut2.ok, false);
   eq('…también por futura, no por el turno', /futura|todavía no ocurre/i.test(fut2.motivo || ''), true);
 
   /* ── 3 · NO puede caer fuera del turno que se está guardando ── */
@@ -60,7 +63,10 @@ const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
   const nocturna = await probar('22:00', RELOJ_DIA);
   eq('22:00 en un turno DÍA se RECHAZA', nocturna.ok, false);
   eq('…y lo dice por el turno', /turno/i.test(nocturna.motivo || ''), true);
-  eq('08:59 (un minuto antes del turno) se RECHAZA', (await probar('08:59', RELOJ_DIA)).ok, false);
+  eq('07:59 (un minuto antes del turno) se RECHAZA', (await probar('07:59', RELOJ_DIA)).ok, false);
+  const yaNoche = await probar('20:30', RELOJ_DIA);
+  eq('★ 20:30 en un turno DÍA se RECHAZA: ya es turno noche', yaNoche.ok, false);
+  eq('…y lo dice por el turno', /turno/i.test(yaNoche.motivo || ''), true);
 
   /* ── 4 · Turno NOCHE: la ventana cruza la medianoche y la madrugada es del día
      siguiente a la fecha del turno. Turno noche del 2026-09-10, reloj fijado a
@@ -73,6 +79,8 @@ const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
   eq('05:00 con el reloj en 02:00 se RECHAZA por futura', nocheFut.ok, false);
   eq('…y lo dice', /futura|todavía no ocurre/i.test(nocheFut.motivo || ''), true);
   eq('15:00 en un turno NOCHE se RECHAZA', (await probar('15:00', RELOJ_NOCHE)).ok, false);
+  eq('★ 19:59 en un turno NOCHE se RECHAZA (todavía es día)', (await probar('19:59', RELOJ_NOCHE)).ok, false);
+  eq('★ 20:00 (borde de entrada del turno noche) se acepta', (await probar('20:00', RELOJ_NOCHE)).ok, true);
 
   /* ── 5 · Basura y vacío no pasan ── */
   for (const mala of ['', '  ', 'ayer', '25:00', '14:70', '1430']) {
