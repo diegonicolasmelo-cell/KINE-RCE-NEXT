@@ -75,12 +75,16 @@ const { chromium } = require('playwright-core');
   eq('★ y el número de reintubación', D.reintub, 'fcRespCard');
 
   console.log('\n2 · Y «General» se queda con lo del paciente');
-  eq('el día de estadía', D.dia, 'fcGen');
-  eq('la adecuación del esfuerzo terapéutico', D.aet, 'fcGen');
-  eq('la ficha previa a la UCI', D.ficha, 'fcGen');
-  eq('la fase clínica', D.fase, 'fcGen');
-  eq('el aislamiento', D.aisl, 'fcGen');
-  eq('el reingreso', D.reing, 'fcGen');
+  // 🗂️ 30-sep-2026: «General» se DISOLVIÓ (Diego: «Barthel, Apache, Charlson, ECF… va a ir en
+  // evaluaciones», «los días de estadía como información», «las fases… una tarjeta nueva»). Lo que
+  // esta guardia protege NO cambió —la vía aérea vive en Respiratorio y nada de ella volvió a
+  // General—; cambió el dueño de lo que SÍ es del paciente. Lo mide general_disuelta.js.
+  eq('el día de estadía (estado oculto; se ve en el banner)', D.dia, 'fcFase');
+  eq('la adecuación del esfuerzo terapéutico', D.aet, 'fcFase');
+  eq('las escalas previas a la UCI, ahora en Evaluaciones', D.ficha, 'fcEval');
+  eq('la fase clínica, en su propia tarjeta', D.fase, 'fcFase');
+  eq('el aislamiento', D.aisl, 'fcFase');
+  eq('el reingreso', D.reing, 'fcFase');
 
   /* ══ 3 · 🔴 La máquina de eventos no se tocó ══════════════════════════ */
   console.log('\n3 · 🔴 Los cinco eventos siguen funcionando');

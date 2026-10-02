@@ -83,8 +83,11 @@ const no = (l, g) => eq(l, !!g, 'false');
      await p.evaluate(() => $('fEdad').closest('.row') !== $('fNombre').closest('.row')), 'true');
 
   console.log('\n3 · 🔴 La fecha y la hora salieron de «General»');
-  eq('★★ la fecha de ingreso ya no está en la tarjeta General', await p.evaluate(() => !!$('fcGen').querySelector('#fFechaIng')), false);
-  eq('★★ la hora tampoco', await p.evaluate(() => !!$('fcGen').querySelector('#fHoraIng')), false);
+  // 🗂️ 30-sep-2026: «General» ya no existe. Lo que se protege —la fecha y la hora de ingreso se
+  // escriben UNA vez, en el paso 0, y no en una tarjeta del turno— se mide ahora contra los
+  // cuatro bloques del ingreso.
+  eq('★★ la fecha de ingreso vive en el ingreso (bloque Llegada), no en el turno', await p.evaluate(() => $('fFechaIng').closest('#fcId [data-bloque]').dataset.bloque), 'llegada');
+  eq('★★ la hora, también', await p.evaluate(() => $('fHoraIng').closest('#fcId [data-bloque]').dataset.bloque), 'llegada');
 
   console.log('\n4 · 🔴 Se sugieren con el momento de AHORA, y son obligatorias');
   eq('★★ la fecha sugerida es la de hoy', await p.evaluate(() => v('fFechaIng')), '2026-08-12');

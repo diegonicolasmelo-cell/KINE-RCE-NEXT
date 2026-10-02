@@ -92,8 +92,9 @@ const no = (l, g) => eq(l, !!g, 'false');
   console.log('\n1 · 🔴 Cajones cuadrados, con icono y nombre, a la vista antes de registrar nada');
   await abrir({ va: 'TOT', sop: 'VM', modo: 'CPAP/PS' });
   si('★★ el panel de cajones se ve', await ver('#evTiles'));
-  eq('★★ hay cajones para las cinco familias', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).map(t => t.dataset.fam).join(',')),
-     'funcionales,fuerza,ecograficas,respiratorias,via');
+  // 🗂️ 30-sep-2026: la sexta familia, «Preingreso», va PRIMERA (Barthel, ECF, Charlson, APACHE II).
+  eq('★★ hay cajones para las seis familias', await p.evaluate(() => Array.from(document.querySelectorAll('#evTiles .evTile')).map(t => t.dataset.fam).join(',')),
+     'preingreso,funcionales,fuerza,ecograficas,respiratorias,via');
   const t1 = await p.evaluate(() => { const ico = document.querySelector('#evTiles .evTile[data-fam="fuerza"] .evIco');
     const r = ico.getBoundingClientRect();
     return { w: Math.round(r.width), h: Math.round(r.height), svg: !!ico.querySelector('svg'),

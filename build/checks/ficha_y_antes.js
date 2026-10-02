@@ -165,8 +165,12 @@ const { chromium } = require('playwright-core');
   eq('los campos del «antes» existen en el formulario', R4.inexistentes.join(',') || 'todos', 'todos');
   eq('son los seis campos de estado', R4.nAntes, 6);
 
-  /* ── 5 · La ficha se pliega y los datos NO se pierden ── */
-  console.log('\n5 · Ficha del episodio plegada');
+  /* ── 5 · La ficha es UNA línea editable, y los datos NO se pierden ──
+     🗂️ 30-sep-2026: «General» se disolvió. Las escalas previas (Barthel, Charlson, APACHE II, ECF)
+     pasaron a la familia «Preingreso» de Evaluaciones, así que ya no hay nada que PLEGAR: la ficha
+     quedó en la línea «✏️ Editar ficha» bajo el banner, que destapa la identificación. Lo que
+     esta guardia protege no cambió: plegar/cerrar NO borra datos y el payload los lee igual. */
+  console.log('\n5 · Ficha del episodio: la línea bajo el banner');
   const R5 = await p.evaluate(() => {
     const r = {};
     $('cIng').value = 'false';
@@ -174,7 +178,6 @@ const { chromium } = require('playwright-core');
     $('fTalla').value = '158'; $('fHoraIng').value = '14:30';
     $('fBarthel').value = '85'; $('fCharlson').value = '4'; $('fApache').value = '18'; $('fEcf').value = '3';
     fichaAplicar(false);
-    r.plegada = $('fPreUci').classList.contains('plegado');
     r.chipVisible = !$('fichaChip').classList.contains('hidden');
     r.resumen = $('fichaChipTxt').textContent;
     r.identOculta = $('fcId').classList.contains('hidden');
@@ -183,57 +186,39 @@ const { chromium } = require('playwright-core');
       .map(id => $(id).value).join('|');
     // …y el formulario los sigue viendo (es como los lee el payload)
     r.leePayload = v('fBarthel') + '/' + v('fApache') + '/' + v('fNombre');
-    // Día estadía y AET NO se pliegan
-    r.diasFuera = !$('fDias').closest('#fPreUci');
-    r.aetFuera = !$('cAET').closest('#fPreUci');
-    r.diasVisible = $('fDias').offsetParent !== null;
     // ⚖️ 30-sep-2026 (AET como serie): la casilla cAET pasó a ser el ESTADO oculto; lo que el
     // kinesiólogo ve en el turno es la tarjeta #aetTurno. La regla de esta guardia —la adecuación
     // se decide durante la estadía y NO se pliega con la ficha— se mide ahora sobre ella.
     DB = [{ ID_CAMA: '1', OCUPADA: true, PATIENT_ID: 'p1' }]; $('cBed').value = '1'; aetPintar();   // la tarjeta existe con un paciente en la cama
-    r.aetVisible = $('aetTurno').offsetParent !== null && !$('aetTurno').closest('#fPreUci');
-    // Los plegados sí quedan invisibles
-    r.barthelInvisible = $('fBarthel').offsetParent === null;
+    r.aetVisible = $('aetTurno').offsetParent !== null;
     return r;
   });
-  eq('la ficha arranca plegada', R5.plegada, true);
-  eq('…con su línea de resumen a la vista', R5.chipVisible, true);
+  eq('la ficha arranca como UNA línea a la vista', R5.chipVisible, true);
   // 🪤 EL NOMBRE SALIÓ DE ACÁ (16-sep-2026, pedido de Diego). El banner del
   // episodio, arriba de la barra de pasos, es el único verificador de
   // identidad del panel; esta línea lo repetía dos veces más abajo. Lo que la
-  // ficha plegada aporta es justo lo que el banner NO trae —Barthel,
-  // Charlson, APACHE, ECF, talla—, y eso se sigue exigiendo.
-  eq('★ el resumen trae las evaluaciones que el banner no muestra',
-     /Barthel/.test(R5.resumen) && /APACHE II/.test(R5.resumen), true);
+  // ficha aporta es lo que el banner NO trae: la talla. Las escalas ya no van acá.
+  eq('★ el resumen trae lo que el banner no muestra (la talla)', /158 cm/.test(R5.resumen), true);
+  eq('★ …y NO repite las escalas (viven en Evaluaciones · Preingreso)', /Barthel|APACHE|Charlson|ECF/.test(R5.resumen), false);
   eq('★ …y ya NO repite el nombre', /Rosa Pérez Muñoz/.test(R5.resumen), false);
   eq('la identificación queda oculta hasta pedirla', R5.identOculta, true);
   eq('★ los valores SIGUEN en el formulario', R5.valoresVivos, '85|4|18|3|14:30|Rosa Pérez Muñoz');
   eq('★ …y el payload los lee igual', R5.leePayload, '85/18/Rosa Pérez Muñoz');
-  eq('Día Estadía queda fuera del plegado', R5.diasFuera, true);
-  eq('…y sigue visible', R5.diasVisible, true);
-  eq('AET queda fuera del plegado', R5.aetFuera, true);
-  eq('…y sigue visible', R5.aetVisible, true);
-  eq('lo plegado sí deja de verse', R5.barthelInvisible, true);
+  eq('★ la adecuación (AET) sigue a la vista en el turno', R5.aetVisible, true);
 
   /* ── 6 · Desplegar y volver a plegar ── */
   console.log('\n6 · El control abre y cierra');
   const R6 = await p.evaluate(() => {
     const r = {};
     fichaToggle();
-    r.abierta = !$('fPreUci').classList.contains('plegado');
-    r.barthelVisible = $('fBarthel').offsetParent !== null;
     r.identVisible = !$('fcId').classList.contains('hidden');
     r.chipSigue = !$('fichaChip').classList.contains('hidden');   // para poder cerrarla
     fichaToggle();
-    r.cerradaDeNuevo = $('fPreUci').classList.contains('plegado');
     r.identOtraVez = $('fcId').classList.contains('hidden');
     return r;
   });
-  eq('al tocarla se despliega', R6.abierta, true);
-  eq('…y aparecen las evaluaciones', R6.barthelVisible, true);
-  eq('…junto con la identificación (nombre/RUT/dx)', R6.identVisible, true);
+  eq('al tocarla se destapa la identificación (nombre/RUT/dx)', R6.identVisible, true);
   eq('la línea sigue ahí para poder cerrarla', R6.chipSigue, true);
-  eq('vuelve a plegarse', R6.cerradaDeNuevo, true);
   eq('…y la identificación se esconde otra vez', R6.identOtraVez, true);
 
   /* ── 7 · En un INGRESO nunca se pliega ── */
@@ -241,13 +226,9 @@ const { chromium } = require('playwright-core');
   const R7 = await p.evaluate(() => {
     $('cIng').value = 'true';
     fichaAplicar(false);   // aunque se pida plegar
-    return { plegada: $('fPreUci').classList.contains('plegado'),
-             chipOculto: $('fichaChip').classList.contains('hidden'),
-             barthelVisible: $('fBarthel').offsetParent !== null };
+    return { chipOculto: $('fichaChip').classList.contains('hidden') };
   });
-  eq('no se pliega aunque se pida', R7.plegada, false);
-  eq('…y no aparece la línea de resumen', R7.chipOculto, true);
-  eq('las evaluaciones están a la vista', R7.barthelVisible, true);
+  eq('en el ingreso no aparece la línea de resumen (la identificación ya está entera)', R7.chipOculto, true);
 
   /* ── 8 · Sin datos de ficha tampoco se pliega ── */
   console.log('\n8 · Ficha vacía: nada que resumir');
@@ -256,11 +237,9 @@ const { chromium } = require('playwright-core');
     ['fNombre', 'fEdad', 'fSexo', 'fTalla', 'fHoraIng', 'fBarthel', 'fCharlson', 'fApache', 'fEcf']
       .forEach(id => { $(id).value = ''; });
     fichaAplicar(false);
-    return { plegada: $('fPreUci').classList.contains('plegado'),
-             chipOculto: $('fichaChip').classList.contains('hidden') };
+    return { chipOculto: $('fichaChip').classList.contains('hidden') };
   });
-  eq('no se pliega (un resumen vacío ocupa lo mismo y no dice nada)', R8.plegada, false);
-  eq('…y no se muestra la línea', R8.chipOculto, true);
+  eq('sin datos no se muestra la línea (un resumen vacío ocupa lo mismo y no dice nada)', R8.chipOculto, true);
 
   /* ── 9 · El ✏️ de la tarjeta de cama ── */
   console.log('\n9 · Lápiz en la tarjeta de cama');

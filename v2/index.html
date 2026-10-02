@@ -1029,8 +1029,6 @@ table.rhb2 .rl{width:128px;text-align:left;}
    `display:contents` deja los campos como hijos directos de la fila, así la
    maqueta es idéntica a antes de envolverlos; plegado pasa a `display:none`
    y los campos siguen en el formulario (su valor viaja igual al guardar). */
-.pre-uci{display:contents;}
-.pre-uci.plegado{display:none;}
 .ficha-chip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;
   background:#fbfaf8;border:1px solid var(--border);border-radius:9px;
   padding:7px 12px;margin-bottom:9px;font-size:.79rem;color:var(--muted);}
@@ -1233,7 +1231,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
   box-shadow:0 2px 8px rgba(15,23,42,.10);}
 #pasoEvalNada:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
 #pasoEvalNada small{display:block;font-weight:400;font-size:.76rem;color:var(--muted);margin-top:3px;}
-#epBannerCaja:empty,#epBannerCaja:has(.hidden){display:none;}
+/* 🪤 Solo el BANNER manda: la línea de la ficha que ahora comparte caja puede estar oculta sin llevarse el banner. */
+#epBannerCaja:empty,#epBannerCaja:has(> #epBanner.hidden){display:none;}
 #epBannerCaja{padding:10px 14px 0;background:var(--card);}
 #gFalta{text-align:right;font-size:.75rem;font-weight:800;color:#b45309;min-height:15px;padding:0 4px;}
 .act-bar .btn{height:46px;border-radius:12px;}
@@ -1471,12 +1470,12 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .evIco{position:relative;width:100%;max-width:112px;aspect-ratio:1/1;border:1px solid;border-radius:26px;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s;}
 .evTile[aria-pressed="true"] .evIco{box-shadow:0 0 0 3px #0f172a;}
 .evBadge{position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;padding:0 6px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.82rem;box-shadow:0 0 0 2px #fff;}
-.evBadge[data-nivel="rojo"]{background:#b91c1c;} .evBadge[data-nivel="gris"]{background:#64748b;} .evBadge[data-nivel="verde"]{background:#15803d;}
+.evBadge[data-nivel="rojo"]{background:#b91c1c;} .evBadge[data-nivel="gris"]{background:#64748b;} .evBadge[data-nivel="verde"]{background:#15803d;} .evBadge[data-nivel="ambar"]{background:#b45309;}
 .evNom{font-size:.86rem;font-weight:700;} .evSub{font-size:.7rem;color:#64748b;line-height:1.25;}
 #dEgr[data-fam] .evFam{display:none;}
 #dEgr[data-fam="funcionales"] .evFam[data-fam="funcionales"],#dEgr[data-fam="fuerza"] .evFam[data-fam="fuerza"],
 #dEgr[data-fam="ecograficas"] .evFam[data-fam="ecograficas"],#dEgr[data-fam="respiratorias"] .evFam[data-fam="respiratorias"],
-#dEgr[data-fam="via"] .evFam[data-fam="via"]{display:block;}
+#dEgr[data-fam="via"] .evFam[data-fam="via"],#dEgr[data-fam="preingreso"] .evFam[data-fam="preingreso"]{display:block;}
 /* Ecografía pulmonar (1-oct-2026): una figura, dos pruebas. */
 .ecoTab{height:36px;padding:0 14px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.8rem;font-weight:700;cursor:pointer;}
 .ecoTab[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff;}
@@ -3092,7 +3091,14 @@ document.documentElement.setAttribute('data-piel', 'inst');
        16-sep-2026 · Salió del formulario y subió acá: es el ÚNICO verificador
        de identidad del panel, y va ARRIBA de los pasos porque primero se ve
        de quién se trata y después qué se va a registrar (pedido de Diego). -->
-  <div id="epBannerCaja"><div id="epBanner" class="hidden"></div></div>
+  <div id="epBannerCaja"><div id="epBanner" class="hidden"></div>
+    <!-- La ficha del episodio, editable, en UNA línea bajo el banner (antes vivía en la tarjeta «General»). -->
+    <div id="fichaChip" class="ficha-chip hidden" onclick="fichaToggle()"
+                 title="Datos del ingreso y evaluaciones pre-UCI — tócalos para revisarlos o corregirlos">
+              <span id="fichaChipTxt"></span>
+              <span class="ficha-lapiz">✏️ Editar ficha</span>
+            </div>
+  </div>
   <div id="spPasos" role="tablist" aria-label="Pasos de la evolución">
     <!-- 🔴 20-sep-2026 · PASO 0 · EL INGRESO. Acuerdo 1, cerrado el 19-sep y
          que se había quedado en papel: «el ingreso pasa a ser un modal único,
@@ -3355,87 +3361,19 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
       <div class="sp-2col"><div class="sp-col">
         <!-- DIAGNÓSTICO -->
-        <div class="fcard fc-g" id="fcGen">
-          <div class="fcard-hdr"><span class="fcard-title">📊 General</span></div>
+        <div class="fcard fc-g" id="fcFase">
+          <div class="fcard-hdr"><span class="fcard-title">🏷️ Fase clínica</span></div>
           <div class="fcard-body">
-            <!-- FICHA DEL EPISODIO PLEGADA (ago-2026, pedido de Diego): las
-                 evaluaciones pre-UCI y los datos de identidad se llenan UNA vez
-                 al ingreso y después solo estorban arriba del formulario. Esta
-                 línea las resume y las despliega al tocarla; el mismo control
-                 destapa la tarjeta de Identificación, que fuera del ingreso
-                 estaba escondida y no había forma de corregir (un RUT mal
-                 escrito obligaba a esperar al egreso). -->
-            <div id="fichaChip" class="ficha-chip hidden" onclick="fichaToggle()"
-                 title="Datos del ingreso y evaluaciones pre-UCI — tócalos para revisarlos o corregirlos">
-              <span id="fichaChipTxt"></span>
-              <span class="ficha-lapiz">✏️ Editar ficha</span>
+            <!-- 🗂️ LA TARJETA «GENERAL» SE DISOLVIÓ (Diego, 30-sep-2026). Cada cosa fue adonde se usa:
+                 las escalas previas (Barthel, ECF, Charlson, APACHE II) a la familia «Preingreso» de
+                 Evaluaciones; la fecha y la hora de ingreso al paso 0; el día de estadía al banner, como
+                 INFORMACIÓN; la «ficha» editable a una línea bajo el banner. Lo que queda acá es lo que
+                 es del TURNO y arrastra: en qué fase está y de qué grupo de adecuación. -->
+            <!-- Fase clínica del paciente (v2 — FASE_JSON) -->
+            <div style="margin-top:2px;margin-bottom:6px;">
+              <div id="faseChips" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;"></div>
             </div>
-            <!-- Día estadía + Barthel + ECF + AET en la misma fila -->
-            <div class="row" style="margin-bottom:6px;align-items:flex-end;flex-wrap:wrap;">
-              <div class="col wa"><label>Día Estadía</label><input type="number" id="fDias" class="tc bold" style="width:64px;" disabled></div>
-              <!-- Lo de adentro es lo que se pliega. `display:contents` deja a
-                   los campos como hijos directos de la fila (la maqueta no
-                   cambia) y al plegar pasa a `display:none`, que es lo que
-                   corresponde: los campos SIGUEN en el formulario y su valor
-                   viaja igual al guardar — solo dejan de verse. -->
-              <div id="fPreUci" class="pre-uci">
-              <div class="col wa" style="margin-right:34px;"><label>Barthel</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <select id="fBarthel" onchange="updBarthelLbl('fBarthel','lblBarthel')" style="width:72px;">
-                    <option value="">--</option>
-                    <option>0</option><option>5</option><option>10</option><option>15</option><option>20</option>
-                    <option>25</option><option>30</option><option>35</option><option>40</option><option>45</option>
-                    <option>50</option><option>55</option><option>60</option><option>65</option><option>70</option>
-                    <option>75</option><option>80</option><option>85</option><option>90</option><option>95</option>
-                    <option>100</option>
-                  </select>
-                  <span id="lblBarthel" class="interp-tip" title=""></span>
-                  <button type="button" onclick="abrirEscala('barthel','fBarthel')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
-                </div>
-              </div>
-              <div class="col wa" style="margin-right:34px;"><label>Charlson</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <input type="number" id="fCharlson" min="0" max="37" style="width:64px;">
-                  <button type="button" onclick="abrirEscala('charlson','fCharlson')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
-                </div>
-              </div>
-              <div class="col wa" style="margin-right:34px;" title="Lo calcula el médico al ingreso — cópialo de la evolución médica. Opcional; habilita el ajuste por gravedad de la estadística."><label>APACHE II</label>
-                <input type="number" id="fApache" min="0" max="71" placeholder="—" style="width:64px;">
-              </div>
-              <div class="col wa" style="margin-right:34px;"><label>ECF</label>
-                <div style="display:flex;align-items:center;gap:5px;">
-                  <select id="fEcf" onchange="updEcfLbl('fEcf','lblEcf')" style="width:56px;">
-                    <option value="">--</option>
-                    <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-                    <option>6</option><option>7</option><option>8</option><option>9</option>
-                  </select>
-                  <span id="lblEcf" class="interp-tip" title=""></span>
-                  <button type="button" onclick="abrirEscala('ecf','fEcf')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
-                </div>
-              </div>
-              </div><!-- /fPreUci — el AET queda FUERA: la adecuación del
-                   esfuerzo terapéutico se decide durante la estadía, no antes -->
-              <div class="col wa hidden" aria-hidden="true"><label>⚖️ AET</label>
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <input type="checkbox" id="cAET" onchange="hAET()" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;">
-                  <div id="dAETnivel" class="hidden" style="display:flex;align-items:center;gap:6px;">
-                    <select id="fAETnivel" class="bold" style="height:32px;font-size:.83rem;" onchange="hAETtip()">
-                      <option value="">-- Grupo --</option>
-                      <option value="I">Grupo I</option>
-                      <option value="II">Grupo II</option>
-                      <option value="IIIA">Grupo IIIA</option>
-                      <option value="IIIB">Grupo IIIB</option>
-                      <option value="IIIC">Grupo IIIC</option>
-                    </select>
-                    <span id="aetTip" class="interp-tip" style="font-size:.75rem;"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- ⚖️ AET en el turno (Diego, 30-sep-2026): «probablemente lo más adecuado sería escribirlo en
-                 el turno, pero que se guarde como un evento de episodio, como episodio serial». Muestra el
-                 grupo VIGENTE; los cinco botones solo salen con «La cambiaron». CONFIRMAR NO ES CAMBIAR: un
-                 toque sin querer no deja una adecuación nueva en la ficha. -->
+            <div style="margin-top:10px;"></div>
             <div id="aetTurno" class="hidden">
               <div class="aetT-fila">
                 <span class="aetT-tit">⚖️ Adecuación del esfuerzo terapéutico</span>
@@ -3454,10 +3392,26 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <div id="aetTurnoAviso"></div>
               </div>
             </div>
-            <!-- Fase clínica del paciente (v2 — FASE_JSON) -->
-            <div style="margin-top:2px;margin-bottom:6px;">
-              <label style="font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;">Fase clínica</label>
-              <div id="faseChips" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;"></div>
+            <!-- ESTADO, no pantalla: los lee el relato, el guardado y la carga de un turno. Son los mismos
+                 ids de siempre; solo dejaron de ser casillas que se llenan. -->
+            <div class="hidden" aria-hidden="true">
+              <input type="number" id="fDias" class="tc bold" disabled>
+              <div class="col wa hidden" aria-hidden="true"><label>⚖️ AET</label>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <input type="checkbox" id="cAET" onchange="hAET()" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;">
+                  <div id="dAETnivel" class="hidden" style="display:flex;align-items:center;gap:6px;">
+                    <select id="fAETnivel" class="bold" style="height:32px;font-size:.83rem;" onchange="hAETtip()">
+                      <option value="">-- Grupo --</option>
+                      <option value="I">Grupo I</option>
+                      <option value="II">Grupo II</option>
+                      <option value="IIIA">Grupo IIIA</option>
+                      <option value="IIIB">Grupo IIIB</option>
+                      <option value="IIIC">Grupo IIIC</option>
+                    </select>
+                    <span id="aetTip" class="interp-tip" style="font-size:.75rem;"></span>
+                  </div>
+                </div>
+              </div>
             </div>
             <!-- Checkboxes y campos de aislamiento/reingreso — ocultos, solo para compatibilidad JS/guardar -->
             <div style="display:none;">
@@ -3471,17 +3425,6 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <input type="hidden" id="fAislMicroVal">
               </div>
             </div>
-            <!-- 🗂️ 17-sep-2026 · TODA LA VÍA AÉREA SE MUDÓ A RESPIRATORIO.
-                 Se fueron el selector, la máquina de eventos («¿qué pasó hoy
-                 con la vía aérea?») y los cuatro contadores de días. Vivían
-                 TRES SECCIONES antes de donde se usan, y eran más de la mitad
-                 de los 36 campos que esta tarjeta llegó a tener siendo la de
-                 datos «generales». Diego: «podría quizás juntarse todo en un
-                 bloque de respiratorio… yo creo que podría moverse».
-                 Acá queda lo que de verdad es del paciente y no del turno: el
-                 día de estadía, la ficha previa a la UCI, la adecuación del
-                 esfuerzo terapéutico, la fase clínica, el reingreso y el
-                 aislamiento. -->
           </div>
         </div>
 
@@ -5160,6 +5103,50 @@ document.documentElement.setAttribute('data-piel', 'inst');
               🔒 Paciente no cooperador — MRC-SS, FSS-ICU y dinamometría requieren cooperación (SAS 3-4 · S5Q ≥3).
               Disponibles: PIM/PEM con válvula, ecografía diafragmática/cuádriceps y CPAx (observacional).
             </div>
+            <div class="evFam" data-fam="preingreso">
+            <!-- 🗂️ PREINGRESO (Diego, 30-sep-2026): «Barthel, Apache, Charlson, escala clínica de fragilidad:
+                 probablemente eso va a ir en evaluaciones.» NO es una medición del turno: son datos del episodio
+                 que llegan con la familia, así que abrir este cajón no marca «se evaluó este turno» y nunca se
+                 pone rojo (el rojo es de lo que vence). Mismos ids de siempre. -->
+            <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:4px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">🧾 Antes de la UCI · ninguna es obligatoria</div>
+            <div class="row" style="align-items:flex-end;flex-wrap:wrap;">
+              <div class="col wa" style="margin-right:34px;"><label>Barthel</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <select id="fBarthel" onchange="updBarthelLbl('fBarthel','lblBarthel')" style="width:72px;">
+                    <option value="">--</option>
+                    <option>0</option><option>5</option><option>10</option><option>15</option><option>20</option>
+                    <option>25</option><option>30</option><option>35</option><option>40</option><option>45</option>
+                    <option>50</option><option>55</option><option>60</option><option>65</option><option>70</option>
+                    <option>75</option><option>80</option><option>85</option><option>90</option><option>95</option>
+                    <option>100</option>
+                  </select>
+                  <span id="lblBarthel" class="interp-tip" title=""></span>
+                  <button type="button" onclick="abrirEscala('barthel','fBarthel')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
+                </div>
+              </div>
+              <div class="col wa" style="margin-right:34px;"><label>Charlson</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <input type="number" id="fCharlson" min="0" max="37" style="width:64px;">
+                  <button type="button" onclick="abrirEscala('charlson','fCharlson')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
+                </div>
+              </div>
+              <div class="col wa" style="margin-right:34px;" title="Lo calcula el médico al ingreso — cópialo de la evolución médica. Opcional; habilita el ajuste por gravedad de la estadística."><label>APACHE II</label>
+                <input type="number" id="fApache" min="0" max="71" placeholder="—" style="width:64px;">
+              </div>
+              <div class="col wa" style="margin-right:34px;"><label>ECF</label>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <select id="fEcf" onchange="updEcfLbl('fEcf','lblEcf')" style="width:56px;">
+                    <option value="">--</option>
+                    <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    <option>6</option><option>7</option><option>8</option><option>9</option>
+                  </select>
+                  <span id="lblEcf" class="interp-tip" title=""></span>
+                  <button type="button" onclick="abrirEscala('ecf','fEcf')" title="Abrir calculadora" style="height:30px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;cursor:pointer;font-size:.82rem;flex-shrink:0;">🧮</button>
+                </div>
+              </div>
+              
+            </div>
+            </div>
             <div class="evFam" data-fam="funcionales">
             <!-- 2) FUNCIONALIDAD (visible): FSS-ICU + CPAx -->
             <div style="font-size:.67rem;font-weight:800;text-transform:uppercase;color:var(--fisico);margin:10px 0 4px;border-bottom:1px solid #cffafe;padding-bottom:2px;">🏃 Funcionalidad</div>
@@ -6738,7 +6725,10 @@ function pasoIr(n){
   // Sin dueño declarado = del turno. Así una tarjeta nueva aparece en el paso
   // correcto sin que nadie se acuerde de tocar esta función.
   document.querySelectorAll('#kf .fcard, #kf [data-paso]').forEach(el => {
-    const mio = String(el.dataset.paso || '2') === String(n);
+    let mio = String(el.dataset.paso || '2') === String(n);
+    /* 🪤 La identificación es del paso 0, pero «✏️ Editar ficha» la destapa en el TURNO (paso 2): sin esta
+       excepción quedaba destapada y oculta a la vez, y un RUT mal escrito seguía sin poder corregirse. */
+    if (el.id === 'fcId' && !_hayCero && n === 2 && _fichaAbierta) mio = true;
     el.classList.toggle('paso-oculto', !mio);
     /* 🪤 La identificación es del paso 0 y no debe asomarse en los demás: sin
        esto volvería a verse «toda la planilla» con la ficha arriba, que es
@@ -9316,28 +9306,25 @@ function _fichaResumen(){
   if(ed) p.push(_escSt(ed)+'a'+(sx?' · '+_escSt(sx):''));
   else if(sx) p.push(_escSt(sx));
   const ta=String(v('fTalla')||'').trim(); if(ta) p.push(_escSt(ta)+' cm');
-  const hi=String(v('fHoraIng')||'').trim(); if(hi) p.push('ingresó '+_escSt(hi));
-  [['fBarthel','Barthel'],['fCharlson','Charlson'],['fApache','APACHE II'],['fEcf','ECF']]
-    .forEach(([id,et])=>{ const x=String(v(id)||'').trim(); if(x) p.push(et+' <b>'+_escSt(x)+'</b>'); });
+  // 🗂️ 30-sep-2026: las escalas viven en Evaluaciones («Preingreso») y el ingreso completo, en el banner.
   return p.join(' · ');
 }
 
 /** Aplica el estado (plegado/desplegado) a la ficha. */
 function fichaAplicar(abrir){
   _fichaAbierta=!!abrir;
-  const pre=$('fPreUci'), chip=$('fichaChip'), txt=$('fichaChipTxt');
+  const chip=$('fichaChip'), txt=$('fichaChipTxt');
   const esIng=v('cIng')==='true';
   const resumen=_fichaResumen();
   // En un INGRESO nunca se pliega: es justo lo que hay que llenar. Sin datos
   // tampoco (paciente recién creado o cama sin ficha).
   const puedePlegar=!esIng && !!resumen;
-  if(pre) pre.classList.toggle('plegado', puedePlegar && !_fichaAbierta);
   if(chip){
     chip.classList.toggle('hidden', !puedePlegar);
     if(txt) txt.innerHTML=(_fichaAbierta?'▲ ':'')+resumen;
   }
   // La identificación (nombre/RUT/dx) solo se destapa a pedido.
-  if(!esIng){ const fi=$('fcId'); if(fi) fi.classList.toggle('hidden', !_fichaAbierta); }
+  if(!esIng){ const fi=$('fcId'); if(fi){ fi.classList.toggle('hidden', !_fichaAbierta); fi.classList.toggle('paso-oculto', !(_fichaAbierta && PASO_ACTUAL===2)); } }
   try{ ingSoportePintar(); aetPintar(); }catch(e){}   // «Cómo llega» y el grupo de AET solo existen en el ingreso
 }
 function fichaToggle(){ fichaAplicar(!_fichaAbierta); }
@@ -13582,6 +13569,13 @@ const EV_VENCE_DIAS = 3;     // días sin medir para que MRC/FSS pasen a rojo (C
 const EV_ECO_MUSC = ['fCuadD','fCuadI','fHeckmatt','fGrosor','fFedD','fFedI','fExcD','fExcI','fDiaf'];
 const _evSvg = (c,d)=>`<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const EV_FAM = [
+  /* 🗂️ Preingreso (30-sep-2026): datos del EPISODIO, no del turno (`ep:true`). Pendiente = ÁMBAR, nunca rojo. */
+  { k:'preingreso', ep:true, nom:'Preingreso', sub:'Barthel · ECF · Charlson', bg:'#f5f3ff', bd:'#ddd6fe',
+    svg:_evSvg('#6d28d9','<path d="M7 3.5h8l3 3v14H7z"/><path d="M15 3.5V7h3"/><path d="M10 12h5"/><path d="M10 15.5h5"/>'),
+    esc:[ { k:'barthel', hoy:()=>v('fBarthel')!=='', col:'BARTHEL' },
+          { k:'ecf', hoy:()=>v('fEcf')!=='', col:'ECF' },
+          { k:'charlson', hoy:()=>v('fCharlson')!=='', col:'CHARLSON' },
+          { k:'apache', hoy:()=>v('fApache')!=='', col:'APACHE2' } ] },
   { k:'funcionales', nom:'Funcionales', sub:'FSS · CPAx · IMS', bg:'#eff6ff', bd:'#bfdbfe',
     svg:_evSvg('#1d4ed8','<circle cx="13.5" cy="4" r="2"/><path d="M13.5 9l-3.5 2.5 1.5 4.5"/><path d="M11.5 16l-2.5 5"/><path d="M14.5 15l2 6"/><path d="M13.5 9.5l3.5 2.5"/>'),
     esc:[ { k:'fss', coop:true, vence:true, hoy:()=>v('fFSS')!=='', col:'ULT_FSS', fec:'ULT_FSS_FECHA' },
@@ -13635,7 +13629,7 @@ function evEstado(){
       if(!hoyV && !prev) sin++;
       if(s.vence && !hoyV && _evVencida(c, s.fec ? String(c[s.fec]||'') : '')) rojo++;
     });
-    const nivel = rojo>0?'rojo':(sin>0?'gris':'verde');
+    const nivel = rojo>0?'rojo':(sin>0?(f.ep?'ambar':'gris'):'verde');
     return { f, apl:apl.length, rojo, sin, nivel, n: rojo>0?rojo:sin };
   });
 }
@@ -13650,23 +13644,25 @@ function evTilesPintar(){
       `<span class="evNom">${e.f.nom}</span><span class="evSub">${e.f.sub}</span></button>`;
   }).join('');
 }
-function _evHayDatos(){ return evEstado().some(e=>e.f.esc.some(s=>s.hoy())); }
+/* Lo del EPISODIO (preingreso) no cuenta como «se midió algo este turno». */
+const _evEp=fam=>!!(EV_FAM.find(f=>f.k===fam)||{}).ep;
+function _evHayDatos(){ return evEstado().some(e=>!e.f.ep && e.f.esc.some(s=>s.hoy())); }
 function evFamAbrir(fam){
   const d=$('dEgr'), c=$('cEgr'); if(!d||!c) return;
-  const abierta=c.checked && !d.classList.contains('hidden') && d.getAttribute('data-fam')===fam;
+  const abierta=!d.classList.contains('hidden') && d.getAttribute('data-fam')===fam;
   if(abierta){                                   // tocar el mismo otra vez lo cierra
     d.removeAttribute('data-fam'); window._evCerrado=true;
     if(!_evHayDatos()) c.checked=false;
     hEgr(); return;
   }
-  window._evCerrado=false; c.checked=true; d.setAttribute('data-fam',fam);
+  window._evCerrado=false; if(!_evEp(fam)) c.checked=true; d.setAttribute('data-fam',fam);
   hEgr();
 }
 /* Reabrir un turno con evaluaciones: se abre la PRIMERA familia con datos (no las cinco). */
 function evReponer(){
   const d=$('dEgr'); if(!d) return;
   window._evCerrado=false;
-  const hay=evEstado().find(e=>e.apl>0 && e.f.esc.some(s=>s.hoy()));
+  const hay=evEstado().find(e=>!e.f.ep && e.apl>0 && e.f.esc.some(s=>s.hoy()));
   if($('cEgr')?.checked && hay) d.setAttribute('data-fam',hay.f.k); else d.removeAttribute('data-fam');
   evTilesPintar();
 }
@@ -14893,7 +14889,8 @@ function hEgr(){
      viendo qué lleva medido el episodio. Lo cuida medicion_no_queda_hueca.js. */
   const marco = $('fcEval');
   if (marco) marco.classList.toggle('hidden', esNoche);
-  if (!esNoche && $('cEgr')?.checked && !window._evCerrado) show('dEgr'); else hide('dEgr');
+  const _dE=$('dEgr'), _epAbierta=!!_dE && _evEp(_dE.getAttribute('data-fam')||'');   // el preingreso se abre sin marcar el turno
+  if (!esNoche && ($('cEgr')?.checked || _epAbierta) && !window._evCerrado) show('dEgr'); else hide('dEgr');
   try{ evTilesPintar(); }catch(e){}
 }
 let _nombreTimer=null;
@@ -20567,6 +20564,9 @@ function renderBannerEpisodio(){
   const hoyD=v('gDate')||hoy();
   const dias=(a,b2)=>{ if(!a) return ''; const x=new Date(String(a).slice(0,10)+'T00:00:00'), y=new Date(String(b2).slice(0,10)+'T00:00:00'); const d=Math.round((y-x)/86400000); return isNaN(d)?'':d; };
   const est=dias(c.FECHA_INGRESO,hoyD);
+  // 🗂️ El día de estadía es INFORMACIÓN, no una casilla (30-sep-2026): día, fecha y hora del ingreso, juntos.
+  const _ingH=String(c.TS_INGRESO||'').slice(11,16), _ingF=_fdd(c.TS_INGRESO||c.FECHA_INGRESO);
+  const ingTxt=(_ingF&&_ingF!==String(c.TS_INGRESO||c.FECHA_INGRESO||''))?(_ingF+(/^\d{2}:\d{2}$/.test(_ingH)?' '+_ingH:'')):'';
   const va=String(c.VIA_AEREA||'—'), sop=String(c.SOPORTE||'—');
   const vm=(sop==='VM'&&c.FECHA_INICIO_SOPORTE)?dias(c.FECHA_INICIO_SOPORTE,hoyD):'';
   const esc=_escalasEpisodioHTML(c,true);
@@ -20575,7 +20575,7 @@ function renderBannerEpisodio(){
   const nom=String(c.NOMBRE||'').replace(/[<>&]/g,'');
   b.innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:0 0 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;">
       <div style="font-weight:800;font-size:.95rem;">${nom||'Paciente'}</div>
-      <div style="font-size:.78rem;color:#475569;">${c.EDAD?c.EDAD+' a':''}${c.SEXO?' · '+c.SEXO:''}${est!==''?' · Día '+est:''}</div>
+      <div style="font-size:.78rem;color:#475569;">${c.EDAD?c.EDAD+' a':''}${c.SEXO?' · '+c.SEXO:''}${est!==''?' · Día '+est:''}${ingTxt?' · ingresó '+ingTxt:''}</div>
       <div style="font-size:.78rem;color:#475569;">VA <b>${va}</b> · ${sop}${vm!==''?' <b>'+vm+' d</b>':''}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;">${esc}${aet}${upot}</div>
     </div>`;
