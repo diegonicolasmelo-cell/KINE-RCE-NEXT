@@ -1411,3 +1411,29 @@ de la PVE: **la PVE obligatoria no bloqueaba en el flujo real** hasta hoy.
 🪤 Otro latente que se arregló de paso: el chip «IMS» de Evaluaciones nunca llevaba a su control, que vive en
 la tarjeta de KTM. Ahora te lleva al paso donde está.
 
+### 8.7 · La revisión a máxima exigencia de los seis pasos (2-oct-2026)
+
+Diego pidió rehacer «el último paso en ultracode». Esa herramienta no existe aquí; lo entendí como **máxima
+exigencia sobre la última tanda**, y en vez de reescribir lo ya verificado se la sometió a la revisión de código
+más profunda disponible. Encontró **diez puntos**; ocho eran reales y se arreglaron, uno es una decisión de Diego
+y uno era solo comentarios. Lo que importa:
+
+- 🔴 **Los obligatorios seguían sin exigirse en el CELULAR.** El arreglo de 8.6 contaba el plegado de tarjetas del
+  teléfono (acordeón) como «oculto por la lógica»: a 390 px la PVE y las razones de KTM no se pedían. Ahora el
+  plegado cuenta como presentación, igual que el paso. La guardia corre en las dos pantallas.
+- 🔴 **Tocar un chip de Evaluaciones no abría su campo** (PIM, PEM, FEmáx, ecografía, deglución, dinamometría): desde
+  los cajones de la tanda F, el campo vive dentro de una familia cerrada. Ahora el chip abre la familia.
+- 🔴 **El IMS pasa a «Funcionales».** Vivía dentro del panel «Realizada» de la KTM: medirlo de noche (las
+  evaluaciones sí se hacen de noche) obligaba a declarar una KTM que no se hizo. Está ahora con el FSS-ICU y el CPAx,
+  como dice el rótulo de su cajón. **Esto cierra el pendiente 14.**
+- **El IMT y el EMS se narran** aunque la KTM no esté «realizada» (el servidor ya lo hacía; el relato de pantalla no).
+- **No hereda tampoco hacia el día**: si el paciente solo tenía turnos de noche, el primer turno de día copiaba el
+  estado, nivel, IMT y EMS de la noche.
+- **El servidor ya no rechaza la KTM de noche** (había una regla dormida de «en turno noche no aplica» que se salvaba
+  porque el payload no traía el turno). Lo que la pantalla ofrece, el servidor lo acepta.
+- **Botón «Siguiente» desactivado al saltar de paso** desde la Prevención, y **la pestaña «6 Relato» ya no se abre antes
+  de guardar** (pintaba «✓ Guardado» sin haber guardado, y con el formulario sin cambios cerraba sin avisar).
+- ⏳ **Pendiente de decisión de Diego:** el aviso «Quedan N valores heredados sin revisar» y el ámbar de lo heredado
+  **están muertos en el flujo por pasos** (miran qué campos se ven, y los de otros pasos no). Arreglarlo haría aparecer un
+  aviso nuevo en cada guardado; no lo toqué. Ver `PENDIENTES.md`.
+

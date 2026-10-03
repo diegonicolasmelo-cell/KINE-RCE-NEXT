@@ -57,6 +57,8 @@ const PUENTE = () => {
     DB = x.ingreso ? [{ ID_CAMA: '5', OCUPADA: false }]
       : [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: 'TOT', SOPORTE: 'VM', FECHA_INGRESO: '2026-08-05', TS_INGRESO: '2026-08-05 23:00:00',
           FECHA_INICIO_VA: '2026-08-08', TS_INICIO_VA: '2026-08-08 10:00:00', FECHA_INICIO_SOPORTE: '2026-08-08', TS_INICIO_SOPORTE: '2026-08-08 10:00:00' }];
+    if (!window.__toastGancho) { window.__toastGancho = true; const t0 = window.toast; window.toast = function (m) { window.__ultimoToast = String(m); return t0.apply(this, arguments); }; }
+    window.__ultimoToast = '';
     window.recargarSilencioso = () => {}; renderGrid(); abrirPanel(x.ingreso ? '5' : '3', !!x.ingreso, false);
     await new Promise(r => setTimeout(r, 800));
     if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
@@ -116,6 +118,35 @@ const PUENTE = () => {
   eq('★★ y se llega al relato (6)', await p.evaluate(() => PASO_ACTUAL), '6');
   eq('en el 6 el botón cierra', await txt(), '✖ Cerrar la evolución');
 
+  console.log('\n4b · 🔴 Saltar de paso con las pestañas no deja el botón desactivado');
+  // Hallazgo de la revisión a máxima exigencia: en el paso 1 «Siguiente» se desactiva hasta revisar la prevención; al saltar
+  // con una pestaña a OTRO paso el botón seguía desactivado (y en el 5 ese botón es el que GUARDA, sin avisar por qué).
+  await abrir(p, 'Dia'); await p.evaluate(() => pasoIr(1));
+  si('(control: en el paso 1, sin revisar la prevención, «Siguiente» está desactivado)', await p.evaluate(() => $('pasoAvanza').disabled));
+  for (const n of [2, 3, 4, 5, 6]) {
+    await p.evaluate(x => { pasoIr(1); pasoIr(x); }, n);
+    no('★★ tras saltar del 1 al ' + n + ', el botón de avanzar está ACTIVADO', await p.evaluate(() => $('pasoAvanza').disabled));
+  }
+  no('★ y sin la opacidad de «apagado»', await p.evaluate(() => $('pasoAvanza').style.opacity === '.55'));
+
+  console.log('\n4c · 🔴 La pestaña «6 Relato» NO se abre antes de guardar');
+  // Hallazgo de la revisión a máxima exigencia: tocar la pestaña 6 antes de guardar pintaba «✓ Guardado · evolución del
+  // turno…» y «✖ Cerrar la evolución», y con el formulario sin cambios cerraba sin avisar: se perdía el turno. En el celular
+  // las pestañas 5 y 6 quedan pegadas (44 px cada una) y un toque corrido basta.
+  await abrir(p, 'Dia'); await p.evaluate(() => { window._ll.length = 0; pasoIr(5); });
+  await p.evaluate(() => document.querySelector('#spPasos [data-p="6"]').click());
+  await p.waitForTimeout(150);
+  eq('★★ tocar el 6 sin haber guardado NO abre el relato (se queda donde estaba)', await p.evaluate(() => PASO_ACTUAL), '5');
+  no('★★ …y no pinta «Guardado»', await p.evaluate(() => /Guardado/.test($('pasoGuardado').textContent)));
+  si('★ …y avisa por qué', await p.evaluate(() => /guarda/i.test(document.querySelector('#toasts, .toast, #toastBox')?.textContent || window.__ultimoToast || '')));
+  await p.evaluate(() => { $('fFirma').appendChild(Object.assign(document.createElement('option'), { value: 'K.T.', textContent: 'K.T.' })); $('fFirma').value = 'K.T.';
+    const he = $('fHEst'); if (he && !he.value) he.value = 'Estable'; const hd = $('fDVA'); if (hd && !hd.value) hd.value = 'Sin requerimientos';
+    hPVEtoggle('si'); setKTMstate('r'); _transAvisoOk = true; pasoAvanzar(); });
+  await p.waitForTimeout(500);
+  eq('(control: tras guardar se llega al relato)', await p.evaluate(() => PASO_ACTUAL), '6');
+  await p.evaluate(() => { pasoIr(5); document.querySelector('#spPasos [data-p="6"]').click(); });
+  eq('★★ y ya guardado, la pestaña 6 sí abre', await p.evaluate(() => PASO_ACTUAL), '6');
+
   console.log('\n5 · Volver paso a paso');
   await p.evaluate(() => pasoRetroceder());
   eq('del 6 se vuelve al 5', await p.evaluate(() => PASO_ACTUAL), '5');
@@ -140,18 +171,18 @@ const PUENTE = () => {
   eq('★★ guardar desde Planes con la KTM «no realizada» sin razón NO guarda', await guardados(), '0');
   eq('★★ …y te lleva a la Terapia física (4)', await p.evaluate(() => PASO_ACTUAL), '4');
 
-  console.log('\n7b · Un chip de Evaluaciones cuyo control vive en OTRO paso lleva hasta él');
-  // El IMS se mide desde el chip del paso 3, pero su control está en la tarjeta de KTM (terapia física). Antes el
-  // chip hacía scroll a algo oculto y no pasaba nada: nadie lo había notado porque nunca llevó a ninguna parte.
+  console.log('\n7b · Los chips de Evaluaciones se quedan en Evaluaciones (el IMS ya no vive en la terapia física)');
+  // 🗂️ 2-oct-2026 · el IMS salió de la tarjeta de KTM y está en la familia «Funcionales» (chips_llevan_al_campo.js): ningún
+  // chip del paso 3 necesita cruzar de paso, y cada uno llega a su campo (eso lo mide esa guardia).
   await abrir(p, 'Dia'); await p.evaluate(() => pasoIr(3));
   await p.evaluate(() => { document.querySelector('#pasoEvalChips [data-evk="ims"]').click(); });
   await p.waitForTimeout(200);
-  eq('★★ tocar «IMS» en Evaluaciones lleva al paso donde está su control (4)', await p.evaluate(() => PASO_ACTUAL), '4');
+  eq('★★ tocar «IMS» en Evaluaciones se queda en el paso 3', await p.evaluate(() => PASO_ACTUAL), '3');
   si('★ …y el control del IMS queda a la vista', await ver(p, '#imsBtn'));
   await p.evaluate(() => pasoIr(3));
   await p.evaluate(() => { document.querySelector('#pasoEvalChips [data-evk="fem"]').click(); });
   await p.waitForTimeout(200);
-  eq('★ un chip cuyo control SÍ está en Evaluaciones (FEmáx) no cambia de paso', await p.evaluate(() => PASO_ACTUAL), '3');
+  eq('★ ni el FEmáx cambia de paso', await p.evaluate(() => PASO_ACTUAL), '3');
 
   console.log('\n8 · El ingreso sigue siendo 0 → 2');
   await abrir(p, 'Dia', true);

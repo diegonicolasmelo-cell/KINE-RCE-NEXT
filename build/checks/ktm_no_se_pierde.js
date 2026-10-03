@@ -120,11 +120,18 @@ eq('…y con razón manual → aceptado', r.ok, true);
 r = api('GUARDAR_EVOLUCION', base('2', TK2, 'Dia', { KTM_REALIZADA: true, KTM_SUSPENDIDA: true }), null);
 eq('dos estados a la vez → rechazado', r.ok, false);
 
-// La KTM nocturna: confirmado con la planilla real (las 36 realizadas son todas
-// de día) y con Manuel (20-ago): en la unidad no se hace KTM de noche.
+// 🗂️ LA KTM NOCTURNA CAMBIÓ DE REGLA (2-oct-2026, Diego). Hasta ese día el servidor la RECHAZABA: «confirmado con la
+// planilla real (las 36 realizadas son todas de día) y con Manuel (20-ago): en la unidad no se hace KTM de noche». Diego
+// lo cambió: «se puede llenar todo en realidad, podría hacerse KTM aunque no es lo habitual; que no herede». La pantalla ya
+// la deja llenar, así que el servidor no puede rechazar lo que la pantalla ofrece (se salvaba solo porque el payload de la
+// pantalla no trae TURNO: era una regla dormida, no una garantía). Lo que no cambia: no hereda, y sin tocar nada no se
+// declara. Lo mide ktm_de_noche.js.
 const TKN = '2026-08-02-Noche';
 r = api('GUARDAR_EVOLUCION', base('2', TKN, 'Noche', { KTM_REALIZADA: true, KTM_NIVEL_KTR: '4' }), null);
-eq('KTM realizada en turno NOCHE → rechazado', r.ok, false);
+eq('KTM realizada en turno NOCHE → ACEPTADA (ya no se rechaza)', r.ok, true);
+eq('…y queda guardada con su nivel', String(fila('2', TKN).KTM_NIVEL_KTR || ''), '4');
+r = api('GUARDAR_EVOLUCION', base('2', '2026-08-02-Noche2', 'Noche', { KTM_REALIZADA: true, KTM_SUSPENDIDA: true }), null);
+eq('(las otras reglas valen de noche igual: dos estados a la vez → rechazado)', r.ok, false);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    4 · LO QUE NO SE PUEDE ROMPER: la noche normal y el ingreso

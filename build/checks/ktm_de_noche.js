@@ -150,6 +150,34 @@ const PREVIA_DIA = { ID_CAMA: '3', TURNO_KEY: '2026-08-12-Dia', TURNO: 'Dia', PA
   const Ac = await turno('Noche', { aet: true });
   no('★★ con AET grupo IIIC la tarjeta se esconde, como de día', Ac.tarjeta);
 
+  console.log('\n6b · 🔴 NO HEREDA TAMPOCO HACIA EL DÍA: lo que se llenó de noche no se copia al día siguiente');
+  // Hallazgo de la revisión: la réplica del día usa `_PREVIA_DIA` (la última fila de DÍA). Cuando el paciente no tiene
+  // ninguna fila de día —una noche de ingreso y luego el primer turno de día—, el servidor no la manda y el cliente
+  // caía a la fila de NOCHE: con la KTM de noche ahora declarable, copiaba al día estado, nivel, IMT y EMS de la noche.
+  const NOCHE_HECHA = Object.assign({}, PREVIA_DIA, { TURNO_KEY: '2026-08-11-Noche', TURNO: 'Noche', PLAN_PLANES: 'PLAN-NOCHE' });
+  const dN = await turno('Dia', { previa: NOCHE_HECHA });
+  eq('(control: la réplica sí corrió, trajo el plan de la noche)', dN.plan, 'PLAN-NOCHE');
+  eq('★★ el nivel de la KTM de la noche NO pasa al día', dN.nivel, '');
+  no('★★ el IMT de la noche NO pasa al día', dN.imt);
+  no('★★ el EMS de la noche NO pasa al día', dN.ems);
+  const NOCHE_NO = Object.assign({}, PREVIA_DIA, { TURNO_KEY: '2026-08-11-Noche', TURNO: 'Noche', KTM_REALIZADA: false, KTM_NO_REALIZADA: true, KTM_NO_RAZON: 'Rechazo del paciente' });
+  const dN2 = await turno('Dia', { previa: NOCHE_NO });
+  eq('★★ una «no realizada» de noche NO hace que el día abra «no realizada»', dN2.estadoElegido, 'bKTMr');
+
+  console.log('\n7 · 🔴 El IMT y el EMS se NARRAN aunque la KTM no esté «realizada»');
+  // Hallazgo de la revisión a máxima exigencia: el relato del cliente narraba el IMT/EMS SOLO dentro de «KTM realizada»,
+  // y el del servidor siempre. De noche la KTM parte neutra y el IMT sí puede hacerse: se guardaba y no se contaba.
+  const relato = async (cual, armar) => { await turno(cual, {}); return p.evaluate(fn => { new Function('return (' + fn + ')')()(); return genTexto(); }, armar); };
+  const IMTEMS = "() => { $('cIMT').checked = true; $('fIMTfreq').value = '3'; $('cEMS').checked = true; $('fEMSfreq').value = '50'; }";
+  let t = await relato('Noche', IMTEMS);
+  si('★★ de noche, con la KTM neutra, el relato nombra el IMT', /Se realiza IMT 3 series/.test(t));
+  si('★★ …y el EMS', /electroestimulación neuromuscular \(EMS\)/.test(t));
+  no('★ …sin inventar una KTM', /KTM/.test(t));
+  t = await relato('Dia', "() => { setKTMstate('n'); _ktmNoRazonSel('Rechazo del paciente'); $('cIMT').checked = true; $('fIMTfreq').value = '3'; }");
+  si('★★ de día con la KTM «no realizada», el IMT también se narra', /Se realiza IMT/.test(t) && /KTM no realizada/.test(t));
+  t = await relato('Dia', "() => { setKTMstate('r'); $('cIMT').checked = true; $('cEMS').checked = true; }");
+  si('(control: con la KTM realizada el orden de siempre — KTM, IMT, EMS)', t.indexOf('Se realiza KTM') < t.indexOf('Se realiza IMT') && t.indexOf('Se realiza IMT') < t.indexOf('electroestimulación'));
+
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();
   console.log(fails.length ? '\n❌ ktm_de_noche: ' + fails.length + ' FALLO(S): ' + fails.join(' · ') : '\n✅ TODO OK');

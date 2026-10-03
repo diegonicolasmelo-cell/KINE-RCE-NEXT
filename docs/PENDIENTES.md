@@ -4,7 +4,7 @@
 > de Diego. Esto es la otra mitad: lo que **falta probar**, lo que **falta
 > decidir** y lo que **se encontró y no se arregló**.
 >
-> 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G, 207
+> 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G, 212
 > guardias en verde). Lo que no existe todavía es **la prueba en la planilla
 > de NEXT**: nada de esto se ha pegado ni visto en un navegador del hospital.
 
@@ -66,9 +66,8 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     UCI. Apagarlas fue un error mío y se deshizo.
 13. ~~El P0.1 se pierde de noche~~ **RESUELTO 2-oct:** las evaluaciones se hacen
     de noche, así que el P0.1 también.
-14. **El IMS vive dentro de la tarjeta de KTM** (paso 4) pero cuenta como
-    evaluación funcional. Hoy el chip de Evaluaciones te lleva hasta él; si se
-    prefiere, se muda a Evaluaciones → Funcionales. No lo toqué.
+14. ~~El IMS vivía dentro de la tarjeta de KTM~~ **RESUELTO 2-oct (acuerdo 8.7):**
+    pasó a Evaluaciones → Funcionales, así se mide de noche sin declarar una KTM.
 15. **Las estadísticas de KTM que mezclen turnos** deben mirar que de noche ahora
     puede haber sesiones (antes eran cero por definición). Las que se hagan de
     noche entran al REM y a las atenciones.
@@ -110,18 +109,28 @@ No se creó ningún campo y no falta ninguno.
 - 🔒 **La hoja `KINESIOLOGOS` nace vacía a propósito.** Diego tiene que escribir
   al equipo ahí para que puedan firmar.
 
+## 4b · Pendiente de decisión: los valores heredados en ámbar
+
+El aviso «Quedan N valores heredados sin revisar» (y el ámbar de lo que se replicó del turno anterior) **no funciona en el
+flujo por pasos**: mira qué campos se ven en pantalla, y los de otros pasos están ocultos, así que cuenta cero. Medido: con una
+previa llena, 0 marcados y 0 pendientes. **Estaba así desde que existen los pasos**, no por esta tanda. Arreglarlo es una
+línea, pero haría aparecer un aviso nuevo en cada guardado de cada turno con datos replicados. ¿Lo quieres encendido?
+
 ## 5b · Lo que se encontró y se arregló el 2-oct
 
 - 🔴 **Los obligatorios de otro paso no bloqueaban el guardado** (PVE, razón de
   KTM no realizada, contraindicación, fundamento de «Otro»). Medido y arreglado
   (acuerdo 8.6). **La PVE obligatoria no bloqueaba en el flujo real hasta hoy.**
-- El chip «IMS» de Evaluaciones nunca llevaba a su control. Arreglado.
+- **Los obligatorios tampoco bloqueaban en el CELULAR** (el plegado de tarjetas contaba como «oculto»). Arreglado.
+- **Los chips de Evaluaciones no abrían su campo** (PIM, PEM, FEmáx, ecografía, deglución, dinamometría). Arreglado.
+- El IMS pasó a Funcionales; el IMT/EMS se narran siempre; la KTM de noche no hereda hacia el día; el servidor ya no la
+  rechaza; la pestaña «6 Relato» no abre antes de guardar; «Siguiente» no queda desactivado al saltar de paso.
 
 ## 6 · Al pegar el paquete
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.3-seis-pasos`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.4-revision-maxima`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 🕗 **Esa misma corrida corrige el horario de turno** en CONFIG: si
   `TURNO_DIA_INICIO` y `TURNO_NOCHE_INICIO` dicen 9 y 21, pasan a 8 y 20, una

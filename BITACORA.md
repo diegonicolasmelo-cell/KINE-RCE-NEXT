@@ -3280,3 +3280,44 @@ viable (sí, con costo en pruebas y en toques) y le pregunté el orden y qué se
 
 Sello `NEXT-5.3-seis-pasos`.
 
+### «Rehaz el último paso en ultracode» · Tanda 5.4 · Revisión a máxima exigencia
+
+Diego escribió *«Rehaz el último paso en ultracode»*. No existe nada llamado ultracode aquí (ni habilidad, ni
+herramienta, ni en el repositorio) y «el último paso» admitía tres lecturas; se le preguntó y no marcó preferencia. Se
+tomó la lectura segura: **máxima exigencia sobre la última tanda**. Reescribir desde cero algo ya verificado y subido
+era perder trabajo sin ganar nada; en su lugar se la sometió a la revisión de código más profunda disponible
+(`code-review`, nivel máximo, todos los hallazgos), de la que salieron **diez puntos**. Cada uno se verificó escribiendo
+la prueba y viéndola ROJA antes de tocar nada.
+
+**Reales, arreglados:**
+
+1. 🔴 `_vis()` contaba el plegado de tarjetas del CELULAR como «oculto por la lógica»: a 390 px los obligatorios seguían sin
+   exigirse. Medido con 18 comprobaciones rojas. `validacion_entre_pasos.js` corre ahora a 1200 y a 390 px, con un control
+   contrario (sin tubo no se exige PVE).
+2. 🔴 Los chips de Evaluaciones no abrían su campo desde la tanda F (la familia está cerrada). `chips_llevan_al_campo.js`
+   lee la lista de chips del código, no la enumera a mano, y prueba día y noche.
+3. 🔴 El IMS vivía dentro de `#dKTMr` (panel «Realizada»): inalcanzable con la KTM neutra. Se mudó a la familia
+   Funcionales (mismos ids). Cierra el pendiente 14.
+4. El IMT/EMS se narraban solo dentro de «KTM realizada»; el servidor siempre. Ahora igual, con el orden del servidor
+   (KTM, IMT, EMS, alerta).
+5. `_PREVIA_DIA` ausente ⇒ el cliente caía a la fila de NOCHE: la KTM de noche pasaba al primer turno de día.
+6. `dominio_validacion.gs` seguía rechazando la KTM de noche (regla dormida, salvada solo porque el payload no trae
+   `TURNO`). Se quitó; `ktm_no_se_pierde.js` pasó de «rechazado» a «aceptado» con su razón escrita.
+7. `pasoIr` no reactivaba «Siguiente» al saltar desde el paso 1.
+8. La pestaña «6 Relato» se abría sin haber guardado (pintaba «✓ Guardado»); ahora solo abre guardado (`_relatoListo`).
+   Además `abrirPanel` limpia el «✓ Guardado» del panel anterior.
+9. Comentarios que mentían tras la renumeración, y cuatro sitios con el estado inicial de la KTM → `ktmEstadoInicial()`.
+
+**Decisión de Diego, no tocada:** los valores heredados en ámbar y su aviso están muertos en el flujo por pasos desde que
+existen los pasos (miran `offsetParent`). Ver `PENDIENTES.md` 4b.
+
+### Para no olvidar
+
+- 🪤 **Un arreglo se prueba en TODAS las pantallas donde corre la app**, no solo en la del escritorio: el de la tanda anterior
+  pasó en 1200 px y fallaba en 390.
+- 🪤 **Un chip que «lleva a un campo» se prueba mirando que el campo se VEA**, no que la función corra sin error.
+- 🪤 **Quitar una regla de un lado sin buscar su gemela en el otro** deja una regla dormida: el servidor tenía la suya.
+- 🪤 La revisión corrió como pasada única (sin verificación por separado); por eso cada hallazgo se confirmó con una prueba roja.
+
+Sello `NEXT-5.4-revision-maxima`.
+

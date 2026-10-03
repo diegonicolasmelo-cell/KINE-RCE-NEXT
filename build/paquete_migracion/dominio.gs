@@ -294,13 +294,11 @@ function validarKTM(d) {
     errs.push('KTM: solo puede estar en UNO de los tres estados (realizada, suspendida o no realizada).');
   }
 
-  // De noche la KTM no aplica: la estadística manual nunca tuvo casilla
-  // nocturna, y el REM cuenta sesiones sin filtrar turno. Confirmado con la
-  // planilla real (20-ago-2026): las 36 KTM realizadas son TODAS de día.
-  const turno = String(d.TURNO || d.turno || '');
-  if (turno === 'Noche') {
-    errs.push('KTM: en turno noche la kinesiterapia motora no aplica; no se declara estado.');
-  }
+  // 🗂️ 2-oct-2026 · DE NOCHE LA KTM YA SE PUEDE DECLARAR. Aquí había una regla que la rechazaba («en turno noche la
+  // kinesiterapia motora no aplica»), apoyada en que la planilla real (20-ago) solo tenía KTM de día. Diego la cambió:
+  // «podría hacerse KTM aunque no es lo habitual; que no herede». La pantalla ya la deja llenar y el servidor no puede
+  // rechazar lo que la pantalla ofrece. Lo que NO cambia: de noche parte en blanco (no hereda) y sin tocar nada no declara
+  // KTM. Ojo para las estadísticas: el REM cuenta sesiones sin filtrar turno, así que una KTM de noche entra como cualquier otra.
 
   if (n && !String(d.KTM_NO_RAZON || '').trim()) {
     errs.push('KTM: indica la razón por la que NO se realizó.');

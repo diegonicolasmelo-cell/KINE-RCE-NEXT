@@ -33,8 +33,14 @@ const no = (l, g) => eq(l, !!g, 'false');
 
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
-  const p = await b.newPage({ viewport: { width: 1200, height: 1500 }, locale: 'es-CL' });
-  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  const errs = [];
+  /* 🪤 LA SEGUNDA PANTALLA ES EL CELULAR. A 390 px las tarjetas del panel están PLEGADAS (acordeón), y eso también
+     esconde el contenido «por presentación»: la primera versión de _vis lo contó como «oculto por la lógica» y en el
+     teléfono la PVE y las razones de KTM siguieron sin exigirse (hallazgo de la revisión a máxima exigencia). */
+  for (const ancho of [1200, 390]) {
+  console.log('\n══════ pantalla de ' + ancho + ' px ══════');
+  const p = await b.newPage({ viewport: { width: ancho, height: 1500 }, locale: 'es-CL' });
+  p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => {
     const FIJA = new Date(2026, 7, 12, 10, 0, 0).getTime(), RD = Date;
     function FD(...a) { if (!new.target) return new RD(FIJA).toString(); return a.length ? new RD(...a) : new RD(FIJA); }
@@ -49,10 +55,10 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.waitForTimeout(800);
 
   /* Abre el turno, deja TODO lo demás en regla, aplica `armar`, se para en OTRO paso y guarda. */
-  const intento = (armar, campo) => p.evaluate(async x => {
+  const intento = (armar, campo, natural) => p.evaluate(async x => {
     $('kf').reset(); $('gDate').value = '2026-08-12'; SHIFT = 'Dia';
     window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
-    DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: 'TOT', SOPORTE: 'VM',
+    DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: x.natural ? 'Natural' : 'TOT', SOPORTE: x.natural ? 'Ambiente' : 'VM',
       FECHA_INGRESO: '2026-08-05', TS_INGRESO: '2026-08-05 23:00:00', FECHA_INICIO_VA: '2026-08-08', TS_INICIO_VA: '2026-08-08 10:00:00',
       FECHA_INICIO_SOPORTE: '2026-08-08', TS_INICIO_SOPORTE: '2026-08-08 10:00:00' }];
     window.recargarSilencioso = () => {}; renderGrid(); abrirPanel('3', false, false);
@@ -69,7 +75,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     const faltas = ($('gFalta') || {}).textContent || '';
     guardar(); await new Promise(r => setTimeout(r, 400));
     return { guardo: window._ll.some(l => l.a === 'GUARDAR_EVOLUCION'), paso: PASO_ACTUAL, suPaso, faltas };
-  }, { armar, campo });
+  }, { armar, campo, natural: !!natural });
 
   const bloquea = async (etq, armar, campo, pedazoFalta) => {
     const r = await intento(armar, campo);
@@ -88,10 +94,16 @@ const no = (l, g) => eq(l, !!g, 'false');
   await bloquea('KTM «Contraindicada» sin contraindicación', "() => { hPVEtoggle('si'); setKTMstate('s'); }", 'fKTMcontra', 'contraindicación de KTM');
   await bloquea('KTM «No realizada · Otro» sin fundamento', "() => { hPVEtoggle('si'); setKTMstate('n'); _ktmNoRazonSel('Otro'); }", 'fKTMnoCom', 'fundamento');
 
+  console.log('\n2b · Lo que NO aplica no se exige, aunque esté en otro paso');
+  const nat = await intento("() => { setKTMstate('r'); }", 'fPVEval', true);
+  si('★★ sin tubo no hay PVE que exigir: guarda desde otro paso', nat.guardo);
+
   console.log('\n3 · Con todo en regla SÍ guarda (control positivo)');
   const ok = await intento("() => { hPVEtoggle('si'); setKTMstate('r'); }", 'fPVEval');
   si('★ PVE respondida y KTM realizada: guarda desde otro paso', ok.guardo);
 
+  await p.close();
+  }
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();
   console.log(fails.length ? '\n❌ validacion_entre_pasos: ' + fails.length + ' FALLO(S): ' + fails.join(' · ') : '\n✅ TODO OK');

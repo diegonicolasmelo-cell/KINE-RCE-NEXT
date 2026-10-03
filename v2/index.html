@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-5.3-seis-pasos">
+<meta name="rce-version" content="NEXT-5.4-revision-maxima">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3117,7 +3117,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <span class="paso-n">4</span><span class="paso-et">Terapia física</span></button>
     <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="5" data-nodirty onclick="pasoIr(5)">
       <span class="paso-n">5</span><span class="paso-et">Planes</span></button>
-    <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="6" data-nodirty onclick="pasoIr(6)">
+    <button type="button" class="paso-t" role="tab" aria-selected="false" data-p="6" data-nodirty onclick="pasoIrRelato()">
       <span class="paso-n">6</span><span class="paso-et">Relato</span></button>
   </div>
   <div class="pcontent">
@@ -4790,11 +4790,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
         </div>
 
 
-        <!-- ▌ REHABILITACIÓN (KTM + válvula de fonación + Evaluaciones) -->
-        
-
-        <!-- IMT + EMS — SIEMPRE disponibles aunque no haya cooperación (única excepción acordada) -->
-        
+        <!-- 🗂️ 2-oct-2026 · La REHABILITACIÓN (KTM + válvula de fonación) y el IMT/EMS ya NO viven en esta columna: son el
+             paso 4, «Terapia física» (buscar `id="fcKtmCard"`). El IMT/EMS sigue disponible aunque no haya cooperación
+             (única excepción acordada). -->
 
         <!-- PROCEDIMIENTOS -->
         <div class="fcard fc-proc">
@@ -4933,6 +4931,20 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <span id="cpaxTotalPill" class="interp-pill interp-empty">—</span>
                   <button type="button" id="btnCpax" class="hbtn" style="padding:4px 8px;font-size:.85rem;" onclick="abrirEvalModal('cpax')" title="Completar por ítem (siempre disponible)">📋</button>
                 </div>
+              </div>
+              <!-- 🦵 EL IMS ES UNA EVALUACIÓN FUNCIONAL (2-oct-2026, revisión a máxima exigencia). Vivía dentro del panel
+                   «Realizada» de la KTM, que se esconde si la KTM no está realizada —y de noche parte neutra—: medir
+                   el IMS obligaba a declarar una KTM que no se hizo, y el chip de Evaluaciones no llegaba a ninguna
+                   parte. Aquí está con el FSS-ICU y el CPAx, como dice el rótulo de su cajón. Mismos ids. -->
+              <div class="col wa" id="rowIms">
+                <div style="position:relative;">
+                      <label style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:5px;">🦵 IMS — Escala de Movilidad UCI</label>
+                      <button type="button" id="imsBtn" onclick="toggleIMS()" style="height:30px;min-width:210px;font-size:.78rem;border:1px solid #e2e8f0;border-radius:6px;padding:0 10px;background:#fff;cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                        <span id="imsBtnLbl" style="color:#94a3b8;">— Seleccionar nivel</span><span style="color:#94a3b8;">▾</span>
+                      </button>
+                      <div id="imsPanel" class="hidden" style="position:absolute;z-index:40;top:100%;left:0;margin-top:4px;width:330px;max-height:320px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:6px;"></div>
+                      <input type="hidden" id="fIMS">
+                    </div>
               </div>
             </div>
             </div>
@@ -5202,14 +5214,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                       <input type="hidden" id="fKtmCant" value="1">
                       <input type="hidden" id="fKtmSesiones">
                     </div>
-                    <div style="position:relative;">
-                      <label style="font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:5px;">🦵 IMS — Escala de Movilidad UCI</label>
-                      <button type="button" id="imsBtn" onclick="toggleIMS()" style="height:30px;min-width:210px;font-size:.78rem;border:1px solid #e2e8f0;border-radius:6px;padding:0 10px;background:#fff;cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                        <span id="imsBtnLbl" style="color:#94a3b8;">— Seleccionar nivel</span><span style="color:#94a3b8;">▾</span>
-                      </button>
-                      <div id="imsPanel" class="hidden" style="position:absolute;z-index:40;top:100%;left:0;margin-top:4px;width:330px;max-height:320px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:6px;"></div>
-                      <input type="hidden" id="fIMS">
-                    </div>
+                    
                   </div>
                   <div id="ktmNivDesc" style="font-size:.7rem;color:var(--muted);margin-top:4px;min-height:1.2em;"></div>
                   <input type="hidden" id="fKTMniv">
@@ -5300,13 +5305,10 @@ document.documentElement.setAttribute('data-piel', 'inst');
           <div class="fcard-hdr"><span class="fcard-title">💨 IMT / ⚡ EMS — Entrenamiento muscular</span></div>
           <div class="fcard-body">
 
-            <!-- 🌙 Mismo trato que la KTM (Diego, 19-sep-2026): «IMT y EMS son
-                 parte de la terapia física, es decir es rehabilitación, parte
-                 del paquete. Movilización precoz (posicionamiento, movilidad
-                 pasiva activa), EMS e IMT. Podría ir de noche apagada.»
-                 El aviso se repite acá a propósito: es OTRA tarjeta, y una
-                 apagada sin explicación deja igual de perdido que una que
-                 desaparece. Lo cuida ktm_de_noche.js. -->
+            <!-- 🌙 Mismo trato que la KTM: es el mismo paquete de terapia física (Diego, 19-sep-2026: «IMT y EMS son parte
+                 de la terapia física, es decir es rehabilitación, parte del paquete»). De noche se llena igual y parte en
+                 blanco; el IMT, además, «sí puede hacerse de noche incluso» (2-oct). La nota de noche vive en la tarjeta
+                 de KTM (#dKTMnoche). Lo cuida ktm_de_noche.js. -->
             <div class="check wa" style="border:none;background:transparent;padding:0;margin-bottom:0;">
                     <input type="checkbox" id="cIMT" onchange="if(this.checked)show('dIMT');else hide('dIMT');">
                     <label for="cIMT" style="font-weight:700;color:#0369a1;">💨 IMT (Entrenamiento muscular inspiratorio)</label>
@@ -5800,7 +5802,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.3-seis-pasos]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.4-revision-maxima]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6717,6 +6719,9 @@ document.addEventListener('wheel', ()=>{
    está en la planilla.
    ══════════════════════════════════════════════════════════════════════════ */
 var PASO_ACTUAL = 1;
+/* 📝 ¿YA HAY RELATO QUE VER? Solo después de guardar este turno, o si se abrió uno ya guardado. La pestaña «6 Relato» no
+   se abre antes: pintaba «✓ Guardado» sin haber guardado nada, y en el celular las pestañas 5 y 6 quedan pegadas. */
+var _relatoListo = false;
 const _PASO_TXT = { 0:'Siguiente: el turno →', 1:'Siguiente: el turno →', 2:'Siguiente: evaluaciones →',
                     3:'Siguiente: terapia física →', 4:'Siguiente: planes →',
                     5:'💾 Guardar y ver el relato', 6:'✖ Cerrar la evolución' };
@@ -6751,6 +6756,9 @@ function pasoIr(n){
   // La pestaña del ingreso solo aparece cuando se está ingresando.
   const t0 = $('pasoTab0'); if(t0) t0.classList.toggle('hidden', !_hayCero);
   const av = $('pasoAvanza'); if(av) av.textContent = _PASO_TXT[n];
+  // «Siguiente» solo se desactiva en el paso 1 (prevAvanceUI, abajo). Al saltar de ahí a otro paso con una pestaña NO puede
+  // quedarse apagado: en el 5 es el botón que GUARDA y no habría ninguna explicación (revisión a máxima exigencia, 2-oct-2026).
+  if(av && n !== 1){ av.disabled = false; av.style.opacity = ''; }
   // El 💾 de siempre queda fuera de la vista: en el camino hay UN solo botón
   // de avance por paso. Sigue en el DOM y sigue guardando.
   const g = $('btnGuardar'); if(g) g.style.display = 'none';
@@ -7249,7 +7257,7 @@ const _PASO_SERIE = [
      aérea»). `abre` es el desplegable que destapa el chip. */
   { k:'pem',    lbl:'PEmáx',     col:'',           fec:'',              fir:'',              campo:'fPEM',       abre:'dxFzaResp', tip:'Presión espiratoria máxima' },
   { k:'fem',    lbl:'FEmáx',     col:'',           fec:'',              fir:'',              campo:'fFEM',       abre:'dxTos',     tip:'Flujo espiratorio máximo de la tos' },
-  { k:'ims',    lbl:'IMS',       col:'',           fec:'',              fir:'',              campo:'fIMS',       tip:'Escala de Movilidad UCI' },
+  { k:'ims',    lbl:'IMS',       col:'',           fec:'',              fir:'',              campo:'imsBtn',      tip:'Escala de Movilidad UCI' },
   { k:'eco',    lbl:'Ecografía', col:'',           fec:'',              fir:'',              campo:'fCuadD',     abre:'dxEco',     tip:'Ecografía muscular y diafragmática' },
   { k:'via',    lbl:'Protección vía aérea', col:'', fec:'',             fir:'',              campo:'fDeglPres', abre:'dxTos',     tip:'Deglución' },
 ];
@@ -7318,6 +7326,14 @@ function pasoEvalMedir(kind){
     // Terapia física). Antes el chip hacía scroll a algo oculto y no pasaba nada.
     const d = el.closest('[data-paso]'), n = d ? parseInt(d.dataset.paso || '2', 10) : 2;
     if(typeof pasoIr === 'function' && n && n !== PASO_ACTUAL) pasoIr(n);
+    /* 🔴 Y LA FAMILIA QUE LO CONTIENE (2-oct-2026). Desde que las evaluaciones son cajones, los campos viven dentro
+       de una familia que está cerrada hasta que se toca su cajón: el chip hacía scroll y foco a un campo oculto y no
+       pasaba NADA con PIM, PEM, FEmáx, ecografía, deglución ni dinamometría. */
+    const fam = el.closest('.evFam');
+    if(fam && typeof evFamAbrir === 'function'){
+      const dE = $('dEgr'), ya = dE && !dE.classList.contains('hidden') && dE.getAttribute('data-fam') === fam.dataset.fam;
+      if(!ya) evFamAbrir(fam.dataset.fam);     // tocar la abierta la CERRARÍA: por eso solo si no está abierta
+    }
     el.scrollIntoView({ block:'center' }); el.focus();
   }
 }
@@ -7331,12 +7347,12 @@ function pasoEvalMedir(kind){
     la función: el onclick reventaba con «pasoEvalNada is not a function» y el
     paso 2 no avanzaba. No da error al cargar — solo falla al tocarlo. */
 function pasoSinMedir(){
-  pasoAvanzar();   // en el paso 2 eso es guardar y pasar al relato
+  pasoAvanzar();   // en el paso 3 eso solo sigue a la terapia física; el guardado es al salir de Planes (5)
 }
 
 
 
-/** El botón de avance. En el paso 2 lo que hace es GUARDAR. */
+/** El botón de avance. En el paso 5 (Planes) lo que hace es GUARDAR. */
 /** 🔴 Del ingreso se sale con lo mínimo para que el paciente EXISTA: nombre y
  *  RUT. El RUT es obligatorio desde el acuerdo 1.1 —sin él no se puede cruzar
  *  con nada, ni consigo mismo si reingresa— y el nombre porque ningún ingreso
@@ -7384,7 +7400,12 @@ function pasoAvanzar(){
 }
 
 /** Lo llama el guardado cuando terminó bien: recién ahí existe el relato. */
-function pasoTrasGuardar(){ if(PASO_ACTUAL === 5) pasoIr(6); }
+function pasoTrasGuardar(){ if(PASO_ACTUAL === 5){ _relatoListo = true; pasoIr(6); } }
+/** La pestaña «6 Relato»: solo abre si ya se guardó (ver _relatoListo). */
+function pasoIrRelato(){
+  if(!_relatoListo){ toast('📝 Primero guarda el turno (paso 5): el relato se arma al guardar'); return; }
+  pasoIr(6);
+}
 
 /* ── 📌 Los pendientes que dejó el turno anterior ────────────────────────
    Se pintan desde la CAMA (el episodio), no desde el turno previo: los chips
@@ -7455,6 +7476,8 @@ function abrirPanel(id, esIng, verFicha) {
   const _gClr=$('spGapAviso'); if(_gClr){_gClr.style.display='none';_gClr.innerHTML='';}
   _transAvisoOk=false; _transMotivo=''; _iniVA=''; _iniSop='';
   _fichaAbierta=!!verFicha;   // lo aplica fichaAplicar() cuando el form esté lleno
+  _relatoListo=false;         // turno recién abierto: todavía no hay relato guardado
+  { const _pg=$('pasoGuardado'); if(_pg) _pg.innerHTML=''; }   // el «✓ Guardado» del panel anterior no se queda pegado
   _formDirty=false;           // panel recién abierto: sin cambios que perder
   _limpiarHeredados();
   _marcarTextoGenerado('');   // editor de texto: parte sin edición manual
@@ -7466,9 +7489,9 @@ function abrirPanel(id, esIng, verFicha) {
   const dl=$('lblPrension'); if(dl){ dl.innerHTML='— <span style="opacity:.6;font-size:.65rem;">(usa sexo del paciente)</span>'; dl.className='interp-pill interp-empty'; }
   // 🌙 De noche la terapia física parte NEUTRA (2-oct-2026): ni «realizada» ni «no realizada» —solo cuenta lo
   // que alguien elija—, y tampoco el «No realizada: motivo ingreso» del turno de ingreso.
-  if(typeof setKTMstate==='function') setKTMstate(SHIFT==='Noche' ? null : 'r');
-  // v2: al ingreso, Terapia Física parte "No realizada: Motivo ingreso" (override manual permitido).
-  if(esIng && SHIFT!=='Noche'){ setKTMstate('n'); const _mr=$('fKTMnoRaz'); if(_mr) _mr.value='Motivo ingreso'; }
+  if(typeof setKTMstate==='function') setKTMstate(ktmEstadoInicial(false));
+  // v2: al ingreso, Terapia Física parte "No realizada: Motivo ingreso" (override manual permitido). De noche, neutra.
+  if(ktmEstadoInicial(esIng)==='n'){ setKTMstate('n'); const _mr=$('fKTMnoRaz'); if(_mr) _mr.value='Motivo ingreso'; }
   // Fecha y hora de ingreso: al INGRESAR se sugiere el momento actual (Diego,
   // 11-sep-2026: «la sugerencia es la fecha actual, no la del turno») y queda
   // editable; en una evolución posterior se muestra lo guardado, bloqueado.
@@ -7519,7 +7542,7 @@ function abrirPanel(id, esIng, verFicha) {
   sumFSS(); sumMRC(); sumCPAX();
   if(window.CFG && CFG.CPAX_ACTIVO===false) hide('rowCpax'); else show('rowCpax');
   // defaults
-  cascadeVA(); hSed(); hHTrend(); hMultiDVA(); hKTM(SHIFT==='Noche' ? null : (esIng ? 'n' : 'r')); hMue();   // 🌙 de noche parte neutra (2-oct-2026)
+  cascadeVA(); hSed(); hHTrend(); hMultiDVA(); hKTM(ktmEstadoInicial(esIng)); hMue();
    hEgr(); calcGCS();
   // Gates al final: si es noche o falta cooperación, mandan sobre los defaults
   // (antes corrían antes de hKTM('r') y este las pisaba — p.ej. ingreso volvía a "Realizada").
@@ -7542,6 +7565,7 @@ function abrirPanel(id, esIng, verFicha) {
       window._ecoSeriePrev=(r&&r.previa&&(r.previa._ECO_SERIE||r.previa.ECO_PULM_SERIE))||'';   // serie de ecografía pulmonar de los turnos anteriores
       const c=DB.find(x=>String(x.ID_CAMA)===String(id));
       if(r && r.actual) {
+        _relatoListo=true;    // este turno ya estaba guardado: su relato existe
         // ─── Turno YA guardado: carga exactamente lo que se registró ───
         fillForm(r.actual);
         _snapIniEstado();
@@ -8745,7 +8769,11 @@ function fillFormReplica(s) {
   // IMT/EMS fantasma que nadie ve ni hizo (contadas en REM y procedimientos).
   // De día la pauta llega desde la última evolución de TURNO DÍA (_PREVIA_DIA
   // adjunta por el servidor cuando la previa inmediata es una Noche).
-  const _tf = SHIFT==='Noche' ? {} : (s._PREVIA_DIA || s);
+  // 🔴 2-oct-2026 (revisión a máxima exigencia): si el servidor no manda `_PREVIA_DIA` es porque el paciente NO tiene
+  // ninguna fila de día. La previa entonces es una NOCHE, y con la terapia física de noche ya declarable copiaría al día
+  // estado, nivel, IMT y EMS de la noche: lo que no hereda de noche tampoco se hereda HACIA el día.
+  const _previaEsNoche = /-Noche$/.test(String(s.TURNO_KEY||'')) || String(s.TURNO||'')==='Noche';
+  const _tf = SHIFT==='Noche' ? {} : (s._PREVIA_DIA || (_previaEsNoche ? {} : s));
   // "Motivo ingreso" es razón EXCLUSIVA del turno de ingreso: NO se replica —
   // sin esto quedaba pegada turno tras turno ("KTM no realizada: motivo
   // ingreso" al día 8). El turno siguiente parte en "Realizada" (default).
@@ -8753,7 +8781,7 @@ function fillFormReplica(s) {
   if(_tf.KTM_REALIZADA===true||_tf.KTM_REALIZADA==='TRUE') setKTMstate('r');
   else if(_tf.KTM_SUSPENDIDA===true||_tf.KTM_SUSPENDIDA==='TRUE') setKTMstate('s');
   else if(!_razIngKTM && (_tf.KTM_NO_REALIZADA===true||_tf.KTM_NO_RAZON)) setKTMstate('n');
-  else setKTMstate(SHIFT==='Noche' ? null : 'r');   // de noche parte neutra: no se hereda ni se supone
+  else setKTMstate(ktmEstadoInicial(false));   // de noche parte neutra: no se hereda ni se supone
   set('fKTMct',_tf.KTM_CONTRA_TIPO); set('fKTMraz',_tf.KTM_CONTRA_RAZON); set('fKTMman',_tf.KTM_CONTRA_MANUAL);
   _ktmContraSel(_tf.KTM_CONTRA_RAZON);   // el select quedaba vacío con la razón ya cargada en el hidden
   if(_tf.KTM_NIVEL_KTR) setKTMniv(String(_tf.KTM_NIVEL_KTR));
@@ -9445,7 +9473,7 @@ function _herTouch(ev){
 }
 
 /** 🔴 EL AVISO LLEVA AL CAMPO (20-sep-2026). El guardado ocurre al salir del
- *  paso 3, pero muchos campos obligatorios viven en el paso 2 (la hemodinamia,
+ *  paso 5 (Planes), pero muchos campos obligatorios viven en pasos anteriores (la hemodinamia,
  *  la vía aérea). Avisar «registra la hemodinamia» y hacerle `focus()` a algo
  *  que está en otro paso deja al colega mirando un aviso sin nada que tocar —
  *  que es exactamente lo que pasaba con la firma antes de moverla.
@@ -9459,8 +9487,18 @@ function _herTouch(ev){
 function _vis(el){
   if(!el || !document.contains(el)) return false;
   for(let a=el; a && a!==document.body; a=a.parentElement){
-    if(a.classList && a.classList.contains('paso-oculto')) continue;     // lo esconde el paso, no la lógica
-    if(getComputedStyle(a).display==='none') return false;
+    /* Lo que esconde un PASO o el PLEGADO del celular (acordeón) es PRESENTACIÓN, no lógica del formulario: a 390 px
+       las tarjetas están plegadas y contarlas como «ocultas» dejaba sin exigir la PVE y las razones de KTM justo en
+       el teléfono. Se quita la clase un instante y se mira si lo esconde OTRA cosa (una rama que no aplica); así
+       tampoco se salta algo que esté oculto por la lógica Y por el paso a la vez. */
+    const pa=a.parentElement; let q=null;
+    if(a.classList.contains('paso-oculto')) q=[a,'paso-oculto'];
+    else if(a.classList.contains('fcard-body') && pa && pa.classList.contains('mcol')) q=[pa,'mcol'];
+    else if(a.classList.contains('msub-b') && pa && pa.classList.contains('cerrado')) q=[pa,'cerrado'];
+    let oculto;
+    if(q){ q[0].classList.remove(q[1]); oculto=getComputedStyle(a).display==='none'; q[0].classList.add(q[1]); }
+    else oculto=getComputedStyle(a).display==='none';
+    if(oculto) return false;
   }
   return true;
 }
@@ -9811,7 +9849,7 @@ function guardar() {
     // la estadística manual jamás tuvo casilla nocturna. Vacío = no aplica.
     // 🌙 De noche, «no realizada» solo si alguien la ELIGIÓ: sin tocar nada el turno no declara KTM, porque
     // «no realizada» entra al denominador de la estadística y nadie decidió que no se hizo.
-    KTM_NO_REALIZADA: SHIFT==='Noche' ? (($('bKTMn')?.classList.contains('on')) ? true : '') : (($('bKTMn')?.classList.contains('on')) || (!bv('cKTMr') && !bv('cKTMs'))),
+    KTM_NO_REALIZADA: SHIFT==='Noche' ? (_ktmEstado()==='n' ? true : '') : (_ktmEstado()==='n' || (!bv('cKTMr') && !bv('cKTMs'))),
     KTM_NO_RAZON:        v('fKTMnoRaz'),
     KTM_NO_COMENTARIO:   v('fKTMnoCom'),
     KTM_ALERTA:          bv('cKTMalert'),
@@ -10081,7 +10119,7 @@ function guardar() {
       _congelarTexto(true);
     }
     show('rarea');
-    pasoTrasGuardar();   // el relato ya existe: paso 3
+    pasoTrasGuardar();   // el relato ya existe: paso 6
     // SIN desplazarse al texto (Diego, 15-ago-2026: «que solo guarde antes
     // de progresar»): guardar es para seguir con el próximo paciente. El
     // texto queda disponible arriba de la barra por si hay que copiarlo, y
@@ -12897,29 +12935,6 @@ function genTexto() {
       if(_bg) k+=`, Borg ${_bg}`;
     }
     _B('ktm'); L.push(k+'.');
-    _B('imt');
-    if($('cIMT')?.checked){
-      const _f=v('fIMTfreq'), _i=v('fIMTint'), _it=v('fIMTt'), _d=v('fIMTdes');
-      let imt='Se realiza IMT';
-      if(_f) imt+=` ${_f} series`;
-      if(_i) imt+=` al ${_i}% de PiMáx`;
-      if(_it) imt+=` por ${_it} min`;
-      if(_d) imt+=`, descanso ${_d} seg entre series`;
-      L.push(imt+'.');
-    }
-    _B('ems');
-    if($('cEMS')?.checked){
-      let ems='Se realiza electroestimulación neuromuscular (EMS)';
-      if(v('fEMSgrupo')) ems+=` en ${v('fEMSgrupo').toLowerCase()}`;
-      const emsP=[v('fEMSfreq')?`${v('fEMSfreq')} Hz`:'', v('fEMSint')?`${v('fEMSint')} mA`:'', v('fEMSpulso')?`ancho de pulso ${v('fEMSpulso')} µs`:''].filter(Boolean);
-      if(emsP.length) ems+=` (${emsP.join(', ')})`;
-      if(v('fEMSt')) ems+=` por ${v('fEMSt')} min`;
-      L.push(ems+'.');
-    }
-    _B('ktm');
-    if($('cKTMalert')?.checked){
-      L.push(`KTM suspendida durante la sesión por señal de alerta ${(gv('fKTMalertCat')||'').toLowerCase()}: ${gv('fKTMalertRaz')||'sin especificar'}.`);
-    }
   } else if(kS){
     /* 🔴 El ítem del catálogo y la observación son DOS datos, no uno
        (22-ago-2026, reportado por Manuel desde el turno). Estaban unidos por un
@@ -12948,6 +12963,33 @@ function genTexto() {
       if(_nc) _ktmn+=`. ${_nc}`;
     }
     _B('ktm'); L.push(_ktmn.replace(/\s*\.\s*$/,'')+'.');
+  }
+  /* 🔴 EL IMT Y EL EMS SE NARRAN SEAN CUAL SEA EL ESTADO DE LA KTM (2-oct-2026, revisión a máxima exigencia). Estaban
+     adentro de «KTM realizada» y el servidor los narra siempre (dominio_texto.gs): de noche la KTM parte neutra y el IMT
+     sí puede hacerse, así que se guardaba una sesión que el relato no contaba. Mismo orden que el servidor: KTM, IMT,
+     EMS y, si hubo, la alerta de la sesión. */
+  _B('imt');
+  if($('cIMT')?.checked){
+    const _f=v('fIMTfreq'), _i=v('fIMTint'), _it=v('fIMTt'), _d=v('fIMTdes');
+    let imt='Se realiza IMT';
+    if(_f) imt+=` ${_f} series`;
+    if(_i) imt+=` al ${_i}% de PiMáx`;
+    if(_it) imt+=` por ${_it} min`;
+    if(_d) imt+=`, descanso ${_d} seg entre series`;
+    L.push(imt+'.');
+  }
+  _B('ems');
+  if($('cEMS')?.checked){
+    let ems='Se realiza electroestimulación neuromuscular (EMS)';
+    if(v('fEMSgrupo')) ems+=` en ${v('fEMSgrupo').toLowerCase()}`;
+    const emsP=[v('fEMSfreq')?`${v('fEMSfreq')} Hz`:'', v('fEMSint')?`${v('fEMSint')} mA`:'', v('fEMSpulso')?`ancho de pulso ${v('fEMSpulso')} µs`:''].filter(Boolean);
+    if(emsP.length) ems+=` (${emsP.join(', ')})`;
+    if(v('fEMSt')) ems+=` por ${v('fEMSt')} min`;
+    L.push(ems+'.');
+  }
+  if(kR && $('cKTMalert')?.checked){
+    _B('ktm');
+    L.push(`KTM suspendida durante la sesión por señal de alerta ${(gv('fKTMalertCat')||'').toLowerCase()}: ${gv('fKTMalertRaz')||'sin especificar'}.`);
   }
   _B('edu');
   if($('cEduReal')?.checked) L.push('Se realiza educación a usuario/cuidador/familia.');
@@ -16464,6 +16506,13 @@ function _extTipo(){
 function peVAext(){ return (_PE_META[_extPeModo()]||{}).va||'Natural'; }
 function peSopext(){ return (_PE_META[_extPeModo()]||{}).sop||'Ambiente'; }
 function hKTM(q){ setKTMstate(q); }
+/** 🌙 EL ESTADO INICIAL DE LA KTM, EN UN SOLO LUGAR. De noche parte NEUTRO (ni «realizada» ni «no realizada»: solo cuenta lo que
+ *  alguien elija); de día parte «realizada», y en el turno de ingreso «no realizada · motivo ingreso». Antes esto estaba escrito en
+ *  cuatro sitios y un segundo valor por defecto pisó el neutro de noche sin que nadie lo viera (revisión a máxima exigencia). */
+function ktmEstadoInicial(esIng){
+  if(SHIFT==='Noche') return null;
+  return esIng ? 'n' : 'r';
+}
 function setKTMstate(q){
   const r = q==='r', s = q==='s', n = q==='n';
   $('bKTMr')?.classList.toggle('on', r);
