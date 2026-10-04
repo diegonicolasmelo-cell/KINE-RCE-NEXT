@@ -11,7 +11,7 @@
 // ingreso de Q: la puerta rechaza con CERO escrituras». La sección A (paso 2) fija lo que todas comparten; la B
 // (paso 4) es la primera puerta, la más grave: ANULAR_EVENTO; la C (paso 5) son las cuatro que MUEVEN la cama (alta,
 // limpiar, intercambiar, mover); la D (paso 6) son las de eventos y línea de tiempo (anexar, anular un anexo, confirmar
-// dispositivos, agregar un hito). Las demás se suman en el paso 7.
+// dispositivos, agregar un hito); la E (paso 7) son las de evaluaciones, pendientes, gases y coordinación.
 //
 //   A1 · ERR.CONFLICTO existe y no movió a ningún otro código.
 //   A2 · validarEpisodioPuerta(abierto, pidCama, idCama, estricto): la TABLA DE VERDAD. Ausente (undefined/null) no
@@ -77,6 +77,21 @@
 //        🪤 CON EL EPISODIO CERRADO EL CANDADO DE COORDINACIÓN NO SE TOCA: quien anota sobre P ya egresado declara a P, la
 //        comparación pasa y la clave se pide igual que antes (sin clave, NO_AUTORIZADO; con clave, entra y el hito es de P).
 //        D5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes.
+//   E  · EVALUACIONES, ESCALAS, PENDIENTES, GASES Y COORDINACIÓN (paso 7): EVAL_REGISTRAR, EPISODIO_ESCALA, PEND_ABRIR,
+//        PEND_CERRAR, GSA_ASIGNAR y COORD_CORREGIR. Cada una escribía sobre «quien esté en la cama»: la medición (y su
+//        espejo ULT_* en la cama), la escala previa a la UCI, el encargo del turno que viene, el gas de la bandeja. El
+//        formulario de P, abierto mientras P recibía el alta y Q ocupaba la cama, dejaba la medición, la escala, el
+//        pendiente o el gas en la ficha de Q. Con el candado REAL y el gancho antesDelCuerpo, por puerta:
+//          Ex.a · el episodio vigente y la pantalla vieja siguen pasando (la vieja queda anotada « [sin episodio]»);
+//          Ex.b · formulario de P y la cama ya de Q: rechazo con CERO escrituras y la base idéntica, ya ocurrido y
+//                 ocurriendo MIENTRAS se espera el candado (con el motivo del cambio de paciente: un pendiente que
+//                 Q ya tenía NO se responde «ya está abierto»);
+//          Ex.c · modo estricto (ausente rechaza; en EVAL_REGISTRAR un patientId declarado NO hace de reclamo).
+//        🪤 COORD_CORREGIR ya traía el episodio (patientId), pero `_coordUbicar` lo ignoraba cuando no lo encontraba en
+//        ninguna parte (un episodio que se limpió no queda en ARCHIVO_PACIENTES) y caía a la cama: el cambio se
+//        escribía en la ficha de quien estuviera ahora. Con patientId NUNCA se resuelve por cama; en modo estricto, sin
+//        patientId se rechaza si la cama tiene paciente.
+//        E7 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes.
 //
 // Uso: node build/checks/guardado_seguro_episodio_g14.js
 //
@@ -106,7 +121,7 @@ const si = (l, c) => eq(l, !!c, true);
 const no = (l, c) => eq(l, !!c, false);
 const terminar = () => {
   console.log(fails.length ? `\n❌ ${fails.length} fallos:\n  - ${fails.join('\n  - ')}`
-    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio, su rastro en la bitácora, ANULAR_EVENTO, las cuatro puertas que mueven la cama y las de eventos y línea de tiempo con candado.');
+    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio, su rastro en la bitácora, ANULAR_EVENTO, las cuatro puertas que mueven la cama, las de eventos y línea de tiempo y las de evaluaciones, pendientes, gases y coordinación con candado.');
   process.exit(fails.length ? 1 : 0);
 };
 // Un tramo que revienta no tumba a los demás: da UN rojo con su razón y la guardia sigue (así el rojo de antes de
@@ -1386,6 +1401,416 @@ tramo('D', () => {
     eq('   …y ANTES del conLock no se lee ninguna hoja', (c.slice(0, iLock).match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+)\(/g) || []).join(',') || '(nada)', '(nada)');
     si('   …solo se invoca si el reclamo viene (o está el modo estricto): los bancos antiguos no cargan la regla', /estricto === true/.test(c) && /\.a !== undefined/.test(c));
   });
+});
+
+/* ══ E · EVALUACIONES, ESCALAS, PENDIENTES, GASES Y COORDINACIÓN (paso 7) ═════ */
+console.log('\nE · EVAL_REGISTRAR, EPISODIO_ESCALA, PEND_ABRIR, PEND_CERRAR, GSA_ASIGNAR y COORD_CORREGIR (paso 7): candado dentro del lock');
+tramo('E', () => {
+  const ctl = S.activarLockReal();
+  const M = require('../sim/sim_muerte.js');
+  global.Utilities.formatDate = (d) => {
+    const p2 = n => ('0' + n).slice(-2);
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  };
+  // 🪤 svc_gsa.gs no está en la lista de archivos de sim_srv.js (cambiarla movería los ~145 bancos). Se evalúa aquí,
+  // junto a infra_respuesta.gs: sus `const` (ERR…) no cuelgan de globalThis con eval indirecto y un servicio evaluado
+  // en otro ámbito revienta con «ERR is not defined» (lo mismo que hace rut_minimo.js).
+  (0, eval)(leer('infra_respuesta.gs') + '\n;\n' + leer('svc_gsa.gs'));
+
+  // ── Datos inventados, en camas que B, C y D no tocaron: P en la 1 y R en la 2 ──
+  const TK1 = '2026-08-10-Dia';
+  const camaDe = id => DB.CAMAS_ESTADO.find(c => String(c.ID_CAMA) === String(id)) || {};
+  const payload = (idCama, tk, extra) => Object.assign({
+    ID_CAMA: String(idCama), TURNO_KEY: tk, PLAN_FIRMA_KINE: 'DMV',
+    VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC',
+    VENT_VT: 450, VENT_FR: 16, VENT_PEEP: 8, VENT_FIO2: 50, HEMO_ESTADO: 'Estable', SED_TIPO: 'Sin sedación',
+  }, extra || {});
+  const ingresa = (idCama, nombre) => api('INGRESAR_PACIENTE', { idCama: String(idCama), nombre, edad: 61, sexo: 'M',
+    diagnostico: 'Dx de prueba', fechaIngreso: '2026-08-08', viaAerea: 'TOT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV' }, null);
+  // «La otra persona»: lo que pasa entremedio, SIN declarar episodio (es otra pantalla, no la que se prueba).
+  const altaDe = idCama => api('DAR_ALTA', { idCama: String(idCama), motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV' }, null);
+  const limpiaDe = idCama => api('LIMPIAR_CAMA', { idCama: String(idCama) }, null);
+  let PID_Q = '';
+  const entraQ = idCama => {
+    const a = ingresa(idCama, 'Paciente Charly');
+    PID_Q = camaDe(idCama).PATIENT_ID;
+    return a.ok;
+  };
+
+  // ── El montaje: P (cama 1) y R (cama 2) con su turno; P deja una medición y un pendiente; la bandeja trae un gas ──
+  SIM.fecha = '2026-08-07'; SIM.hora = '12:00:00';
+  const rIngP = ingresa('1', 'Paciente Alfa'); const PID_P = camaDe('1').PATIENT_ID;
+  const rIngR = ingresa('2', 'Paciente Bravo'); const PID_R = camaDe('2').PATIENT_ID;
+  SIM.fecha = '2026-08-10';
+  const rT1 = [api('GUARDAR_EVOLUCION', payload('1', TK1, { EPISODIO_ABIERTO: PID_P }), null), api('GUARDAR_EVOLUCION', payload('2', TK1, { EPISODIO_ABIERTO: PID_R }), null)];
+  const rEval = api('EVAL_REGISTRAR', { idCama: '1', escala: 'MRC', total: '40', firma: 'DMV', fecha: '2026-08-10', turno: 'Dia', EPISODIO_ABIERTO: PID_P }, null);
+  const rPend = api('PEND_ABRIR', { idCama: '1', texto: 'Pedir interconsulta', firma: 'DMV', EPISODIO_ABIERTO: PID_P }, null);
+  DB.GSA_IMPORTADAS = [{ ID_GSA: 'gas_1', ESTADO: 'sin_emparejar', ARCHIVO: 'gsa1.pdf', ARCHIVO_ID: '', FECHA: '2026-08-10', HORA: '05:00',
+    PETICION: '', PATIENT_ID: '', ID_CAMA: '', TURNO_KEY: '', DETALLE: '', TS_IMPORT: '2026-08-10 06:31:00', PH: 7.4 }];
+  si('(el montaje) P y R ingresan y guardan su turno; P deja una medición y un pendiente', rIngP.ok && rIngR.ok && rT1.every(r => r.ok) && rEval.ok && rPend.ok);
+  si('(el montaje) son dos episodios distintos', PID_P && PID_R && PID_P !== PID_R);
+  const ID_EVAL_P = ((DB.EVALUACIONES || []).find(e => e.PATIENT_ID === PID_P && e.ESCALA === 'MRC') || {}).ID_EVAL;
+  const ID_PEND_P = ((JSON.parse(camaDe('1').PENDIENTES_JSON || '[]'))[0] || {}).id;
+  si('(el montaje) la medición y el pendiente de P tienen su id', !!ID_EVAL_P && !!ID_PEND_P);
+  const FOTO_E = M.foto();
+
+  const volver = () => {
+    M.restaurar(FOTO_E); M.reiniciar();
+    SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+    ctl.antesDelCuerpo = null; ctl.cache.fallar(false);
+    delete CONFIG.CONTRATO_ESTRICTO;
+    PID_Q = '';
+  };
+  const sinBit = () => M.instantanea({ sinHojas: ['AUDIT_LOG'] });
+  const ajenos = () => [PID_P, PID_R, PID_Q].filter(Boolean);
+  const sinDatosAjenosE = txt => !ajenos().some(p => String(txt).includes(p)) && !/Alfa|Bravo|Charly/.test(String(txt));
+  const evalsDe = pid => (DB.EVALUACIONES || []).filter(e => e.PATIENT_ID === pid);
+  const hitosDe = pid => DB.TIMELINE.filter(h => h.PATIENT_ID === pid);
+  const pendDe = id => JSON.parse(camaDe(id).PENDIENTES_JSON || '[]');
+  const gasDe = () => (DB.GSA_IMPORTADAS || []).find(g => g.ID_GSA === 'gas_1') || {};
+
+  // Una llamada y todo lo que hay que mirar de ella. `hook` es «la otra petición»: corre DENTRO de la espera del candado.
+  function corre(accion, datos, hook) {
+    M.reiniciar();
+    let n0 = 0, foto = sinBit(), hookOk = null, a0 = DB.AUDIT_LOG.length;
+    if (hook) ctl.antesDelCuerpo = () => { hookOk = hook(); n0 = M.total(); foto = sinBit(); a0 = DB.AUDIT_LOG.length; };
+    const r = callando(() => api(accion, datos, null));
+    ctl.antesDelCuerpo = null;
+    return {
+      r, hookOk, escrituras: M.registro().slice(n0), igual: sinBit() === foto,
+      bit: DB.AUDIT_LOG.slice(a0).filter(f => String(f.accion).indexOf(accion) === 0),
+    };
+  }
+  function rechazo(etiqueta, i, accion, codigo, frase, cama) {
+    no('★ ' + etiqueta + ': se RECHAZA', i.r.ok);
+    eq('   …con código ' + codigo, i.r.codigo, codigo);
+    si('   …y el motivo que se le muestra a la persona (' + frase + ')', frase.test(i.r.error || ''));
+    if (cama) si('   …nombra la cama ' + cama, new RegExp('\\bcama ' + cama + '\\b').test(i.r.error || ''));
+    si('★★ …sin nombrar a nadie ni dar el identificador de ningún paciente (Ley 19.628)', sinDatosAjenosE(i.r.error || ''));
+    eq('★★ ' + etiqueta + ': NINGUNA escritura aterrizó', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+    si('★★ …y la base COMPLETA quedó idéntica (salvo la bitácora)', i.igual);
+    eq('   …la bitácora gana UNA fila: ' + accion + '_RECHAZADO', i.bit.map(f => f.accion).join(','), accion + '_RECHAZADO');
+  }
+  const VAL = 'VALIDACION';
+  const ESTRICTO = () => { CONFIG.CONTRATO_ESTRICTO = 'TRUE'; };
+  const VIEJA = /versi[oó]n anterior/i;
+  const MARCA_ = ' [sin episodio]';
+  const sinMarca = i => !String((i.bit[0] || {}).resumen || '').endsWith(MARCA_);
+  const conMarca = i => String((i.bit[0] || {}).resumen || '').endsWith(MARCA_);
+  // El alta de P y el ingreso de Q en la misma cama, MIENTRAS esta petición espera el candado.
+  const cambioDeDueno = idCama => () => { const a = altaDe(idCama); return a.ok && entraQ(idCama); };
+
+  /* ═════════ E1 · EVAL_REGISTRAR ═════════ */
+  console.log('   · E1 · EVAL_REGISTRAR (además escribe el espejo ULT_* en la cama del ocupante actual)');
+  const mide = extra => Object.assign({ idCama: '1', escala: 'MRC', total: '45', firma: 'DMV', fecha: '2026-08-10', turno: 'Dia' }, extra || {});
+  volver();
+  let i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente (EPISODIO_ABIERTO = el de la cama) la medición PASA', i.r.ok && evalsDe(PID_P).length === 2);
+  eq('   …y el espejo de la cama dice 45', String(camaDe('1').ULT_MRC), '45');
+  si('   …y NO lleva la marca « [sin episodio]» (declaró episodio)', sinMarca(i));
+  volver();
+  i = corre('EVAL_REGISTRAR', mide());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok);
+  si('   …y la bitácora la anota « [sin episodio]» para medir cuántas llamadas siguen sin candado', conMarca(i));
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P, anulaId: ID_EVAL_P }));
+  si('★ corregir con anulaId, con el episodio vigente: pasa, agrega la nueva y anula la vieja (nunca se borra)',
+    i.r.ok && evalsDe(PID_P).length === 2 && String((evalsDe(PID_P).find(e => e.ID_EVAL === ID_EVAL_P) || {}).ANULADA) === 'true');
+  // — EL HUECO: formulario abierto para P, entremedio alta de P e ingreso de Q en la misma cama —
+  volver(); altaDe('1'); entraQ('1');
+  si('(montaje) la cama 1 es de Q, P ya salió y Q no tiene ninguna medición', camaDe('1').PATIENT_ID === PID_Q && evalsDe(PID_Q).length === 0 && String(camaDe('1').ULT_MRC || '') === '');
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …Q no ganó ninguna medición y su cama NO recibió el espejo ULT_* de P', evalsDe(PID_Q).length + '/' + String(camaDe('1').ULT_MRC || '(vacío)'), '0/(vacío)');
+  eq('   …y no le cayó ningún hito de «evaluación» en la línea de tiempo', hitosDe(PID_Q).filter(h => h.TIPO === 'evaluacion').length, 0);
+  volver(); altaDe('1'); entraQ('1');
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P, anulaId: ID_EVAL_P }));
+  rechazo('corregir con anulaId desde el formulario de P sobre la cama de Q (queda bajo el mismo candado)', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …y la medición de P que se quería anular NO se anuló', String((evalsDe(PID_P).find(e => e.ID_EVAL === ID_EVAL_P) || {}).ANULADA), 'false');
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }), cambioDeDueno('1'));
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …la cama 1 sigue siendo de Q, sin la medición de P', camaDe('1').PATIENT_ID + '/' + evalsDe(PID_Q).length, PID_Q + '/0');
+  // La cama quedó LIBRE: el reclamo de P ya no es de nadie.
+  volver(); altaDe('1');
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P con la cama ya libre', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '1');
+  console.log('      · E1 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('EVAL_REGISTRAR', mide());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'EVAL_REGISTRAR', VAL, VIEJA, null);
+  no('   …SIN la frase «cambió de paciente»', EP_CAMBIO_RE.test(i.r.error || ''));
+  i = corre('EVAL_REGISTRAR', mide({ patientId: PID_P }));
+  no('★ un patientId declarado NO hace de reclamo: la medición escribe el espejo en la CAMA y el reclamo tiene que igualar a su ocupante', i.r.ok);
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: '' }));
+  no('★ el VACÍO tampoco se acepta sobre una cama con paciente', i.r.ok);
+  si('   …es el cambio de paciente', EP_CAMBIO_RE.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E2 · EPISODIO_ESCALA ═════════ */
+  console.log('   · E2 · EPISODIO_ESCALA');
+  const escala = extra => Object.assign({ idCama: '1', escala: 'ECF', valor: '5', firma: 'DMV' }, extra || {});
+  volver();
+  i = corre('EPISODIO_ESCALA', escala({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente la escala se escribe en la ficha de P', i.r.ok && String(camaDe('1').ECF) === '5');
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('EPISODIO_ESCALA', escala());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok);
+  si('   …y la bitácora la anota « [sin episodio]»', conMarca(i));
+  // Hoy escribe sobre la cama que esté ocupada: la ECF de P le quedaba a Q.
+  volver(); altaDe('1'); entraQ('1');
+  si('(montaje) Q todavía no tiene ECF', String(camaDe('1').ECF || '') === '');
+  i = corre('EPISODIO_ESCALA', escala({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'EPISODIO_ESCALA', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …la ficha de Q NO recibió la ECF de P ni un hito', String(camaDe('1').ECF || '(vacío)') + '/' + hitosDe(PID_Q).filter(h => h.TIPO === 'evaluacion').length, '(vacío)/0');
+  volver();
+  i = corre('EPISODIO_ESCALA', escala({ EPISODIO_ABIERTO: PID_P }), cambioDeDueno('1'));
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'EPISODIO_ESCALA', VAL, EP_CAMBIO_RE, '1');
+  // La cama libre ya se rechazaba («no tiene paciente ingresado»): se sigue rechazando, con su motivo.
+  volver(); altaDe('1');
+  i = corre('EPISODIO_ESCALA', escala({ EPISODIO_ABIERTO: PID_P }));
+  no('control: la cama libre se rechaza (como hoy)', i.r.ok);
+  si('   …con su motivo de siempre', /no tiene paciente ingresado/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  console.log('      · E2 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('EPISODIO_ESCALA', escala());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'EPISODIO_ESCALA', VAL, VIEJA, null);
+  i = corre('EPISODIO_ESCALA', escala({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E3 · PEND_ABRIR ═════════ */
+  console.log('   · E3 · PEND_ABRIR');
+  const TXT = 'Solicitar evaluación de fonoaudiología';
+  const abre = extra => Object.assign({ idCama: '1', texto: TXT, firma: 'DMV' }, extra || {});
+  volver();
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente el pendiente se abre en la ficha de P', i.r.ok && pendDe('1').length === 2);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('PEND_ABRIR', abre());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok && pendDe('1').length === 2);
+  si('   …y la bitácora la anota « [sin episodio]»', conMarca(i));
+  volver(); altaDe('1'); entraQ('1');
+  si('(montaje) Q no tiene pendientes', pendDe('1').length === 0);
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'PEND_ABRIR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …Q no heredó el encargo de P', pendDe('1').length, 0);
+  // 🪤 Q ya tiene ese mismo encargo abierto: el formulario de P NO puede contestar «ya está abierto» (eso le diría a P que su
+  // pendiente existe, cuando el que existe es el de OTRA persona). El motivo es el cambio de paciente.
+  volver(); altaDe('1'); entraQ('1');
+  const rQ = api('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_Q }), null);
+  si('(Q abre el mismo encargo en su cama)', rQ.ok && pendDe('1').length === 1);
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P pide el mismo texto que Q ya tiene abierto', i, 'PEND_ABRIR', VAL, EP_CAMBIO_RE, '1');
+  no('★★ …y NO dice «ya está abierto» (el motivo es el cambio de paciente)', /ya est[aá] abierto/i.test(i.r.error || ''));
+  volver();
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }), cambioDeDueno('1'));
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'PEND_ABRIR', VAL, EP_CAMBIO_RE, '1');
+  volver(); altaDe('1');
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }));
+  no('control: la cama libre se rechaza (como hoy)', i.r.ok);
+  si('   …con su motivo de siempre', /no tiene paciente ingresado/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  console.log('      · E3 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('PEND_ABRIR', abre());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'PEND_ABRIR', VAL, VIEJA, null);
+  i = corre('PEND_ABRIR', abre({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E4 · PEND_CERRAR ═════════ */
+  console.log('   · E4 · PEND_CERRAR');
+  const cierra = extra => Object.assign({ idCama: '1', id: ID_PEND_P, firma: 'DMV' }, extra || {});
+  volver();
+  i = corre('PEND_CERRAR', cierra({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente el pendiente de P se cierra', i.r.ok && !!pendDe('1')[0].ci);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('PEND_CERRAR', cierra());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok && !!pendDe('1')[0].ci);
+  si('   …y la bitácora la anota « [sin episodio]»', conMarca(i));
+  // Ya la protegía el id del pendiente (vive en la cama y se vacía con el alta), pero entonces el rechazo decía «ya no está»
+  // —un NO_ENCONTRADO que no explica nada— y el censo tenía una excepción. Ahora el motivo es el cambio de paciente.
+  volver(); altaDe('1'); entraQ('1');
+  i = corre('PEND_CERRAR', cierra({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'PEND_CERRAR', VAL, EP_CAMBIO_RE, '1');
+  volver();
+  i = corre('PEND_CERRAR', cierra({ EPISODIO_ABIERTO: PID_P }), cambioDeDueno('1'));
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'PEND_CERRAR', VAL, EP_CAMBIO_RE, '1');
+  console.log('      · E4 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('PEND_CERRAR', cierra());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'PEND_CERRAR', VAL, VIEJA, null);
+  i = corre('PEND_CERRAR', cierra({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E5 · GSA_ASIGNAR ═════════ */
+  console.log('   · E5 · GSA_ASIGNAR');
+  const asigna = extra => Object.assign({ idGsa: 'gas_1', idCama: '1' }, extra || {});
+  volver();
+  i = corre('GSA_ASIGNAR', asigna({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente el gas se asigna a P', i.r.ok && gasDe().ESTADO === 'ok' && gasDe().PATIENT_ID === PID_P);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('GSA_ASIGNAR', asigna());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok && gasDe().PATIENT_ID === PID_P);
+  si('   …y la bitácora la anota « [sin episodio]»', conMarca(i));
+  // Hoy el gas se adjunta al PATIENT_ID de quien esté en la cama en ese momento.
+  volver(); altaDe('1'); entraQ('1');
+  i = corre('GSA_ASIGNAR', asigna({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el selector abierto sobre P, con la cama ya de Q', i, 'GSA_ASIGNAR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …el gas sigue en la bandeja, sin emparejar y sin paciente (NO le quedó a Q)', gasDe().ESTADO + '/' + (gasDe().PATIENT_ID || '(vacío)'), 'sin_emparejar/(vacío)');
+  volver();
+  i = corre('GSA_ASIGNAR', asigna({ EPISODIO_ABIERTO: PID_P }), cambioDeDueno('1'));
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'GSA_ASIGNAR', VAL, EP_CAMBIO_RE, '1');
+  volver(); altaDe('1');
+  i = corre('GSA_ASIGNAR', asigna({ EPISODIO_ABIERTO: PID_P }));
+  no('control: la cama libre se rechaza (como hoy)', i.r.ok);
+  si('   …con su motivo de siempre', /no tiene un paciente hospitalizado/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  console.log('      · E5 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('GSA_ASIGNAR', asigna());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'GSA_ASIGNAR', VAL, VIEJA, null);
+  i = corre('GSA_ASIGNAR', asigna({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E6 · COORD_CORREGIR ═════════ */
+  console.log('   · E6 · COORD_CORREGIR (el reclamo es patientId; nunca se resuelve por la cama)');
+  // La sesión de coordinación es el CONTRATO que el servicio exige (la real la vigilan coordinacion.js y
+  // coordinacion_revocacion.js): un solo token bueno.
+  const conClave = fn => {
+    const orig = global.coordExigirSesion;
+    global.coordExigirSesion = t => t === 'COORD_OK'
+      ? { ok: true, firma: 'MCC', usuario: 'coord1' }
+      : { ok: false, error: 'Tu sesión de coordinación expiró. Vuelve a entrar con tu clave.', codigo: 'NO_AUTORIZADO' };
+    try { return fn(); } finally { global.coordExigirSesion = orig; }
+  };
+  const corrige = extra => Object.assign({ token: 'COORD_OK', cambios: { DIAGNOSTICO: 'Dx corregido de prueba' } }, extra || {});
+  const dxDe = id => String(camaDe(id).DIAGNOSTICO);
+  const llama = (datos, hook) => conClave(() => {
+    M.reiniciar();
+    let n0 = 0, hookOk = null;
+    if (hook) ctl.antesDelCuerpo = () => { hookOk = hook(); n0 = M.total(); };
+    const r = callando(() => api('COORD_CORREGIR', datos, null));
+    ctl.antesDelCuerpo = null;
+    return { r, hookOk, escrituras: M.registro().slice(n0) };
+  });
+  // El montaje del hueco: P se LIMPIÓ (no recibió el alta, así que no tiene fila en ARCHIVO_PACIENTES) y Q ocupa su cama.
+  // P no está en ninguna parte: ni en las camas ni en el archivo.
+  const montajeHueco = () => { volver(); const l = limpiaDe('1'); const q = entraQ('1'); return l.ok && q; };
+  si('(montaje) la limpieza de P y el ingreso de Q salen bien', montajeHueco());
+  si('(montaje) P no está en ninguna parte: ni en las camas ni en ARCHIVO_PACIENTES', !DB.CAMAS_ESTADO.some(c => c.PATIENT_ID === PID_P) && !DB.ARCHIVO_PACIENTES.some(a => a.PATIENT_ID === PID_P));
+  const dxQ0 = dxDe('1');
+  let c = llama(corrige({ patientId: PID_P, idCama: '1' }));
+  no('★★ un patientId que no está en ninguna parte NO cae a la cama: se rechaza (no se corrige a quien esté ahora)', c.r.ok);
+  eq('   …como «no se encontró»', c.r.codigo, 'NO_ENCONTRADO');
+  eq('★★ …la ficha de Q quedó como estaba', dxDe('1'), dxQ0);
+  eq('   …y no se escribió NADA', c.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  si('   …sin nombrar a nadie ni dar identificadores', sinDatosAjenosE(c.r.error || ''));
+  // _coordUbicar, directamente: la regla en una línea
+  eq('★ _coordUbicar(patientId que no existe, cama de Q) = nadie', String(global._coordUbicar(PID_P, '1')), 'null');
+  eq('   …_coordUbicar(sin patientId, cama de Q) = la cama de Q (la ficha de un episodio sin ingreso formal se sigue ubicando por la cama)', (global._coordUbicar('', '1') || {}).id + '/' + (global._coordUbicar('', '1') || {}).tipo, '1/activo');
+  eq('   …_coordUbicar(patientId de Q, otra cama) = la cama de Q: el paciente manda sobre la cama', (global._coordUbicar(PID_Q, '2') || {}).id, '1');
+  // — Lo que sigue funcionando —
+  montajeHueco();
+  c = llama(corrige({ patientId: PID_Q, idCama: '1' }));
+  si('control: con el patientId de Q (que está en esa cama) la corrección PASA y es de Q', c.r.ok && dxDe('1') === 'Dx corregido de prueba');
+  montajeHueco();
+  c = llama(corrige({ idCama: '1' }));
+  si('control: sin patientId, solo con la cama, en modo tolerante: se ubica por la cama como hoy (compatibilidad)', c.r.ok && dxDe('1') === 'Dx corregido de prueba');
+  volver(); altaDe('1'); entraQ('1');
+  c = llama(corrige({ patientId: PID_P, idCama: '1' }));
+  si('control: P egresado (con su fila en el archivo) y la cama ya de Q: la corrección es de P, en el archivo', c.r.ok && c.r.data && c.r.data.tipo === 'egresado');
+  eq('   …y la ficha de Q no se tocó', dxDe('1') === 'Dx corregido de prueba' ? 'se tocó' : 'intacta', 'intacta');
+  console.log('      · E6 · modo estricto');
+  montajeHueco(); ESTRICTO();
+  const dxQ1 = dxDe('1');
+  c = llama(corrige({ idCama: '1' }));
+  no('★ sin patientId (ausente) y solo con la cama: se rechaza, la pantalla es de una versión anterior', c.r.ok);
+  si('   …y dice que hay que recargar', VIEJA.test(c.r.error || '') && /rec[aá]rgala/i.test(c.r.error || ''));
+  eq('★★ …sin escribir nada y con la ficha de Q intacta', c.escrituras.length + '/' + (dxDe('1') === dxQ1), '0/true');
+  c = llama(corrige({ patientId: '', idCama: '1' }));
+  no('★ patientId VACÍO sobre una cama con paciente: se rechaza (el vacío no es un reclamo válido ahí)', c.r.ok);
+  eq('   …sin escribir nada', c.escrituras.length, 0);
+  c = llama(corrige({ patientId: PID_Q, idCama: '1' }));
+  si('★ con el patientId de Q PASA también en modo estricto', c.r.ok && dxDe('1') === 'Dx corregido de prueba');
+  // 🪤 Esta puerta no recibe `ep` (su reclamo es patientId): lee el modo estricto ELLA, con una copia de la lectura de
+  // `_epDeDatos` (api.gs). Las dos copias se atan aquí: para cada valor que alguien pueda escribir en la hoja CONFIG, las
+  // dos puertas de entrada al modo estricto tienen que decidir IGUAL. Un interruptor de seguridad que se enciende por un
+  // lado y no por el otro no se ve en ninguna pantalla.
+  ['TRUE', 'true', ' TRUE ', 'True', 'SI', 'FALSE', '1', ''].forEach(v => {
+    montajeHueco(); CONFIG.CONTRATO_ESTRICTO = v;
+    const quiereEstricto = global._epDeDatos({}).estricto;
+    const dx0 = dxDe('1');
+    const r = llama(corrige({ idCama: '1' }));
+    eq('   …CONTRATO_ESTRICTO = ' + JSON.stringify(v) + ': coordinación y _epDeDatos deciden igual (' + (quiereEstricto ? 'estricto: rechaza' : 'tolerante: pasa') + ')',
+      (r.r.ok ? 'pasa' : 'rechaza') + '/' + (dxDe('1') === dx0 ? 'intacta' : 'corregida'),
+      quiereEstricto ? 'rechaza/intacta' : 'pasa/corregida');
+  });
+  // Un episodio sin ingreso formal (cama ocupada sin PATIENT_ID) no tiene a quién reclamar: el vacío pasa.
+  volver(); ESTRICTO();
+  camaDe('2').PATIENT_ID = '';
+  c = llama(corrige({ patientId: '', idCama: '2' }));
+  si('★ cama ocupada SIN PATIENT_ID (episodio sin ingreso formal) con patientId vacío: pasa también en modo estricto', c.r.ok && dxDe('2') === 'Dx corregido de prueba');
+  volver();
+
+  /* ═════════ E7 · la forma ═════════ */
+  console.log('   · E7 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes');
+  const cuerpoDeEn = (archivo, nombre) => {
+    const src = leer(archivo);
+    const ini = src.indexOf('function ' + nombre + '(');
+    const fin = ini === -1 ? -1 : src.indexOf('\n}\n', ini);
+    return (ini === -1 || fin === -1) ? '' : src.slice(ini, fin).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  };
+  [
+    // [archivo, función, firma esperada, lo primero que ESCRIBE]
+    ['svc_evaluaciones.gs', 'evalRegistrar', /^function evalRegistrar\(datos, ctx, ep\)/, /\b_evalRegistrarInterno\(/],
+    ['svc_evaluaciones.gs', 'episodioEscala', /^function episodioEscala\(datos, ctx, ep\)/, /\brepoActualizar\(/],
+    ['svc_pendientes.gs', 'pendAbrir', /^function pendAbrir\(datos, ctx, ep\)/, /\brepoActualizar\(/],
+    ['svc_pendientes.gs', 'pendCerrar', /^function pendCerrar\(datos, ctx, ep\)/, /\brepoActualizar\(/],
+    ['svc_gsa.gs', 'gsaAsignar', /^function gsaAsignar\(datos, ctx, ep\)/, /\brepoActualizar\(/],
+  ].forEach(([archivo, fn, firma, escribe]) => {
+    const c = cuerpoDeEn(archivo, fn);
+    si('★ ' + fn + ' recibe el reclamo de episodio como ÚLTIMO parámetro', firma.test(c));
+    const iLock = c.indexOf('conLock(');
+    const iVal = c.indexOf('validarEpisodioPuerta(');
+    const iEsc = c.search(escribe);
+    si('   …toma el lock y DENTRO compara con validarEpisodioPuerta', iLock > -1 && iVal > iLock);
+    si('★★ …y la comparación va ANTES de la primera escritura', iVal > -1 && iEsc > iVal);
+    eq('   …y ANTES del conLock no se lee ninguna hoja', (c.slice(0, iLock).match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+|_pendCama)\(/g) || []).join(',') || '(nada)', '(nada)');
+    si('   …solo se invoca si el reclamo viene (o está el modo estricto): los bancos antiguos no cargan la regla', /estricto === true/.test(c) && /\.a !== undefined/.test(c));
+  });
+  si('★ _evalRegistrarInterno queda INTACTA: guardarEvolucion ya comparó el episodio y no lo vuelve a comparar',
+    /^function _evalRegistrarInterno\(datos, ctx\)/.test(cuerpoDeEn('svc_evaluaciones.gs', '_evalRegistrarInterno')) &&
+    !/validarEpisodioPuerta/.test(cuerpoDeEn('svc_evaluaciones.gs', '_evalRegistrarInterno')));
+  {
+    const cf = cuerpoDeEn('svc_coordinacion.gs', 'coordCorregirFicha'), ci = cuerpoDeEn('svc_coordinacion.gs', '_coordCorregirFichaInterno');
+    si('★ coordCorregirFicha conserva su firma (datos) —no recibe ep: su reclamo es patientId— y corre dentro de conLock',
+      /^function coordCorregirFicha\(datos\)/.test(cf) && /conLock\(function \(\) \{ return _coordCorregirFichaInterno\(datos\);/.test(cf));
+    si('   …el cuerpo compara DESPUÉS de ubicar al paciente y ANTES de escribir',
+      ci.indexOf('_coordUbicar(') > -1 && ci.indexOf('validarEpisodioPuerta(') > ci.indexOf('_coordUbicar(') && ci.search(/\brepoActualizar\(/) > ci.indexOf('validarEpisodioPuerta('));
+    si('   …y solo en modo estricto, leído con leerConfig(\'CONTRATO_ESTRICTO\', \'FALSE\') sin distinguir mayúsculas ni espacios (la misma lectura que _epDeDatos)',
+      /leerConfig\('CONTRATO_ESTRICTO',\s*'FALSE'\)/.test(ci) && /\.trim\(\)\.toUpperCase\(\) === 'TRUE'/.test(ci));
+    const cu = cuerpoDeEn('svc_coordinacion.gs', '_coordUbicar');
+    const iPid = cu.indexOf('if (pid) {'), iCama = cu.indexOf('if (idCama)');
+    si('★ _coordUbicar: dentro de «if (pid)» devuelve null antes de mirar la cama', iPid > -1 && iCama > iPid && /return null;/.test(cu.slice(iPid, iCama)));
+  }
 });
 
 function esVerdaderoB(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }

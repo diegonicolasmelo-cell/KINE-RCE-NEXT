@@ -88,18 +88,18 @@ function api(accion, datos, token) {
       case 'PLANTILLA_RETIRAR':  return _auditar(ctx, accion, () => plantillaDesactivar(datos), datos);
       case 'GSA_IMPORTAR':       return _auditar(ctx, accion, () => gsaImportarPendientes(ctx), datos);
       case 'GET_GSA_PENDIENTES': return gsaPendientes();
-      case 'GSA_ASIGNAR':        return _auditar(ctx, accion, () => gsaAsignar(datos, ctx), datos);
+      case 'GSA_ASIGNAR':        return _auditar(ctx, accion, () => gsaAsignar(datos, ctx, _epDeDatos(datos)), datos);
       case 'GSA_DESCARTAR':      return _auditar(ctx, accion, () => gsaDescartar(datos, ctx), datos);
       case 'WHOAMI':           return ok({ email: ctx.email, firma: ctx.firma, dev: !!auth.dev });
       // 🗂️ Rama episodio/turno (11-sep-2026)
       case 'GET_EVALUACIONES': return obtenerEvaluaciones(datos);
-      case 'EVAL_REGISTRAR':   return _auditar(ctx, accion, () => evalRegistrar(datos, ctx), datos);
-      case 'EPISODIO_ESCALA':  return _auditar(ctx, accion, () => episodioEscala(datos, ctx), datos);
+      case 'EVAL_REGISTRAR':   return _auditar(ctx, accion, () => evalRegistrar(datos, ctx, _epDeDatos(datos)), datos);
+      case 'EPISODIO_ESCALA':  return _auditar(ctx, accion, () => episodioEscala(datos, ctx, _epDeDatos(datos)), datos);
       // 📌 Pendientes del episodio (16-sep-2026). No hay PEND_LISTAR: viajan
       // dentro de la cama, que el arranque ya trae — una acción de listar
       // sería un viaje más por nada.
-      case 'PEND_ABRIR':       return _auditar(ctx, accion, () => pendAbrir(datos, ctx), datos);
-      case 'PEND_CERRAR':      return _auditar(ctx, accion, () => pendCerrar(datos, ctx), datos);
+      case 'PEND_ABRIR':       return _auditar(ctx, accion, () => pendAbrir(datos, ctx, _epDeDatos(datos)), datos);
+      case 'PEND_CERRAR':      return _auditar(ctx, accion, () => pendCerrar(datos, ctx, _epDeDatos(datos)), datos);
 
       // ── Escrituras (auditadas) ──
       case 'GUARDAR_SUGERENCIA':
@@ -180,6 +180,8 @@ function api(accion, datos, token) {
       case 'COORD_FICHA':        return coordFicha(datos);
       // 📣 Aviso al buzón del equipo — exige sesión DENTRO del servicio.
       case 'COORD_AVISO':        return coordAviso(datos);
+      // El reclamo de episodio de esta puerta es `patientId` (lo que la ficha mostró), no EPISODIO_ABIERTO, y lo compara el propio
+      // servicio (G14, paso 7): no recibe `ep`.
       case 'COORD_CORREGIR':     return coordCorregirFicha(datos);
 
       default:

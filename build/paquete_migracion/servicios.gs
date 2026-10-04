@@ -2532,7 +2532,16 @@ function coordSoltarMarca(hoja, colKey, id, obj, campo) {
 // CORREGIR UNA FICHA
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo. */
+/**
+ * Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo.
+ *
+ * 🔴 CON patientId NUNCA SE RESUELVE POR LA CAMA (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026). Antes, si el
+ * patientId no estaba en ninguna parte, la búsqueda seguía de largo y caía a `idCama`: el episodio que la ficha mostró ya no
+ * existía —un paciente que se LIMPIÓ no deja fila en ARCHIVO_PACIENTES— y la corrección se escribía en la ficha de quien
+ * ocupara esa cama AHORA (nombre, RUT, fechas de ingreso: justo lo que coordinación corrige). La respuesta correcta a «no
+ * encuentro a ESE paciente» es «no se encontró», no «encontré a otro». La cama sola solo ubica cuando NO se declara
+ * patientId (un episodio sin ingreso formal no tiene pid).
+ */
 function _coordUbicar(patientId, idCama) {
   const pid = String(patientId || '').trim();
   if (pid) {
@@ -2548,6 +2557,7 @@ function _coordUbicar(patientId, idCama) {
         return { tipo: 'egresado', hoja: 'ARCHIVO_PACIENTES', colKey: 'ID_ARCHIVO', id: String(arch[j].ID_ARCHIVO), obj: arch[j] };
       }
     }
+    return null;
   }
   if (idCama) {
     const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idCama));
@@ -2641,6 +2651,24 @@ function _coordCorregirFichaInterno(datos) {
 
     const ubic = _coordUbicar(datos && datos.patientId, datos && datos.idCama);
     if (!ubic) return err('No se encontró ese paciente, ni en cama ni en el archivo.', ERR.NO_ENCONTRADO);
+
+    /* 🔐 EL CANDADO DE EPISODIO EN MODO ESTRICTO (G14, tanda 2, paso 7, 4-oct-2026). El reclamo de esta puerta es
+       `patientId` (el episodio que la ficha mostró) y `_coordUbicar` ya lo respeta: con patientId no se cae a la cama. Lo que
+       queda abierto es ubicar POR LA CAMA SOLA, sin declarar a nadie: ahí se corrige a quien esté ahora, y quien llamó nunca
+       dijo a quién quería corregir. En modo estricto eso se rechaza si la cama tiene paciente (ausente: «pantalla de una
+       versión anterior»; vacío: el cambio de paciente). Un episodio sin ingreso formal —cama ocupada sin PATIENT_ID— no
+       tiene a quién reclamar y pasa con el vacío, igual que en las demás puertas. En modo tolerante todo corre como siempre.
+       🪤 El modo estricto se lee aquí con la MISMA lectura que `_epDeDatos` (api.gs): con valor por defecto, sin distinguir
+       mayúsculas ni espacios, solo TRUE lo enciende. Esta puerta no recibe `ep` porque su reclamo no es EPISODIO_ABIERTO, así
+       que son dos copias de una misma lectura; la guardia build/checks/guardado_seguro_episodio_g14.js (E6) las ata: que un
+       interruptor de seguridad se encienda por un lado y no por el otro no se ve en ninguna pantalla. Solo se lee cuando
+       hace falta (ubicado por la cama, sin patientId), y la regla viene de dominio_validacion.gs: si alguien llega aquí en
+       modo estricto sin cargarla, REVIENTA (INTERNO) en vez de saltarse el candado. */
+    if (ubic.tipo === 'activo' && !String((datos && datos.patientId) || '').trim() &&
+        String(leerConfig('CONTRATO_ESTRICTO', 'FALSE')).trim().toUpperCase() === 'TRUE') {
+      const _msgEp = validarEpisodioPuerta(datos && datos.patientId, String(ubic.obj.PATIENT_ID || ''), ubic.id, true);
+      if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+    }
 
     const cambios = (datos && datos.cambios) || {};
     const horas   = (datos && datos.horas) || {};
@@ -4231,10 +4259,38 @@ function _evalEscala(x) {
  * firma). Devuelve la fila creada. NO toca EVOLUCIONES: si la medición vino de
  * un turno, ese turno ya escribió su columna por su cuenta.
  */
-function evalRegistrar(datos, ctx) {
+function evalRegistrar(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026).
+
+         🔴 EL HUECO. La medición se abre sobre la tarjeta de P y se envía después. Si entremedio P recibió el alta y entró Q
+         a la misma cama, `_evalRegistrarInterno` la guardaba con el PATIENT_ID de quien ocupara la cama AHORA y, si era la
+         más reciente de ese episodio, copiaba su valor, fecha y firma al espejo ULT_* de la CAMA: la ficha de Q mostraba
+         «MRC 45 (firma de quien midió a P)» y el hito «MRC 45» le quedaba en su línea de tiempo.
+
+         LA REGLA: lo que la pantalla abrió (EPISODIO_ABIERTO) tiene que ser el ocupante de la cama AHORA (una cama libre
+         no tiene dueño). Corregir con `anulaId` va bajo el mismo candado: está dentro de este mismo lock y después de esta
+         comparación. 🪤 Se compara con la CAMA, no con `datos.patientId`: la fila de EVALUACIONES se atribuye al episodio
+         que se declare, pero el espejo se escribe SIEMPRE en la cama, así que un `patientId` declarado no reemplaza al
+         reclamo (ni lo suple en modo estricto).
+
+         Va ANTES de `_evalRegistrarInterno`, que queda intacta: la llama también guardarEvolucion, que ya comparó el
+         episodio con su propia regla. Solo se invoca con reclamo o con el modo estricto: los bancos antiguos, que cargan
+         una lista fija de archivos, no traen dominio_validacion.gs. Si alguien lo pide sin cargarlo REVIENTA (INTERNO) en
+         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _d = datos || {};
+        const _idCama = String(_d.idCama || _d.ID_CAMA || '').trim();
+        const _cama = _idCama ? repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', _idCama) : null;
+        if (_cama) {
+          const _atribuido = esVerdadero(_cama.OCUPADA) ? String(_cama.PATIENT_ID || '') : '';
+          const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, _idCama, _ep.estricto === true);
+          if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+        }
+      }
       const r = _evalRegistrarInterno(datos, ctx);
       if (r && r.error) return r;
       SpreadsheetApp.flush();
@@ -4364,7 +4420,7 @@ function obtenerEvaluaciones(datos) {
  * porque el dato describe el estado PREVIO a la UCI (Diego, 11-sep).
  * datos: { idCama, escala:'ECF'|'BARTHEL'|'CHARLSON', valor, items?, firma? }
  */
-function episodioEscala(datos, ctx) {
+function episodioEscala(datos, ctx, ep) {
   ctx = ctx || {};
   datos = datos || {};
   const idCama = String(datos.idCama || '').trim();
@@ -4384,6 +4440,16 @@ function episodioEscala(datos, ctx) {
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
       if (!cama) return err('No existe la cama ' + idCama + '.', ERR.VALIDACION);
       if (!esVerdadero(cama.OCUPADA) || !cama.PATIENT_ID) return err('La cama ' + idCama + ' no tiene paciente ingresado.', ERR.VALIDACION);
+      /* 🔐 EL CANDADO DE EPISODIO (G14, paso 7). ECF, Barthel y Charlson se escriben directo en la CAMA, que es del ocupante
+         de AHORA: la escala de P (abierta antes de su alta) le quedaba a Q como si fuera suya, con su hito en la línea de
+         tiempo. Lo que la pantalla abrió tiene que ser quien ocupa la cama, comparado aquí DENTRO del lock y antes de la
+         primera escritura. (La cama libre ya se rechaza arriba con su motivo de siempre.) Solo con reclamo o con el modo
+         estricto: los bancos antiguos no traen dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
       let firma = String(datos.firma || ctx.firma || '').trim();
       if (firma.length > 15 || /\n/.test(firma)) firma = '';
       const antes = String(cama[col] == null ? '' : cama[col]);
@@ -7513,7 +7579,7 @@ function gsaPendientes() {
  * fecha, hora}. La fecha y la hora solo se piden si el informe no las traía;
  * con ellas se calcula el turno con la MISMA regla del importador.
  */
-function gsaAsignar(datos, ctx) {
+function gsaAsignar(datos, ctx, ep) {
   return conLock(function () {
     try {
       const d = datos || {};
@@ -7528,6 +7594,20 @@ function gsaAsignar(datos, ctx) {
       const cama = repoLeerTodos('CAMAS_ESTADO', 'ID_CAMA', idCama)[0];
       if (!cama || !esVerdadero(cama.OCUPADA) || !cama.PATIENT_ID) {
         return err('La cama ' + (idCama || '—') + ' no tiene un paciente hospitalizado.', ERR.VALIDACION);
+      }
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026).
+         🔴 EL HUECO. El gas se adjunta al PATIENT_ID de quien esté en la cama EN ESE MOMENTO. El selector de la bandeja se
+         abre mostrando a P en la cama 7 y se confirma después: si entremedio P recibió el alta y entró Q, el gas de P pasaba a
+         ser de Q —en su hoja diaria y en la hoja impresa—, que es justo lo que la regla dura de este archivo prohíbe («un gas
+         en la cama equivocada es peor que uno que falta»), solo que ahora lo hacía la persona sin saberlo. El PDF además se
+         movía a «copiados», así que la bandeja ya no lo volvía a mostrar.
+         LA REGLA: lo que la pantalla abrió (EPISODIO_ABIERTO = el paciente de la cama elegida) tiene que ser quien ocupa la cama
+         AHORA, comparado DENTRO del lock y ANTES de la primera escritura. Solo con reclamo o con el modo estricto: los bancos
+         antiguos no traen dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA en vez de saltarse el candado. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
       const fecha = String(d.fecha || fila.FECHA || '').slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return err('Falta la fecha de la toma (el informe no la traía).', ERR.VALIDACION);
@@ -8270,7 +8350,7 @@ function _pendCama(idCama) {
  * Guarda quién lo abrió y cuándo: procedencia, para que el que lo lee sepa
  * de dónde salió.
  */
-function pendAbrir(datos, ctx) {
+function pendAbrir(datos, ctx, ep) {
   ctx = ctx || {};
   datos = datos || {};
   const idCama = String(datos.idCama || '').trim();
@@ -8285,6 +8365,20 @@ function pendAbrir(datos, ctx) {
     try {
       const r = _pendCama(idCama);
       if (r.e) return r.e;
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026).
+         El chip se abre sobre la tarjeta de P y se envía después. Si entremedio P recibió el alta y entró Q a la misma
+         cama, el encargo de P quedaba en la lista de Q (los pendientes viven en la CAMA, en el episodio) y el kinesiólogo
+         del turno siguiente lo leía como un pedido sobre Q. Lo que la pantalla abrió tiene que ser quien ocupa la cama
+         AHORA, comparado aquí DENTRO del lock y antes de la primera escritura.
+         🪤 Va ANTES de la regla de «ya está abierto»: si Q ya tenía ese mismo encargo, la respuesta correcta al formulario de
+         P NO es «ya está abierto» (le diría que su pendiente existe, cuando el que existe es el de otra persona) sino que
+         la cama cambió de paciente. Solo con reclamo o con el modo estricto: los bancos antiguos no traen
+         dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA en vez de saltarse el candado. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(r.cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
       const lista = _pendLeer(r.cama);
       /* 🔴 NO SE ABRE DOS VECES LO MISMO (20-sep-2026). Diego: «un pendiente se
          puede arrastrar más de 12 horas, hay veces que está pabellón pendiente
@@ -8323,7 +8417,7 @@ function pendAbrir(datos, ctx) {
  * y qué se cumplió.
  * Cerrar algo ya cerrado NO pisa al primero que lo cerró.
  */
-function pendCerrar(datos, ctx) {
+function pendCerrar(datos, ctx, ep) {
   ctx = ctx || {};
   datos = datos || {};
   const idCama = String(datos.idCama || '').trim();
@@ -8335,6 +8429,16 @@ function pendCerrar(datos, ctx) {
     try {
       const r = _pendCama(idCama);
       if (r.e) return r.e;
+      /* 🔐 EL CANDADO DE EPISODIO (G14, paso 7). Ya la protegía el id del pendiente —vive en la cama y se vacía con el
+         alta, así que el de P no existe en la lista de Q—, pero entonces el formulario de P recibía «ya no está en la cama»
+         (un NO_ENCONTRADO que no explica nada) y el censo de puertas tenía una excepción. Ahora el motivo es el cambio de
+         paciente, dicho con las mismas palabras que las demás puertas. Dentro del lock y antes de la primera escritura;
+         solo con reclamo o con el modo estricto (los bancos antiguos no traen dominio_validacion.gs). */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(r.cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
       const lista = _pendLeer(r.cama);
       const p = lista.filter(function (x) { return String(x.id) === id; })[0];
       if (!p) return err('Ese pendiente ya no está en la cama ' + idCama + '.', ERR.NO_ENCONTRADO);

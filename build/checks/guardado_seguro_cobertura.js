@@ -26,7 +26,9 @@
 //      exactamente la de las filas 'episodio' de la tabla: dos listas escritas a mano que no se pueden separar.
 //
 // Fuera de `_auditar` hay una sola puerta con candado de episodio: COORD_CORREGIR (se audita sola, con la firma de
-// coordinación). Entra a la tabla con `viaAuditar:false` y su reclamo es `patientId`, no EPISODIO_ABIERTO.
+// coordinación). Entra a la tabla con `viaAuditar:false` y su reclamo es `patientId`, no EPISODIO_ABIERTO: lo compara el
+// propio servicio (el dispatcher no le pasa `ep`), así que `epImplementado` no se mide contra api.gs en esa fila; lo prueba
+// la sección E de guardado_seguro_episodio_g14.js (comportamiento y forma).
 //
 // 🪤 LA GUARDIA SE PRUEBA A SÍ MISMA. Un censo que nunca se vio rojo no prueba que cace nada: antes de dar por
 // bueno el resultado real, se le corrige un defecto a propósito a la tabla o a api.gs (borrar una fila, agregar una
@@ -71,16 +73,16 @@ const TABLA = [
   E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.', true),   // paso 6
   E('CONFIRMAR_DISPOSITIVOS',  'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: hoy basta con que la cama esté ocupada.', true),   // paso 6
   E('AGREGAR_HITO',            'EPISODIO_ABIERTO de la tarjeta al abrir: hoy el hito se atribuye a quien esté en la cama.', true),   // paso 6
-  E('EVAL_REGISTRAR',          'EPISODIO_ABIERTO de la tarjeta al abrir la medición: además escribe el espejo ULT_* en la cama del ocupante actual.'),
-  E('EPISODIO_ESCALA',         'EPISODIO_ABIERTO de la tarjeta al abrir la escala previa a la UCI: hoy escribe sobre la cama que esté ocupada.'),
-  E('PEND_ABRIR',              'EPISODIO_ABIERTO de la tarjeta al abrir el chip de pendientes.'),
-  E('PEND_CERRAR',             'EPISODIO_ABIERTO de la tarjeta al abrir: ya la protege el id del pendiente, se agrega para que el censo no tenga excepciones.'),
-  E('GSA_ASIGNAR',             'EPISODIO_ABIERTO = el paciente de la cama elegida en la bandeja al abrir el selector de asignación.'),
+  E('EVAL_REGISTRAR',          'EPISODIO_ABIERTO de la tarjeta al abrir la medición: además escribe el espejo ULT_* en la cama del ocupante actual.', true),   // paso 7
+  E('EPISODIO_ESCALA',         'EPISODIO_ABIERTO de la tarjeta al abrir la escala previa a la UCI: hoy escribe sobre la cama que esté ocupada.', true),   // paso 7
+  E('PEND_ABRIR',              'EPISODIO_ABIERTO de la tarjeta al abrir el chip de pendientes.', true),   // paso 7
+  E('PEND_CERRAR',             'EPISODIO_ABIERTO de la tarjeta al abrir: ya la protege el id del pendiente, se agrega para que el censo no tenga excepciones.', true),   // paso 7
+  E('GSA_ASIGNAR',             'EPISODIO_ABIERTO = el paciente de la cama elegida en la bandeja al abrir el selector de asignación.', true),   // paso 7
   // ── Crea el episodio ──
   { accion: 'INGRESAR_PACIENTE', clase: 'ingreso', epImplementado: false,
     razon: 'Crea el episodio: no puede reclamar uno que no existe. Lleva datos.PATIENT_ID acuñado por quien llama (la pantalla actual ingresa por GUARDAR_EVOLUCION y no usa esta acción).' },
   // ── Fuera de _auditar: se audita sola, con la firma del modo coordinación ──
-  { accion: 'COORD_CORREGIR', clase: 'episodio', viaAuditar: false, epImplementado: false,
+  { accion: 'COORD_CORREGIR', clase: 'episodio', viaAuditar: false, epImplementado: true,   // paso 7
     razon: 'Reclamo = datos.patientId (el episodio que la ficha mostró) más idCama, resueltos por _coordUbicar; exige además la sesión de coordinación.' },
   // ── No actúan sobre ningún paciente ──
   SIN('PLANTILLA_GUARDAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.'),

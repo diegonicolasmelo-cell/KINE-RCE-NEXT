@@ -394,7 +394,7 @@ function gsaPendientes() {
  * fecha, hora}. La fecha y la hora solo se piden si el informe no las traía;
  * con ellas se calcula el turno con la MISMA regla del importador.
  */
-function gsaAsignar(datos, ctx) {
+function gsaAsignar(datos, ctx, ep) {
   return conLock(function () {
     try {
       const d = datos || {};
@@ -409,6 +409,20 @@ function gsaAsignar(datos, ctx) {
       const cama = repoLeerTodos('CAMAS_ESTADO', 'ID_CAMA', idCama)[0];
       if (!cama || !esVerdadero(cama.OCUPADA) || !cama.PATIENT_ID) {
         return err('La cama ' + (idCama || '—') + ' no tiene un paciente hospitalizado.', ERR.VALIDACION);
+      }
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026).
+         🔴 EL HUECO. El gas se adjunta al PATIENT_ID de quien esté en la cama EN ESE MOMENTO. El selector de la bandeja se
+         abre mostrando a P en la cama 7 y se confirma después: si entremedio P recibió el alta y entró Q, el gas de P pasaba a
+         ser de Q —en su hoja diaria y en la hoja impresa—, que es justo lo que la regla dura de este archivo prohíbe («un gas
+         en la cama equivocada es peor que uno que falta»), solo que ahora lo hacía la persona sin saberlo. El PDF además se
+         movía a «copiados», así que la bandeja ya no lo volvía a mostrar.
+         LA REGLA: lo que la pantalla abrió (EPISODIO_ABIERTO = el paciente de la cama elegida) tiene que ser quien ocupa la cama
+         AHORA, comparado DENTRO del lock y ANTES de la primera escritura. Solo con reclamo o con el modo estricto: los bancos
+         antiguos no traen dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA en vez de saltarse el candado. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
       const fecha = String(d.fecha || fila.FECHA || '').slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return err('Falta la fecha de la toma (el informe no la traía).', ERR.VALIDACION);

@@ -62,10 +62,38 @@ function _evalEscala(x) {
  * firma). Devuelve la fila creada. NO toca EVOLUCIONES: si la medición vino de
  * un turno, ese turno ya escribió su columna por su cuenta.
  */
-function evalRegistrar(datos, ctx) {
+function evalRegistrar(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026).
+
+         🔴 EL HUECO. La medición se abre sobre la tarjeta de P y se envía después. Si entremedio P recibió el alta y entró Q
+         a la misma cama, `_evalRegistrarInterno` la guardaba con el PATIENT_ID de quien ocupara la cama AHORA y, si era la
+         más reciente de ese episodio, copiaba su valor, fecha y firma al espejo ULT_* de la CAMA: la ficha de Q mostraba
+         «MRC 45 (firma de quien midió a P)» y el hito «MRC 45» le quedaba en su línea de tiempo.
+
+         LA REGLA: lo que la pantalla abrió (EPISODIO_ABIERTO) tiene que ser el ocupante de la cama AHORA (una cama libre
+         no tiene dueño). Corregir con `anulaId` va bajo el mismo candado: está dentro de este mismo lock y después de esta
+         comparación. 🪤 Se compara con la CAMA, no con `datos.patientId`: la fila de EVALUACIONES se atribuye al episodio
+         que se declare, pero el espejo se escribe SIEMPRE en la cama, así que un `patientId` declarado no reemplaza al
+         reclamo (ni lo suple en modo estricto).
+
+         Va ANTES de `_evalRegistrarInterno`, que queda intacta: la llama también guardarEvolucion, que ya comparó el
+         episodio con su propia regla. Solo se invoca con reclamo o con el modo estricto: los bancos antiguos, que cargan
+         una lista fija de archivos, no traen dominio_validacion.gs. Si alguien lo pide sin cargarlo REVIENTA (INTERNO) en
+         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _d = datos || {};
+        const _idCama = String(_d.idCama || _d.ID_CAMA || '').trim();
+        const _cama = _idCama ? repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', _idCama) : null;
+        if (_cama) {
+          const _atribuido = esVerdadero(_cama.OCUPADA) ? String(_cama.PATIENT_ID || '') : '';
+          const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, _idCama, _ep.estricto === true);
+          if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+        }
+      }
       const r = _evalRegistrarInterno(datos, ctx);
       if (r && r.error) return r;
       SpreadsheetApp.flush();
@@ -195,7 +223,7 @@ function obtenerEvaluaciones(datos) {
  * porque el dato describe el estado PREVIO a la UCI (Diego, 11-sep).
  * datos: { idCama, escala:'ECF'|'BARTHEL'|'CHARLSON', valor, items?, firma? }
  */
-function episodioEscala(datos, ctx) {
+function episodioEscala(datos, ctx, ep) {
   ctx = ctx || {};
   datos = datos || {};
   const idCama = String(datos.idCama || '').trim();
@@ -215,6 +243,16 @@ function episodioEscala(datos, ctx) {
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
       if (!cama) return err('No existe la cama ' + idCama + '.', ERR.VALIDACION);
       if (!esVerdadero(cama.OCUPADA) || !cama.PATIENT_ID) return err('La cama ' + idCama + ' no tiene paciente ingresado.', ERR.VALIDACION);
+      /* 🔐 EL CANDADO DE EPISODIO (G14, paso 7). ECF, Barthel y Charlson se escriben directo en la CAMA, que es del ocupante
+         de AHORA: la escala de P (abierta antes de su alta) le quedaba a Q como si fuera suya, con su hito en la línea de
+         tiempo. Lo que la pantalla abrió tiene que ser quien ocupa la cama, comparado aquí DENTRO del lock y antes de la
+         primera escritura. (La cama libre ya se rechaza arriba con su motivo de siempre.) Solo con reclamo o con el modo
+         estricto: los bancos antiguos no traen dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
       let firma = String(datos.firma || ctx.firma || '').trim();
       if (firma.length > 15 || /\n/.test(firma)) firma = '';
       const antes = String(cama[col] == null ? '' : cama[col]);

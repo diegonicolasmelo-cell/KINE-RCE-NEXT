@@ -693,7 +693,16 @@ function coordSoltarMarca(hoja, colKey, id, obj, campo) {
 // CORREGIR UNA FICHA
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo. */
+/**
+ * Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo.
+ *
+ * 🔴 CON patientId NUNCA SE RESUELVE POR LA CAMA (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026). Antes, si el
+ * patientId no estaba en ninguna parte, la búsqueda seguía de largo y caía a `idCama`: el episodio que la ficha mostró ya no
+ * existía —un paciente que se LIMPIÓ no deja fila en ARCHIVO_PACIENTES— y la corrección se escribía en la ficha de quien
+ * ocupara esa cama AHORA (nombre, RUT, fechas de ingreso: justo lo que coordinación corrige). La respuesta correcta a «no
+ * encuentro a ESE paciente» es «no se encontró», no «encontré a otro». La cama sola solo ubica cuando NO se declara
+ * patientId (un episodio sin ingreso formal no tiene pid).
+ */
 function _coordUbicar(patientId, idCama) {
   const pid = String(patientId || '').trim();
   if (pid) {
@@ -709,6 +718,7 @@ function _coordUbicar(patientId, idCama) {
         return { tipo: 'egresado', hoja: 'ARCHIVO_PACIENTES', colKey: 'ID_ARCHIVO', id: String(arch[j].ID_ARCHIVO), obj: arch[j] };
       }
     }
+    return null;
   }
   if (idCama) {
     const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idCama));
@@ -802,6 +812,24 @@ function _coordCorregirFichaInterno(datos) {
 
     const ubic = _coordUbicar(datos && datos.patientId, datos && datos.idCama);
     if (!ubic) return err('No se encontró ese paciente, ni en cama ni en el archivo.', ERR.NO_ENCONTRADO);
+
+    /* 🔐 EL CANDADO DE EPISODIO EN MODO ESTRICTO (G14, tanda 2, paso 7, 4-oct-2026). El reclamo de esta puerta es
+       `patientId` (el episodio que la ficha mostró) y `_coordUbicar` ya lo respeta: con patientId no se cae a la cama. Lo que
+       queda abierto es ubicar POR LA CAMA SOLA, sin declarar a nadie: ahí se corrige a quien esté ahora, y quien llamó nunca
+       dijo a quién quería corregir. En modo estricto eso se rechaza si la cama tiene paciente (ausente: «pantalla de una
+       versión anterior»; vacío: el cambio de paciente). Un episodio sin ingreso formal —cama ocupada sin PATIENT_ID— no
+       tiene a quién reclamar y pasa con el vacío, igual que en las demás puertas. En modo tolerante todo corre como siempre.
+       🪤 El modo estricto se lee aquí con la MISMA lectura que `_epDeDatos` (api.gs): con valor por defecto, sin distinguir
+       mayúsculas ni espacios, solo TRUE lo enciende. Esta puerta no recibe `ep` porque su reclamo no es EPISODIO_ABIERTO, así
+       que son dos copias de una misma lectura; la guardia build/checks/guardado_seguro_episodio_g14.js (E6) las ata: que un
+       interruptor de seguridad se encienda por un lado y no por el otro no se ve en ninguna pantalla. Solo se lee cuando
+       hace falta (ubicado por la cama, sin patientId), y la regla viene de dominio_validacion.gs: si alguien llega aquí en
+       modo estricto sin cargarla, REVIENTA (INTERNO) en vez de saltarse el candado. */
+    if (ubic.tipo === 'activo' && !String((datos && datos.patientId) || '').trim() &&
+        String(leerConfig('CONTRATO_ESTRICTO', 'FALSE')).trim().toUpperCase() === 'TRUE') {
+      const _msgEp = validarEpisodioPuerta(datos && datos.patientId, String(ubic.obj.PATIENT_ID || ''), ubic.id, true);
+      if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+    }
 
     const cambios = (datos && datos.cambios) || {};
     const horas   = (datos && datos.horas) || {};
