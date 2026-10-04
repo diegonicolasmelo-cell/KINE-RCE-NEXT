@@ -56,7 +56,8 @@ const info = t => console.log('ℹ️  ' + t);
 /* ══ LA TABLA ═════════════════════════════════════════════════════════════ */
 // clase: 'episodio' | 'ingreso' | 'sinEpisodio'. razon: para 'episodio' e 'ingreso', cuál es el reclamo y de dónde
 // lo toma la pantalla; para 'sinEpisodio', por qué no necesita candado. epImplementado: nace en false.
-const E = (accion, razon) => ({ accion, clase: 'episodio', epImplementado: false, razon });
+// `hecho` voltea la fila a epImplementado:true: es lo que cierra un paso (el dispatcher le pasa el reclamo a su servicio).
+const E = (accion, razon, hecho) => ({ accion, clase: 'episodio', epImplementado: hecho === true, razon });
 const SIN = (accion, razon) => ({ accion, clase: 'sinEpisodio', razon });
 const TABLA = [
   // ── Actúan sobre «quien esté en la cama» ──
@@ -65,7 +66,7 @@ const TABLA = [
   E('LIMPIAR_CAMA',            'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: nunca se limpia al ocupante nuevo.'),
   E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.'),
   E('MOVER_A_CAMA_VACIA',      'EPISODIO_ABIERTO (origen) y EPISODIO_ABIERTO_B (destino; vacío = libre al elegir).'),
-  E('ANULAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta mostrada al abrir el menú del evento; la comparación va DENTRO del lock.'),
+  E('ANULAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta mostrada al abrir el menú del evento; la comparación va DENTRO del lock.', true),   // paso 4
   E('ANEXAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta al abrir el ➕; datos.patientId declarado queda como respaldo.'),
   E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.'),
   E('CONFIRMAR_DISPOSITIVOS',  'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: hoy basta con que la cama esté ocupada.'),

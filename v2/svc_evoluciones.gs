@@ -1648,39 +1648,36 @@ function obtenerHistorialPaciente(idCama, patientId) {
  * la cama (incluidas las fechas de inicio de soporte/VA para que los días
  * no se reinicien). Solo permitido si NO existen evoluciones posteriores del
  * paciente (para no romper la historia construida sobre el evento).
+ *
+ * 🔴 LA PUERTA MÁS GRAVE DEL GUARDADO SEGURO (G14, tanda 2, paso 4, 4-oct-2026). Esta función escribe más lejos que
+ * ninguna otra: al final le reescribe a la CAMA el estado del turno (vía aérea, soporte, modo, fechas de inicio) y a
+ * la hoja de EVOLUCIONES la fila entera. Tenía cuatro defectos, todos de la misma raíz —actuar sobre «lo que había
+ * al leer» y «quien esté en la cama»—:
+ *  · LEÍA FUERA DEL LOCK. La evolución, la cama y los turnos posteriores se leían ANTES de tomar el candado. Otra
+ *    petición que se adelantaba mientras esta esperaba quedaba pisada con una fila vieja (la FiO₂ que alguien acababa
+ *    de corregir volvía a la de antes), y un turno guardado en medio no frenaba la anulación aunque ya se hubiera
+ *    construido sobre ese estado. Ahora TODO se lee dentro del lock.
+ *  · SU CANDADO DE PACIENTE ERA DÉBIL. Comparaba la evolución con la cama, nunca con lo que la pantalla abrió: con
+ *    la cama libre, o con un alta y un ingreso entremedio, no veía nada raro. Ahora compara EPISODIO_ABIERTO (el
+ *    PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el menú del evento) con la cama, dentro del lock y antes de la
+ *    primera escritura, con la regla y la frase de las demás puertas (validarEpisodioPuerta).
+ *  · RESUCITABA AL EGRESADO. Si el turno estaba en EVOLUCIONES_ARCHIVO, `repoUpsert('EVOLUCIONES', …)` reinsertaba la
+ *    fila en la hoja viva y `_syncCamaDesdeEvolucion` le ponía OCUPADA:true a la cama —libre, o de otro paciente—. Ahora
+ *    se ubica el turno por episodio (`_ubicarEvolucionDeTurno`) y un turno que no es VIVO se rechaza sin escribir.
+ *    🔴 Corregir el turno pasado de un egresado sigue siendo NO (decisión 6 de Diego, pendiente desde F2): este paso
+ *    no lo afloja.
+ *  · LA RESTA NO ERA IDEMPOTENTE. `DIAS_VM_PREVIOS` resta los días de VM del turno al anular una extubación o una
+ *    decanulación: anular dos veces (el doble toque, el reintento de una respuesta perdida) restaba dos veces. Ahora
+ *    un evento que ya no está contesta ok `yaEstaba` sin tocar nada, y la resta solo corre si el evento ESTABA.
+ *
+ * @param ep  el reclamo de episodio de la petición ({a, b, estricto, ausente}, api.gs `_epDeDatos`). Sin él (los
+ *            bancos antiguos y las llamadas internas) no se compara nada: es el modo tolerante de siempre.
  */
-function anularEvento(datos, ctx) {
+function anularEvento(datos, ctx, ep) {
   const idCama = String(datos.idCama || datos.ID_CAMA || '');
   const turnoKey = String(datos.turnoKey || datos.TURNO_KEY || '');
   const tipo = String(datos.tipo || '');
   if (!idCama || !turnoKey || !tipo) return err('Faltan idCama/turnoKey/tipo.', ERR.VALIDACION);
-
-  const evoR = obtenerEvolucion(idCama, turnoKey, datos.patientId);
-  if (!evoR.ok) return evoR;   // p. ej. la cama tuvo dos pacientes ese turno
-  if (!evoR.data) return err('No existe evolución para ese turno.', ERR.VALIDACION);
-  const evo = evoR.data;
-
-  /* 🔴 CANDADO MÍNIMO. Al final, `anularEvento` llama a `_syncCamaDesdeEvolucion`
-     con los datos de la evolución: vía aérea, soporte, modo, fechas de inicio.
-     Si esa evolución es de un episodio que ya no ocupa la cama, ese sync le
-     reescribe el censo AL OCUPANTE ACTUAL — escribe más lejos que el bug que
-     esta tanda vino a cerrar. Anular sobre episodios cerrados es deuda conocida
-     y queda fuera (NO3 del PRD); lo que no puede pasar es que toque a un tercero. */
-  const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-  const _pidCama = String((_camaAnu && _camaAnu.PATIENT_ID) || '');
-  const _pidEvo = String(evo.PATIENT_ID || '');
-  if (_pidCama && _pidEvo && _pidCama !== _pidEvo) {
-    return err('Esa evolución es de un episodio anterior de la cama ' + idCama + '. Anular desde ' +
-      'aquí le reescribiría el estado al paciente que está ahora.', ERR.VALIDACION);
-  }
-
-  // Guard: sin evoluciones posteriores del mismo paciente
-  const posteriores = repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', evo.PATIENT_ID)
-    .filter(function (e) { return String(e.TURNO_KEY) > turnoKey; });
-  if (posteriores.length) {
-    return err('Solo se puede anular un evento desde la ÚLTIMA evolución del paciente (hay ' +
-      posteriores.length + ' turnos posteriores que se construyeron sobre este estado).', ERR.VALIDACION);
-  }
 
   const GRUPOS = {
     pve_ext: ['PVE_RESULTADO','PVE_FR_MOTIVOS','PVE_SC_RAZON','PVE_SC_DET','PVE_VAL','EXT_OCURRIO','EXT_HORA','EXT_TS','EXT_TIPO','EXT_MOTIVO','EXT_POST_DET','EXT_PE_VA','EXT_PE_SOP','EXT_PE_MODO'],
@@ -1700,13 +1697,92 @@ function anularEvento(datos, ctx) {
     cambio_tot: ['CAMBIO TOT'],
     cambio_tqt: ['CAMBIO TQT'],
   };
+  // Validación pura, ANTES del lock: no hay por qué tomar el candado (ni leer nada) por un tipo que no existe.
   if (!GRUPOS[tipo]) return err('Tipo de evento desconocido: ' + tipo, ERR.VALIDACION);
 
-  const tipos = [tipo];
-  // Anular la extubación arrastra la reintubación anidada del mismo turno
-  if (tipo === 'pve_ext' && esVerdadero(evo.EXT_REINTUB)) tipos.push('reintub');
-
+  /* 🔐 Desde aquí, TODO dentro del lock. Antes de él no se lee ninguna hoja (la guardia
+     guardado_seguro_episodio_g14.js lo ata): lo que se lee antes de tener el candado puede estar viejo cuando se
+     obtiene, y esta función reescribe filas enteras sobre lo que leyó. */
   return conLock(function () {
+    // La cama, leída UNA vez y dentro del lock: la comparan el reclamo de la pantalla y el candado de abajo.
+    const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
+    const _pidCama = String((_camaAnu && _camaAnu.PATIENT_ID) || '');
+
+    /* El candado de episodio de las demás puertas: lo que la pantalla abrió contra quien ocupa la cama AHORA, antes de
+       la primera escritura. Solo corre si la pantalla declaró EPISODIO_ABIERTO o está encendido el modo estricto: los
+       bancos antiguos y las llamadas internas (sin `ep`) siguen como siempre. 🪤 Si alguien lo pide y el archivo de la
+       regla no está cargado, REVIENTA (INTERNO) en vez de saltarse la comprobación en silencio. */
+    const _ep = ep || {};
+    if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+      const _msgEp = validarEpisodioPuerta(_ep.a, _pidCama, idCama, _ep.estricto === true);
+      if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+    }
+
+    // La evolución del turno, por EPISODIO (no por la clave de la cama, que dos pacientes comparten cuando la cama
+    // rota) y mirando las DOS hojas: el localizador avisa cuando no puede decidir en vez de elegir por su cuenta.
+    const ubic = _ubicarEvolucionDeTurno(String(datos.patientId || ''), turnoKey, idCama);
+    if (ubic && ubic.ambigua) {
+      return err('La cama ' + idCama + ' tuvo dos pacientes en ese turno: hay que indicar de cuál ' +
+        'se está hablando.', ERR.VALIDACION);
+    }
+    if (!ubic) return err('No existe evolución para ese turno.', ERR.VALIDACION);
+    const evo = ubic.obj;
+
+    /* 🔴 CANDADO MÍNIMO. Al final, `anularEvento` llama a `_syncCamaDesdeEvolucion`
+       con los datos de la evolución: vía aérea, soporte, modo, fechas de inicio.
+       Si esa evolución es de un episodio que ya no ocupa la cama, ese sync le
+       reescribe el censo AL OCUPANTE ACTUAL — escribe más lejos que el bug que
+       esta tanda vino a cerrar. Anular sobre episodios cerrados es deuda conocida
+       y queda fuera (NO3 del PRD); lo que no puede pasar es que toque a un tercero. */
+    const _pidEvo = String(evo.PATIENT_ID || '');
+    if (_pidCama && _pidEvo && _pidCama !== _pidEvo) {
+      return err('Esa evolución es de un episodio anterior de la cama ' + idCama + '. Anular desde ' +
+        'aquí le reescribiría el estado al paciente que está ahora.', ERR.VALIDACION);
+    }
+
+    /* 🔴 NO SE RESUCITA AL EGRESADO. Una fila que vive en EVOLUCIONES_ARCHIVO es de un paciente que ya salió. Anularle
+       el evento reinsertaría la fila en la hoja viva (`repoUpsert` no la encuentra ahí) y el sync de abajo le pondría
+       OCUPADA:true a una cama que está libre, o le copiaría su estado a quien la ocupa. Corregir el turno pasado de un
+       egresado es la decisión 6 de Diego (NO, pendiente desde F2): hace falta una operación aparte que nombre el
+       episodio, no aflojar esto. */
+    if (!ubic.vivo) {
+      return err('Ese turno ya está archivado: el paciente egresó de la cama ' + idCama + '. Desde aquí no se puede ' +
+        'anular un evento de un turno archivado. No se guardó nada.', ERR.VALIDACION);
+    }
+
+    // Guard: sin evoluciones posteriores del mismo paciente. Dentro del lock: un turno que otra petición guardó
+    // mientras esta esperaba ya cuenta.
+    const posteriores = repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', evo.PATIENT_ID)
+      .filter(function (e) { return String(e.TURNO_KEY) > turnoKey; });
+    if (posteriores.length) {
+      return err('Solo se puede anular un evento desde la ÚLTIMA evolución del paciente (hay ' +
+        posteriores.length + ' turnos posteriores que se construyeron sobre este estado).', ERR.VALIDACION);
+    }
+
+    const tipos = [tipo];
+    // Anular la extubación arrastra la reintubación anidada del mismo turno
+    if (tipo === 'pve_ext' && esVerdadero(evo.EXT_REINTUB)) tipos.push('reintub');
+
+    /* ¿El evento ESTABA? Está si alguna columna de su grupo tiene algo (un `false` suelto no es un evento). Es lo que
+       distingue la primera anulación del doble toque o del reintento de una respuesta perdida: lo que la primera
+       borró no se resta, ni se descuenta, una segunda vez. */
+    const _hay = function (x) {
+      if (x === undefined || x === null || x === '' || x === false) return false;
+      const t = String(x).trim().toLowerCase();
+      return t !== '' && t !== 'false';
+    };
+    const estaba = {};
+    tipos.forEach(function (t) { estaba[t] = GRUPOS[t].some(function (c) { return _hay(evo[c]); }); });
+    if (!tipos.some(function (t) { return estaba[t]; })) {
+      // Ya estaba anulado: nada que borrar, nada que restar, nada que escribir. ok, porque el efecto pedido ya es
+      // verdad (el mismo criterio que el alta y la limpieza que ya aterrizaron).
+      return ok({
+        idEvolucion: evo.ID_EVOLUCION, idCama: idCama, patientId: evo.PATIENT_ID || '',
+        turnoKey: turnoKey, accion: 'anular_' + tipos.join('+') + ' (ya estaba)', entidad: 'EVOLUCIONES',
+        yaEstaba: true, TEXTO_GENERADO: evo.TEXTO_GENERADO || '',
+      });
+    }
+
     tipos.forEach(function (t) {
       GRUPOS[t].forEach(function (c) { evo[c] = ''; });
       if (t === 'reintub') {
@@ -1732,7 +1808,9 @@ function anularEvento(datos, ctx) {
       evo.VENT_VIA_AEREA_FINAL = evo.VENT_VIA_AEREA;
       evo.VENT_SOPORTE_FINAL = evo.VENT_SOPORTE;
       evo.VENT_MODO_FINAL = evo.VENT_MODO;
-      if (tipo === 'pve_ext' || tipo === 'decan') {
+      // La resta SOLO si el evento estaba: ya no es idempotente por sí sola (restar dos veces dejaba de más), así que
+      // se ata a la presencia del evento que acaba de borrarse.
+      if ((tipo === 'pve_ext' || tipo === 'decan') && estaba[tipo]) {
         const dvm = parseInt(evo.DIAS_VM) || 0;
         evo.DIAS_VM_PREVIOS = Math.max(0, (parseInt(evo.DIAS_VM_PREVIOS) || 0) - dvm);
       }

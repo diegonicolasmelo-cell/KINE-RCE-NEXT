@@ -7,8 +7,9 @@
 // anexo, confirmar dispositivos, agregar un hito, medir, escalas, pendientes, asignar un gas) siguen atribuyendo
 // lo que hacen al ocupante de AHORA. Un diálogo que quedó abierto mientras la cama se daba de alta y se reingresaba
 // a OTRO paciente limpia la cama del nuevo, anula el evento del nuevo o le confirma los dispositivos al nuevo.
-// Esta guardia va a ir sumando, puerta por puerta, el caso «formulario abierto para P, entremedio alta de P e
-// ingreso de Q: la puerta rechaza con CERO escrituras». Hoy (paso 2) fija lo que todas van a compartir:
+// Esta guardia va sumando, puerta por puerta, el caso «formulario abierto para P, entremedio alta de P e
+// ingreso de Q: la puerta rechaza con CERO escrituras». La sección A (paso 2) fija lo que todas comparten; la B
+// (paso 4) es la primera puerta, la más grave: ANULAR_EVENTO. Las demás se suman en los pasos 5 a 7.
 //
 //   A1 · ERR.CONFLICTO existe y no movió a ningún otro código.
 //   A2 · validarEpisodioPuerta(abierto, pidCama, idCama, estricto): la TABLA DE VERDAD. Ausente (undefined/null) no
@@ -28,6 +29,22 @@
 //   A5 · La forma: la regla vive en dominio_validacion.gs (validarEpisodioAbierto se queda en svc_evoluciones.gs,
 //        porque los bancos antiguos cargan una lista FIJA de archivos), y ni EPISODIO_ABIERTO_B ni
 //        CONTRATO_ESTRICTO son columnas.
+////   B  · ANULAR_EVENTO (paso 4), la puerta más grave. Antes leía la evolución, la cama y los turnos posteriores
+//        FUERA del lock: un guardado que se adelantaba mientras esperaba el candado quedaba pisado con una fila vieja,
+//        y un anular sobre un turno del archivo REINSERTABA la fila en la hoja viva y le ponía OCUPADA:true a la cama
+//        (resucitaba al egresado sobre una cama libre o sobre el ocupante nuevo). Su candado de paciente era débil
+//        (comparaba la evolución con la cama, nunca con lo que la pantalla abrió) y la resta de DIAS_VM_PREVIOS no era
+//        idempotente: anular dos veces restaba dos veces. Se prueba con el candado REAL y el gancho antesDelCuerpo
+//        («otra petición se adelantó»):
+//          B1 · el episodio vigente anula como siempre, y la pantalla vieja (sin EPISODIO_ABIERTO) también;
+//          B2 · formulario abierto para P, entremedio alta de P e ingreso de Q: rechazo con CERO escrituras, tanto si
+//               ya pasó como si pasa mientras se esperaba el lock;
+//          B3 · un turno del ARCHIVO se rechaza y la cama no se resucita;
+//          B4 · las lecturas van dentro del lock: un guardado concurrente del mismo turno no se pisa, y uno de un turno
+//               posterior frena la anulación;
+//          B5 · anular dos veces: la segunda es «ya estaba», sin escrituras y sin volver a restar;
+//          B6 · modo estricto (ausente rechaza);
+//          B7 · la forma: nada se lee antes del conLock.
 //
 // Uso: node build/checks/guardado_seguro_episodio_g14.js
 //
@@ -57,8 +74,13 @@ const si = (l, c) => eq(l, !!c, true);
 const no = (l, c) => eq(l, !!c, false);
 const terminar = () => {
   console.log(fails.length ? `\n❌ ${fails.length} fallos:\n  - ${fails.join('\n  - ')}`
-    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio y su rastro en la bitácora.');
+    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio, su rastro en la bitácora y ANULAR_EVENTO con candado.');
   process.exit(fails.length ? 1 : 0);
+};
+// Un tramo que revienta no tumba a los demás: da UN rojo con su razón y la guardia sigue (así el rojo de antes de
+// arreglar el código se lee entero, en vez de cortarse en la primera sección).
+const tramo = (etiqueta, fn) => {
+  try { fn(); } catch (e) { console.log('❌ ' + etiqueta + ': reventó (' + (e && e.message) + ')'); fails.push(etiqueta + ' reventó: ' + (e && e.message)); }
 };
 
 // Datos inventados: ni un nombre ni un identificador reales. Los «pid» parecen lo que son (un uuid corto) para que la
@@ -375,5 +397,244 @@ no('   …y no se movió a dominio_validacion.gs ni a infra_respuesta.gs', /func
 no('★ EPISODIO_ABIERTO_B NO es columna de ninguna hoja (viaja transitorio, como EPISODIO_ABIERTO)', /EPISODIO_ABIERTO_B/.test(esq));
 no('★ CONTRATO_ESTRICTO NO se siembra en el esquema (se lee con leerConfig y su valor por defecto)', /CONTRATO_ESTRICTO/.test(esq));
 si('el modo estricto se lee con leerConfig(\'CONTRATO_ESTRICTO\', \'FALSE\') (nace apagado)', /leerConfig\('CONTRATO_ESTRICTO',\s*'FALSE'\)/.test(leer('api.gs')));
+
+/* ══ B · ANULAR_EVENTO: LA PUERTA MÁS GRAVE ═══════════════════════════════ */
+console.log('\nB · ANULAR_EVENTO (paso 4): todo dentro del lock, con candado de episodio y sin resucitar a nadie');
+tramo('B', () => {
+  // El candado REAL (el de v2/infra_lock.gs) y el banco que cuenta cada escritura que aterriza. `activarLockReal` va
+  // aquí y no arriba: la sección A prueba funciones puras y el dispatcher con servicios de juguete, y no lo necesita.
+  const ctl = S.activarLockReal();
+  const M = require('../sim/sim_muerte.js');
+  // 🪤 El simulador no deja usar Utilities.formatDate (hoyISO/ahoraTS están pisados a propósito) y anularEvento lo usa
+  // para restaurar las fechas de inicio de soporte y de vía aérea. Aquí se le da la única forma que usa, calculada con
+  // las partes locales de la fecha: no lee el reloj, la fecha sale del argumento.
+  global.Utilities.formatDate = (d) => {
+    const p2 = n => ('0' + n).slice(-2);
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  };
+
+  const TK0 = '2026-08-09-Dia', TK1 = '2026-08-10-Dia', TK2 = '2026-08-10-Noche';
+  const camaDe = id => DB.CAMAS_ESTADO.find(c => String(c.ID_CAMA) === String(id)) || {};
+  const evoDe = (tk, pid) => DB.EVOLUCIONES.find(e => e.TURNO_KEY === tk && (pid === undefined || e.PATIENT_ID === pid));
+  const payload = (idCama, tk, extra) => Object.assign({
+    ID_CAMA: String(idCama), TURNO_KEY: tk, PLAN_FIRMA_KINE: 'DMV',
+    VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC',
+    VENT_VT: 450, VENT_FR: 16, VENT_PEEP: 8, VENT_FIO2: 50, HEMO_ESTADO: 'Estable', SED_TIPO: 'Sin sedación',
+  }, extra || {});
+  const ingresa = (idCama, nombre) => api('INGRESAR_PACIENTE', { idCama: String(idCama), nombre, edad: 61, sexo: 'M',
+    diagnostico: 'Dx de prueba', fechaIngreso: '2026-08-08', viaAerea: 'TOT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV' }, null);
+  const darAlta = idCama => api('DAR_ALTA', { idCama: String(idCama), motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV' }, null);
+  // La extubación del turno 1 (el evento que se anula) y la forma de volver a guardar ese mismo turno SIN perderla
+  // (el formulario reabierto manda el estado de salida: sin eso la transición de vía aérea se rechaza).
+  const EXT = { EXT_OCURRIO: true, EXT_TIPO: 'protocolo', EXT_HORA: '10:00', VENT_VIA_AEREA_FINAL: 'Natural', VENT_SOPORTE_FINAL: 'Ambiente' };
+
+  // ── El montaje: P ingresa ventilada el 7, tiene turno el 9 y el 10 (con extubación y 9 días de VM previos) ──
+  // La VM de P arranca el 7 (la fecha del reloj del banco) para que el turno del evento tenga DIAS_VM > 0: sin eso la
+  // resta de DIAS_VM_PREVIOS resta cero y «restar dos veces» no se vería.
+  SIM.fecha = '2026-08-07'; SIM.hora = '12:00:00';
+  const rIng = ingresa('6', 'Paciente Alfa');
+  const PID_P = camaDe('6').PATIENT_ID;
+  SIM.fecha = '2026-08-09';
+  const rT0 = api('GUARDAR_EVOLUCION', payload('6', TK0, { EPISODIO_ABIERTO: PID_P }), null);
+  SIM.fecha = '2026-08-10';
+  const rT1 = api('GUARDAR_EVOLUCION', payload('6', TK1, Object.assign({ EPISODIO_ABIERTO: PID_P, DIAS_VM_PREVIOS: 9 }, EXT)), null);
+  si('(el montaje) P ingresa y guarda sus dos turnos', rIng.ok && rT0.ok && rT1.ok);
+  const DVM = parseInt((evoDe(TK1) || {}).DIAS_VM) || 0;
+  si('(el montaje) el turno del evento deja DIAS_VM > 0 (si no, restar dos veces no se vería)', DVM > 0);
+  eq('(el montaje) y los días de VM previos que se van a restar', (evoDe(TK1) || {}).DIAS_VM_PREVIOS, 9);
+  const FOTO_P = M.foto();
+  let PID_Q = '';
+
+  const volver = () => {
+    M.restaurar(FOTO_P); M.reiniciar();
+    SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+    ctl.antesDelCuerpo = null; ctl.cache.fallar(false);
+    delete CONFIG.CONTRATO_ESTRICTO;
+  };
+  const sinBit = () => M.instantanea({ sinHojas: ['AUDIT_LOG'] });
+  const anula = extra => Object.assign({ idCama: '6', turnoKey: TK1, tipo: 'pve_ext' }, extra || {});
+  const ajenos = () => [PID_P, PID_Q].filter(Boolean);
+  const sinDatosAjenosB = txt => !ajenos().some(p => String(txt).includes(p)) && !/Alfa|Bravo/.test(String(txt));
+
+  // Una anulación y todo lo que hay que mirar de ella. `hook` es «la otra petición»: corre DENTRO de la espera del
+  // candado, o sea después de lo que se leyó FUERA del lock y antes de lo que se lee DENTRO. Lo que escribe el gancho
+  // no cuenta como escritura de la anulación: se descuenta el conteo y la foto de la base al terminar el gancho.
+  function intento(datos, hook) {
+    M.reiniciar();
+    let n0 = 0, foto = sinBit(), hookOk = null;
+    if (hook) ctl.antesDelCuerpo = () => { hookOk = hook(); n0 = M.total(); foto = sinBit(); };
+    const a0 = DB.AUDIT_LOG.length;
+    const r = callando(() => api('ANULAR_EVENTO', datos, null));
+    ctl.antesDelCuerpo = null;
+    return {
+      r, hookOk, escrituras: M.registro().slice(n0), igual: sinBit() === foto,
+      bit: DB.AUDIT_LOG.slice(a0).filter(f => String(f.accion).indexOf('ANULAR_EVENTO') === 0),
+    };
+  }
+  // El contrato de un rechazo: sin éxito, con el código y la frase que se espera, sin escribir NADA y dejando la huella.
+  function rechazo(etiqueta, i, codigo, frase) {
+    no('★ ' + etiqueta + ': se RECHAZA', i.r.ok);
+    eq('   …con código ' + codigo, i.r.codigo, codigo);
+    si('   …y el motivo que se le muestra a la persona (' + frase + ')', frase.test(i.r.error || ''));
+    si('   …nombra la cama 6', /\bcama 6\b/.test(i.r.error || ''));
+    si('★★ …sin nombrar a nadie ni dar el identificador de ningún paciente (Ley 19.628)', sinDatosAjenosB(i.r.error || ''));
+    eq('★★ ' + etiqueta + ': NINGUNA escritura aterrizó', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+    si('★★ …y la base COMPLETA quedó idéntica (salvo la bitácora)', i.igual);
+    eq('   …la bitácora gana UNA fila: <ACCION>_RECHAZADO', i.bit.map(f => f.accion).join(','), 'ANULAR_EVENTO_RECHAZADO');
+    eq('   …que nombra la cama del intento', (i.bit[0] || {}).idEntidad, '6');
+  }
+
+  /* ── B1 · lo de todos los días sigue igual ──────────────────────────── */
+  console.log('   · B1 · el episodio vigente anula como siempre (y la pantalla vieja también)');
+  volver();
+  let i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente (EPISODIO_ABIERTO = el de la cama) la anulación PASA', i.r.ok);
+  eq('   …y no es un «ya estaba»', i.r.data && i.r.data.yaEstaba, undefined);
+  eq('   …el evento ya no está en el turno', String(evoDe(TK1).EXT_OCURRIO) + '/' + String(evoDe(TK1).EXT_TIPO), '/');
+  eq('   …la vía aérea de salida vuelve a la de entrada', evoDe(TK1).VENT_VIA_AEREA_FINAL, 'TOT');
+  eq('   …los días de VM previos pierden los días de VM del turno, UNA vez', evoDe(TK1).DIAS_VM_PREVIOS, 9 - DVM);
+  eq('   …la cama vuelve a estar ventilada por TOT', camaDe('6').VIA_AEREA + '/' + camaDe('6').SOPORTE, 'TOT/VM');
+  eq('   …y sigue siendo de P', camaDe('6').PATIENT_ID, PID_P);
+  eq('   …la bitácora dice «anular_pve_ext» y NO lleva « [sin episodio]» (declaró episodio)', (i.bit[0] || {}).accion + '/' + (i.bit[0] || {}).resumen, 'ANULAR_EVENTO/anular_pve_ext');
+  volver();
+  i = intento(anula());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok);
+  eq('   …y la bitácora lo anota « [sin episodio]» para medir cuántas llamadas siguen sin candado', (i.bit[0] || {}).resumen, 'anular_pve_ext [sin episodio]');
+  volver();
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P, patientId: PID_P }));
+  si('   …y declarando además el episodio con patientId (como el ➕) pasa igual', i.r.ok);
+
+  /* ── B2 · formulario abierto para P, entremedio alta de P e ingreso de Q ─ */
+  console.log('   · B2 · formulario abierto para P; entremedio, alta de P e ingreso de Q');
+  volver();
+  let rr = darAlta('6'); si('(la otra persona da el alta a P)', rr.ok);
+  rr = ingresa('6', 'Paciente Bravo'); si('(y ingresa a Q en la misma cama)', rr.ok);
+  PID_Q = camaDe('6').PATIENT_ID;
+  si('(Q es otro episodio)', PID_Q && PID_Q !== PID_P);
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'VALIDACION', EP_CAMBIO_RE);
+  eq('   …la cama 6 sigue siendo de Q', camaDe('6').PATIENT_ID, PID_Q);
+
+  // Lo mismo, pero el alta y el ingreso ocurren MIENTRAS esta petición espera el candado: lo que se leyó antes de tomarlo
+  // (la evolución, la cama) está viejo. Con las lecturas fuera del lock esto pasaba; dentro, no.
+  volver(); PID_Q = '';
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }), () => {
+    const a = darAlta('6'); const b = ingresa('6', 'Paciente Bravo');
+    PID_Q = camaDe('6').PATIENT_ID; return a.ok && b.ok;
+  });
+  si('(la otra petición sí dio el alta e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'VALIDACION', EP_CAMBIO_RE);
+  eq('★★ …la cama 6 sigue siendo de Q (no se le copió el estado de P)', camaDe('6').PATIENT_ID, PID_Q);
+  eq('   …y la fila de P NO volvió a la hoja viva', DB.EVOLUCIONES.filter(e => e.PATIENT_ID === PID_P).length, 0);
+  si('   …sigue en el archivo', DB.EVOLUCIONES_ARCHIVO.some(e => e.PATIENT_ID === PID_P));
+
+  /* ── B3 · un turno del archivo no se anula ni resucita la cama ────────── */
+  console.log('   · B3 · el turno está en EVOLUCIONES_ARCHIVO: se rechaza y la cama no se resucita');
+  PID_Q = '';
+  const libreSinResucitar = etiqueta => {
+    eq('★★ ' + etiqueta + ': la cama 6 sigue LIBRE (no se resucitó al egresado)', camaDe('6').OCUPADA + '/' + (camaDe('6').PATIENT_ID || '(vacío)'), 'false/(vacío)');
+    eq('★★ …y la hoja viva no ganó ninguna fila de P', DB.EVOLUCIONES.filter(e => e.PATIENT_ID === PID_P).length, 0);
+    eq('   …el archivo conserva sus filas de P', DB.EVOLUCIONES_ARCHIVO.filter(e => e.PATIENT_ID === PID_P).length, 2);
+  };
+  volver(); darAlta('6');
+  i = intento(anula({ patientId: PID_P }));
+  rechazo('el egresado, nombrado por patientId, con la cama libre', i, 'VALIDACION', /archivad/i);
+  libreSinResucitar('con patientId');
+  volver(); darAlta('6');
+  i = intento(anula());
+  rechazo('el egresado, SIN patientId (se resuelve por la clave), con la cama libre', i, 'VALIDACION', /archivad/i);
+  libreSinResucitar('sin patientId');
+  volver(); darAlta('6');
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P con la cama ya libre', i, 'VALIDACION', EP_CAMBIO_RE);
+  libreSinResucitar('con el formulario abierto');
+  // Control: con la cama ocupada por Q y el turno de P archivado, ya se rechazaba (episodio anterior) y se sigue rechazando.
+  volver(); darAlta('6'); ingresa('6', 'Paciente Bravo'); PID_Q = camaDe('6').PATIENT_ID;
+  const camaQ = JSON.stringify(camaDe('6'));
+  i = intento(anula({ patientId: PID_P }));
+  no('control: P nombrado por patientId con la cama de Q se rechaza (como antes)', i.r.ok);
+  si('   …con el motivo de siempre (episodio anterior)', /paciente que est[aá] ahora|episodio anterior/i.test(i.r.error || ''));
+  eq('   …sin escrituras y con la cama de Q byte a byte igual', i.escrituras.length + '/' + (JSON.stringify(camaDe('6')) === camaQ), '0/true');
+  PID_Q = '';
+
+  /* ── B4 · las lecturas van dentro del lock ──────────────────────────── */
+  console.log('   · B4 · un guardado que se adelanta mientras se espera el candado no se pisa');
+  volver();
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }), () => api('GUARDAR_EVOLUCION', payload('6', TK1,
+    Object.assign({ EPISODIO_ABIERTO: PID_P, VENT_FIO2: 77, VENT_VIA_AEREA: 'TOT' }, EXT)), null).ok);
+  si('(el guardado de la otra petición, de ese mismo turno, aterrizó)', i.hookOk);
+  si('★ la anulación PASA', i.r.ok);
+  eq('★★ …y NO pisa lo que la otra petición acababa de escribir (FiO₂ 77, no la 50 que se leyó antes de esperar)', evoDe(TK1).VENT_FIO2, 77);
+  eq('   …el evento ya no está', String(evoDe(TK1).EXT_OCURRIO), '');
+  eq('   …y una sola fila de P en ese turno', DB.EVOLUCIONES.filter(e => e.TURNO_KEY === TK1 && e.PATIENT_ID === PID_P).length, 1);
+
+  volver();
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }), () => api('GUARDAR_EVOLUCION', payload('6', TK2,
+    { EPISODIO_ABIERTO: PID_P, VENT_VIA_AEREA: 'Natural', VENT_SOPORTE: 'Ambiente', VENT_MODO: 'Sin soporte' }), null).ok);
+  si('(la otra petición guardó el turno SIGUIENTE de P mientras esta esperaba)', i.hookOk);
+  no('★★ la anulación se RECHAZA: ya hay un turno construido sobre ese estado', i.r.ok);
+  eq('   …con código de validación', i.r.codigo, 'VALIDACION');
+  si('   …y dice que solo se anula desde la última evolución', /[ÚU]LTIMA evoluci[oó]n/i.test(i.r.error || ''));
+  eq('★★ …y NINGUNA escritura de la anulación aterrizó', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  si('   …y la base quedó como la dejó la otra petición', i.igual);
+  si('   …con el evento todavía en su turno', esVerdaderoB(evoDe(TK1).EXT_OCURRIO));
+
+  /* ── B5 · anular dos veces ──────────────────────────────────────────── */
+  console.log('   · B5 · anular dos veces: la segunda es «ya estaba» y no vuelve a restar');
+  volver();
+  const e0 = evoDe(TK1);
+  const prev0 = parseInt(e0.DIAS_VM_PREVIOS);
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  si('(la primera anulación pasa)', i.r.ok);
+  const prev1 = parseInt(evoDe(TK1).DIAS_VM_PREVIOS);
+  eq('(y resta los días de VM del turno una vez)', prev1, prev0 - DVM);
+  const fotoTras1 = sinBit();
+  const i2 = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ la SEGUNDA anulación contesta ok (no es un error: ya estaba hecho)', i2.r.ok);
+  eq('   …marcada como «ya estaba»', i2.r.data && i2.r.data.yaEstaba, true);
+  eq('★★ …sin volver a restar los días de VM previos', parseInt(evoDe(TK1).DIAS_VM_PREVIOS), prev1);
+  eq('★★ …sin NINGUNA escritura', i2.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  si('   …y la base idéntica a la de después de la primera', sinBit() === fotoTras1);
+  si('   …y devuelve lo mismo que una anulación (la pantalla recarga el turno igual)', i2.r.data && i2.r.data.idEvolucion === i.r.data.idEvolucion && i2.r.data.idCama === '6');
+  const i3 = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  eq('   …y una tercera también', (i3.r.data || {}).yaEstaba + '/' + parseInt(evoDe(TK1).DIAS_VM_PREVIOS), 'true/' + prev1);
+
+  /* ── B6 · modo estricto ─────────────────────────────────────────────── */
+  console.log('   · B6 · modo estricto (CONFIG.CONTRATO_ESTRICTO = TRUE): el ausente rechaza');
+  volver(); CONFIG.CONTRATO_ESTRICTO = 'TRUE';
+  i = intento(anula());
+  no('★ sin EPISODIO_ABIERTO se RECHAZA: la pantalla es de una versión anterior', i.r.ok);
+  eq('   …con código de validación', i.r.codigo, 'VALIDACION');
+  si('   …y dice que hay que recargar', /versi[oó]n anterior/i.test(i.r.error || '') && /rec[aá]rgala/i.test(i.r.error || ''));
+  no('   …SIN la frase «cambió de paciente»', EP_CAMBIO_RE.test(i.r.error || ''));
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  si('   …y la base idéntica', i.igual);
+  i = intento(anula({ EPISODIO_ABIERTO: '' }));
+  no('★ el VACÍO tampoco se acepta sobre una cama con paciente', i.r.ok);
+  si('   …es el cambio de paciente', EP_CAMBIO_RE.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ── B7 · la forma ──────────────────────────────────────────────────── */
+  console.log('   · B7 · la forma: nada se lee antes del conLock');
+  const svc = leer('svc_evoluciones.gs');
+  const ini = svc.indexOf('function anularEvento(');
+  const fin = svc.indexOf('\n}\n', ini);
+  si('anularEvento existe en svc_evoluciones.gs', ini > -1 && fin > ini);
+  const cuerpo = svc.slice(ini, fin).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  si('★ recibe el reclamo de episodio como ÚLTIMO parámetro: anularEvento(datos, ctx, ep)', /^function anularEvento\(datos, ctx, ep\)/.test(cuerpo));
+  const iLock = cuerpo.indexOf('conLock(');
+  si('toma el lock', iLock > -1);
+  const antes = cuerpo.slice(0, iLock), dentro = cuerpo.slice(iLock);
+  eq('★★ ANTES del conLock no se lee ninguna hoja (ni repo*, ni obtener*, ni el localizador): lo leído fuera del lock queda viejo',
+    (antes.match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+)\(/g) || []).join(',') || '(nada)', '(nada)');
+  si('★ DENTRO ubica el turno por episodio (_ubicarEvolucionDeTurno)', /_ubicarEvolucionDeTurno\(/.test(dentro));
+  si('★ DENTRO compara el episodio (validarEpisodioPuerta)', /validarEpisodioPuerta\(/.test(dentro));
+  si('   …y mira si la fila es viva (no resucita al archivado)', /\.vivo\b/.test(dentro));
+  no('   …y ya no resuelve por obtenerEvolucion (que leía fuera del lock)', /obtenerEvolucion\(/.test(cuerpo));
+});
+function esVerdaderoB(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
 
 terminar();

@@ -132,7 +132,7 @@ function api(accion, datos, token) {
           return ok({ entidad: 'CONFIG', accion: 'portada ' + tab, valor: String(datos.valor || '') });
         }, datos);
       case 'ANULAR_EVENTO':
-        return _auditar(ctx, accion, () => anularEvento(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anularEvento(datos, ctx, _epDeDatos(datos)), datos);
       case 'ANEXAR_EVENTO':
         return _auditar(ctx, accion, () => anexarEventoRapido(datos, ctx), datos);
       case 'ANULAR_ANEXO':
