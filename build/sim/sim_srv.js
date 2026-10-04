@@ -225,4 +225,75 @@ DB.VENTILADORES.push(
   { ID_VM: 'vm2', NOMBRE: 'PB-840', MARCA: 'Medtronic', ESTADO: 'Operativo', ACTIVO: true, UBIC_TIPO: 'BODEGA', UBIC_DETALLE: '' },
 );
 
-module.exports = { api: global.api, DB, SIM, CONFIG, MAILS };
+// ── El candado REAL, solo para quien lo pida (tanda 2 del guardado seguro, paso 1) ──
+// 🔴 POR QUÉ NO ES EL DEFECTO. `global.conLock = fn => fn()` de arriba es un juguete: no toma nada, no devuelve
+// LOCK_TIMEOUT, no suelta si el cuerpo lanza, y es reentrante. Sirve para los ~145 bancos de siempre —que anidan
+// sin saberlo— y por eso NO se cambia. Las guardias del guardado seguro necesitan el de v2/infra_lock.gs, porque el
+// sello de operación va a vivir DENTRO de él, y piden el real con `activarLockReal()`. Cada guardia corre en su
+// propio proceso, así que pedirlo no contamina a nadie.
+//
+// Lo que instala:
+//   · el texto REAL de infra_lock.gs (no una copia): si el candado cambia, el banco cambia con él;
+//   · un doble de LockService con estado: UN solo candado, NO reentrante (un segundo tryLock con el candado tomado
+//     devuelve false, como un proceso ajeno que lo tiene; en un solo hilo no se puede esperar de verdad);
+//   · el gancho `antesDelCuerpo`: «mientras esta petición esperaba el candado, otra se adelantó». En un solo hilo
+//     eso es correr la otra petición ENTERA —con su propio conLock— dentro de la espera de la nuestra, o sea
+//     dentro de `tryLock`, con el candado libre; cuando tryLock vuelve, el mundo ya cambió. Una lectura hecha FUERA
+//     del lock no ve ese cambio; una hecha dentro, sí. Corre UNA vez (se consume antes de correr, para que el
+//     conLock de la otra petición no lo dispare de nuevo);
+//   · un CacheService que se puede hacer fallar (`ctl.cache.fallar(true)`): el sello de operación tiene que ser
+//     fail-open y esa promesa no se prueba sin un caché que falle.
+//
+// 🪤 `ERR` es una `const` y las `const` no cuelgan de globalThis con eval indirecto: evaluar infra_lock.gs SOLO daría
+// «ERR is not defined» en el primer LOCK_TIMEOUT. Por eso se evalúa junto a infra_respuesta.gs, en el mismo eval (que
+// vuelve a definir ok/err, idénticas). Y se evalúa en el ámbito global, no en un `new Function`, porque el paso 3
+// pone `var OP_ACTUAL` en este mismo archivo y api.gs lo asigna: si viviera en un ámbito propio, el candado leería
+// una variable y la API escribiría otra.
+let _CTL_REAL = null;
+function activarLockReal(opts) {
+  if (!_CTL_REAL) {
+    const E = { tomado: false, enEspera: false, llamadas: 0, tomas: 0, rechazos: 0, liberaciones: 0, ganchos: 0, timeouts: [] };
+    const ctl = {
+      antesDelCuerpo: null,
+      estado: () => Object.assign({}, E, { timeouts: E.timeouts.slice() }),
+      cache: { falla: false, fallar: b => { ctl.cache.falla = (b !== false); } },
+    };
+    const tryLock = ms => {
+      E.llamadas++; E.timeouts.push(ms);
+      if (E.tomado) { E.rechazos++; return false; }
+      const gancho = ctl.antesDelCuerpo;
+      if (gancho) {
+        ctl.antesDelCuerpo = null; E.ganchos++; E.enEspera = true;
+        try { gancho(); } finally { E.enEspera = false; }
+        if (E.tomado) { E.rechazos++; return false; }          // la «otra petición» dejó el candado tomado: esta no lo obtiene
+      }
+      E.tomado = true; E.tomas++;
+      return true;
+    };
+    const lock = {
+      tryLock,
+      waitLock: ms => { if (!tryLock(ms)) throw new Error('sim: Lock timeout'); },
+      releaseLock: () => { if (E.tomado) { E.tomado = false; E.liberaciones++; } },
+      hasLock: () => E.tomado,
+    };
+    global.LockService = { getScriptLock: () => lock };
+
+    const cacheAnterior = global.CacheService;
+    global.CacheService = { getScriptCache: () => {
+      const c = cacheAnterior.getScriptCache();
+      const falla = op => { if (ctl.cache.falla) throw new Error('sim: CacheService no disponible (' + op + ')'); };
+      return Object.assign({}, c, {
+        get: k => { falla('get'); return c.get(k); },
+        put: (k, v, seg) => { falla('put'); return c.put(k, v, seg); },
+        remove: k => { falla('remove'); return c.remove(k); },
+      });
+    } };
+
+    (0, eval)(fs.readFileSync(path.join(v2, 'infra_respuesta.gs'), 'utf8') + '\n;\n' + fs.readFileSync(path.join(v2, 'infra_lock.gs'), 'utf8'));
+    _CTL_REAL = ctl;
+  }
+  if (opts && Object.prototype.hasOwnProperty.call(opts, 'antesDelCuerpo')) _CTL_REAL.antesDelCuerpo = opts.antesDelCuerpo || null;
+  return _CTL_REAL;
+}
+
+module.exports = { api: global.api, DB, SIM, CONFIG, MAILS, activarLockReal };
