@@ -1177,7 +1177,45 @@ function _primeroNoVacio(...valores) {
   return '';
 }
 
-function darAltaPaciente(datos, ctx) {
+/**
+ * 🔐 G14 EN LAS PUERTAS QUE MUEVEN LA CAMA (tanda 2 del guardado seguro, paso 5, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Dar el alta, limpiar, mover o intercambiar actuaban sobre «quien esté en la cama AHORA», sin mirar a
+ * quién le abrió la pantalla el kinesiólogo. Un diálogo de egreso que quedó abierto mientras la cama se daba de alta y se
+ * reingresaba a OTRO paciente le daba el alta al nuevo (lo archivaba y le vaciaba la cama); limpiar le borraba la
+ * historia; mover o intercambiar lo trasladaba sin que nadie lo hubiera elegido. Y el REINTENTO de algo que sí aterrizó
+ * (la respuesta se perdió, la pantalla reenvía) chocaba con su propio éxito: el alta contestaba «ya está libre» —«no se
+ * guardó» sobre algo guardado— y un intercambio repetido DESHACÍA el traslado, cruzando de vuelta a los dos pacientes.
+ *
+ * LA REGLA (dominio_validacion.gs, pura): la pantalla manda EPISODIO_ABIERTO —el PATIENT_ID de la tarjeta TAL COMO
+ * ESTABA AL ABRIR el diálogo, también vacío— y, en intercambio y traslado, EPISODIO_ABIERTO_B. Cada puerta lo compara
+ * con la cama que leyó DENTRO de su lock y ANTES de la primera escritura (`decidirEpisodioPuerta`): sigue, o contesta
+ * ok «ya estaba» (el reintento de lo que ya aterrizó: sin una sola escritura), o se rechaza sin tocar nada —con
+ * VALIDACION cuando la cama no es la de la pantalla, con CONFLICTO cuando otra persona se adelantó—.
+ *
+ * `ep` es el último parámetro y NO es obligatorio: sin él (los bancos antiguos, las llamadas internas, los smoke tests)
+ * no se compara nada, que es el modo tolerante de siempre. Con él, solo se llama a la regla si la pantalla declaró
+ * EPISODIO_ABIERTO o está encendido el modo estricto: un banco antiguo con lista fija de archivos no carga
+ * dominio_validacion.gs y no tiene por qué, y uno nuevo que SÍ manda el reclamo sin cargarla REVIENTA (INTERNO) en vez
+ * de saltarse el candado en silencio.
+ *
+ * 🪤 Estas dos funciones viven AQUÍ y no en dominio_validacion.gs: leen la fila de la cama (esVerdadero), y los bancos
+ * antiguos cargan este servicio con una lista fija de archivos.
+ */
+function _epReclamado(ep) {
+  return !!ep && (ep.estricto === true || (ep.a !== undefined && ep.a !== null));
+}
+
+/**
+ * El PATIENT_ID que la cama tiene AHORA, para comparar con lo que la pantalla abrió: vacío si la cama está libre o no
+ * existe, aunque la fila conserve un pid viejo (una cama libre no tiene dueño). Una cama OCUPADA sin PATIENT_ID
+ * (episodio sin ingreso formal) también da vacío: por eso LIMPIAR_CAMA pasa además `ocupada`.
+ */
+function _pidDeCama(c) {
+  return (c && esVerdadero(c.OCUPADA)) ? String(c.PATIENT_ID || '').trim() : '';
+}
+
+function darAltaPaciente(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
@@ -1185,6 +1223,29 @@ function darAltaPaciente(datos, ctx) {
       const rc = obtenerCama(idCama);
       if (!rc.ok) return rc;
       const cama = rc.data;
+
+      /* 🔐 La cama que leí contra el paciente que la pantalla abrió, antes de la primera escritura. Aquí NO basta con
+         igualar: el alta es la puerta donde un desacuerdo puede ser el REINTENTO de un alta que sí aterrizó. Si la
+         pantalla abrió a P y P ya tiene su fila en ARCHIVO_PACIENTES, el alta ya se hizo —la cama puede estar libre u
+         ocupada por otro, da igual— y se contesta ok «ya estaba» sin tocar a quien esté ahora. Sin esa fila, P se
+         trasladó o la cama se limpió, no se le dio el alta: rechazo. La fila se lee SOLO cuando hace falta (un
+         desacuerdo con un episodio reclamado), no en el alta de todos los días. */
+      if (_epReclamado(ep)) {
+        const pidAhora = _pidDeCama(cama);
+        const ab = String(ep.a === undefined || ep.a === null ? '' : ep.a).trim();
+        const filaArchivo = (ab && ab !== pidAhora) ? repoBuscarPorId('ARCHIVO_PACIENTES', 'PATIENT_ID', ab) : null;
+        const d = decidirEpisodioPuerta('DAR_ALTA', {
+          abierto: ep.a, pid: pidAhora, idCama: idCama, hayArchivo: !!filaArchivo, estricto: ep.estricto === true,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') {
+          return ok({
+            idCama, accion: 'alta (ya estaba)', fecha: String((filaArchivo && filaArchivo.FECHA_EGRESO) || '').slice(0, 10),
+            patientId: ab, entidad: 'ARCHIVO_PACIENTES', yaEstaba: true,
+          });
+        }
+      }
+
       if (!esVerdadero(cama.OCUPADA)) return err('La cama ' + idCama + ' ya está libre.', ERR.VALIDACION);
 
       const pid = cama.PATIENT_ID;
@@ -1320,13 +1381,30 @@ function _reetiquetarEpisodioACama(patientId, idCamaNueva) {
 }
 
 // ── TRASLADO: intercambio entre dos camas ocupadas ─────────
-function intercambiarCamas(idA, idB, ctx) {
+function intercambiarCamas(idA, idB, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
       const A = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idA));
       const B = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idB));
       if (!A || !B) return err('Cama origen o destino no encontrada.', ERR.NO_ENCONTRADO);
+
+      /* 🔐 Las DOS camas contra los dos pacientes que la pantalla abrió (EPISODIO_ABIERTO = el de la A,
+         EPISODIO_ABIERTO_B = el de la B), antes de escribir. «Ya hecho»: A ya tiene al paciente que la pantalla vio en
+         B y B al que vio en A — el reintento de un intercambio que aterrizó. Repetirlo lo DESHARÍA, cruzando de vuelta
+         a los dos: ok «ya estaba» y no se toca nada. Una mitad hecha (A cambió y B no) no es un reintento seguro:
+         rechazo.
+         🔴 PENDIENTE (paso 9): el reintento de un intercambio que murió DESPUÉS de cruzar las camas y ANTES del
+         reetiquetado o de los hitos queda hoy «ya estaba» sin completar esos pasos. Completarlos exige ids derivados
+         para los hitos de traslado (insertar-si-no-existe), y el orden de las escrituras no se cambia en este paso. */
+      if (_epReclamado(ep)) {
+        const d = decidirEpisodioPuerta('INTERCAMBIAR_CAMAS', {
+          abierto: ep.a, abiertoB: ep.b, pid: _pidDeCama(A), pidB: _pidDeCama(B),
+          idCama: String(idA), idCamaB: String(idB), estricto: ep.estricto === true,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') return ok({ accion: 'intercambio (ya estaba)', camaA: idA, camaB: idB, yaEstaba: true });
+      }
 
       // Los PATIENT_ID se capturan ANTES de escribir: si la lectura devolvió
       // referencias vivas en vez de fotos, A y B ya tendrían los datos del
@@ -1352,13 +1430,30 @@ function intercambiarCamas(idA, idB, ctx) {
 }
 
 // ── TRASLADO: mover a cama vacía (caso aislamiento) ────────
-function moverACamaVacia(idOrigen, idDestino, ctx) {
+function moverACamaVacia(idOrigen, idDestino, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
       const O = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idOrigen));
       const D = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idDestino));
       if (!O || !D) return err('Cama origen o destino no encontrada.', ERR.NO_ENCONTRADO);
+
+      /* 🔐 El origen contra el paciente que la pantalla abrió (EPISODIO_ABIERTO) y el destino contra lo que vio al elegir
+         (EPISODIO_ABIERTO_B; vacío = estaba LIBRE). Va ANTES de las comprobaciones de «ocupada» de abajo: un traslado
+         que ya aterrizó deja el origen libre, y «la cama origen está libre» le diría «no se guardó» a algo guardado.
+         «Ya hecho»: el destino ya tiene al paciente y el origen quedó libre. Un destino que ahora ocupa OTRA persona
+         es CONFLICTO (se adelantó), no un error de la pantalla. */
+      if (_epReclamado(ep)) {
+        const d = decidirEpisodioPuerta('MOVER_A_CAMA_VACIA', {
+          abierto: ep.a, abiertoB: ep.b, pid: _pidDeCama(O), pidB: _pidDeCama(D),
+          idCama: String(idOrigen), idCamaB: String(idDestino), estricto: ep.estricto === true,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') {
+          return ok({ accion: 'mover_cama_vacia (ya estaba)', origen: idOrigen, destino: idDestino, patientId: _pidDeCama(D), yaEstaba: true });
+        }
+      }
+
       if (!esVerdadero(O.OCUPADA)) return err('La cama origen está libre.', ERR.VALIDACION);
       if (esVerdadero(D.OCUPADA)) return err('La cama destino no está libre.', ERR.VALIDACION);
 
@@ -1409,13 +1504,25 @@ function moverACamaVacia(idOrigen, idDestino, ctx) {
  * REM y los indicadores con un egreso que nadie registró. Lo que se arregla es
  * el arrastre entre pacientes; el episodio queda consultable en el histórico.
  */
-function limpiarCama(idCama) {
+function limpiarCama(idCama, ep) {
   return conLock(() => {
     try {
       const id = String(idCama);
       const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', id);
       const pid = c ? String(c.PATIENT_ID || '') : '';
       const nombre = c ? String(c.NOMBRE || '') : '';
+
+      /* 🔐 La cama contra el paciente que la pantalla abrió, antes de archivar o limpiar nada. Libre ya no hay nada que
+         limpiar: ok «ya estaba» (el reintento de una limpieza que aterrizó). Ocupada por OTRO es CONFLICTO y no se toca:
+         NUNCA se limpia al ocupante nuevo, que archivaría su historia y le vaciaría la cama. «Ocupada» se pasa aparte
+         del pid porque un episodio sin ingreso formal tiene pid vacío igual que una cama libre. */
+      if (_epReclamado(ep)) {
+        const d = decidirEpisodioPuerta('LIMPIAR_CAMA', {
+          abierto: ep.a, pid: _pidDeCama(c), ocupada: !!c && esVerdadero(c.OCUPADA), idCama: id, estricto: ep.estricto === true,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') return ok({ idCama: id, accion: 'limpiar (ya estaba)', archivadas: 0, yaEstaba: true });
+      }
       // Por CAMA, igual que el alta (regla de Manuel, ago-2026): liberar la
       // cama debe llevarse TODO lo que el siguiente ocupante podría heredar,
       // incluidas las filas huérfanas sin PATIENT_ID.

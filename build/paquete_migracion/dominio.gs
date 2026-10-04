@@ -643,6 +643,10 @@ function validarEpisodioPuerta(abierto, pidCama, idCama, estricto) {
  *    tiene la fila de ese paciente (`hayArchivo`): cama libre u ocupada por otro, da igual, el alta ya se hizo. Sin
  *    esa fila, el paciente se trasladó o la cama se limpió, no se le dio el alta: rechazo como hoy.
  *  · LIMPIAR_CAMA — cama libre: ya hecho. Ocupada por OTRO: CONFLICTO (nunca se limpia al ocupante nuevo).
+ *    🪤 «Libre» NO es «sin PATIENT_ID»: una cama ocupada por un episodio sin ingreso formal (cargado a mano) tiene el
+ *    pid vacío igual que una libre. Quien llama pasa `ocupada: true` cuando la cama está OCUPADA, tenga o no pid, y
+ *    esa cama es un ocupante nuevo (CONFLICTO), no un «ya hecho». Sin la bandera (los bancos antiguos) se decide solo
+ *    por el pid, como antes.
  *  · INTERCAMBIAR_CAMAS — `abierto`/`pid` es la cama A y `abiertoB`/`pidB` la B. Ya hecho si A tiene el paciente que
  *    la pantalla vio en B y B el que vio en A. Cualquier otra diferencia rechaza (también la mitad hecha: con un
  *    solo setValues para las dos filas no debería existir, y si existe no es un reintento seguro).
@@ -656,7 +660,7 @@ function validarEpisodioPuerta(abierto, pidCama, idCama, estricto) {
  * sería peor que no tenerlo.
  *
  * @param  puerta  'DAR_ALTA' | 'LIMPIAR_CAMA' | 'INTERCAMBIAR_CAMAS' | 'MOVER_A_CAMA_VACIA'
- * @param  e       { abierto, abiertoB, pid, pidB, idCama, idCamaB, hayArchivo, estricto }
+ * @param  e       { abierto, abiertoB, pid, pidB, idCama, idCamaB, hayArchivo, ocupada, estricto }
  */
 function decidirEpisodioPuerta(puerta, e) {
   e = e || {};
@@ -679,8 +683,9 @@ function decidirEpisodioPuerta(puerta, e) {
     case 'LIMPIAR_CAMA': {
       const m = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
       if (!m) return seguir;
-      if (ab && !pid) return yaHecho;
-      if (ab && pid) {
+      const hayOcupante = !!pid || e.ocupada === true;
+      if (ab && !hayOcupante) return yaHecho;
+      if (ab && hayOcupante) {
         return rechazo(ERR.CONFLICTO, 'La cama ' + e.idCama + ' ya está ocupada por otro paciente (la limpieza que pediste era para quien estaba antes), ' +
           'así que no se limpió nada. Cierra esta ventana y mira cómo está la cama ahora.');
       }

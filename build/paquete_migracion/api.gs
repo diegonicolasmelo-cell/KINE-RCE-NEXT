@@ -109,13 +109,13 @@ function api(accion, datos, token) {
       case 'INGRESAR_PACIENTE':
         return _auditar(ctx, accion, () => ingresarPaciente(datos, ctx), datos);
       case 'DAR_ALTA':
-        return _auditar(ctx, accion, () => darAltaPaciente(datos, ctx), datos);
+        return _auditar(ctx, accion, () => darAltaPaciente(datos, ctx, _epDeDatos(datos)), datos);
       case 'INTERCAMBIAR_CAMAS':
-        return _auditar(ctx, accion, () => intercambiarCamas(datos.idCamaA || datos.idA, datos.idCamaB || datos.idB, ctx), datos);
+        return _auditar(ctx, accion, () => intercambiarCamas(datos.idCamaA || datos.idA, datos.idCamaB || datos.idB, ctx, _epDeDatos(datos)), datos);
       case 'MOVER_A_CAMA_VACIA':
-        return _auditar(ctx, accion, () => moverACamaVacia(datos.idOrigen, datos.idDestino, ctx), datos);
+        return _auditar(ctx, accion, () => moverACamaVacia(datos.idOrigen, datos.idDestino, ctx, _epDeDatos(datos)), datos);
       case 'LIMPIAR_CAMA':
-        return _auditar(ctx, accion, () => limpiarCama(datos.idCama), datos);
+        return _auditar(ctx, accion, () => limpiarCama(datos.idCama, _epDeDatos(datos)), datos);
       case 'GUARDAR_EVOLUCION':
         return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx), datos);
       case 'AGREGAR_HITO':

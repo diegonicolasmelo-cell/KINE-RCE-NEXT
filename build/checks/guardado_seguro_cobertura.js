@@ -62,10 +62,10 @@ const SIN = (accion, razon) => ({ accion, clase: 'sinEpisodio', razon });
 const TABLA = [
   // ── Actúan sobre «quien esté en la cama» ──
   E('GUARDAR_EVOLUCION',       'EPISODIO_ABIERTO del formulario, capturado al abrirlo; y en un ingreso, el PATIENT_ID acuñado por la pantalla (G15).'),
-  E('DAR_ALTA',                'EPISODIO_ABIERTO tomado al abrir el diálogo de egreso y pasado por argumento, nunca releído de la base al confirmar.'),
-  E('LIMPIAR_CAMA',            'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: nunca se limpia al ocupante nuevo.'),
-  E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.'),
-  E('MOVER_A_CAMA_VACIA',      'EPISODIO_ABIERTO (origen) y EPISODIO_ABIERTO_B (destino; vacío = libre al elegir).'),
+  E('DAR_ALTA',                'EPISODIO_ABIERTO tomado al abrir el diálogo de egreso y pasado por argumento, nunca releído de la base al confirmar.', true),   // paso 5
+  E('LIMPIAR_CAMA',            'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: nunca se limpia al ocupante nuevo.', true),   // paso 5
+  E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.', true),   // paso 5
+  E('MOVER_A_CAMA_VACIA',      'EPISODIO_ABIERTO (origen) y EPISODIO_ABIERTO_B (destino; vacío = libre al elegir).', true),   // paso 5
   E('ANULAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta mostrada al abrir el menú del evento; la comparación va DENTRO del lock.', true),   // paso 4
   E('ANEXAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta al abrir el ➕; datos.patientId declarado queda como respaldo.'),
   E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.'),
@@ -242,17 +242,20 @@ si('(la mutación de la prueba sí agregó la puerta nueva)', nueva !== API_SRC 
 rojo('una puerta NUEVA que pasa por _auditar sin estar en la tabla', nueva, TABLA, 'ESCRITURA_NUEVA');
 // c) una fila de una puerta que ya no existe
 rojo('una fila huérfana (la puerta se borró de api.gs)', API_SRC, TABLA.concat([SIN('PUERTA_BORRADA', 'Una puerta que ya no existe en el dispatcher: la fila quedó huérfana.')]), 'PUERTA_BORRADA');
-// d) una fila volteada a «implementada» sin que el dispatcher pase el reclamo
-rojo('una fila volteada a epImplementado:true SIN que api.gs pase el reclamo (la tabla mintiendo hacia delante)', API_SRC,
-  TABLA.map(f => f.accion === 'DAR_ALTA' ? Object.assign({}, f, { epImplementado: true }) : f), 'DAR_ALTA');
-// e) el dispatcher pasa el reclamo y la fila sigue en false
-const conEp = API_SRC.replace("limpiarCama(datos.idCama)", "limpiarCama(datos.idCama, _epDeDatos(datos))");
-si('(la mutación de la prueba sí le pasó el reclamo a LIMPIAR_CAMA)', conEp !== API_SRC);
-rojo('api.gs YA pasa el reclamo y la fila sigue en false (la tabla mintiendo hacia atrás)', conEp, TABLA, 'LIMPIAR_CAMA');
+// d) una fila «implementada» cuyo dispatcher NO pasa el reclamo. 🪤 Se le QUITA el reclamo a una puerta que ya lo trae
+//    (DAR_ALTA, hecha en el paso 5) en vez de voltear una fila pendiente: así la prueba sigue midiendo lo mismo el día que
+//    ya no quede ninguna pendiente (paso 17), que es cuando una mutación «sobre una puerta sin hacer» dejaría de existir.
+const sinEpAlta = API_SRC.replace('darAltaPaciente(datos, ctx, _epDeDatos(datos))', 'darAltaPaciente(datos, ctx)');
+si('(la mutación de la prueba sí le quitó el reclamo a DAR_ALTA)', sinEpAlta !== API_SRC);
+rojo('una fila implementada (true) cuyo dispatcher NO pasa el reclamo (la tabla mintiendo hacia delante)', sinEpAlta, TABLA, 'DAR_ALTA');
+// e) el dispatcher pasa el reclamo y la fila dice que no (la otra punta, mutando la TABLA)
+const alta = f => f.accion === 'DAR_ALTA';
+rojo('api.gs YA pasa el reclamo y la fila dice false (la tabla mintiendo hacia atrás)', API_SRC,
+  TABLA.map(f => alta(f) ? Object.assign({}, f, { epImplementado: false }) : f), 'DAR_ALTA');
 {
-  const p = censar(conEp, TABLA.map(f => f.accion === 'LIMPIAR_CAMA' ? Object.assign({}, f, { epImplementado: true }) : f));
+  const p = censar(sinEpAlta, TABLA.map(f => alta(f) ? Object.assign({}, f, { epImplementado: false }) : f));
   eq('★ …y verde cuando las dos puntas coinciden (voltear la fila Y pasar el reclamo es lo que cierra un paso)',
-    p.filter(x => x.indexOf('LIMPIAR_CAMA') > -1).length, 0);
+    p.filter(x => x.indexOf('DAR_ALTA') > -1).length, 0);
 }
 // f) una razón vacía
 rojo('una puerta sin episodio SIN su razón escrita', API_SRC, TABLA.map(f => f.accion === 'SET_BANNER' ? Object.assign({}, f, { razon: '' }) : f), 'SET_BANNER');
