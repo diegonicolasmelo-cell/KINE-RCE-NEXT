@@ -8,6 +8,11 @@ function validarPayloadEvolucion(d) {
   const errs = [];
   if (!d) return ['Payload vacío'];
 
+  // 🔴 NaN e Infinity no se guardan (G06, 4-oct-2026): se rechazan SOLOS y con el nombre del campo. Ver
+  // _errsNoFinitos: sin esto un «Infinity» o un «1e999» entraba a la planilla como si fuera una medición.
+  const noFinitos = _errsNoFinitos(d);
+  if (noFinitos.length) return noFinitos;
+
   if (!d.ID_CAMA && !d.idCama) errs.push('Falta ID_CAMA');
   if (!d.TURNO_KEY && !d.turnoKey) errs.push('Falta TURNO_KEY');
   if (!d.PLAN_FIRMA_KINE || String(d.PLAN_FIRMA_KINE).trim() === '') errs.push('Falta firma del kinesiólogo');
@@ -229,6 +234,50 @@ function validarPayloadIngreso(d) {
   if (!firma || String(firma).trim() === '') errs.push('Falta firma del kinesiólogo');
   _rango(errs, d.edad || d.EDAD, 'Edad', 15, 110, true);
   _rango(errs, d.talla || d.TALLA_CM, 'Talla (cm)', 100, 230, false);
+  return errs;
+}
+
+/**
+ * _errsNoFinitos — un número que no es un número no se guarda (G06, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. El contrato de los ceros tiene cuatro frases y esta es la tercera: el 0 se conserva, el
+ * vacío no se vuelve 0, y lo que NO es un número finito (NaN, Infinity) se rechaza con un mensaje que dice
+ * cuál campo. Antes pasaba derecho: solo los campos con rango (_rango) lo frenaban, y un «Infinity» en la PIC,
+ * en el EB o en el PEEP-0 de un campo sin tope entraba a la fila de EVOLUCIONES y de ahí a la cama.
+ *
+ * Qué mira:
+ *  · Un valor de tipo `number` no finito, en CUALQUIER clave (nada lo vuelve válido).
+ *  · Un TEXTO que dice «NaN», «Infinity» o «-Infinity», o que desborda al leerlo («1e999»), pero SOLO en las
+ *    columnas entero/decimal del esquema de EVOLUCIONES: en una columna de texto «NaN» es un apellido o un
+ *    diagnóstico, y «Infinity» una frase como cualquier otra. Sin ESQUEMA a mano (algún banco antiguo carga este
+ *    archivo suelto) solo corre la primera mirada.
+ * Qué NO mira, a propósito: texto basura en una columna numérica («abc»). No es un valor no finito y rechazarlo
+ * es una decisión de producto aparte; hoy se guarda tal cual y los lectores lo toleran.
+ */
+function _errsNoFinitos(d) {
+  const errs = [];
+  const rot = {};
+  const numericas = [];
+  if (typeof ESQUEMA !== 'undefined' && ESQUEMA && ESQUEMA.EVOLUCIONES && ESQUEMA.EVOLUCIONES.cols) {
+    ESQUEMA.EVOLUCIONES.cols.forEach(function (c) {
+      rot[c[0]] = c[2];
+      if (c[1] === 'entero' || c[1] === 'decimal') numericas.push(c[0]);
+    });
+  }
+  Object.keys(d).forEach(function (k) {
+    if (typeof d[k] === 'number' && !isFinite(d[k])) {
+      errs.push((rot[k] || k) + ' no es un número válido (' + String(d[k]) + ')');
+    }
+  });
+  numericas.forEach(function (k) {
+    const v = d[k];
+    if (typeof v !== 'string') return;
+    const t = v.trim();
+    if (t === '') return;
+    if (/^[+-]?(nan|infinity)$/i.test(t) || Math.abs(parseFloat(t)) === Infinity) {
+      errs.push(rot[k] + ' no es un número válido (' + t + ')');
+    }
+  });
   return errs;
 }
 

@@ -74,6 +74,19 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 16. **La válvula de fonación de noche** ahora se puede llenar y suma sus horas
     para la decanulación (12 h por turno con válvula). ¿Es lo que quieres?
 
+## 2b · Decisiones nuevas, de la tanda 1 de integridad (4-oct)
+
+1. **Turno pasado de un paciente egresado cuya cama ya ocupa otro:** hoy el servidor lo rechaza. ¿Se deja así, se ofrece una
+   vista de solo lectura, o se diseña una corrección aparte con firma que nombre el episodio?
+2. **Estadísticas con MRC/FSS/CPAx de valor 0:** el egreso ahora los archiva, pero `obtenerStats` los excluye de promedios y de
+   «evaluados» (`> 0`). ¿Se alinean?
+3. **KTR vacío frente a cero** en el CSV y la tabla del registro diario (`regCSV`): hoy exportan 0 donde nadie anotó. ¿Cambia?
+4. **El relato omite PEEP 0, AutoPEEP 0 y PS 0** (usa `> 0`), y ΔP y compliance se calculan con PEEP vacío como si fuera 0.
+5. **Sesión de Coordinación:** ¿desactivar a alguien en KINESIOLOGOS debe cortarle también esa sesión? Hoy corta solo el cambio de clave.
+6. **Prefijo del caché de la app instalada:** `rce-armazon-` es compartido con RCE-KINE si ambos viven en el mismo origen.
+   ¿Se le da a NEXT un prefijo propio (`rce-next-armazon-`)?
+7. **Qué conserva la pantalla cuando se corta la sesión** (política de borradores) y si reintenta sola ante un tropiezo de la planilla.
+
 ## 3 · Pendientes viejos, de antes del rediseño
 
 - Sacarle el **estado previo a la TQT** — Diego dijo que ahí es irrelevante.
@@ -90,7 +103,7 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 
 | Bug | Dónde | Qué pasa |
 |---|---|---|
-| 🔴 **`_evalHoy` mira la fecha en UTC** | al reabrir un turno guardado (`index.html`) | Usa `new Date().toISOString()`, que es UTC. Chile va 3 o 4 horas atrás: pasadas las 20 o 21 h, «hoy» ya es mañana para esa línea, y reabrir un turno de día **no repone sus evaluaciones**. Hay que compararla con la fecha del turno, no con el reloj. |
+| ✅ **`_evalHoy` mira la fecha en UTC** — ARREGLADO 4-oct (tanda 1) | `fillForm` | Ahora se compara con la fecha del turno que se reabre. Guardia `eval_hoy_fecha_del_turno.js`. |
 | 🟠 **`_camaPanel` está definida dos veces** | `index.html` | Las dos hacen lo mismo hoy; si una cambia, gana la de más abajo sin avisar. |
 | 🟠 **El P0.1 no entra en la «evaluación intermedia» ni en el REM** | informes | Se guarda y se narra, pero los conteos de evaluaciones no lo miran. |
 

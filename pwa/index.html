@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-5.4-revision-maxima">
+<meta name="rce-version" content="NEXT-5.5-integridad">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -3051,7 +3051,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
      UN SOLO cuadro para los dos casos, para no duplicar markup:
        · GUARDADO → «No se guardó». BLOQUEANTE a propósito: ni Escape ni un
          clic fuera lo cierran, porque cerrarlo de un manotazo es justo lo que
-         hace perder la evolución. Sale por «Reintentar» o «Seguir editando».
+         hace perder la evolución. Sale por «Reintentar» o «Seguir editando»
+         (con el rechazo «la cama cambió de paciente», el principal es «Cerrar
+         la cama»: reintentar mandaría lo mismo y recibiría lo mismo).
        · CARGA    → «No se pudo cargar». Éste sí se cierra: no hay nada escrito
          que perder.
      🔒 Ley 19.628: aquí solo entra el mensaje técnico del servidor.
@@ -5808,7 +5810,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.4-revision-maxima]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.5-integridad]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -5893,13 +5895,59 @@ function _apiHttp(accion, datos) {
   });
 }
 
+/* ══ ¿ESTE ERROR DICE «TU SESIÓN ESTÁ CORTADA»? — UN solo lugar ═══════════════
+   (F3B, revisión adversarial, 4-oct-2026). La pantalla decide por el TEXTO del
+   error, no por su código, y ese reconocimiento vivía en TRES sitios con
+   listas distintas: `gs()` conocía «Entra con tu clave» y «Tu sesión expiró»;
+   el guardado de la evolución solo «Sesión no válida» e «Inicia sesión»; y
+   Coordinación miraba la palabra «sesión» suelta. Con el candado del turno
+   puesto, el servidor contesta «Entra con tu clave para registrar.» a una
+   sesión cortada (cambió su clave, la dieron de baja): `gs()` la mandaba a la
+   puerta y el guardado NO, así que quien guardaba con la sesión cortada veía
+   «sin conexión», esperaba el reintento de 3 s y terminaba leyendo «revisa la
+   red». Creía que fallaba el internet, no que lo habían sacado.
+
+   🔴 La frase de la RED no cuenta. Si la planilla no responde al comprobar la
+   sesión, el servidor contesta «No se pudo comprobar tu sesión» (svc_acceso.gs):
+   la sesión puede estar perfecta y mandar a la puerta a quien la tiene es
+   sacarlo de su trabajo por un tropiezo de Sheets. Es un error REINTENTABLE, y
+   se excluye ANTES de mirar las demás frases: así una redacción futura que
+   comparta alguna palabra con las de abajo tampoco lo dispara.
+
+   Lleva a la puerta Y avisa si lo era (devuelve true): quien llama decide qué
+   más hace con su formulario. Las dos listas son las dos puertas, cada una con
+   su redacción: la del turno (svc_acceso.gs) y la de Google (infra_auth.gs).
+   🪤 Los patrones van en la MISMA línea que la llamada a la puerta a propósito:
+   acceso_revocacion.js los lee del archivo (líneas que llaman a la puerta) para
+   medir el texto que inventa el servidor contra lo que la pantalla de verdad
+   hace con él. Si se parten en otra línea, esa guardia se queda sin patrones.
+   Guardia: acceso_pantalla.js (secciones 6 a 9). */
+const _SES_SIN_COMPROBAR_RE = /No se pudo comprobar tu sesi[oó]n/i;
+function _sesionCortadaALaEntrada(msg, motivo) {
+  msg = String(msg || '');
+  if (_SES_SIN_COMPROBAR_RE.test(msg)) return false;
+  if ((/Entra con tu clave|Tu sesión expiró/i.test(msg)) || (/Sesión no válida|Inicia sesión/i.test(msg))) { loading(false); mostrarLogin(motivo); return true; }
+  return false;
+}
+/* Coordinación tiene SU sesión (otro espacio: una clave de coordinación no abre
+   el turno ni al revés). Aquí lo que se cierra es la sesión de coordinación DE LA
+   PANTALLA, no se va a la puerta del turno; el reconocimiento de siempre es la
+   palabra «sesión», sin más. Solo se le quita la frase de la red: toda acción de
+   coordinación pasa primero por la identidad del turno, y con la planilla caída el
+   servidor le contesta «No se pudo comprobar tu sesión». Eso botaba al coordinador
+   de su modo (y a teclear su clave de coordinación otra vez) sin que su sesión
+   estuviera cortada. */
+function _sesionCoordCortada(msg) {
+  msg = String(msg || '');
+  return !_SES_SIN_COMPROBAR_RE.test(msg) && /sesión/i.test(msg);
+}
+
 //  GAS CALL — misma firma que v1, sobre el API v2
 function gs(accion, datos, ok, fail) {
   api(accion, datos).then(d => { if (ok) ok(d); }).catch(e => {
     const msg = (e && e.message) || String(e);
     // Token GIS expirado a mitad de sesión → pedir re-login sin perder la vista
-    if (/Sesión no válida|Inicia sesión|Entra con tu clave|Tu sesión expiró/i.test(msg)) { loading(false); mostrarLogin(msg); }
-    else if (msg !== 'offline') toast('❌ ' + msg);
+    if (!_sesionCortadaALaEntrada(msg, msg) && msg !== 'offline') toast('❌ ' + msg);
     if (fail) fail(msg);
   });
 }
@@ -6354,6 +6402,31 @@ function _camaDesdeEvo(c, e, fecha){
     _RETRO:true, VM_TAG:'', CAT_RESP_PJE:'', CAT_MOTOR_PJE:'', WEAN_PVE_JSON:'',
   });
 }
+/* La evolución con que la vista retrospectiva ARMA la tarjeta de una cama: la del turno que se mira y, si ese turno
+   no tiene, cualquiera de la cama ese día. Es UNA sola búsqueda para dos usos —dibujar la tarjeta (`renderGrid`) y
+   saber a qué episodio pertenece lo que esa tarjeta muestra (`_episodioDeTarjeta`)—: si cada uno la hiciera por su
+   cuenta, la tarjeta podría mostrar a un paciente y el formulario abrirse para otro (F2, 4-oct-2026). */
+function _evoDeTarjetaRetro(idCama, tkey){
+  const _id=String(idCama);
+  return EVOS_DIA.find(e=>String(e.ID_CAMA)===_id&&String(e.TURNO_KEY)===tkey)
+      || EVOS_DIA.find(e=>String(e.ID_CAMA)===_id);
+}
+/* 🔴 EL EPISODIO DE LA TARJETA QUE SE MUESTRA (F2, 4-oct-2026). Es el que reclama el formulario al abrirse
+   (`_episodioAbierto`, G14). En la vista de HOY la tarjeta es la cama en vivo (`DB`). En la vista de un DÍA PASADO
+   (fecha elegida a mano: sin la marca `turno-hoy`, la misma lectura que `renderGrid`) la tarjeta NO es la de `DB`: se
+   arma con lo registrado ese día (`_camaDesdeEvo`) y puede ser de un paciente que ya no está en la cama. Leer el
+   episodio del censo vivo hacía que «Ver / editar» sobre el turno pasado de K reclamara al ocupante de HOY (L): el
+   servidor lo aceptaba —L sí es el de la cama— y el turno de K se escribía sobre L. Se toma de la MISMA tarjeta
+   que la grilla dibujó (`_camaDesdeEvo`), no de una búsqueda aparte.
+   Si la vista es pasada pero esa cama no tiene registro ese día (la grilla no ofrece botón; solo llegan por aquí
+   la campanita, el buzón o el aviso de fin de turno), no hay tarjeta retrospectiva y queda la cama en vivo, como
+   antes. Guardia: episodio_al_guardar.js, sección 8. */
+function _episodioDeTarjeta(idCama, fecha, tkey){
+  const viva=((typeof DB!=='undefined'&&DB)||[]).find(c=>String(c.ID_CAMA)===String(idCama))||{};
+  if($('gDate').classList.contains('turno-hoy')) return String(viva.PATIENT_ID||'');
+  const ev=_evoDeTarjetaRetro(idCama, tkey);
+  return String((ev ? _camaDesdeEvo(viva, ev, fecha) : viva).PATIENT_ID||'');
+}
 function _restarDiasISO(fecha, n){
   const [y,m,d]=String(fecha).split('-').map(Number);
   const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()-(parseInt(n)||0));
@@ -6389,9 +6462,7 @@ function renderGrid() {
   DB.forEach(c => {
     let ocu = c.OCUPADA===true||c.OCUPADA==='TRUE';
     if(_retro){
-      const _id=String(c.ID_CAMA);
-      const _ev = EVOS_DIA.find(e=>String(e.ID_CAMA)===_id&&String(e.TURNO_KEY)===tkey)
-               || EVOS_DIA.find(e=>String(e.ID_CAMA)===_id);
+      const _ev = _evoDeTarjetaRetro(c.ID_CAMA, tkey);
       if(!_ev){ frag.appendChild(_camaSinRegistro(c)); return; }
       c = _camaDesdeEvo(c, _ev, fecha);
       ocu = true;
@@ -7465,6 +7536,11 @@ function abrirPanel(id, esIng, verFicha) {
   const fecha=v('gDate')||hoy();
   const tkey=`${fecha}-${SHIFT}`;
   $('cBed').value=id; $('cIng').value=String(esIng); window._camaEvo=id;
+  // 🔴 G14 · el episodio que ESTE formulario abre es el de la tarjeta que se está MOSTRANDO (ver `_episodioAbierto`).
+  // 🔴 F2 · «la tarjeta que se muestra» es la de HOY o, en la vista de un día pasado, la que arma lo registrado ese
+  // día: NO siempre la cama en vivo (ver `_episodioDeTarjeta`).
+  // Se anota primero de todo: `_borradorRestaurar`, al final de esta función, lo necesita.
+  _episodioAbierto=_episodioDeTarjeta(id, fecha, tkey);
   $('spBed').textContent=`CAMA ${id}`;
   const _tipo = esIng ? 'Ingreso' : 'Evolución';
   const _st = $('spTitle'); if(_st){ _st.dataset.tipo=_tipo; _st.textContent=_tipo; }
@@ -7562,7 +7638,7 @@ function abrirPanel(id, esIng, verFicha) {
     // v2: una sola llamada combinada (turno actual + turno previo)
     // v5.99: viaja el paciente de la tarjeta para que el servidor devuelva SU
     // fila si la cama rotó sin alta (sin viaje extra a CAMAS_ESTADO).
-    const _pidTarjeta=String(((typeof DB!=='undefined'&&DB)||[]).find(c=>String(c.ID_CAMA)===String(id))?.PATIENT_ID||'');
+    const _pidTarjeta=_episodioAbierto;   // el mismo dato que se anotó arriba: una sola fuente
     gs('GET_EVO_TURNO',{idCama:id,turnoKey:tkey,patientId:_pidTarjeta}, r=>{
       loading(false);
       // Pronación ABIERTA del episodio (puede ser de otro turno y otro colega):
@@ -7736,6 +7812,22 @@ setInterval(_tickSinGuardar, 2000);
 
 // Guardado que quedó pendiente de reintentar a mano (lo arma guardar()).
 let _reintentoGuardado = null;
+
+/* 🔴 EL EPISODIO QUE ABRIÓ ESTE FORMULARIO (G14, 4-oct-2026). `abrirPanel` anota aquí el PATIENT_ID que tenía la
+   tarjeta de la cama en el MOMENTO DE ABRIR —lo que la persona estaba viendo cuando empezó a escribir; en la vista
+   de un día pasado, la tarjeta de ESE día (`_episodioDeTarjeta`, F2) y no la cama en vivo—, y
+   `guardar()` lo manda como `EPISODIO_ABIERTO`. El servidor lo compara con quien ocupa la cama al guardar: si la
+   cama se dio de alta y se reingresó a otro paciente mientras el formulario seguía abierto, rechaza en vez de
+   escribir la evolución del anterior sobre el nuevo. '' = el formulario no abrió ningún episodio (ingreso en cama
+   libre, o episodio sin ingreso formal): no reclama ninguno. 🪤 NO se lee de `DB` al guardar: el censo se vuelve a
+   bajar solo (`recargarSilencioso`, tras cualquier guardado o acción, incluidos los de OTRA cama) y entonces
+   siempre coincidiría con la cama — justo lo que esta protección tiene que evitar.
+   Al guardar BIEN toma el episodio que el servidor devuelve: un ingreso nace sin episodio y desde su primer
+   guardado el formulario ya es de ese paciente. Guardia: episodio_al_guardar.js. */
+let _episodioAbierto = '';
+/* El rechazo del servidor por cambio de paciente se reconoce por su frase (`validarEpisodioAbierto`, en
+   svc_evoluciones.gs): no es un fallo de red, así que no se reintenta solo ni manda a «revisar la red». */
+const _EP_CAMBIO_RE = /cambi[oó] de paciente/i;
 // «Guardar y cerrar» del modal de cierre: el panel se cierra SOLO si el
 // guardado termina bien.
 let _cerrarTrasGuardar = false;
@@ -7764,8 +7856,27 @@ function _marcaGuardadoOK(d){ _reintentoGuardado=null; _estadoGuardado('ok','✓
 // 🔴 La píldora NO se toca ni se reemplaza — es el estado PERSISTENTE del PRD y
 // la mide build/checks/sin_guardar.js. El cuadro al centro se SUMA encima.
 function _marcaGuardadoError(detalle){
+  /* 🔴 F2 · «La cama cambió de paciente» es un rechazo DELIBERADO: reenviar lo mismo recibe lo mismo. Su salida
+     principal es cerrar la cama (y volver a abrirla para verla como está ahora), no «Reintentar». Lo escrito no
+     se pierde: `_falloFinal` ya lo dejó de borrador de SU paciente. */
+  if(_EP_CAMBIO_RE.test(detalle||'')){
+    _estadoGuardado('error','❌ NO se guardó <button type="button" data-nodirty onclick="cerrarCamaTrasRechazo()" style="font:inherit;border:1px solid #991b1b;background:#fff;color:#991b1b;border-radius:14px;padding:1px 9px;cursor:pointer;">Cerrar la cama</button>');
+    avisoErrorGuardado(detalle);
+    return;
+  }
   _estadoGuardado('error','❌ NO se guardó <button type="button" data-nodirty onclick="reintentarGuardado()" style="font:inherit;border:1px solid #991b1b;background:#fff;color:#991b1b;border-radius:14px;padding:1px 9px;cursor:pointer;">Reintentar</button>');
   avisoErrorGuardado(detalle);
+}
+
+/* Salida del rechazo «la cama cambió de paciente» (F2): cierra el panel, deja lo escrito como borrador de SU
+   paciente (`ep`: no vuelve sobre el ocupante nuevo) y pide el censo de nuevo para que la tarjeta ya diga quién
+   ocupa la cama. NO reenvía nada ni abre otra cama sola: reabrirla es decisión de quien está en turno. */
+function cerrarCamaTrasRechazo(){
+  avErrCerrar();
+  _borradorGuardar();      // lo último que se escribió, también (la persona pudo seguir editando tras el rechazo)
+  _formDirty=false;
+  cerrarPanel(true);
+  recargarSilencioso();
 }
 
 /* ══ AVISO DE ERROR AL CENTRO (Manuel, 13-sep-2026) ════════════════════
@@ -7778,12 +7889,15 @@ function _marcaGuardadoError(detalle){
 let _avErrModo = null;      // 'guardado' | 'carga' | null
 let _avErrAccion = null;    // lo que corre el botón «Reintentar»
 
-function _avErrAbrir(modo, titulo, detalle, accion, textoSec){
+function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim){
   const o=$('avErrOvl'); if(!o) return;
   _avErrModo=modo; _avErrAccion=(typeof accion==='function')?accion:null;
   $('avErrTit').textContent=titulo;
   // textContent, no innerHTML: el detalle viene del servidor y no se interpreta.
   const m=$('avErrMsg'); m.textContent=detalle||''; m.style.display=detalle?'':'none';
+  // El rótulo del botón principal se repone en CADA apertura (F2): el cuadro es uno solo para guardado y carga, y
+  // un «Cerrar la cama» dejado por el rechazo de cambio de paciente no puede quedarse pegado al siguiente fallo.
+  $('avErrReint').textContent=textoPrim||'Reintentar';
   $('avErrSec').textContent=textoSec||'Cerrar';
   o.classList.add('on');
   setTimeout(()=>{ try{ $('avErrReint').focus(); }catch(_){} }, 60);
@@ -7802,6 +7916,11 @@ function avErrReintentar(){
 // cierra el cuadro: la evolución sigue entera en pantalla y la píldora roja
 // queda de rastro hasta que un guardado termine bien.
 function avisoErrorGuardado(detalle){
+  // F2 · el rechazo por cambio de paciente no ofrece «Reintentar» (mandaría lo mismo): lo principal es cerrar la cama.
+  if(_EP_CAMBIO_RE.test(detalle||'')){
+    _avErrAbrir('guardado', 'No se guardó', detalle||'', cerrarCamaTrasRechazo, 'Seguir editando', 'Cerrar la cama');
+    return;
+  }
   _avErrAbrir('guardado', 'No se guardó', detalle||'', reintentarGuardado, 'Seguir editando');
 }
 
@@ -7847,6 +7966,10 @@ function _borradorEstado(){
   });
   return {
     v:1, hora:_hhmm(), ts:Date.now(), firma:(campos.fFirma||''),
+    // 🔴 G14 · de QUÉ paciente es el borrador. La llave es cama+turno y no dice quién: sin esto, tras un rechazo
+    // por cambio de paciente, «reabrir la cama» le devolvía al formulario del ocupante NUEVO los parámetros del
+    // anterior (todo menos nombre, RUT, edad y diagnóstico), y el siguiente guardado los habría escrito.
+    ep:_episodioAbierto,
     campos,
     procs:[...(PROCS||[])],
     fases:[...FASES_SEL], pend:_PEND_PUESTOS.slice(), aisl:[..._aislTags],
@@ -7869,8 +7992,27 @@ function _borradorDescartar(idCama){
   try{ localStorage.removeItem(_borradorLlave(idCama||$('cBed')?.value||'')); }catch(e){}
 }
 
-function _borradorHay(idCama){
-  try{ return !!localStorage.getItem(_borradorLlave(idCama)); }catch(e){ return false; }
+/* 🔴 ¿ESTE BORRADOR ES DE ESTE PACIENTE? (G14 + F2). UNA sola regla para las dos preguntas que se hacen sobre un
+   borrador —«¿se restaura sobre este formulario?» (`_borradorRestaurar`) y «¿hay un borrador que avisar?»
+   (`_borradorHay`, que alimenta el «borrador sin guardar» del aviso de fin de turno)—: si cada una la escribiera por
+   su cuenta, el aviso podía anunciar un borrador que al abrir la cama NO volvía (era de otro paciente). Un borrador
+   de antes de G14 no trae `ep` (`undefined`) y cuenta como siempre; uno con `ep` solo es de quien lo escribió. */
+function _borradorEsDe(d, ep){
+  return !(d && d.ep!==undefined && String(d.ep)!==String(ep||''));
+}
+
+/* `ep` = el PATIENT_ID de quien ocupa la cama AHORA (el del censo). Sin `ep` (quien llama no sabe a quién
+   pertenece la cama) solo se mira que exista la llave, como antes de G14. Con `ep` la respuesta es la de
+   `_borradorRestaurar`: un borrador ilegible, vacío de campos o de otro paciente NO se cuenta, porque al abrir la
+   cama no volvería. */
+function _borradorHay(idCama, ep){
+  try{
+    const raw=localStorage.getItem(_borradorLlave(idCama));
+    if(!raw) return false;
+    if(ep===undefined) return true;
+    let d=null; try{ d=JSON.parse(raw); }catch(e){ return false; }
+    return !!(d && d.campos) && _borradorEsDe(d, ep);
+  }catch(e){ return false; }
 }
 
 // Los borradores de un turno que ya no es el vigente se limpian y NO se
@@ -7892,6 +8034,10 @@ function _borradorRestaurar(idCama){
   try{ const raw=localStorage.getItem(_borradorLlave(idCama)); if(!raw) return false; d=JSON.parse(raw); }
   catch(e){ return false; }
   if(!d || !d.campos) return false;
+  // 🔴 G14 · un borrador de OTRO paciente no se restaura sobre éste (ver `ep` en `_borradorEstado`). Se deja
+  // donde está —no se borra: es trabajo de alguien—, solo no entra a este formulario. Un borrador de antes de
+  // este cambio no trae `ep` y se restaura como siempre.
+  if(!_borradorEsDe(d, _episodioAbierto)) return false;
   Object.keys(d.campos).forEach(id=>{
     if(_BORR_SIN_IDENTIDAD.indexOf(id)!==-1) return;
     const e=document.getElementById(id); if(!e) return;
@@ -7985,7 +8131,9 @@ function _aftPendientesDe(camas, evos, tk){
   const con=new Set((evos||[]).filter(e=>String(e.TURNO_KEY)===String(tk)).map(e=>String(e.ID_CAMA)));
   return (camas||[])
     .filter(c=>(c.OCUPADA===true||c.OCUPADA==='TRUE')&&!con.has(String(c.ID_CAMA)))
-    .map(c=>({cama:String(c.ID_CAMA), cod:String(c.COD_PACIENTE||''), alta:false, borr:_borradorHay(String(c.ID_CAMA))}))
+    // 🔴 F2 · el borrador cuenta solo si es del paciente que ocupa la cama AHORA (`PATIENT_ID` del censo): el de otro
+    // paciente `_borradorRestaurar` no lo devuelve, y avisarlo mandaba a abrir una cama donde no hay nada.
+    .map(c=>({cama:String(c.ID_CAMA), cod:String(c.COD_PACIENTE||''), alta:false, borr:_borradorHay(String(c.ID_CAMA), String(c.PATIENT_ID||''))}))
     .sort((a,b)=>(parseInt(a.cama)||0)-(parseInt(b.cama)||0));
 }
 
@@ -8498,8 +8646,11 @@ function fillForm(s) {
   try {
   } catch(e){}
 
-  // Evaluaciones funcionales — solo cargar si la fecha de registro es hoy
-  const _evalHoy = _isoDia(_ex.EVAL_FECHA) === new Date().toISOString().slice(0,10);
+  // Evaluaciones funcionales — solo cargar si la fecha de registro es la del TURNO que se reabre.
+  // 🔴 NO se compara con el reloj: `toISOString()` es UTC y Chile va 3 o 4 horas atrás, así que pasadas
+  // las 20-21 h «hoy» ya era mañana y el turno reabierto perdía sus evaluaciones (ver
+  // `eval_hoy_fecha_del_turno.js`). Es la misma fecha con que `guardar()` fecha `EVAL_FECHA`.
+  const _evalHoy = _isoDia(_ex.EVAL_FECHA) === _isoDia(v('gDate')||hoy());
   chk('cEgr', _evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE'));
   if(_evalHoy && (_ex.EVAL_T_REALIZAR===true||_ex.EVAL_T_REALIZAR==='TRUE')) show('dEgr');
   // (la familia que se abre al reabrir se decide DESPUÉS de cargar los valores: ver evReponer)
@@ -9523,7 +9674,12 @@ function _irAlCampo(id){
 
 function guardar() {
   const id=v('cBed'), fecha=v('gDate')||hoy(), tkey=`${fecha}-${SHIFT}`;
-  const n=x=>parseFloat(x)||null;
+  /* 🔴 EL CERO SE CONSERVA (G06, 4-oct-2026). Antes era `parseFloat(x)||null`, y como 0 es falso, un PEEP, un
+     AutoPEEP, una PIC o un exceso de base de 0 salían como `null` y se guardaban VACÍOS (y al reabrir el turno
+     el 0 volvía a la casilla y re-guardar lo borraba). Ahora solo es vacío lo que de verdad está vacío; un valor
+     que no es un número finito («Infinity», texto) tampoco viaja. Guardia: ceros_de_punta_a_punta.js. */
+  const n=x=>{ if(x===undefined||x===null) return null; const s=String(x).trim(); if(s==='') return null;
+    const k=parseFloat(s); return isFinite(k)?k:null; };
   const bv=id=>$(id)?.checked||false;
   const _cR=calcCatResp(), _cM=calcCatMotor();
   // ★ Firma OBLIGATORIA — no se puede guardar sin firma del kinesiólogo ★
@@ -10090,6 +10246,11 @@ function guardar() {
     PLAN_PLANES:v('fPlanes'), PLAN_NOTA_TURNO:v('fNota'), PLAN_FIRMA_KINE:v('fFirma'),
     ANOTACIONES_JSON: JSON.stringify(ANOTS||[]),
   };
+  /* 🔴 G14 · EL EPISODIO QUE SE ABRIÓ VIAJA CON EL GUARDADO, SIEMPRE (también vacío: el servidor distingue «no
+     abrió ningún episodio» de «cliente que no lo manda»). Va FUERA del literal de arriba a propósito: no es un
+     campo del formulario —no lo escribe nadie— sino lo que el formulario ya traía cuando se abrió. No es columna
+     de ninguna hoja. Ver `_episodioAbierto`. */
+  datos.EPISODIO_ABIERTO=_episodioAbierto;
   // Editor de texto (opción A): lo que está EN PANTALLA es el texto oficial y
   // se guarda tal cual; la salida cruda del motor viaja aparte (TEXTO_AUTO)
   // para trazabilidad y refinamiento del generador. Sin edición manual, ambos
@@ -10112,6 +10273,11 @@ function guardar() {
   const _exito=r=>{
     btn.disabled=false; btn.textContent='✅ Guardado';
     toast('✅ Evolución guardada correctamente');
+    /* 🔴 G14 · El formulario ya es del paciente al que se guardó: un ingreso nace sin episodio, y desde este
+       primer guardado el siguiente ya viaja con el suyo (y queda protegido si la cama cambia de dueño).
+       Solo si el panel SIGUE siendo este: la respuesta de un guardado lento puede llegar cuando ya se abrió otra
+       cama, y entonces el episodio de aquella no le corresponde a esta. */
+    if(r && r.patientId && _episodioAbierto===datos.EPISODIO_ABIERTO && String(v('cBed'))===String(id)) _episodioAbierto=String(r.patientId);
     /* Texto DEFINITIVO. Si hubo edición manual, lo de pantalla ES lo guardado y
        no se toca. Si no, se refleja el que confirmó el servidor — y desde aquí
        queda CONGELADO (30-ago-2026): el turno ya está guardado, así que tocar
@@ -10142,16 +10308,25 @@ function guardar() {
     // «Guardar y cerrar» del modal de cierre: solo cierra si terminó bien.
     if(_cerrarTrasGuardar){ _cerrarTrasGuardar=false; cerrarPanel(true); }
   };
-  const _falloFinal=m=>{
+  /* `sesionCortada` (F3B): el servidor rechazó el guardado porque la sesión está cortada y la pantalla ya fue a la puerta
+     (`_sesionCortadaALaEntrada`). No es una red caída: el aviso dice qué pasó y qué hacer, sin «revisa la red». El formulario
+     NO se toca y `_reintentoGuardado` queda armado: al entrar con la clave, Reintentar manda estos mismos datos con la sesión nueva. */
+  const _falloFinal=(m,sesionCortada)=>{
     btn.disabled=false; btn.textContent='💾 Guardar Evolución';
-    toast('❌ No se pudo guardar: '+(m||'sin conexión')+' — tu evolución sigue en pantalla, revisa la red y aprieta 💾 de nuevo');
+    // 🔴 G14 · «La cama cambió de paciente» ya dice qué pasó y qué hacer; mandar a «revisar la red» sería mentir.
+    toast(_EP_CAMBIO_RE.test(m||'')
+      ? '❌ '+m
+      : sesionCortada
+        ? '🔐 Se cerró tu sesión: entra con tu clave y aprieta Reintentar — tu evolución sigue en pantalla'
+        : '❌ No se pudo guardar: '+(m||'sin conexión')+' — tu evolución sigue en pantalla, revisa la red y aprieta 💾 de nuevo');
     // O3b · el toast se apaga a los 3,2 s; esto NO. La franja del botón 💾
     // queda en error hasta que un guardado termine bien, con su Reintentar
     // que remanda los MISMOS datos. _formDirty sigue en true y el formulario
     // no se toca. Y se deja borrador local por si el equipo se apaga ahora.
     _cerrarTrasGuardar=false;
-    _reintentoGuardado=_enviar;
-    _marcaGuardadoError(m||'sin conexión');
+    // F2 · el rechazo por cambio de paciente no deja nada que reintentar: reenviaría lo mismo y recibiría lo mismo.
+    _reintentoGuardado=_EP_CAMBIO_RE.test(m||'')?null:_enviar;
+    _marcaGuardadoError(sesionCortada ? 'Tu sesión se cerró. Entra con tu clave y aprieta Reintentar: lo que escribiste sigue aquí.' : (m||'sin conexión'));
     _borradorGuardar();
   };
   // Reintento automático (v5.25): si la red parpadea justo al guardar, se
@@ -10164,13 +10339,23 @@ function guardar() {
     btn.disabled=true; btn.textContent='⏳ Guardando...';
     api('GUARDAR_EVOLUCION', datos).then(_exito).catch(e1=>{
       const m1=(e1&&e1.message)||String(e1);
-      if(/Sesión no válida|Inicia sesión/i.test(m1)){ loading(false); mostrarLogin(); _falloFinal(m1); return; }
+      // 🔴 F3B · Sesión cortada: a la puerta y SIN reintento automático (mandaría lo mismo y recibiría lo mismo; mientras tanto el
+      // aviso diría «sin respuesta»). El formulario queda como está. «No se pudo comprobar tu sesión» NO entra acá: es la planilla
+      // que no respondió, y sigue el camino de los errores reintentables (un reintento a los 3 s y «Reintentar» a mano).
+      if(_sesionCortadaALaEntrada(m1, m1)){ _falloFinal(m1, true); return; }
+      // 🔴 G14 · Un rechazo DELIBERADO del servidor (la cama cambió de paciente) no es una red que parpadeó:
+      // reintentar a los 3 s manda lo mismo y recibe lo mismo, y mientras tanto el aviso diría «sin respuesta».
+      if(_EP_CAMBIO_RE.test(m1)){ _falloFinal(m1); return; }
       btn.textContent='⏳ Reintentando…';
       toast('⚠️ Sin respuesta del servidor — reintentando en 3 s…');
       setTimeout(()=>{
         api('GUARDAR_EVOLUCION', datos)
           .then(r=>{ toast('✅ Guardado al segundo intento'); _exito(r); })
-          .catch(e2=>_falloFinal((e2&&e2.message)||String(e2)));
+          .catch(e2=>{
+            const m2=(e2&&e2.message)||String(e2);
+            // La sesión también puede cortarse ENTRE el primer intento y este (o el primero ser un parpadeo de red): mismo reconocimiento.
+            _falloFinal(m2, _sesionCortadaALaEntrada(m2, m2));
+          });
       }, 3000);
     });
   };
@@ -10187,7 +10372,9 @@ function egreso(id) {
   $('egDestino').value = '';
   hide('egOtroBox'); hide('egMotivoInfo');
   $('egOtroVal').value = '';
-  $('egBarthel').value = c.BARTHEL || '';
+  // 🔴 El Barthel 0 es un dato (el paciente más dependiente): `c.BARTHEL || ''` lo abría en blanco (F1). Vacío es
+  // solo '', null o undefined.
+  $('egBarthel').value = (c.BARTHEL === '' || c.BARTHEL == null) ? '' : c.BARTHEL;
   updBarthelLbl('egBarthel','lblEgBarthel');
   // APACHE II: si el episodio ya lo tiene, se informa; si no, última oportunidad
   const _apc = (c.APACHE2 !== '' && c.APACHE2 !== undefined && c.APACHE2 !== null) ? String(c.APACHE2) : '';
@@ -11478,6 +11665,16 @@ const HJ_RANGOS=[[7,'Últimos 7 días'],[14,'14 días'],[999,'Toda la estadía']
 const _hjT   = x => x===true||x==='TRUE';
 const _hjNum = x => { if(x===''||x==null) return null;
   const n=parseFloat(String(x).replace(',','.')); return isFinite(n)?n:null; };
+/* 🔴 EL CERO SE PINTA (F1, 4-oct-2026). «Vacío» es SOLO '', null o undefined: un 0 es un dato. Sheets devuelve el
+   0 de una celda numérica como el número 0 —falso en JS—, y `e.VENT_PEEP||e.VENT_EPAP||''` pintaba en blanco el
+   PEEP 0, la PS 0, el MRC 0, el FSS 0… que ahora SÍ se guardan (ceros_de_punta_a_punta.js, sección 10).
+   · `_hjPri(a,b,…)` = el primer valor NO vacío ('' si todos lo están). Un PEEP vacío cae al EPAP (BiPAP), un PEEP en
+     0 se queda en 0.
+   · `_hjTxt(x)` = el valor listo para la celda: vacío → '', y el número 0 → «0» (el 0 numérico es falso y la
+     celda lo trataría como «sin dato»: `val?…:'—'`). */
+const _hjVacio = x => x===''||x==null;
+const _hjPri = (...v) => { for(const x of v) if(!_hjVacio(x)) return x; return ''; };
+const _hjTxt = x => _hjVacio(x) ? '' : String(x);
 const _hjChip= (t,c) => `<span class="hjc hjc-${c}">${t}</span>`;
 const _hjJson= s => { try{ return JSON.parse(s||'[]')||[]; }catch(e){ return []; } };
 /** Día n de la vida de un dispositivo respecto de la fecha de la columna. */
@@ -11524,15 +11721,16 @@ const HJ_F = {
             return v+(e.CALC_ML_KG?' · <b>'+e.CALC_ML_KG+'</b>':''); }, spark:e=>_hjNum(e.CALC_ML_KG)},
   flujo: {l:'Flujo / T. insp', per:'t', f:e=>e.VENT_FLUJO?(e.VENT_FLUJO+' L'):(e.VENT_TI?(e.VENT_TI+' s'):'')},
   fr:    {l:'Frecuencia', per:'t', f:e=>e.VENT_FR||'', spark:e=>_hjNum(e.VENT_FR)},
-  peep:  {l:'PEEP / EPAP', per:'t', f:e=>e.VENT_PEEP||e.VENT_EPAP||'', spark:e=>_hjNum(e.VENT_PEEP||e.VENT_EPAP)},
-  ps:    {l:'P. Soporte / IPAP', per:'t', f:e=>e.VENT_PS||e.VENT_IPAP||'', spark:e=>_hjNum(e.VENT_PS||e.VENT_IPAP)},
+  // 🔴 PEEP/EPAP y PS/IPAP: el primero NO vacío (F1). Con `||` un PEEP en 0 caía al EPAP, o a blanco.
+  peep:  {l:'PEEP / EPAP', per:'t', f:e=>_hjTxt(_hjPri(e.VENT_PEEP,e.VENT_EPAP)), spark:e=>_hjNum(_hjPri(e.VENT_PEEP,e.VENT_EPAP))},
+  ps:    {l:'P. Soporte / IPAP', per:'t', f:e=>_hjTxt(_hjPri(e.VENT_PS,e.VENT_IPAP)), spark:e=>_hjNum(_hjPri(e.VENT_PS,e.VENT_IPAP))},
   pmax:  {l:'P. Máxima', per:'t', f:e=>e.VENT_PMAX||''},
   pmed:  {l:'P. Media', per:'t', f:e=>e.VENT_PMEDIA||''},
   pplat: {l:'P. Plateau', per:'t', f:e=>e.VENT_PPL||''},
   dp:    {l:'P. Distensión', per:'t', f:e=>{ const n=_hjNum(e.CALC_DP); if(n==null) return '';
             return n<=15?_hjChip('✓ '+e.CALC_DP,'ok'):_hjChip('⚠ '+e.CALC_DP,'warn'); }, spark:e=>_hjNum(e.CALC_DP)},
   compl: {l:'Compliance', per:'t', f:e=>e.CALC_CESR||''},
-  apeep: {l:'Auto PEEP', per:'t', f:e=>e.VENT_AUTOPEEP||''},
+  apeep: {l:'Auto PEEP', per:'t', f:e=>_hjTxt(e.VENT_AUTOPEEP)},
   ie:    {l:'Relación I:E', per:'t', f:e=>e.CALC_IE||''},
   tobin: {l:'Índice de Tobin', per:'t', f:e=>{ const n=_hjNum(e.CALC_TOBIN); if(n==null) return '';
             return n<105?_hjChip('✓ '+e.CALC_TOBIN,'ok'):_hjChip('⚠ '+e.CALC_TOBIN,'warn'); }, spark:e=>_hjNum(e.CALC_TOBIN)},
@@ -11614,18 +11812,18 @@ const HJ_F = {
             if(/relat/i.test(t)) return _hjChip('⚠ Relativa','warn');
             if(_hjT(e.KTM_REALIZADA)) return _hjChip('✓ Sin contraind.','ok');
             return e.KTM_NO_RAZON?_hjChip('No realizada: '+e.KTM_NO_RAZON,'gray'):''; }},
-  mrc:   {l:'MRC-ss ( /60)', per:'d', ver:'mrc', f:e=>e.EVAL_T_MRC||'', spark:e=>_hjNum(e.EVAL_T_MRC)},
+  mrc:   {l:'MRC-ss ( /60)', per:'d', ver:'mrc', f:e=>_hjTxt(e.EVAL_T_MRC), spark:e=>_hjNum(e.EVAL_T_MRC)},
   dauci: {l:'Debilidad UCI (≤48)', per:'d', f:e=>{ const n=_hjNum(e.EVAL_T_MRC); if(n==null) return '';
             return n<=48?_hjChip('✕ SÍ','bad'):_hjChip('✓ NO','ok'); }},
-  fss:   {l:'FSS-ICU ( /35)', per:'d', ver:'fss', f:e=>e.EVAL_T_FSS||'', spark:e=>_hjNum(e.EVAL_T_FSS)},
-  cpax:  {l:'CPAx ( /50)', per:'d', f:e=>e.CPAX_TOTAL||'', spark:e=>_hjNum(e.CPAX_TOTAL)},
+  fss:   {l:'FSS-ICU ( /35)', per:'d', ver:'fss', f:e=>_hjTxt(e.EVAL_T_FSS), spark:e=>_hjNum(e.EVAL_T_FSS)},
+  cpax:  {l:'CPAx ( /50)', per:'d', f:e=>_hjTxt(e.CPAX_TOTAL), spark:e=>_hjNum(e.CPAX_TOTAL)},
   ims:   {l:'IMS (0-10)', per:'d', f:e=>{ const v=e.EVAL_IMS; if(v===''||v==null) return '';
             const it=(typeof IMS_NIVELES!=='undefined')?IMS_NIVELES.find(x=>String(x[0])===String(v)):null;
             return _hjChip(v+(it?' · '+it[2].split('—')[0].trim():''), parseInt(v)>=5?'ok':(parseInt(v)>=3?'blue':'gray')); },
           spark:e=>_hjNum(e.EVAL_IMS)},
-  dina:  {l:'Dinamometría', per:'d', f:e=>e.EVAL_T_DINAMO?e.EVAL_T_DINAMO+' kg':''},
+  dina:  {l:'Dinamometría', per:'d', f:e=>_hjVacio(e.EVAL_T_DINAMO)?'':e.EVAL_T_DINAMO+' kg'},
   pimpem:{l:'PIM / PEM / FEM', per:'d', f:e=>{ const a=[e.EVAL_T_PIM,e.EVAL_T_PEM,e.EVAL_T_FEM];
-            return a.some(x=>x!==''&&x!=null)?a.map(x=>x||'—').join(' / '):''; }},
+            return a.some(x=>!_hjVacio(x))?a.map(x=>_hjVacio(x)?'—':x).join(' / '):''; }},
   eco:   {l:'Eco diafragma', per:'d', f:e=>{ const g=e.EVAL_T_GROSOR, fd=e.EVAL_T_FED_D;
             if(!g&&!fd) return ''; return [g?g+' mm':'', fd?'FED '+fd+'%':''].filter(Boolean).join(' · '); }},
   degl:  {l:'Deglución', per:'d', f:e=>{ const d=e.EVAL_DEGLUCION||''; if(!d) return '';
@@ -11771,22 +11969,22 @@ function hjVer(tipo, fecha){
     h='<table style="width:100%;border-collapse:collapse;font-size:.74rem;">'+
       '<tr><th style="text-align:left;">MOVIMIENTO</th><th>DERECHO</th><th>IZQUIERDO</th></tr>';
     _HJ_MRC_MOV.forEach((m,i)=>{
-      const d=e['EVAL_MRC_D'+(i+1)]||'', iz=e['EVAL_MRC_I'+(i+1)]||'';
+      const d=_hjTxt(e['EVAL_MRC_D'+(i+1)]), iz=_hjTxt(e['EVAL_MRC_I'+(i+1)]);   // el 0 de un movimiento es un dato (F1)
       sD+=parseInt(d)||0; sI+=parseInt(iz)||0;
       h+=`<tr><td style="text-align:left;">${i+1}. ${m}</td><td>${d||'—'}</td><td>${iz||'—'}</td></tr>`;
     });
     h+=`<tr class="tot"><td style="text-align:left;"><b>Fuerza subtotal</b></td><td><b>${sD} / 30</b></td><td><b>${sI} / 30</b></td></tr></table>`;
     const t=_hjNum(e.EVAL_T_MRC);
-    tot=`MRC SUM SCORE TOTAL: <b>${e.EVAL_T_MRC||sD+sI} / 60</b> · Debilidad adquirida en UCI (≤48): `+
+    tot=`MRC SUM SCORE TOTAL: <b>${_hjVacio(e.EVAL_T_MRC)?sD+sI:e.EVAL_T_MRC} / 60</b> · Debilidad adquirida en UCI (≤48): `+
         (t!=null?(t<=48?_hjChip('✕ SÍ','bad'):_hjChip('✓ NO','ok')):'—');
   } else {
     h='<table style="width:100%;border-collapse:collapse;font-size:.74rem;">'+
       '<tr><th style="text-align:left;">ACTIVIDAD</th><th>PUNTAJE (0-7)</th></tr>';
     _HJ_FSS_ACT.forEach((a,i)=>{
-      h+=`<tr><td style="text-align:left;">${i+1}. ${a}</td><td>${e['EVAL_FSS_IT'+(i+1)]||'—'}</td></tr>`;
+      h+=`<tr><td style="text-align:left;">${i+1}. ${a}</td><td>${_hjTxt(e['EVAL_FSS_IT'+(i+1)])||'—'}</td></tr>`;
     });
     h+='</table>';
-    tot=`TOTAL: <b>${e.EVAL_T_FSS||'—'} / 35</b>`;
+    tot=`TOTAL: <b>${_hjTxt(e.EVAL_T_FSS)||'—'} / 35</b>`;
   }
   const [y,m,d]=fecha.split('-');
   $('hjDet').innerHTML=`<div style="font-size:.85rem;font-weight:800;color:var(--pdark);margin-bottom:9px;">🔍 `+
@@ -18470,7 +18668,10 @@ function setTab(t){
   const _bar=document.querySelector('.tabs'), _bt=$('tab'+t);
   if(_bar&&_bt){ _bar.scrollTo({left: _bt.offsetLeft-(_bar.clientWidth-_bt.offsetWidth)/2, behavior:'smooth'}); }
   if(t==='D' && !window._statsLoaded) dashPreset('mes', document.querySelector('.dpset'));
-  if(t==='D' && $('indMes') && !$('indMes').value){ const _h=new Date().toISOString().slice(0,7); $('indMes').value=_h; if($('remMes')&&!$('remMes').value) $('remMes').value=_h; }
+  // 🔴 El mes sugerido es el del CALENDARIO LOCAL (`hoy()`), como los botones «Mes actual» / «Mes anterior» de esta
+  // misma pestaña (`dashPreset`). NO `toISOString()`: es UTC y Chile va 3 o 4 horas atrás, así que la noche del último
+  // día del mes (pasadas las 20-21 h) sugería el mes SIGUIENTE — y el REM se cierra por mes. Guardia: estadisticas_mes_local.js.
+  if(t==='D' && $('indMes') && !$('indMes').value){ const _h=hoy().slice(0,7); $('indMes').value=_h; if($('remMes')&&!$('remMes').value) $('remMes').value=_h; }
   // Indicadores centinela en tiempo real: se calculan solos al entrar (año en curso)
   if(t==='D' && !window._indAuto){ window._indAuto=true; indCalcular('anio'); }
   if(t==='E') initEntrega();
@@ -18753,6 +18954,9 @@ function regCSV(){
 // ══ ARCHIVADOS (pacientes egresados) ══════════════════════════════════════
 let ARC_ALL=null, ARC_VIEW=[];
 const _arcF=s=>s?String(s).slice(0,10).split('-').reverse().join('-'):'—';
+// 🔴 Un valor del archivo, o «—» si no hay: el 0 (Barthel 0, FSS 0…) ES un dato y se muestra (F1). `a.barthelEg||'—'`
+// lo pintaba como «—»; y `a.barthelIn??'—'` dejaba en blanco el '' que Sheets devuelve para una celda vacía.
+const _arcVal=x=>(x===''||x==null)?'—':x;
 
 function initArchivados(){ if(ARC_ALL===null) arcCargar(); }
 
@@ -18825,7 +19029,7 @@ function arcDetalle(i){
       ${chip('Cama',a.cama)}${chip('Edad',(a.edad||'?')+'a '+(a.sexo||''))}
       ${chip('Diagnóstico',a.diagnostico)}${chip('Motivo',a.motivo)}${chip('Destino',a.destino)}
       ${chip('KTR totales',a.ktr)}${chip('Turnos KTM',a.turnosKTM)}
-      ${chip('Barthel in/eg',(a.barthelIn??'—')+' / '+(a.barthelEg||'—'))}
+      ${chip('Barthel in/eg',_arcVal(a.barthelIn)+' / '+_arcVal(a.barthelEg))}
       ${chip('MRC egreso',a.mrc)}${chip('FSS egreso',a.fss)}${chip('CPAx egreso',a.cpax)}
       ${a.dauci?'<div style="background:#dc262618;border:1px solid #dc262655;border-radius:8px;padding:7px 11px;color:#dc2626;font-weight:800;font-size:.8rem;align-self:center;">⚠️ DAUCI al egreso</div>':''}
       ${chip('Kine responsable',a.firma)}
@@ -19142,7 +19346,7 @@ function coordAbrir(pid, cama){
   gs('COORD_FICHA',{token:COORD_TK, patientId:pid, idCama:cama}, r=>{
     coordPintarFicha(r);
   }, m=>{ $('coordFicha').innerHTML='<div class="pivot-empty" style="color:var(--danger);">'+_cEsc(m)+'</div>';
-          if(/sesión/i.test(m)){ COORD_TK=null; coordInit(); } });
+          if(_sesionCoordCortada(m)){ COORD_TK=null; coordInit(); } });
 }
 
 function coordPintarFicha(f){
@@ -19214,7 +19418,7 @@ async function coordGuardar(){
     if(r.avisoVM) toast('⚠️ Los días de VM del archivo no se pueden recalcular (no guardan su fecha de inicio): revísalos a mano.', 7000);
     coordAbrir(COORD_PID, r.idCama||'');
     recargar();
-  }, m=>{ toast('❌ '+m, 5200); if(/sesión/i.test(m)){ COORD_TK=null; coordInit(); } });
+  }, m=>{ toast('❌ '+m, 5200); if(_sesionCoordCortada(m)){ COORD_TK=null; coordInit(); } });
 }
 
 function _coordValorPrevio(f, campo){
@@ -22163,24 +22367,26 @@ function pivRender(){
     (PIV_DIM.find(x=>x[0]===fK)||['',''])[1]+'</th>'+
     cols.map(c=>`<th style="border:1px solid var(--border);background:#f1efec;padding:3px 9px;">${c}</th>`).join('')+
     '<th style="border:1px solid var(--border);background:#e4e1da;padding:3px 9px;">TOTAL</th></tr>';
-  const totCol={}; let totGral=0, nGral=0;
+  // 🔴 «Nadie anotó» no suma 0 (F1): una fila —o la tabla entera— sin NINGÚN dato en sus celdas muestra «—» en el
+  // total, igual que sus celdas. Antes el total de una fila sin datos decía 0 al lado de un «—».
+  const totCol={}; let totGral=0, nGral=0, hayGral=false;
   filas.forEach(f=>{
     let totFila=0,nFila=0;
     h+='<tr><td style="border:1px solid var(--border);padding:3px 9px;font-weight:700;background:#fbfaf9;">'+f+'</td>';
     cols.forEach(c=>{
       const k=f+''+c, x=val(k);
-      if(x!=null){ totFila+=celda[k]; nFila+=(modo==='P'?nCel[k]:1); totCol[c]=(totCol[c]||0)+celda[k]; totGral+=celda[k];
+      if(x!=null){ hayGral=true; totFila+=celda[k]; nFila+=(modo==='P'?nCel[k]:1); totCol[c]=(totCol[c]||0)+celda[k]; totGral+=celda[k];
         if(modo==='P'){ nGral+=nCel[k]; totCol['n'+c]=(totCol['n'+c]||0)+nCel[k]; } }
       h+='<td style="border:1px solid var(--border);padding:3px 9px;text-align:center;">'+fmt(x)+'</td>';
     });
-    const tf=modo==='P'?(nFila?Math.round(10*totFila/nFila)/10:null):Math.round(10*totFila)/10;
+    const tf=!nFila?null:(modo==='P'?Math.round(10*totFila/nFila)/10:Math.round(10*totFila)/10);
     h+='<td style="border:1px solid var(--border);padding:3px 9px;text-align:center;font-weight:800;background:#fbfaf9;">'+fmt(tf)+'</td></tr>';
   });
   h+='<tr><td style="border:1px solid var(--border);padding:3px 9px;font-weight:800;background:#e4e1da;">TOTAL</td>';
   cols.forEach(c=>{ const t=totCol[c];
     const x=t==null?null:(modo==='P'?Math.round(10*t/(totCol['n'+c]||1))/10:Math.round(10*t)/10);
     h+='<td style="border:1px solid var(--border);padding:3px 9px;text-align:center;font-weight:800;background:#f1efec;">'+fmt(x)+'</td>'; });
-  const tg=modo==='P'?(nGral?Math.round(10*totGral/nGral)/10:null):Math.round(10*totGral)/10;
+  const tg=!hayGral?null:(modo==='P'?(nGral?Math.round(10*totGral/nGral)/10:null):Math.round(10*totGral)/10);
   h+='<td style="border:1px solid var(--border);padding:3px 9px;text-align:center;font-weight:800;background:#e4e1da;">'+fmt(tg)+'</td></tr></table>';
   out.innerHTML=h;
 }
@@ -22505,7 +22711,12 @@ function accMostrarPuerta(mensaje){
   if(sub) sub.innerHTML='Registro Clínico Electrónico · Kinesiología<br>Entra con tu firma y tu clave.';
   const f=$('accForm'); if(f) f.style.display='block';
   $('loginMsg').textContent = mensaje || '';
-  setTimeout(()=>{ const u=$('accUsr'); if(u&&!u.value) u.focus(); else $('accClave')?.focus(); }, 60);
+  /* 120 ms y no 60: el cuadro «No se guardó» (`_avErrAbrir`) enfoca su botón a los 60 ms. Cuando la puerta ya se conocía
+     (`__ACC_ACTIVO`: pasa desde que entrar por una sesión cortada ya no recarga la página, así que una segunda sesión cortada
+     en la misma pantalla la abre al tiro) se abre justo ANTES que ese cuadro, y con el mismo plazo el cursor quedaba en un
+     «Reintentar» tapado por la puerta: quien tecleaba su clave no escribía en ningún campo. El foco de la puerta tiene que
+     ser el último. Guardia: acceso_pantalla.js, sección 9. */
+  setTimeout(()=>{ const u=$('accUsr'); if(u&&!u.value) u.focus(); else $('accClave')?.focus(); }, 120);
 }
 
 /** Entrar, o —si la clave era temporal— entrar y cambiarla en el mismo paso. */
@@ -22562,7 +22773,18 @@ function accAdentro(d){
   $('accNuevaBox').style.display='none';
   $('accUsr').readOnly=false;
   const btn=$('accBtn'); if(btn){ btn.disabled=false; btn.textContent='Entrar'; }
-  toast('👋 Hola '+((d&&d.nombre)||(d&&d.firma)||''));
+  const quien=((d&&d.nombre)||(d&&d.firma)||'');
+  /* 🔴 F3B · Si la sesión se cortó con una evolución abierta y escrita, NO se recarga: recargar tira el formulario (queda el
+     borrador local, pero hay que volver a buscar la cama, abrirla y confiar en que el borrador sea el último). La puerta se
+     cierra, el formulario sigue donde estaba y la franja «NO se guardó» conserva su Reintentar, que manda lo mismo con la sesión
+     nueva. Solo cambia lo que dependía de la sesión vieja: quién es (la cabecera) y el token, que ya quedó puesto en `accEntrar`.
+     Si entró OTRA persona, el servidor rechaza firmar como la anterior («No puedes firmar como…») en vez de aceptarlo. */
+  if(typeof _aftPanelSucio==='function' && _aftPanelSucio()){
+    toast('👋 Hola '+quien+' — tu evolución sigue aquí: aprieta Reintentar para guardarla', 6500);
+    api('WHOAMI',{}).then(w=>{ if(w){ YO=w; hSesRender(); } }).catch(()=>{});
+    return;
+  }
+  toast('👋 Hola '+quien);
   // Se recarga en vez de continuar a mano: el arranque ya sabe pedirlo todo
   // con el token puesto, y repetir esa secuencia acá sería mantener dos.
   location.reload();

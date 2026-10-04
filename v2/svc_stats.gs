@@ -409,15 +409,23 @@ function datosPivot(desde, hasta) {
       .filter(e => { const f = _statISO(e.FECHA); return f && (!d0 || f >= d0) && (!d1 || f <= d1); })
       .sort((a, b) => String(a.TURNO_KEY).localeCompare(String(b.TURNO_KEY)));
     const esT = v => v === true || v === 'TRUE';
+    // 🔴 EL CERO SE EXPORTA Y EL VACÍO NO SE VUELVE CERO (F1, 4-oct-2026). Vacío es solo undefined o null (Sheets
+    // entrega '' para la celda en blanco); el 0 es un dato. Con `e.VENT_PEEP || ''` un PEEP 0, un MRC 0, un CPAx 0 y
+    // —sobre todo— el Día 0 de la estadía (el del ingreso) salían como «(vacío)» y quedaban fuera de los promedios
+    // de la tabla. Local, como `esT`: este servicio no depende de ningún global de infraestructura.
+    const nv = v => (v === undefined || v === null) ? '' : v;
     const filas = todas.slice(0, LIM).map(e => {
       const f = _statISO(e.FECHA);
       let fase = ''; try { fase = (JSON.parse(e.FASE_JSON || '[]') || [])[0] || ''; } catch (err) { fase = ''; }
+      // Al revés: `parseInt(...) || 0` exportaba «0 sesiones» donde nadie anotó nada. Sin dato, vacío: el cruce de
+      // la pantalla no lo suma ni lo cuenta en el divisor de un promedio (solo cuenta lo que se anotó, 0 incluido).
+      const ktrN = parseInt(e.RESP_KTR_CANT, 10);
       return {
         FECHA: f, MES: f.slice(0, 7), TURNO: String(e.TURNO || ''), CAMA: String(e.ID_CAMA || ''),
         SEXO: String(e.PAC_SEXO || ''), EDAD: e.PAC_EDAD || '', DIAG_REM: String(e.PAC_DIAG_REM || ''),
         FASE: fase, VIA_AEREA: String(e.VENT_VIA_AEREA || ''), SOPORTE: String(e.VENT_SOPORTE || ''),
-        MODO: String(e.VENT_MODO || ''), DIA_ESTADIA: e.DIA_ESTADIA || '',
-        KTR: parseInt(e.RESP_KTR_CANT) || 0,
+        MODO: String(e.VENT_MODO || ''), DIA_ESTADIA: nv(e.DIA_ESTADIA),
+        KTR: isNaN(ktrN) ? '' : ktrN,
         KTM: esT(e.KTM_REALIZADA) ? 'Sí' : (esT(e.KTM_SUSPENDIDA) ? 'Suspendida' : 'No'),
         KTM_MOTIVO: _ktmMotivo(e),
         NIVEL_KTM: String(e.KTM_NIVEL_KTR || ''), IMT: esT(e.KTM_IMT) ? 'Sí' : 'No',
@@ -428,8 +436,8 @@ function datosPivot(desde, hasta) {
         PVE_MOTIVO: _pveMotivo(e), PVE_DETALLE: String(e.PVE_SC_DET || ''),
         EXTUBACION: esT(e.EXT_OCURRIO) ? String(e.EXT_TIPO || 'sí') : '',
         CUFF: String(e.VENT_CUFF_EST || ''),
-        FIO2: e.VENT_FIO2 || '', PEEP: e.VENT_PEEP || '', PAFI: e.VENT_PAFI || '',
-        MRC: e.EVAL_T_MRC || '', CPAX: e.CPAX_TOTAL || '',
+        FIO2: nv(e.VENT_FIO2), PEEP: nv(e.VENT_PEEP), PAFI: nv(e.VENT_PAFI),
+        MRC: nv(e.EVAL_T_MRC), CPAX: nv(e.CPAX_TOTAL),
       };
     });
     return ok({ filas: filas, total: todas.length, truncado: todas.length > LIM });

@@ -5,6 +5,66 @@
  * se sirve con obtenerEvolucionPrevia().
  */
 
+/**
+ * validarEpisodioAbierto — el formulario que se abrió para un paciente no se guarda sobre otro (G14, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `guardarEvolucion` atribuía lo que se guarda a «el paciente que tenga la cama AHORA» y nunca
+ * lo comparaba con el que el formulario había abierto. Un formulario que quedaba abierto mientras la cama se
+ * daba de alta y se reingresaba a OTRO paciente escribía la evolución del anterior sobre el nuevo ocupante:
+ * la fila salía con el PATIENT_ID del nuevo y `_syncCamaDesdeEvolucion` le copiaba a su tarjeta los parámetros
+ * del que ya no estaba. Dato verdadero, persona equivocada, y nadie lo ve. Guardia: episodio_al_guardar.js.
+ *
+ * El campo se llama `EPISODIO_ABIERTO`: el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el formulario (no al
+ * guardar). NO es columna de ninguna hoja (viaja transitorio, como PAC_RUT): no entra a `esquema.gs`.
+ *
+ * LAS REGLAS, y por qué cada una:
+ *  · AUSENTE (undefined/null) ⇒ no se comprueba. Es COMPATIBILIDAD con las llamadas por API sin navegador (smoke
+ *    tests, build/sim, medidores), que nunca lo mandaron. El cliente real SIEMPRE lo manda.
+ *  · VACÍO ('') ⇒ el formulario no abrió ningún episodio (ingreso en cama libre, o episodio sin ingreso formal)
+ *    y por lo tanto no reclama ninguno: guarda como hasta hoy. 🪤 A propósito: si el vacío rechazara cuando la
+ *    cama ya tiene paciente, el reintento automático de un INGRESO cuyo primer intento sí aterrizó (y cuya
+ *    respuesta se perdió) se vería idéntico a «otro ingreso en la misma cama» y se rechazaría por error. La
+ *    pantalla cierra ese hueco por su lado: al guardar bien toma el episodio que el servidor le devuelve, y desde
+ *    ahí el formulario ya es de ese paciente.
+ *  · CON VALOR ⇒ tiene que ser el de la cama. Si la cama pasó a otro paciente, o quedó libre (alta, traslado,
+ *    limpieza), se rechaza.
+ *
+ * 🗂️ CORREGIR UN TURNO PASADO (F2, 4-oct-2026). Desde la vista de un día pasado, «Ver / editar» abre el turno de
+ * ESE día, y el formulario reclama el episodio de la tarjeta que esa vista MOSTRÓ (la que arma lo registrado ese
+ * día), no el del censo vivo: la pantalla lo decide, y aquí solo se compara con quien ocupa la cama HOY. El turno
+ * pasado del paciente que SIGUE en la cama se corrige como siempre. El de uno que ya no está (egresado, trasladado)
+ * se RECHAZA con este mismo mensaje, tenga la cama otro paciente o esté libre. 🔴 DECISIÓN DE PRODUCTO DE DIEGO,
+ * PENDIENTE: ¿debe poderse corregir el turno pasado de un paciente ya egresado cuando su cama la ocupa otro? Hoy NO:
+ * es el comportamiento seguro por omisión —atribuir ese turno «a quien esté en la cama» es justo el error que esta
+ * regla existe para impedir— y su costo es que esa corrección no se puede hacer desde la pantalla. Si la respuesta
+ * es que sí, hace falta una operación aparte que nombre el episodio; NO se arregla aflojando esta comparación.
+ * (La frase «desde que abriste este formulario» no es exacta en ese caso —el cambio fue antes de abrirlo—, pero es
+ * el mensaje acordado y la pantalla lo reconoce por su texto: cambiarlo se hace en los dos lados.)
+ *
+ * Es PURA: no lee la cama, la recibe. Quien llama la lee DENTRO del lock y la compara ANTES de escribir nada.
+ * El mensaje no nombra a nadie ni lleva el identificador del episodio (queda en AUDIT_LOG y en pantalla). La
+ * pantalla reconoce este rechazo por la frase «cambió de paciente» (`_EP_CAMBIO_RE` en index.html): si se
+ * reescribe, se reescribe en los dos lados — la guardia lo ata.
+ *
+ * 🪤 VIVE AQUÍ y no en `dominio_validacion.gs`, aunque sea una validación pura: varios bancos de prueba antiguos
+ * cargan una lista FIJA de archivos que trae este servicio y no aquel (y le ponen un doble a
+ * `validarPayloadEvolucion`). Una comprobación de seguridad que se SALTARA en silencio cuando no está definida
+ * —el `typeof` de más abajo para la vía aérea— es peor que una que viaja siempre con quien la usa.
+ *
+ * @param  abierto  EPISODIO_ABIERTO del payload
+ * @param  pidCama  PATIENT_ID que tiene la cama AHORA
+ * @param  idCama   número de la cama, solo para el mensaje
+ * @return '' si se puede guardar; el mensaje, en palabras simples, si no.
+ */
+function validarEpisodioAbierto(abierto, pidCama, idCama) {
+  if (abierto === undefined || abierto === null) return '';
+  const ab = String(abierto).trim();
+  if (!ab) return '';
+  if (ab === String(pidCama === undefined || pidCama === null ? '' : pidCama).trim()) return '';
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste este formulario, ' +
+    'así que no se guardó nada. Cierra el formulario y vuelve a abrir la cama para ver cómo está ahora.';
+}
+
 // ═══ ESCRITURA ════════════════════════════════════════════
 function guardarEvolucion(datos, ctx) {
   const errs = validarPayloadEvolucion(datos);
@@ -74,6 +134,20 @@ function guardarEvolucion(datos, ctx) {
       // qué episodio es la fila previa, y eso solo lo dice la cama.
       const filaCama = repoBuscarFila('CAMAS_ESTADO', 'ID_CAMA', idCama);
       const cama = filaCama === -1 ? {} : repoLeerFila('CAMAS_ESTADO', filaCama);
+
+      /* 🔴 EL EPISODIO SE COMPRUEBA AL GUARDAR (G14, 4-oct-2026). Lo primero que se hace con la cama leída, y
+         antes de CUALQUIER escritura: la pantalla manda `EPISODIO_ABIERTO` (el paciente que tenía la tarjeta
+         cuando se abrió el formulario) y aquí, dentro del lock, se compara con el que ocupa la cama AHORA. Un
+         formulario que quedó abierto mientras la cama se daba de alta y se reingresaba a OTRO paciente
+         escribía la evolución del anterior sobre el nuevo: la línea `datos.PATIENT_ID || cama.PATIENT_ID` de
+         más abajo atribuía todo a «quien esté en la cama», sin preguntar de quién era el formulario.
+         Si no coinciden se rechaza sin escribir nada (la huella queda en AUDIT_LOG, que lo hace el
+         dispatcher). La regla —campo ausente no rechaza, vacío no reclama episodio— y su porqué están en
+         `validarEpisodioAbierto`, y la guardia que la ata es episodio_al_guardar.js. 🪤 Tiene que ir ANTES de
+         la validación de vía aérea de abajo: esa ya mira la cama, y mirar una cama que cambió de dueño solo
+         produce un mensaje que habla de otro paciente. */
+      const _errEpisodio = validarEpisodioAbierto(datos.EPISODIO_ABIERTO, cama.PATIENT_ID, idCama);
+      if (_errEpisodio) return err(_errEpisodio, ERR.VALIDACION);
 
       // 🗂️ Dos reglas del episodio que necesitan la CAMA para decidir, y por
       // eso no caben en validarPayloadEvolucion (que es puro). Se evalúan
@@ -791,7 +865,12 @@ function _aetSerieDelTurno(cama, evo, turnoKey, fecha, turno) {
 
 function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, patientId, filaCama, timelineJson) {
   const esIngreso = esVerdadero(evo.ES_INGRESO);
-  const val = (a, b) => (a !== undefined && a !== null && a !== '') ? a : (b || '');
+  /* 🔴 EL CERO DE RESPALDO NO SE PIERDE (G06, 4-oct-2026). `val(a, b)` es «lo del turno y, si el turno no dijo
+     nada, lo que ya tenía la cama». El respaldo era `b || ''`: Sheets devuelve el 0 de una celda numérica como
+     el número 0 —que es falso— y el siguiente guardado sin ese campo borraba Barthel 0, FSS 0, MRC 0… justo los
+     pacientes más dependientes. Vacío es solo undefined, null o ''; el 0 es un dato. */
+  const _vacio = x => x === undefined || x === null || x === '';
+  const val = (a, b) => !_vacio(a) ? a : (_vacio(b) ? '' : b);
 
   /* 🔴 UNA SOLA PUERTA AL RELOJ (17-sep-2026). El paso de prevención no manda
      fechas: manda la MARCA ('' sin revisar · 'ok' vigente · 'chg' cambiado).
@@ -1038,7 +1117,9 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
   if (_marcasSueltas !== null) campos.CORRECCIONES_JSON = _marcasSueltas;
 
   // Snapshot por turno (para la tabla de Registro Diario)
-  const ktrCant = parseInt(evo.RESP_KTR_CANT) || 0;
+  // 🔴 Sin sesiones anotadas el snapshot queda VACÍO, no «0 sesiones» (G06): «nadie anotó» no es «hizo cero».
+  const _ktrN = parseInt(evo.RESP_KTR_CANT, 10);
+  const ktrCant = isNaN(_ktrN) ? '' : _ktrN;
   const ktmTurno = esVerdadero(evo.KTM_REALIZADA) ? (evo.KTM_NIVEL_KTR || '') : (esVerdadero(evo.KTM_SUSPENDIDA) ? 'C' : '');
   const procStr = evo.PROC_RESUMEN || '';
   const firmaT = evo.PLAN_FIRMA_KINE || '';

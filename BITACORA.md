@@ -3321,3 +3321,49 @@ existen los pasos (miran `offsetParent`). Ver `PENDIENTES.md` 4b.
 
 Sello `NEXT-5.4-revision-maxima`.
 
+
+---
+
+## 4-oct-2026 · Tanda 1 de integridad: las cuatro correcciones de septiembre, rehechas sobre NEXT-5.4
+
+**De dónde sale.** El plan «limpieza del registro de evolución» (3-oct) traía cuatro correcciones preparadas en septiembre
+(commit local `c312de3`) que nunca llegaron a GitHub. La tanda 0 (4-oct) midió que **ninguna** estaba en la rama viva y
+que la batería base daba 212 verdes. Se rehicieron desde cero, cada una con su guardia vista ROJA primero. Después una
+revisión adversarial independiente (dos lentes por corrección) encontró 31 hallazgos, cuatro importantes, y se arreglaron.
+
+| Defecto | Qué pasaba | Guardia (roja antes, verde después) |
+|---|---|---|
+| Ceros | `parseFloat(x)\|\|null` en `guardar()` y `(b\|\|'')` en `_syncCamaDesdeEvolucion` volvían vacío un 0 válido (PEEP, PS, AutoPEEP, PIC, PPC, Barthel, MRC, FSS…). Mismo defecto en el alta (`darAltaPaciente`), el Historial, el egreso, los archivados y la tabla dinámica. El servidor aceptaba NaN e Infinity | `ceros_de_punta_a_punta.js` |
+| Episodio al guardar | El servidor usaba `datos.PATIENT_ID \|\| cama.PATIENT_ID` y no comparaba el episodio que el formulario abrió con el que ocupa hoy la cama. Ahora la pantalla manda `EPISODIO_ABIERTO` y el servidor rechaza, dentro del lock y antes de escribir, si la cama cambió de paciente | `episodio_al_guardar.js` |
+| `_evalHoy` en UTC | Pasadas las 20-21 h de Chile «hoy» era mañana y reabrir un turno de día no reponía sus evaluaciones. Igual el mes por defecto de Estadísticas el último día del mes | `eval_hoy_fecha_del_turno.js`, `estadisticas_mes_local.js` |
+| Sesiones | Desactivar a alguien o cambiarle la clave no cortaba sus sesiones abiertas (hasta 6 h renovables). Ahora la sesión lleva una versión por persona y se comprueba ACTIVO; lo mismo en Coordinación por cambio de clave | `acceso_revocacion.js`, `coordinacion_revocacion.js`, `acceso_pantalla.js` |
+| Caché PWA | `activate` borraba TODOS los cachés del origen y `fetch` guardaba cualquier GET propio. Ahora solo borra los `rce-armazon-` de otra versión y solo guarda el armazón | `pwa_cache_aislado.js` |
+
+**Lo que cambió de comportamiento y Diego debe saber** (decisiones abiertas, ninguna tomada por mí):
+- Un turno PASADO de un paciente ya egresado, abierto con «Ver / editar» cuando la cama la ocupa otro, ahora el servidor lo
+  rechaza. Antes se guardaba atribuido al ocupante de hoy.
+- Tras ese rechazo el botón principal es «Cerrar la cama», no «Reintentar» (reenviaba lo mismo y recibía el mismo rechazo).
+- Un egreso con MRC 0 ahora se archiva (antes quedaba vacío) y cuenta como DAUCI; `obtenerStats` sigue filtrando MRC/FSS/CPAx
+  de valor 0 de sus promedios, así que conteo y promedios quedan en desacuerdo hasta decidir.
+- El promedio de KTR en la tabla dinámica cuenta solo los turnos que anotaron sesiones (el 0 anotado cuenta, el vacío no).
+- Una falla de la planilla al comprobar la sesión ya no manda a la pantalla de entrada: avisa «no se pudo comprobar» y la
+  sesión sigue viva.
+- El corte de sesión por baja en KINESIOLOGOS no existe en Coordinación (tabla fija en el código); ahí corta solo el cambio de clave.
+
+**Pendiente a propósito (va a la tanda 2):** ingreso sobre cama libre que otro ocupa en el intertanto; extender el candado
+del episodio a DAR_ALTA, PEND_ABRIR/CERRAR, EVAL_REGISTRAR y mover/limpiar; identificador de operación para el reintento.
+
+**Cómo revertir:** cada corrección vive en archivos propios; `git revert` del commit de la tanda las deshace todas, y
+las guardias nuevas se borran con él. Las cuatro son compatibles hacia atrás: no cambia ninguna columna.
+
+### Para no olvidar
+
+- 🪤 **El mismo defecto vive en las rutas hermanas.** El arreglo de ceros en el guardado dejaba el 0 vacío en el alta y en el
+  Historial; la revisión independiente lo encontró, no la guardia propia. La guardia mide ahora el camino completo.
+- 🪤 **Un `||` sobre un número es sospechoso siempre**: Sheets devuelve el 0 como número y en JavaScript es falso.
+- 🪤 **«Mismo origen» no es «mío»**: un service worker que limpia con `caches.keys()` sin filtrar borra los cachés de otras
+  apps del mismo dominio (GitHub Pages reparte un origen por cuenta).
+- 🪤 **Un mensaje de error se reconoce en UN solo lugar.** El servidor decía «Entra con tu clave» y una de las tres regex de
+  la pantalla solo conocía «Inicia sesión»: con sesión cortada el guardado caía a «Reintentar» y parecía una falla de red.
+
+Sello `NEXT-5.5-integridad`.

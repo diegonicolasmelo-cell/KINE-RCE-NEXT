@@ -550,7 +550,21 @@ function autorizar(idToken, firmaDeclarada) {
   // el acceso con AUTH_DEV_MODE=TRUE olvidado en TRUE no protegería nada, y
   // ese olvido no se ve en ninguna pantalla.
   if (typeof accesoActivo === 'function' && accesoActivo()) {
-    const ses = accesoSesion(idToken);
+    // La sesión viene vacía no solo si el token no existe o expiró, sino
+    // también si fue CORTADA: la persona cambió de clave desde que
+    // entró, o la desactivaron en KINESIOLOGOS (G20, 4-oct-2026). Acá no se
+    // distingue el motivo a propósito: el equipo ve siempre «Entra con tu
+    // clave», y se rechaza ANTES de que el dispatcher toque nada, así que una
+    // sesión cortada no deja escrito ni un dato. Guardia: acceso_revocacion.js.
+    const verif = accesoVerificarSesion(idToken);
+    // 🔴 Si Sheets no respondió NO se contesta «Entra con tu clave»: la pantalla lo
+    // lee como sesión cortada y manda a la puerta de entrada a quien tenía una
+    // sesión válida, por un tropiezo de la planilla. Se rechaza igual (aceptar sin
+    // poder comprobar sería lo peor en un registro clínico) pero con un error
+    // DISTINTO y honesto que la pantalla no interpreta como «te sacaron», y la
+    // sesión sigue como estaba: no se corta nada.
+    if (verif.noSePudo) return accesoRespuestaNoVerificable();
+    const ses = verif.sesion;
     if (!ses) {
       return { ok: false, error: 'Entra con tu clave para registrar.', codigo: ERR.NO_AUTORIZADO };
     }

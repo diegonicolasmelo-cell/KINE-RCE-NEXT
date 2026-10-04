@@ -330,12 +330,17 @@ function _auditar(ctx, accion, fn, datos) {
 
      El `idEntidad` sale del payload de ENTRADA, porque una respuesta de rechazo
      no trae `data`. Y el resumen se acota: lleva el motivo tal como se le mostró
-     a la persona, que por construcción nombra la cama pero no al otro paciente. */
+     a la persona, que por construcción nombra la cama pero no al otro paciente.
+
+     🪤 `ID_CAMA` también cuenta (G14, 4-oct-2026): el formulario de la pantalla
+     manda la cama así, en mayúsculas, y sin esto el rechazo de un guardado
+     —justo el que dice «la cama cambió de paciente»— quedaba en la bitácora con
+     la cama VACÍA. */
   if (r && r.ok === false && r.codigo === ERR.VALIDACION) {
     const dd = datos || {};
     auditar({
       email: ctx.email, firma: ctx.firma, accion: accion + '_RECHAZADO',
-      entidad: '', idEntidad: dd.idCama || dd.idEvolucion || dd.id || '',
+      entidad: '', idEntidad: dd.idCama || dd.ID_CAMA || dd.idEvolucion || dd.id || '',
       patientId: dd.patientId || '', resumen: String(r.error || '').slice(0, 300),
     });
   }

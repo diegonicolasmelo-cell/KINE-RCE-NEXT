@@ -183,6 +183,29 @@ function _interpEgreso(mrc, fss, dinamo, sexo) {
   return out;
 }
 
+/**
+ * _primeroNoVacio — el primer valor que NO esté vacío; '' si todos lo están (F1, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. El alta armaba lo que archiva con `datos.fssEgreso || ult.EVAL_T_FSS || ''`. Un `||` trata el
+ * 0 como «no hay nada»: Sheets devuelve el 0 de una celda numérica como el número 0 —falso en JS—, así que el bucle
+ * de «últimas evaluaciones» SÍ conservaba un FSS 0, un MRC 0, una dinamometría 0 o un CPAx 0, y la línea de abajo se
+ * lo llevaba por delante: en ARCHIVO_PACIENTES quedaba vacío justo el dato de los pacientes más dependientes.
+ * Peor todavía: un 0 EXPLÍCITO del egreso perdía contra una medición vieja distinta de cero.
+ *
+ * VACÍO es solo `undefined`, `null` o `''`; el 0 (número o «0») es un dato. Con un solo argumento sirve para
+ * normalizar («vacío → ''») sin tocar el 0. Guardia: ceros_de_punta_a_punta.js, sección 8.
+ *
+ * 🪤 Vive en ESTE archivo y no en `infra_util.gs`: varios bancos de prueba cargan este servicio con una lista fija
+ * de archivos que no trae la infraestructura, y una dependencia cruzada los rompería sin que el dato esté mal.
+ */
+function _primeroNoVacio(...valores) {
+  for (let i = 0; i < valores.length; i++) {
+    const x = valores[i];
+    if (x !== undefined && x !== null && x !== '') return x;
+  }
+  return '';
+}
+
 function darAltaPaciente(datos, ctx) {
   ctx = ctx || {};
   return conLock(() => {
@@ -244,10 +267,13 @@ function darAltaPaciente(datos, ctx) {
           if (e[k] !== '' && e[k] !== undefined && e[k] !== null) ult[k] = e[k];
         });
       });
-      const fssEgr  = datos.fssEgreso   || ult.EVAL_T_FSS    || '';
-      const mrcEgr  = datos.mrcSsEgreso || ult.EVAL_T_MRC    || '';
-      const dinEgr  = datos.dinamoEgreso|| ult.EVAL_T_DINAMO || '';
-      const cpaxEgr = ult.CPAX_TOTAL || '';
+      // 🔴 Lo del egreso manda y, si no vino, lo último que midió el episodio. «Vino» = no vacío: un 0 es un dato
+      // (ver `_primeroNoVacio`), y `_interpEgreso` lo interpreta (MRC 0 = DAUCI severa; FSS 0 = dependencia severa).
+      const fssEgr  = _primeroNoVacio(datos.fssEgreso, ult.EVAL_T_FSS);
+      const mrcEgr  = _primeroNoVacio(datos.mrcSsEgreso, ult.EVAL_T_MRC);
+      const dinEgr  = _primeroNoVacio(datos.dinamoEgreso, ult.EVAL_T_DINAMO);
+      const cpaxEgr = _primeroNoVacio(ult.CPAX_TOTAL);
+      const barthelEgr = _primeroNoVacio(datos.barthelEgreso);
       const interp  = _interpEgreso(mrcEgr, fssEgr, dinEgr, cama.SEXO);
 
       repoInsertar('ARCHIVO_PACIENTES', {
@@ -262,7 +288,7 @@ function darAltaPaciente(datos, ctx) {
         // y quedaban siempre en falso). El egreso puede forzarlos si los envía.
         EXTUBACION_OK: datos.extubacionOk !== undefined ? esVerdadero(datos.extubacionOk) : (huboExtProg && !huboReintub),
         REINTUBACION: datos.reintubacion !== undefined ? esVerdadero(datos.reintubacion) : huboReintub,
-        BARTHEL_INGRESO: cama.BARTHEL, BARTHEL_EGRESO: datos.barthelEgreso || '',
+        BARTHEL_INGRESO: cama.BARTHEL, BARTHEL_EGRESO: barthelEgr,
         FSS_EGRESO: fssEgr, MRC_SS_EGRESO: mrcEgr,
         AET_SERIE: cama.AET_SERIE || '',
         DINAMO_EGRESO: dinEgr, CPAX_EGRESO: cpaxEgr,
