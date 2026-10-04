@@ -1254,6 +1254,80 @@ function _pidDeCama(c) {
   return (c && esVerdadero(c.OCUPADA)) ? String(c.PATIENT_ID || '').trim() : '';
 }
 
+/**
+ * 🔐 G16 · LA RECUPERACIÓN EN LAS PUERTAS DE CAMA (tanda 2 del guardado seguro, paso 9, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Un script de Apps Script puede MORIR a mitad de camino (tiempo agotado, un corte, la pestaña cerrada en mal
+ * momento): deja las escrituras que ya hizo y ninguna más, y la pantalla reintenta. Las cuatro puertas que mueven la cama
+ * escribían en varios pasos sin que el reintento pudiera reconocer lo ya hecho:
+ *   · INTERCAMBIAR_CAMAS eran DOS `repoActualizar` seguidos (A con los datos de B, luego B con los de A): una muerte entre
+ *     ambos dejaba a un paciente BORRADO de la hoja —la cama A con los datos de B y la B intacta, o sea B en dos camas y A
+ *     en ninguna— sin error en ninguna pantalla.
+ *   · MOVER_A_CAMA_VACIA escribía el destino y DESPUÉS limpiaba el origen: una muerte entre ambos dejaba al paciente en
+ *     DOS camas.
+ *   · DAR_ALTA escribía el egreso con un id con reloj y azar: una muerte después de ese insert y un reintento egresaban al
+ *     paciente dos veces, y el REM contaba un egreso de más. Y archivar (copiar las evoluciones al archivo y borrarlas de la
+ *     hoja viva) volvía a copiar las ya copiadas.
+ *   · LIMPIAR_CAMA archivaba igual: el reintento duplicaba lo ya archivado.
+ *
+ * LA REGLA (la misma en las cuatro): (1) las validaciones y el reclamo de episodio van ANTES de la primera escritura (paso 5);
+ * (2) hay UN PUNTO DE COMPROMISO, la escritura que hace visible el cambio en el censo; (3) lo que va antes es CONVERGENTE
+ * —un id derivado más «escribir solo si no existe», o una función pura del estado— y lo que va después un reintento lo repite
+ * sin daño; (4) el sello de operación se escribe al final, solo si todo terminó limpio (infra_lock.gs).
+ *   · intercambio y traslado: el compromiso es UNA sola `repoActualizarDonde` sobre CAMAS_ESTADO que reescribe las dos filas
+ *     en un solo setValues (nunca queda un paciente borrado ni en dos camas). Lo demás —el reetiquetado del episodio y los
+ *     hitos— va después, y el reintento lo completa porque reconoce el «ya hecho» por paciente (`decidirEpisodioPuerta`).
+ *   · alta: el compromiso es limpiar la cama (lo último). El egreso es `ARCH_<pid>`, el hito de egreso es único por paciente,
+ *     el archivado no duplica; el reintento con la cama aún ocupada sigue donde quedó, y con la cama ya libre es «ya estaba».
+ *   · limpiar: el compromiso es limpiar la cama; archivar no duplica.
+ *
+ * 🪤 «Un setValues de un rango es indivisible» es una suposición de la documentación y de la práctica, NO una garantía. La matriz
+ * de muerte (guardado_seguro_operacion_g16.js) prueba cortes ENTRE escrituras, no dentro de una.
+ */
+
+/**
+ * `ARCH_<pid>`: el id del egreso de un paciente. Un egreso sin PATIENT_ID (un episodio cargado a mano, sin ingreso formal) se
+ * identifica por cama y fecha: `ARCH_SINPID_<cama>_<fecha>`. 🪤 Ahí un id solo de cama y fecha CHOCARÍA con un segundo episodio
+ * sin identidad dado de alta el mismo día en la misma cama, y «escribir solo si no existe» lo habría descartado en silencio
+ * tomándolo por el reintento del primero (un egreso menos en el REM). Por eso, si la fila de ese id es de OTRO episodio
+ * (otro código, otro nombre u otra fecha de ingreso), se prueba el id siguiente (`_2`, `_3`…): el reintento del mismo episodio
+ * vuelve a caer en SU fila, y uno distinto en una libre.
+ * @returns {{id: string, existe: boolean, n: number}} `existe`: la fila de ESTE egreso ya está escrita (un reintento); `n`: cuál es
+ *          de los egresos sin identidad de esa cama y esa fecha (1 si tiene PATIENT_ID o es el primero del día).
+ */
+function _egresoDeLaCama(pid, idCama, fecha, cama) {
+  const p = String(pid || '').trim();
+  if (p) {
+    const id = 'ARCH_' + p;
+    return { id: id, existe: !!repoBuscarPorId('ARCHIVO_PACIENTES', 'ID_ARCHIVO', id), n: 1 };
+  }
+  const base = 'ARCH_SINPID_' + idCama + '_' + fecha;
+  const diaDe = function (x) { return String(x || '').slice(0, 10); };
+  for (let n = 1; n <= 50; n++) {
+    const id = n === 1 ? base : base + '_' + n;
+    const f = repoBuscarPorId('ARCHIVO_PACIENTES', 'ID_ARCHIVO', id);
+    if (!f) return { id: id, existe: false, n: n };
+    if (String(f.COD_PACIENTE || '') === String(cama.COD_PACIENTE || '') && String(f.NOMBRE || '') === String(cama.NOMBRE || '') &&
+        diaDe(f.FECHA_INGRESO) === diaDe(cama.FECHA_INGRESO)) return { id: id, existe: true, n: n };
+  }
+  throw new Error('darAltaPaciente: la cama ' + idCama + ' ya tiene 50 egresos sin identidad el ' + fecha + '.');
+}
+
+/**
+ * ¿El episodio ya tiene su hito de egreso? Con PATIENT_ID: cualquiera de tipo egreso (es único por paciente). Sin él no hay
+ * identidad que comparar, así que se CUENTAN los de esa cama y esa fecha: el episodio número `n` del día tiene el suyo si hay al
+ * menos `n` (cada episodio escribe uno, en orden), y el primero no se da por escrito por el hito de un episodio anterior.
+ */
+function _hitoEgresoYaEsta(pid, idCama, fecha, n) {
+  const p = String(pid || '').trim();
+  const filas = p ? repoLeerTodos('TIMELINE', 'PATIENT_ID', p) : repoLeerTodos('TIMELINE', 'ID_CAMA', String(idCama));
+  const egresos = filas.filter(function (h) {
+    if (String(h.TIPO) !== 'egreso') return false;
+    return p ? true : (!String(h.PATIENT_ID || '').trim() && String(h.FECHA || '').slice(0, 10) === fecha);
+  });
+  return p ? egresos.length > 0 : egresos.length >= (n || 1);
+}
+
 function darAltaPaciente(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
@@ -1347,8 +1421,14 @@ function darAltaPaciente(datos, ctx, ep) {
       const barthelEgr = _primeroNoVacio(datos.barthelEgreso);
       const interp  = _interpEgreso(mrcEgr, fssEgr, dinEgr, cama.SEXO);
 
-      repoInsertar('ARCHIVO_PACIENTES', {
-        ID_ARCHIVO: uid('ARCH'), PATIENT_ID: pid, CAMA_ORIGEN: idCama, COD_PACIENTE: cama.COD_PACIENTE,
+      /* 🔐 G16 · EL EGRESO SE ESCRIBE UNA VEZ (paso 9). Con el id que le ponía `uid('ARCH')` —reloj más azar— cada intento
+         escribía una fila NUEVA: si el script moría después de este insert (el tiempo agotado, un corte, la pestaña cerrada
+         en mal momento) y la pantalla reintentaba, el paciente quedaba egresado DOS veces y el REM contaba un egreso de más,
+         sin error en ninguna pantalla. Ahora el id sale del paciente (`ARCH_<pid>`) y el egreso se escribe solo si no
+         existe: el reintento encuentra su propia fila y sigue con lo que falta. */
+      const egreso = _egresoDeLaCama(pid, idCama, fechaEgreso, cama);
+      if (!egreso.existe) repoInsertar('ARCHIVO_PACIENTES', {
+        ID_ARCHIVO: egreso.id, PATIENT_ID: pid, CAMA_ORIGEN: idCama, COD_PACIENTE: cama.COD_PACIENTE,
         FECHA_INGRESO: cama.FECHA_INGRESO, TS_INGRESO: cama.TS_INGRESO || '', FECHA_EGRESO: fechaEgreso,
         DIAS_TOTAL: cama.DIA_ESTADIA, DIAS_VM_TOTAL: diasVMTot, DIAS_VA_TOTAL: diasVATot,
         NOMBRE: cama.NOMBRE, EDAD: cama.EDAD, SEXO: cama.SEXO, RUT: cama.RUT || '',
@@ -1374,11 +1454,15 @@ function darAltaPaciente(datos, ctx, ep) {
           ? cama.APACHE2 : _apacheNorm(datos.apache2),
       });
 
-      _agregarHitoInterno({
-        idCama, patientId: pid, fecha: fechaEgreso, turno: datos.turno || 'Dia', tipo: 'egreso',
-        texto: 'Alta de UCI. Motivo: ' + (datos.motivoEgreso || 'Sin especificar'),
-        autor: ctx.firma || '', autorEmail: ctx.email || '',
-      });
+      // El hito de egreso es ÚNICO por paciente: si el egreso ya estaba escrito (un reintento) se mira si el hito también.
+      // Un egreso recién escrito no puede tener hito todavía (va después), así que el caso normal no paga esa lectura.
+      if (!(egreso.existe && _hitoEgresoYaEsta(pid, idCama, fechaEgreso, egreso.n))) {
+        _agregarHitoInterno({
+          idCama, patientId: pid, fecha: fechaEgreso, turno: datos.turno || 'Dia', tipo: 'egreso',
+          texto: 'Alta de UCI. Motivo: ' + (datos.motivoEgreso || 'Sin especificar'),
+          autor: ctx.firma || '', autorEmail: ctx.email || '',
+        });
+      }
 
       // Partición (D5): mover las evoluciones del episodio al archivo histórico.
       // Regla clínica (Manuel, ago-2026): dado el alta, en la cama NO puede
@@ -1419,6 +1503,59 @@ function _reetiquetarEpisodioACama(patientId, idCamaNueva) {
     () => ({ ID_CAMA: nueva }));
 }
 
+/**
+ * ¿Alguna fila del episodio sigue etiquetada a OTRA cama? (EVOLUCIONES o TIMELINE). Lo usa el reintento de un traslado «ya
+ * hecho» para reetiquetar solo donde falte: si ya está todo en la cama nueva, no se escribe nada. Solo lee.
+ */
+function _episodioDesalineado(patientId, idCama) {
+  const pid = String(patientId || '');
+  if (!pid) return false;
+  const cama = String(idCama);
+  return repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', pid).some(e => String(e.ID_CAMA) !== cama) ||
+         repoLeerTodos('TIMELINE', 'PATIENT_ID', pid).some(h => String(h.ID_CAMA) !== cama);
+}
+
+/**
+ * La operación en curso (el OP_ID que armó `_auditar`, infra_lock.gs), o '' si no hay. 🪤 La comprobación es la misma que la de
+ * `uid(prefijo, clave)` y vive AQUÍ y no en infra_util.gs porque varios bancos de prueba cargan este servicio con una lista
+ * fija de archivos y un doble de `uid`: una dependencia nueva los rompería sin que el dato esté mal. `typeof` sobre algo que
+ * ni está declarado no lanza.
+ */
+function _opIdCamas() {
+  return (typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id) ? String(OP_ACTUAL.id) : '';
+}
+
+/**
+ * Escribe un hito de traslado SOLO SI NO ESTÁ, y deja el caché de la cama mostrándolo (G16, paso 9).
+ *  · Con operación en curso (OP_ID): el hito lleva el id derivado `HITO_<op>_<huella de tipo|cama|paciente|texto>`; la clave
+ *    es de CONTENIDO y no un contador, porque un reintento que se salta pasos ya hechos correría los números y chocaría con
+ *    OTRO hito. Si el id ya existe, el primer intento lo escribió.
+ *  · Sin operación: un hito nuevo como siempre, salvo en el reintento de un traslado «ya hecho» (`yaHecho`), donde se busca
+ *    uno igual del paciente, con el mismo texto y la misma fecha (sin el OP_ID no hay otra forma de reconocerlo).
+ *  · Si el hito ya estaba pero el caché TIMELINE_JSON de la cama no lo muestra (la muerte cayó entre las dos escrituras), se
+ *    vuelve a sincronizar; si ya lo muestra, no se escribe nada.
+ */
+function _hitoTraslado(h, yaHecho) {
+  const op = _opIdCamas();
+  let id = '', existente = '';
+  if (op) {
+    id = uid('HITO', [h.tipo, h.idCama, h.patientId, h.texto].join('|'));
+    if (repoBuscarFila('TIMELINE', 'ID_HITO', id) !== -1) existente = id;
+  } else if (yaHecho) {
+    const dia = String(h.fecha || '').slice(0, 10);
+    const x = repoLeerTodos('TIMELINE', 'PATIENT_ID', String(h.patientId || '')).filter(
+      f => String(f.TIPO) === String(h.tipo) && String(f.TEXTO) === String(h.texto) && String(f.FECHA || '').slice(0, 10) === dia)[0];
+    existente = x ? String(x.ID_HITO) : '';
+  }
+  if (!existente) {
+    if (op) { _agregarHitoInternoSinSync(Object.assign({ id: id }, h)); _sincronizarTimelineCama(String(h.idCama)); }
+    else _agregarHitoInterno(h);
+    return;
+  }
+  const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(h.idCama));
+  if (c && String(c.TIMELINE_JSON || '').indexOf(existente) === -1) _sincronizarTimelineCama(String(h.idCama));
+}
+
 // ── TRASLADO: intercambio entre dos camas ocupadas ─────────
 function intercambiarCamas(idA, idB, ctx, ep) {
   ctx = ctx || {};
@@ -1431,39 +1568,48 @@ function intercambiarCamas(idA, idB, ctx, ep) {
       /* 🔐 Las DOS camas contra los dos pacientes que la pantalla abrió (EPISODIO_ABIERTO = el de la A,
          EPISODIO_ABIERTO_B = el de la B), antes de escribir. «Ya hecho»: A ya tiene al paciente que la pantalla vio en
          B y B al que vio en A — el reintento de un intercambio que aterrizó. Repetirlo lo DESHARÍA, cruzando de vuelta
-         a los dos: ok «ya estaba» y no se toca nada. Una mitad hecha (A cambió y B no) no es un reintento seguro:
-         rechazo.
-         🔴 PENDIENTE (paso 9): el reintento de un intercambio que murió DESPUÉS de cruzar las camas y ANTES del
-         reetiquetado o de los hitos queda hoy «ya estaba» sin completar esos pasos. Completarlos exige ids derivados
-         para los hitos de traslado (insertar-si-no-existe), y el orden de las escrituras no se cambia en este paso. */
+         a los dos: no se vuelve a cruzar. Una mitad hecha (A cambió y B no) no es un reintento seguro: rechazo.
+         G16 (paso 9): «ya hecho» NO quiere decir «no queda nada por hacer». El cruce de camas es el punto de compromiso, y
+         lo que va después —reetiquetar el episodio de cada paciente y los dos hitos de traslado— puede haber quedado a
+         medias si el script murió ahí. El reintento lo COMPLETA: el reetiquetado solo donde falte, y cada hito si no está. */
+      let yaCruzadas = false;
       if (_epReclamado(ep)) {
         const d = decidirEpisodioPuerta('INTERCAMBIAR_CAMAS', {
           abierto: ep.a, abiertoB: ep.b, pid: _pidDeCama(A), pidB: _pidDeCama(B),
           idCama: String(idA), idCamaB: String(idB), estricto: ep.estricto === true,
         });
         if (d.estado === 'rechazo') return err(d.error, d.codigo);
-        if (d.estado === 'yaHecho') return ok({ accion: 'intercambio (ya estaba)', camaA: idA, camaB: idB, yaEstaba: true });
+        yaCruzadas = d.estado === 'yaHecho';
       }
 
-      // Los PATIENT_ID se capturan ANTES de escribir: si la lectura devolvió
-      // referencias vivas en vez de fotos, A y B ya tendrían los datos del
-      // otro al llegar al reetiquetado (orden-independiente por diseño).
-      const pidA = String(A.PATIENT_ID || ''), pidB = String(B.PATIENT_ID || '');
-      const campA = Object.assign({}, B); campA.ID_CAMA = String(idA);
-      const campB = Object.assign({}, A); campB.ID_CAMA = String(idB);
-      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idA), campA);
-      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idB), campB);
+      // Quién queda en cada cama DESPUÉS del intercambio, capturado ANTES de escribir (la lectura devolvió una foto, pero el
+      // reetiquetado no debe depender de eso). Ya cruzadas, A tiene al que estaba en B y B al que estaba en A.
+      const pidEnA = String(A.PATIENT_ID || ''), pidEnB = String(B.PATIENT_ID || '');
+      const quedaEnA = yaCruzadas ? pidEnA : pidEnB;
+      const quedaEnB = yaCruzadas ? pidEnB : pidEnA;
 
-      // El episodio completo viaja con el paciente (antes de los hitos, para
-      // que el cache TIMELINE_JSON se reconstruya con las filas correctas).
-      _reetiquetarEpisodioACama(pidA, idB);
-      _reetiquetarEpisodioACama(pidB, idA);
+      // 🔴 EL PUNTO DE COMPROMISO: las dos filas en UNA sola escritura. Antes eran dos `repoActualizar` seguidos y una muerte
+      // entre ambos dejaba a un paciente borrado de la hoja (A con los datos de B, B intacta).
+      if (!yaCruzadas) {
+        const campA = Object.assign({}, B); campA.ID_CAMA = String(idA);
+        const campB = Object.assign({}, A); campB.ID_CAMA = String(idB);
+        repoActualizarDonde('CAMAS_ESTADO',
+          c => { const id = String(c.ID_CAMA); return id === String(idA) || id === String(idB); },
+          c => (String(c.ID_CAMA) === String(idA) ? campA : campB));
+      }
+
+      // El episodio completo viaja con el paciente (antes de los hitos, para que el cache TIMELINE_JSON se reconstruya con
+      // las filas correctas). Idempotente: en el reintento solo se toca lo que sigue etiquetado a la cama vieja.
+      if (!yaCruzadas || _episodioDesalineado(quedaEnB, idB)) _reetiquetarEpisodioACama(quedaEnB, idB);
+      if (!yaCruzadas || _episodioDesalineado(quedaEnA, idA)) _reetiquetarEpisodioACama(quedaEnA, idA);
 
       const fecha = hoyISO();
-      _agregarHitoInterno({ idCama: idA, patientId: pidB, fecha, turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idA} (desde ${idB})`, autor: ctx.firma || '', autorEmail: ctx.email || '' });
-      _agregarHitoInterno({ idCama: idB, patientId: pidA, fecha, turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idB} (desde ${idA})`, autor: ctx.firma || '', autorEmail: ctx.email || '' });
+      _hitoTraslado({ idCama: idA, patientId: quedaEnA, fecha, turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idA} (desde ${idB})`, autor: ctx.firma || '', autorEmail: ctx.email || '' }, yaCruzadas);
+      _hitoTraslado({ idCama: idB, patientId: quedaEnB, fecha, turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idB} (desde ${idA})`, autor: ctx.firma || '', autorEmail: ctx.email || '' }, yaCruzadas);
       SpreadsheetApp.flush();
-      return ok({ accion: 'intercambio', camaA: idA, camaB: idB });
+      return yaCruzadas
+        ? ok({ accion: 'intercambio (ya estaba)', camaA: idA, camaB: idB, yaEstaba: true })
+        : ok({ accion: 'intercambio', camaA: idA, camaB: idB });
     } catch (e) { return err('intercambiarCamas: ' + e.message, ERR.INTERNO, e); }
   });
 }
@@ -1481,33 +1627,44 @@ function moverACamaVacia(idOrigen, idDestino, ctx, ep) {
          (EPISODIO_ABIERTO_B; vacío = estaba LIBRE). Va ANTES de las comprobaciones de «ocupada» de abajo: un traslado
          que ya aterrizó deja el origen libre, y «la cama origen está libre» le diría «no se guardó» a algo guardado.
          «Ya hecho»: el destino ya tiene al paciente y el origen quedó libre. Un destino que ahora ocupa OTRA persona
-         es CONFLICTO (se adelantó), no un error de la pantalla. */
+         es CONFLICTO (se adelantó), no un error de la pantalla.
+         G16 (paso 9): «ya hecho» NO quiere decir «no queda nada por hacer»: el traslado de las camas es el punto de
+         compromiso y el reetiquetado del episodio y el hito pueden haber quedado a medias. El reintento los COMPLETA. */
+      let yaMovido = false;
       if (_epReclamado(ep)) {
         const d = decidirEpisodioPuerta('MOVER_A_CAMA_VACIA', {
           abierto: ep.a, abiertoB: ep.b, pid: _pidDeCama(O), pidB: _pidDeCama(D),
           idCama: String(idOrigen), idCamaB: String(idDestino), estricto: ep.estricto === true,
         });
         if (d.estado === 'rechazo') return err(d.error, d.codigo);
-        if (d.estado === 'yaHecho') {
-          return ok({ accion: 'mover_cama_vacia (ya estaba)', origen: idOrigen, destino: idDestino, patientId: _pidDeCama(D), yaEstaba: true });
-        }
+        yaMovido = d.estado === 'yaHecho';
       }
 
-      if (!esVerdadero(O.OCUPADA)) return err('La cama origen está libre.', ERR.VALIDACION);
-      if (esVerdadero(D.OCUPADA)) return err('La cama destino no está libre.', ERR.VALIDACION);
+      if (!yaMovido) {
+        if (!esVerdadero(O.OCUPADA)) return err('La cama origen está libre.', ERR.VALIDACION);
+        if (esVerdadero(D.OCUPADA)) return err('La cama destino no está libre.', ERR.VALIDACION);
+      }
 
-      // El PATIENT_ID se captura ANTES de limpiar el origen: el reetiquetado
-      // de las evoluciones no debe depender de si la lectura fue foto o
-      // referencia viva (orden-independiente por diseño).
-      const pidO = String(O.PATIENT_ID || '');
-      const camp = Object.assign({}, O); camp.ID_CAMA = String(idDestino);
-      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idDestino), camp);
-      _limpiarCamaInterno(String(idOrigen));
-      _reetiquetarEpisodioACama(pidO, idDestino);
+      // El PATIENT_ID se captura ANTES de limpiar el origen: el reetiquetado de las evoluciones no debe depender de si la
+      // lectura fue foto o referencia viva (orden-independiente por diseño). Ya movido, el paciente está en el destino.
+      const pidO = yaMovido ? _pidDeCama(D) : String(O.PATIENT_ID || '');
 
-      _agregarHitoInterno({ idCama: idDestino, patientId: pidO, fecha: hoyISO(), turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idDestino} (desde ${idOrigen})`, autor: ctx.firma || '', autorEmail: ctx.email || '' });
+      // 🔴 EL PUNTO DE COMPROMISO: destino lleno y origen libre en UNA sola escritura. Antes eran dos (escribir el destino y
+      // DESPUÉS limpiar el origen): una muerte entre ambas dejaba al paciente en DOS camas. `_camaVacia()` es la misma
+      // que usa la limpieza, para que alta, limpiar y traslado no diverjan.
+      if (!yaMovido) {
+        const camp = Object.assign({}, O); camp.ID_CAMA = String(idDestino);
+        repoActualizarDonde('CAMAS_ESTADO',
+          c => { const id = String(c.ID_CAMA); return id === String(idOrigen) || id === String(idDestino); },
+          c => (String(c.ID_CAMA) === String(idDestino) ? camp : _camaVacia()));
+      }
+      if (!yaMovido || _episodioDesalineado(pidO, idDestino)) _reetiquetarEpisodioACama(pidO, idDestino);
+
+      _hitoTraslado({ idCama: idDestino, patientId: pidO, fecha: hoyISO(), turno: 'Dia', tipo: 'general', texto: `Traslado a Cama ${idDestino} (desde ${idOrigen})`, autor: ctx.firma || '', autorEmail: ctx.email || '' }, yaMovido);
       SpreadsheetApp.flush();
-      return ok({ accion: 'mover_cama_vacia', origen: idOrigen, destino: idDestino, patientId: O.PATIENT_ID });
+      return yaMovido
+        ? ok({ accion: 'mover_cama_vacia (ya estaba)', origen: idOrigen, destino: idDestino, patientId: pidO, yaEstaba: true })
+        : ok({ accion: 'mover_cama_vacia', origen: idOrigen, destino: idDestino, patientId: O.PATIENT_ID });
     } catch (e) { return err('moverACamaVacia: ' + e.message, ERR.INTERNO, e); }
   });
 }
@@ -1565,6 +1722,9 @@ function limpiarCama(idCama, ep) {
       // Por CAMA, igual que el alta (regla de Manuel, ago-2026): liberar la
       // cama debe llevarse TODO lo que el siguiente ocupante podría heredar,
       // incluidas las filas huérfanas sin PATIENT_ID.
+      // 🔐 G16 (paso 9): el compromiso es liberar la cama, que va LO ÚLTIMO. Si el script muere antes, la cama sigue ocupada
+      // por el mismo paciente y el reintento (mismo reclamo de episodio) archiva lo que falte —sin duplicar lo ya copiado— y
+      // la libera. Con la cama ya libre es «ya estaba» (arriba).
       const archivadas = _archivarEvolucionesDeCama(id);
       _limpiarCamaInterno(id);
       if (archivadas) {
@@ -1582,6 +1742,17 @@ function limpiarCama(idCama, ep) {
 }
 
 function _limpiarCamaInterno(idCama) {
+  repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), _camaVacia());
+}
+
+/**
+ * Lo que queda en una fila de CAMAS_ESTADO cuando la cama se libera: TODA columna del paciente en blanco (menos ID_CAMA, que
+ * es la identidad de la fila). La comparten la limpieza (`_limpiarCamaInterno`: alta y limpiar) y el traslado a cama vacía,
+ * que escribe origen y destino en UNA sola escritura (G16, paso 9): si cada uno tuviera su lista, la columna que se agregue
+ * mañana se olvidaría en una de las dos, que es exactamente cómo se arrastraron quince columnas al paciente siguiente.
+ * `alta_no_deja_rastro.js` DERIVA del esquema la lista de lo que este objeto debe limpiar.
+ */
+function _camaVacia() {
   const vacio = {
     OCUPADA: false, STATUS_CAMA: 'Libre', PATIENT_ID: '', COD_PACIENTE: '',
     NOMBRE: '', EDAD: '', SEXO: '', TALLA_CM: '', PESO_IDEAL_KG: '', BARTHEL: '', ECF: '', RUT: '',
@@ -1633,7 +1804,7 @@ function _limpiarCamaInterno(idCama) {
     PRONO_DESDE: '',
     NOMBRE_SOCIAL: '',   // identidad del paciente: se va con el alta como el resto
   };
-  repoActualizar('CAMAS_ESTADO', 'ID_CAMA', String(idCama), vacio);
+  return vacio;
 }
 
 /**
@@ -1676,7 +1847,17 @@ function _archivarEvolucionesDeCama(idCama) {
   const cama = String(idCama);
   const restantes = repoLeerTodos('EVOLUCIONES', 'ID_CAMA', cama);
   if (!restantes.length) return 0;
-  restantes.forEach(e => repoInsertar('EVOLUCIONES_ARCHIVO', e));
+  /* 🔐 G16 · ARCHIVAR SIN DUPLICAR (paso 9). Copiar al archivo y recién entonces borrar de la hoja viva son dos pasos, y el
+     script puede morir entre ellos (o a mitad de las copias, que son una escritura por fila). El reintento volvía a copiar
+     TODAS las filas: el episodio quedaba con sus turnos repetidos en EVOLUCIONES_ARCHIVO, y la historia que lee el
+     histórico y el REM los contaba dos veces. Ahora solo se copian las que aún no están. La llave es el ID_EVOLUCION MÁS el
+     paciente: dos pacientes de la misma cama pueden tener el mismo turno, y con solo el id el archivo se habría quedado sin
+     el segundo. Se compara contra lo que había ANTES de empezar, no entre las propias filas a copiar. El borrado de la hoja
+     viva es lo último: mientras queden filas vivas, el archivado sigue pendiente y el reintento lo termina. */
+  const llave = e => String(e.ID_EVOLUCION || '') + '|' + String(e.PATIENT_ID || '');
+  const yaArchivadas = {};
+  repoLeerTodos('EVOLUCIONES_ARCHIVO', 'ID_CAMA', cama).forEach(e => { yaArchivadas[llave(e)] = true; });
+  restantes.forEach(e => { if (!yaArchivadas[llave(e)]) repoInsertar('EVOLUCIONES_ARCHIVO', e); });
   repoEliminarDonde('EVOLUCIONES', e => String(e.ID_CAMA) === cama);
   return restantes.length;
 }
@@ -1738,7 +1919,11 @@ function obtenerArchivados(params) {
       const q = String(params.q).toLowerCase();
       rows = rows.filter(r => [r.nombre, r.cod, r.diagnostico, r.diagRem].join(' ').toLowerCase().indexOf(q) !== -1);
     }
-    rows.sort((a, b) => String(b.fEgreso).localeCompare(String(a.fEgreso)) || String(b.id).localeCompare(String(a.id)));
+    // El más reciente primero. 🔐 G16 (paso 9): el desempate entre egresos del mismo día ya NO puede ser el id: antes llevaba el
+    // reloj (`ARCH_<ms>_<azar>`) y el más nuevo salía primero; ahora es `ARCH_<pid>` y ordenaría al azar. La hoja se llena en
+    // orden de egreso, así que el desempate es la posición: se da vuelta la lista y el orden estable deja primero al último.
+    rows.reverse();
+    rows.sort((a, b) => String(b.fEgreso).localeCompare(String(a.fEgreso)));
     return ok(params.limite ? rows.slice(0, params.limite) : rows);
   } catch (e) { return err('obtenerArchivados: ' + e.message, ERR.INTERNO, e); }
 }
@@ -10122,7 +10307,9 @@ function _agregarHitoInternoSinSync(hito) {
     if (c && c.PATIENT_ID) patId = c.PATIENT_ID;
   }
   repoInsertar('TIMELINE', {
-    ID_HITO:     uid('HITO'),
+    // 🔐 G16 (paso 9): quien necesita que el reintento de SU operación reconozca este hito le pasa el id derivado del OP_ID
+    // (`uid('HITO', clave)`, ver `_hitoTraslado` en svc_camas.gs). Sin `hito.id`, el de siempre: reloj más azar.
+    ID_HITO:     hito.id || uid('HITO'),
     ID_CAMA:     String(hito.idCama || ''),
     PATIENT_ID:  patId,
     FECHA:       hito.fecha || hoyISO(),

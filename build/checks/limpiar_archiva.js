@@ -48,7 +48,11 @@ global.repoBuscarPorId = (h, c, id) => (DB[h] || []).find(r => String(r[c]) === 
 global.repoActualizar = (h, c, id, ch) => { const r = global.repoBuscarPorId(h, c, id); if (r) Object.assign(r, ch); return !!r; };
 global.repoInsertar = (h, o) => { (DB[h] = DB[h] || []).push(o); return o; };
 global.repoEliminarDonde = (h, fn) => { const a = (DB[h] || []).length; DB[h] = (DB[h] || []).filter(r => !fn(r)); return a - DB[h].length; };
-global.repoActualizarDonde = () => 0; global.repoUpsert = () => 'crear';
+// 🔐 Paso 9 del guardado seguro: el traslado a cama vacía escribe origen y destino en UNA sola `repoActualizarDonde` sobre
+// CAMAS_ESTADO (antes eran dos `repoActualizar`). Con el doble que no hacía nada («() => 0») el paciente no llegaba a ninguna
+// cama. El doble ahora hace lo que repo.gs: aplica `mut` a cada fila que cumple `fil`. Ninguna aserción de esta guardia cambió.
+global.repoActualizarDonde = (h, fil, mut) => { let n = 0; (DB[h] || []).forEach(r => { if (!fil(r)) return; Object.assign(r, mut(r) || {}); n++; }); return n; };
+global.repoUpsert = () => 'crear';
 global.esVerdadero = v => v === true || v === 'TRUE' || v === 'true';
 global.leerConfig = (k, d) => d; global.escribirConfig = () => {}; global.conLock = fn => fn();
 global.hoyISO = () => '2026-08-06'; global.ahoraTS = () => '2026-08-06 10:00';

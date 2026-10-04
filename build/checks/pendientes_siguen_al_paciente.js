@@ -71,7 +71,20 @@ global._sincronizarTimelineCama = () => {};
 /* 🪤 Los stubs de funciones que el propio svc_camas.gs DECLARA (como
    _reetiquetarEpisodioACama) no sirven: el eval las redefine y corre la real.
    Lo que hay que doblar es lo que ella usa por debajo. */
-global.repoActualizarDonde = () => 0;
+/* 🔐 Paso 9 del guardado seguro: el intercambio y el traslado escriben las dos camas en UNA sola `repoActualizarDonde` sobre
+   CAMAS_ESTADO (antes eran dos `repoActualizar`), así que ese doble ya no puede ser un «() => 0»: aplica `mut` a cada cama que
+   cumple `fil`, como repo.gs. Las demás hojas (el reetiquetado del episodio) siguen sin nada que hacer. Ninguna aserción cambió. */
+global.repoActualizarDonde = (h, fil, mut) => {
+  if (h !== 'CAMAS_ESTADO') return 0;
+  let n = 0;
+  Object.keys(CAMAS).forEach(id => {
+    if (!fil(CAMAS[id])) return;
+    CAMAS[id] = Object.assign({}, CAMAS[id], mut(CAMAS[id]) || {});
+    CAMAS[id].ID_CAMA = id;
+    n++;
+  });
+  return n;
+};
 global.repoEliminarDonde = () => 0;
 global._archivarEvolucionesDeCama = () => {};
 (0, eval)(src);

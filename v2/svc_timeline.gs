@@ -12,7 +12,9 @@ function _agregarHitoInternoSinSync(hito) {
     if (c && c.PATIENT_ID) patId = c.PATIENT_ID;
   }
   repoInsertar('TIMELINE', {
-    ID_HITO:     uid('HITO'),
+    // 🔐 G16 (paso 9): quien necesita que el reintento de SU operación reconozca este hito le pasa el id derivado del OP_ID
+    // (`uid('HITO', clave)`, ver `_hitoTraslado` en svc_camas.gs). Sin `hito.id`, el de siempre: reloj más azar.
+    ID_HITO:     hito.id || uid('HITO'),
     ID_CAMA:     String(hito.idCama || ''),
     PATIENT_ID:  patId,
     FECHA:       hito.fecha || hoyISO(),

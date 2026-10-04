@@ -31,6 +31,19 @@
 //  12 · uid(prefijo, clave): determinista con OP_ACTUAL, clásico sin ella (los bancos antiguos no cambian).
 //  13 · LA FORMA: dónde vive cada pieza.
 //
+// LO QUE SE SUMA EN EL PASO 9 (4-oct-2026) — LA RECUPERACIÓN EN LAS PUERTAS DE CAMA, secciones 15 a 18:
+//  15 · LA MATRIZ DE MUERTE de INTERCAMBIAR_CAMAS, MOVER_A_CAMA_VACIA, DAR_ALTA y LIMPIAR_CAMA: para cada N = 0..total+1 la
+//       corrida muere tras la escritura N (la N aterriza y toda posterior lanza aunque un catch la trague), el reintento
+//       reenvía el MISMO paquete y el estado final tiene que ser IGUAL al de una corrida limpia. Dos veces por puerta:
+//       con OP_ID (ids derivados) y SOLO con el reclamo de episodio (lo que reconoce el «ya hecho» por pid, sin sello).
+//       Y a la vista, en CADA corte, que nadie desaparece ni se duplica: el intercambio nunca deja a un paciente borrado de
+//       la hoja, el traslado nunca lo deja en dos camas, el alta nunca duplica el egreso (inflaría el REM).
+//  16 · LA FORMA de lo que lo hace posible: UNA sola escritura de CAMAS_ESTADO que lleva el cambio (intercambio y traslado),
+//       `_camaVacia()` compartida con la limpieza, el id del egreso derivado del paciente, el archivado que no duplica.
+//  17 · EL EGRESO SIN PATIENT_ID (un episodio cargado a mano): id derivado de cama y fecha, sin perder a un segundo
+//       episodio del mismo día en la misma cama.
+//  18 · LA LISTA DE ARCHIVADOS conserva su orden (el más reciente primero) aunque el id del egreso ya no lleve el reloj.
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -58,9 +71,10 @@ const eq = (l, g, w) => {
 };
 const si = (l, c) => eq(l, !!c, true);
 const no = (l, c) => eq(l, !!c, false);
+const info = t => console.log('ℹ️  ' + t);
 const terminar = () => {
   console.log(fails.length ? `\n❌ ${fails.length} fallos:\n  - ${fails.join('\n  - ')}`
-    : '\n✅ guardado_seguro_operacion_g16: el sello de operación y el id derivado.');
+    : '\n✅ guardado_seguro_operacion_g16: el sello de operación, el id derivado y la recuperación en las puertas de cama.');
   process.exit(fails.length ? 1 : 0);
 };
 // Un tramo que revienta no tumba a los demás: da UN rojo con su razón y la guardia sigue (así el rojo de antes de
@@ -635,6 +649,260 @@ tramo('forma', () => {
   no('★ OP_ID NO es columna de ninguna hoja (viaja transitorio, como EPISODIO_ABIERTO)', /OP_ID/.test(esq));
   si('api_web.gs menciona el OP_ID (un comentario) y NO tiene un segundo catálogo de acciones', /OP_ID/.test(web) && !/\bcase\s+'/.test(web));
   eq('   …y sigue llamando al mismo api()', (web.match(/\bapi\(accion,/g) || []).length, 1);
+});
+
+/* ══ 15 · LA MATRIZ DE MUERTE EN LAS PUERTAS DE CAMA (paso 9) ═════════════ */
+console.log('\n15 · Muerte tras la escritura N y reintento con el MISMO paquete: el estado final es el de una corrida limpia');
+// El mundo de las cuatro puertas: P en la cama 3 y R en la 4 (cada uno con dos turnos guardados), la 9 libre y la 5 con un
+// episodio cargado a mano SIN PATIENT_ID. Todos inventados. `volverAlMundo` lo deja EXACTO cuantas veces haga falta.
+const MUNDO = { PID_P: '', PID_R: '', FOTO: null };
+const OPC = 'op_cama_0001';
+const SIN = { sinHojas: ['AUDIT_LOG'] };
+const TK0 = '2026-08-09-Dia';
+tramo('mundo de las puertas de cama', () => {
+  global.Utilities.formatDate = (d) => {
+    const p2 = n => ('0' + n).slice(-2);
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  };
+  reset();
+  SIM.fecha = '2026-08-07'; SIM.hora = '12:00:00';
+  const iP = llama('INGRESAR_PACIENTE', ingreso('3', { nombre: 'Paciente Alfa', fechaIngreso: '2026-08-07' }));
+  MUNDO.PID_P = camaDe('3').PATIENT_ID;
+  const iR = llama('INGRESAR_PACIENTE', ingreso('4', { nombre: 'Paciente Bravo', fechaIngreso: '2026-08-07' }));
+  MUNDO.PID_R = camaDe('4').PATIENT_ID;
+  SIM.fecha = '2026-08-09';
+  const t0 = [['3', MUNDO.PID_P], ['4', MUNDO.PID_R]].map(([c, p]) => llama('GUARDAR_EVOLUCION', evo(c, { TURNO_KEY: TK0, EPISODIO_ABIERTO: p, RESP_KTR_CANT: 1 })));
+  SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+  const t1 = [['3', MUNDO.PID_P], ['4', MUNDO.PID_R]].map(([c, p]) => llama('GUARDAR_EVOLUCION', evo(c, { EPISODIO_ABIERTO: p, RESP_KTR_CANT: 2 })));
+  si('(el montaje) P y R ingresan y guardan sus dos turnos', iP.ok && iR.ok && t0.every(r => r.ok) && t1.every(r => r.ok));
+  si('(el montaje) son dos episodios distintos', MUNDO.PID_P && MUNDO.PID_R && MUNDO.PID_P !== MUNDO.PID_R);
+  // La cama 5: un episodio cargado a mano, sin ingreso formal (PATIENT_ID vacío), con dos turnos sin paciente.
+  Object.assign(camaDe('5'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', NOMBRE: 'Carga A', COD_PACIENTE: 'CA1', FECHA_INGRESO: '2026-08-08', PATIENT_ID: '', VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' });
+  ['2026-08-09-Dia', '2026-08-10-Dia'].forEach(tk => DB.EVOLUCIONES.push({ ID_EVOLUCION: 'CAMA_5_' + tk, ID_CAMA: '5', PATIENT_ID: '', TURNO_KEY: tk, FECHA: tk.slice(0, 10), TURNO: 'Dia' }));
+  si('(el montaje) P tiene dos turnos vivos y la cama 5 también', DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_P).length === 2 && DB.EVOLUCIONES.filter(e => e.ID_CAMA === '5').length === 2);
+  MUNDO.FOTO = M.foto();
+});
+
+const volverAlMundo = () => {
+  M.restaurar(MUNDO.FOTO);
+  PUTS.length = 0; GETS.length = 0; FLUSHES.length = 0; FALLA_PUT = false;
+  ctl.cache.fallar(false); ctl.antesDelCuerpo = null;
+  SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+};
+const ocupantes = () => DB.CAMAS_ESTADO.filter(c => c.OCUPADA === true).map(c => String(c.PATIENT_ID || ''));
+const vecesEn = (lista, x) => lista.filter(y => y === x).length;
+const sinOpId = p => { const o = Object.assign({}, p); delete o.OP_ID; return o; };
+const archivoDeP = () => DB.ARCHIVO_PACIENTES.filter(a => a.PATIENT_ID === MUNDO.PID_P);
+const evoArchDe = pid => DB.EVOLUCIONES_ARCHIVO.filter(e => e.PATIENT_ID === pid);
+const hitosDe = (pid, tipo) => DB.TIMELINE.filter(h => h.PATIENT_ID === pid && h.TIPO === tipo);
+
+/**
+ * La matriz de una puerta. `mk()` arma el paquete (uno nuevo cada vez: el servicio puede mutarlo), `viola(fase)` devuelve '' si
+ * lo que la puerta promete se cumple o el motivo si no: 'corte' = con la corrida muerta a medias y ANTES del reintento, 'final'
+ * = tras el reintento. Los cortes son N = 0..total+1: 0 muere antes de la primera escritura y total+1 no muere.
+ * `opts.sinExigirOk`: no se exige que el reintento CONTESTE ok (solo que el estado final sea el de la limpia): un alta sin
+ * PATIENT_ID no tiene a quién buscar en el archivo, así que tras morir entre limpiar la cama y el sello el reintento
+ * contesta «la cama ya está libre», con el estado ya correcto.
+ */
+function matriz(etq, accion, mk, viola, opts) {
+  volverAlMundo();
+  const r0 = llama(accion, mk());
+  const total = M.total(), reg = M.registro(), limpio = M.instantanea(SIN);
+  si('★ ' + etq + ' · la corrida limpia sale ok', r0.ok);
+  si('   …con varias escrituras (si no, no habría corte que probar): ' + total, total >= 2);
+  eq('   …y cumple lo que la puerta promete', viola('final') || '(todo)', '(todo)');
+  const cortes = [], desiguales = [], noOk = [];
+  for (let n = 0; n <= total + 1; n++) {
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(n); llama(accion, mk()); });
+    const corte = viola('corte');
+    if (corte) cortes.push('N=' + n + ' (' + corte + ')');
+    M.reiniciar();
+    const r = llama(accion, mk());               // el reintento: el MISMO paquete (mismo OP_ID, mismos reclamos)
+    if (!r.ok) noOk.push('N=' + n + ' (' + (r.codigo || '?') + ': ' + String(r.error || '').slice(0, 70) + ')');
+    const fin = M.instantanea(SIN);
+    const fallaFinal = viola('final');
+    const igual = fin === limpio;
+    if (!igual) desiguales.push(n);
+    eq('   N=' + n + ' · muerta y reintentada: el estado final es el de la corrida limpia' + (fallaFinal ? ' [' + fallaFinal + ']' : ''), igual && !fallaFinal, true);
+    if (!igual) M.diferencias(limpio, fin).slice(0, 4).forEach(l => console.log('        ' + l.slice(0, 170)));
+  }
+  eq('★★ ' + etq + ' · en NINGÚN corte queda a la vista un paciente borrado, duplicado o un egreso doble', cortes.join('; ') || '(ninguno)', '(ninguno)');
+  if (opts && opts.sinExigirOk) info('   ' + etq + ' · cortes cuyo reintento NO contesta ok (el estado final es el correcto igual): ' + (noOk.join('; ') || '(ninguno)'));
+  else eq('★★ ' + etq + ' · el reintento contesta ok en todos los cortes', noOk.join('; ') || '(todos)', '(todos)');
+  eq('   ' + etq + ' · cortes tras cuyo reintento el estado difiere de la limpia', desiguales.join(',') || '(ninguno)', '(ninguno)');
+  return { total, reg, limpio };
+}
+
+tramo('INTERCAMBIAR_CAMAS', () => {
+  const mk = () => ({ idCamaA: '3', idCamaB: '4', EPISODIO_ABIERTO: MUNDO.PID_P, EPISODIO_ABIERTO_B: MUNDO.PID_R, OP_ID: OPC });
+  const viola = () => {
+    const o = ocupantes();
+    return (vecesEn(o, MUNDO.PID_P) === 1 && vecesEn(o, MUNDO.PID_R) === 1) ? '' : 'P en ' + vecesEn(o, MUNDO.PID_P) + ' cama(s) y R en ' + vecesEn(o, MUNDO.PID_R);
+  };
+  const violaFinal = fase => viola() || (fase === 'final' && (camaDe('3').PATIENT_ID !== MUNDO.PID_R || camaDe('4').PATIENT_ID !== MUNDO.PID_P) ? 'las camas no quedaron cruzadas' : '');
+  console.log('   · INTERCAMBIAR_CAMAS con OP_ID');
+  const a = matriz('INTERCAMBIAR_CAMAS con OP_ID', 'INTERCAMBIAR_CAMAS', mk, violaFinal);
+  eq('★ el cambio de camas es UNA sola escritura de CAMAS_ESTADO, y es la PRIMERA (el punto de compromiso)', a.reg[0], 'repoActualizarDonde(CAMAS_ESTADO)');
+  eq('   …y la siguiente ya es el reetiquetado del episodio (no queda otra escritura de camas en medio)', a.reg[1], 'repoActualizarDonde(EVOLUCIONES)');
+  eq('   …y no hay ninguna otra escritura de CAMAS_ESTADO antes de los hitos', a.reg.slice(0, a.reg.findIndex(x => /^repoInsertar\(TIMELINE\)/.test(x))).filter(x => /\(CAMAS_ESTADO\)/.test(x)).length, 1);
+  console.log('   · INTERCAMBIAR_CAMAS sin OP_ID (solo el reclamo de episodio)');
+  matriz('INTERCAMBIAR_CAMAS sin OP_ID', 'INTERCAMBIAR_CAMAS', () => sinOpId(mk()), violaFinal);
+  // El reintento de un intercambio que murió DESPUÉS de cruzar las camas completa lo que falta: reetiquetado y hitos.
+  volverAlMundo();
+  callando(() => { M.muereTrasLaEscritura(1); llama('INTERCAMBIAR_CAMAS', mk()); });
+  eq('(el corte N=1) las camas ya están cruzadas y el episodio sigue en la cama vieja', camaDe('3').PATIENT_ID + '/' + DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_P).every(e => e.ID_CAMA === '3'), MUNDO.PID_R + '/true');
+  M.reiniciar();
+  const rr = llama('INTERCAMBIAR_CAMAS', mk());
+  eq('★★ el reintento reconoce el «ya hecho» por pid (no deshace el cruce)…', rr.ok + '/' + camaDe('3').PATIENT_ID + '/' + camaDe('4').PATIENT_ID, 'true/' + MUNDO.PID_R + '/' + MUNDO.PID_P);
+  eq('★★ …y COMPLETA lo que faltaba: las evoluciones de P viajaron a la 4 y las de R a la 3',
+    DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_P).every(e => e.ID_CAMA === '4') + '/' + DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_R).every(e => e.ID_CAMA === '3'), 'true/true');
+  eq('   …y escribió los DOS hitos de traslado, ni uno más', DB.TIMELINE.filter(h => /^Traslado a Cama/.test(h.TEXTO || '')).length, 2);
+});
+
+tramo('MOVER_A_CAMA_VACIA', () => {
+  const mk = () => ({ idOrigen: '3', idDestino: '9', EPISODIO_ABIERTO: MUNDO.PID_P, EPISODIO_ABIERTO_B: '', OP_ID: OPC });
+  const viola = fase => {
+    const o = ocupantes();
+    if (vecesEn(o, MUNDO.PID_P) !== 1) return 'P en ' + vecesEn(o, MUNDO.PID_P) + ' cama(s)';
+    if (camaDe('4').PATIENT_ID !== MUNDO.PID_R) return 'R ya no está en la 4';
+    return (fase === 'final' && (camaDe('9').PATIENT_ID !== MUNDO.PID_P || camaDe('3').OCUPADA !== false)) ? 'P no quedó en la 9 con la 3 libre' : '';
+  };
+  console.log('   · MOVER_A_CAMA_VACIA con OP_ID');
+  const a = matriz('MOVER_A_CAMA_VACIA con OP_ID', 'MOVER_A_CAMA_VACIA', mk, viola);
+  eq('★ el traslado es UNA sola escritura de CAMAS_ESTADO (destino lleno y origen libre juntos), y es la PRIMERA', a.reg[0], 'repoActualizarDonde(CAMAS_ESTADO)');
+  eq('   …y la siguiente ya es el reetiquetado del episodio', a.reg[1], 'repoActualizarDonde(EVOLUCIONES)');
+  console.log('   · MOVER_A_CAMA_VACIA sin OP_ID (solo el reclamo de episodio)');
+  matriz('MOVER_A_CAMA_VACIA sin OP_ID', 'MOVER_A_CAMA_VACIA', () => sinOpId(mk()), viola);
+  volverAlMundo();
+  callando(() => { M.muereTrasLaEscritura(1); llama('MOVER_A_CAMA_VACIA', mk()); });
+  eq('(el corte N=1) P ya está en la 9, la 3 quedó libre y su episodio sigue etiquetado a la 3', camaDe('9').PATIENT_ID + '/' + camaDe('3').OCUPADA + '/' + DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_P).every(e => e.ID_CAMA === '3'), MUNDO.PID_P + '/false/true');
+  M.reiniciar();
+  const rr = llama('MOVER_A_CAMA_VACIA', mk());
+  eq('★★ el reintento reconoce el «ya hecho» y COMPLETA el reetiquetado y el hito (UNO solo)', rr.ok + '/' + DB.EVOLUCIONES.filter(e => e.PATIENT_ID === MUNDO.PID_P).every(e => e.ID_CAMA === '9') + '/' + DB.TIMELINE.filter(h => /^Traslado a Cama/.test(h.TEXTO || '')).length, 'true/true/1');
+});
+
+tramo('DAR_ALTA', () => {
+  const mk = () => ({ idCama: '3', motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPC });
+  const viola = fase => {
+    const a = archivoDeP();
+    if (a.length > 1) return 'el egreso de P está ' + a.length + ' veces (inflaría el REM)';
+    if (hitosDe(MUNDO.PID_P, 'egreso').length > 1) return 'el hito de egreso está duplicado';
+    const claves = evoArchDe(MUNDO.PID_P).map(e => e.ID_EVOLUCION);
+    if (new Set(claves).size !== claves.length) return 'EVOLUCIONES_ARCHIVO tiene turnos de P duplicados';
+    if (fase !== 'final') return '';
+    if (a.length !== 1) return 'P no quedó archivado';
+    if (claves.length !== 2) return 'P tiene ' + claves.length + ' turnos archivados (eran 2)';
+    if (hitosDe(MUNDO.PID_P, 'egreso').length !== 1) return 'no hay UN hito de egreso';
+    return (camaDe('3').OCUPADA !== false || DB.EVOLUCIONES.some(e => e.PATIENT_ID === MUNDO.PID_P)) ? 'la cama 3 no quedó libre y sin turnos vivos de P' : '';
+  };
+  console.log('   · DAR_ALTA con OP_ID');
+  const a = matriz('DAR_ALTA con OP_ID', 'DAR_ALTA', mk, viola);
+  eq('★ el egreso se escribe UNA vez, con el id derivado del paciente: ARCH_<pid>', DB.ARCHIVO_PACIENTES.map(x => x.ID_ARCHIVO).join(',') + '|' + a.reg.filter(x => /^repoInsertar\(ARCHIVO_PACIENTES\)/.test(x)).length,
+    'ARCH_' + MUNDO.PID_P + '|1');
+  console.log('   · DAR_ALTA sin OP_ID (la capa durable no depende del sello)');
+  matriz('DAR_ALTA sin OP_ID', 'DAR_ALTA', () => sinOpId(mk()), viola);
+});
+
+tramo('LIMPIAR_CAMA', () => {
+  const mk = () => ({ idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPC });
+  const viola = fase => {
+    const claves = evoArchDe(MUNDO.PID_P).map(e => e.ID_EVOLUCION);
+    if (new Set(claves).size !== claves.length) return 'EVOLUCIONES_ARCHIVO tiene turnos de P duplicados (' + claves.length + ')';
+    if (fase !== 'final') return '';
+    if (claves.length !== 2) return 'P tiene ' + claves.length + ' turnos archivados (eran 2)';
+    if (DB.ARCHIVO_PACIENTES.length) return 'limpiar inventó un egreso';
+    return (camaDe('3').OCUPADA !== false || DB.EVOLUCIONES.some(e => e.ID_CAMA === '3')) ? 'la cama 3 no quedó libre y sin turnos vivos' : '';
+  };
+  console.log('   · LIMPIAR_CAMA con OP_ID');
+  matriz('LIMPIAR_CAMA con OP_ID', 'LIMPIAR_CAMA', mk, viola);
+  console.log('   · LIMPIAR_CAMA sin OP_ID');
+  matriz('LIMPIAR_CAMA sin OP_ID', 'LIMPIAR_CAMA', () => sinOpId(mk()), viola);
+});
+
+/* ══ 16 · LA FORMA DE LA RECUPERACIÓN ═════════════════════════════════════ */
+console.log('\n16 · La forma: una escritura que lleva el cambio, _camaVacia compartida, id del egreso derivado, archivado que no duplica');
+tramo('forma de la recuperación', () => {
+  const sinComentarios = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  const svc = leer('svc_camas.gs');
+  const cuerpo = nombre => {
+    const ini = svc.indexOf('function ' + nombre + '(');
+    const fin = ini === -1 ? -1 : svc.indexOf('\n}\n', ini);
+    return (ini === -1 || fin === -1) ? '' : sinComentarios(svc.slice(ini, fin));
+  };
+  const cuenta = (t, re) => (t.match(re) || []).length;
+  si('★ _camaVacia() existe (la comparten la limpieza, el alta y el traslado: no divergen)', /function _camaVacia\(\)/.test(svc));
+  si('   …y _limpiarCamaInterno la USA', /_camaVacia\(\)/.test(cuerpo('_limpiarCamaInterno')));
+  const inter = cuerpo('intercambiarCamas');
+  eq('★ intercambiarCamas: UNA repoActualizarDonde sobre CAMAS_ESTADO…', cuenta(inter, /repoActualizarDonde\('CAMAS_ESTADO'/g), 1);
+  eq('   …y ningún repoActualizar suelto (esas eran las DOS escrituras que dejaban a un paciente borrado)', cuenta(inter, /\brepoActualizar\(/g), 0);
+  const mov = cuerpo('moverACamaVacia');
+  eq('★ moverACamaVacia: UNA repoActualizarDonde sobre CAMAS_ESTADO (destino lleno y origen libre juntos)…', cuenta(mov, /repoActualizarDonde\('CAMAS_ESTADO'/g), 1);
+  eq('   …que usa _camaVacia() para el origen', cuenta(mov, /_camaVacia\(\)/g), 1);
+  eq('   …y ya no limpia el origen con una escritura aparte (_limpiarCamaInterno) ni con repoActualizar', cuenta(mov, /_limpiarCamaInterno\(|\brepoActualizar\(/g), 0);
+  const alta = cuerpo('darAltaPaciente');
+  const egr = cuerpo('_egresoDeLaCama');
+  si('★ el egreso deriva su id del paciente (ARCH_<pid>) y ya no usa un id con reloj y azar', /'ARCH_'/.test(egr) && /'ARCH_SINPID_'/.test(egr) && !/uid\('ARCH'\)/.test(alta + egr));
+  si('   …y el alta pregunta por ese egreso ANTES de insertarlo (repoInsertar solo si no existe)', alta.indexOf('_egresoDeLaCama(') > -1 && alta.indexOf('_egresoDeLaCama(') < alta.indexOf("repoInsertar('ARCHIVO_PACIENTES'") && /!egreso\.existe/.test(alta));
+  si('   …y lo busca con repoBuscarPorId (los bancos antiguos tienen ese doble; repoBuscarFila no)', /repoBuscarPorId\('ARCHIVO_PACIENTES'/.test(egr));
+  const arch = cuerpo('_archivarEvolucionesDeCama');
+  si('★ _archivarEvolucionesDeCama mira lo ya archivado ANTES de insertar (un reintento no duplica)', arch.indexOf("repoLeerTodos('EVOLUCIONES_ARCHIVO'") > -1 && arch.indexOf("repoLeerTodos('EVOLUCIONES_ARCHIVO'") < arch.indexOf("repoInsertar('EVOLUCIONES_ARCHIVO'"));
+  si('   …y borra de la hoja viva solo DESPUÉS de insertar (el compromiso es el último paso, no el primero)', arch.indexOf("repoInsertar('EVOLUCIONES_ARCHIVO'") < arch.indexOf("repoEliminarDonde('EVOLUCIONES'"));
+  si('★ el traslado deriva sus hitos del OP_ID (insertar-si-no-existe)', /uid\('HITO'/.test(sinComentarios(svc)));
+  no('★ repo.gs no cambió de forma: sigue sin una primitiva «dos filas a la vez» (el paso 9 no la necesita)', /function repoActualizarDos|function repoActualizarFilas/.test(leer('repo.gs')));
+});
+
+/* ══ 17 · EL EGRESO DE UN EPISODIO SIN PATIENT_ID ═════════════════════════ */
+console.log('\n17 · El egreso de un episodio cargado a mano (sin PATIENT_ID): ARCH_SINPID_<cama>_<fecha>, sin perder a un segundo episodio del día');
+tramo('egreso sin pid', () => {
+  const alta5 = () => ({ idCama: '5', motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV', EPISODIO_ABIERTO: '', OP_ID: OPC });
+  const viola = fase => {
+    const f = DB.ARCHIVO_PACIENTES.filter(a => String(a.CAMA_ORIGEN) === '5');
+    if (f.length > 1) return 'el egreso de la cama 5 está ' + f.length + ' veces';
+    const k = DB.EVOLUCIONES_ARCHIVO.filter(e => e.ID_CAMA === '5').map(e => e.ID_EVOLUCION);
+    if (new Set(k).size !== k.length) return 'EVOLUCIONES_ARCHIVO duplicada';
+    return (fase === 'final' && (f.length !== 1 || k.length !== 2 || camaDe('5').OCUPADA !== false)) ? 'el egreso no quedó completo (' + f.length + ' fila(s), ' + k.length + ' turno(s))' : '';
+  };
+  matriz('DAR_ALTA de la cama 5 (sin PATIENT_ID) con OP_ID', 'DAR_ALTA', alta5, viola, { sinExigirOk: true });
+  volverAlMundo(); llama('DAR_ALTA', alta5());
+  eq('★ el id es ARCH_SINPID_<cama>_<fecha>', DB.ARCHIVO_PACIENTES.map(x => x.ID_ARCHIVO).join(','), 'ARCH_SINPID_5_2026-08-10');
+  // Un SEGUNDO episodio cargado a mano en la misma cama, dado de alta el mismo día: su egreso NO se pierde (con el id
+  // idéntico, «insertar si no existe» lo habría tomado por el reintento del primero y lo habría descartado en silencio).
+  Object.assign(camaDe('5'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', NOMBRE: 'Carga B', COD_PACIENTE: 'CB1', FECHA_INGRESO: '2026-08-10', PATIENT_ID: '' });
+  DB.EVOLUCIONES.push({ ID_EVOLUCION: 'CAMA_5_2026-08-10-Dia', ID_CAMA: '5', PATIENT_ID: '', TURNO_KEY: '2026-08-10-Dia', FECHA: '2026-08-10', TURNO: 'Dia' });
+  const b = llama('DAR_ALTA', Object.assign(alta5(), { OP_ID: 'op_cama_0002' }));
+  eq('★★ el segundo episodio de la misma cama el mismo día TAMBIÉN se archiva (dos egresos, dos ids distintos)', b.ok + '/' + DB.ARCHIVO_PACIENTES.length + '/' + new Set(DB.ARCHIVO_PACIENTES.map(x => x.ID_ARCHIVO)).size, 'true/2/2');
+  eq('   …con sus nombres, cada uno el suyo', DB.ARCHIVO_PACIENTES.map(x => x.NOMBRE).join(','), 'Carga A,Carga B');
+  // El reintento de ESE segundo egreso (cama ya libre, mismo OP_ID) no agrega un tercero.
+  const b2 = llama('DAR_ALTA', Object.assign(alta5(), { OP_ID: 'op_cama_0002' }));
+  eq('   …y repetirlo (mismo OP_ID) no suma un tercero', b2.ok + '/' + DB.ARCHIVO_PACIENTES.length, 'true/2');
+  // Y el reintento de una corrida muerta de ese segundo episodio, sin sello, tampoco.
+  volverAlMundo(); llama('DAR_ALTA', alta5());
+  Object.assign(camaDe('5'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', NOMBRE: 'Carga B', COD_PACIENTE: 'CB1', FECHA_INGRESO: '2026-08-10', PATIENT_ID: '' });
+  DB.EVOLUCIONES.push({ ID_EVOLUCION: 'CAMA_5_2026-08-10-Dia', ID_CAMA: '5', PATIENT_ID: '', TURNO_KEY: '2026-08-10-Dia', FECHA: '2026-08-10', TURNO: 'Dia' });
+  const F2 = M.foto();
+  const limpioB = (() => { M.restaurar(F2); SIM.fecha = '2026-08-10'; llama('DAR_ALTA', Object.assign(alta5(), { OP_ID: 'op_cama_0003' })); return M.instantanea(SIN); })();
+  const totalB = M.total();
+  const malos = [];
+  for (let n = 1; n <= totalB; n++) {
+    M.restaurar(F2); SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+    callando(() => { M.muereTrasLaEscritura(n); llama('DAR_ALTA', Object.assign(alta5(), { OP_ID: 'op_cama_0003' })); });
+    M.reiniciar(); llama('DAR_ALTA', Object.assign(alta5(), { OP_ID: 'op_cama_0003' }));
+    if (M.instantanea(SIN) !== limpioB) malos.push(n);
+  }
+  eq('★ el segundo episodio muerto en cualquier punto y reintentado queda como una corrida limpia (sin perder ni duplicar)', malos.join(',') || '(ninguno)', '(ninguno)');
+});
+
+/* ══ 18 · LA LISTA DE ARCHIVADOS CONSERVA SU ORDEN ════════════════════════ */
+console.log('\n18 · Archivados: el egreso más reciente va primero aunque el id ya no lleve el reloj');
+tramo('orden de archivados', () => {
+  volverAlMundo();
+  const a1 = llama('DAR_ALTA', { idCama: '3', motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P });
+  const a2 = llama('DAR_ALTA', { idCama: '4', motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_R });
+  const lista = llama('GET_ARCHIVADOS', {});
+  si('(el montaje) las dos altas del mismo día entran', a1.ok && a2.ok && lista.ok);
+  eq('★ el alta de la cama 4 (después) sale ANTES que la de la 3, con el mismo día de egreso', (lista.data || []).map(x => x.cama).join(','), '4,3');
+  si('   …y la lista no filtra campos internos de orden', (lista.data || []).every(x => Object.keys(x).every(k => k[0] !== '_')));
 });
 
 terminar();
