@@ -35,9 +35,58 @@ function esVerdadero(v) {
   return false;
 }
 
-/** ID único legible con prefijo. */
-function uid(prefix) {
-  return (prefix || 'ID') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7).toUpperCase();
+/**
+ * ID único legible con prefijo.
+ *
+ * 🔐 Con `clave` (G16, tanda 2 del guardado seguro) el id DEJA DE SER AZAROSO cuando hay una operación en curso
+ * (`OP_ACTUAL`, la que arma `_auditar` a partir del OP_ID de la pantalla, ver infra_lock.gs):
+ *
+ *     uid('PROC', '')                          → PROC_<op>
+ *     uid('HITO', 'nota|3|<pid>|<texto>')      → HITO_<op>_<huella de la clave>
+ *     uid('PROC')                              → PROC_<ms>_<azar>      (como siempre)
+ *
+ * POR QUÉ. Cuando el sello no está (la corrida murió a medias, el caché se evaporó o expiró a las 6 h), el reintento con
+ * el mismo OP_ID tiene que poder reconocer lo que ya escribió su primer intento. Con un id azaroso cada intento inserta
+ * una fila nueva y el registro queda duplicado; con el id derivado del OP_ID el reintento calcula el MISMO id, y la
+ * puerta puede preguntar «¿ya existe?» (repoBuscarFila) antes de insertar.
+ *
+ * 🔴 LA CLAVE ES DE CONTENIDO, NO UN CONTADOR. Un reintento que se salta pasos ya hechos correría los números y
+ * chocaría con OTRO hito de la misma operación. La clave es lo que identifica al registro en lógica (tipo, cama,
+ * paciente, texto): dos hitos distintos de una misma operación tienen claves distintas, y uno idéntico es justo lo que
+ * se quiere deduplicar.
+ *
+ * `clave` ausente (undefined/null) = el formato de siempre: los bancos y los registros antiguos no cambian, y nadie debe
+ * parsear ni ordenar por este id. `clave` vacía ('') = un solo registro de ese tipo por operación.
+ * 🪤 `typeof OP_ACTUAL` NO es una comprobación de seguridad sino compatibilidad: la variable se declara en infra_lock.gs
+ * y los bancos que no lo cargan ni la tienen declarada; ahí cae al formato de siempre.
+ */
+function uid(prefix, clave) {
+  const p = prefix || 'ID';
+  if (clave !== undefined && clave !== null && typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id) {
+    const k = String(clave);
+    return p + '_' + OP_ACTUAL.id + (k === '' ? '' : '_' + _huellaTexto(k));
+  }
+  return p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+/**
+ * Huella de un texto: 53 bits (cyrb53), JS puro, en base 36. NO es criptográfica ni protege nada: sirve para que el mismo
+ * contenido dé el mismo número y otro contenido, con casi toda seguridad, otro. La usan el sello de operación (huella del
+ * payload) y los ids derivados de `uid(prefijo, clave)`.
+ * 🪤 No es `credHuellaDe`, que es SHA-256 de CLAVES y cuyo texto no se toca; y vive acá y no en infra_lock.gs porque
+ * `uid` la necesita y los bancos antiguos cargan infra_util.gs pero no infra_lock.gs.
+ */
+function _huellaTexto(texto) {
+  const s = String(texto);
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 /**

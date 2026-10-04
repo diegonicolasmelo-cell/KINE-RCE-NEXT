@@ -376,9 +376,45 @@ function _marcaSinEpisodio(accion, datos) {
   return (_ACC_EPISODIO.indexOf(accion) !== -1 && _epAusente(datos)) ? ' [sin episodio]' : '';
 }
 
+/**
+ * Forma de un OP_ID: lo que `crypto.randomUUID()` de la pantalla acuña con su prefijo («op_…»), de 8 a 64 caracteres de
+ * `[A-Za-z0-9_-]`. Es parte del contrato porque el OP_ID entra a la CLAVE del sello en el caché ('op|ACCION|OP_ID'): sin
+ * «|» ni espacios no se puede colar en la de otra operación, y el largo deja la clave muy por debajo de los 250
+ * caracteres que admite el caché. `var` y no `const`: ver infra_lock.gs.
+ */
+var _OP_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * 🔐 La operación de esta petición para el sello de operación (G16; infra_lock.gs hace el resto), o null si el payload no
+ * trae un OP_ID con la forma válida. Un OP_ID mal formado se trata como AUSENTE y no se rechaza: el sello es una ayuda
+ * para no repetir lo ya hecho, no una puerta, y con él ausente la operación corre exactamente como hoy.
+ *
+ * 🪤 Se arma ANTES de llamar al servicio, no después: `guardarEvolucion` MUTA `datos` (reescribe TEXTO_GENERADO, fija la
+ * FECHA, fusiona la fila previa), así que la huella y el texto tienen que tomarse de lo que la pantalla mandó, no de lo
+ * que quedó. El OP_ID no entra a la huella (se excluye): lo que se compara es el CONTENIDO.
+ */
+function _opDe(accion, datos) {
+  const d = datos || {};
+  const id = d.OP_ID;
+  if (typeof id !== 'string' || !_OP_ID_RE.test(id)) return null;
+  return { id: id, accion: accion, h: _huellaPayload(d), texto: String(d.TEXTO_GENERADO || '').trim(), tomado: false, repetida: false };
+}
+
 /** Ejecuta fn y, si resultó ok, deja registro en AUDIT_LOG. */
 function _auditar(ctx, accion, fn, datos) {
-  const r = fn();
+  // 🔐 OP_ACTUAL se arma ANTES del servicio y se DEVUELVE a lo que era al terminar, salga como salga (excepción
+  // incluida): en Apps Script cada petición es un proceso y vuelve a null; el simulador, que corre «la otra petición» dentro
+  // de la espera del candado de ésta, necesita que la de adentro no se lleve la de afuera.
+  const previa = (typeof OP_ACTUAL !== 'undefined') ? OP_ACTUAL : null;
+  const op = _opDe(accion, datos);
+  OP_ACTUAL = op;
+  let r;
+  try { r = fn(); } finally { OP_ACTUAL = previa; }
+  // Una repetición (el sello la reconoció) NO vuelve a anotar la acción: ya quedó en la bitácora la primera vez, y una
+  // segunda fila diría que el guardado ocurrió dos veces.
+  // 🔴 DECISIÓN DE DIEGO PENDIENTE (la 10 del diseño): ¿dejar además una fila corta <ACCION>_REPETIDA para medir cuánto
+  // ayuda el sello? Hasta que responda no se escribe nada: es un cambio de estas pocas líneas, no de diseño.
+  if (op && op.repetida) return r;
   const marca = _marcaSinEpisodio(accion, datos);
   if (r && r.ok) {
     const d = r.data || {};
