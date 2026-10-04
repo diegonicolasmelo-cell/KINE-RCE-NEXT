@@ -107,7 +107,7 @@ function api(accion, datos, token) {
       case 'SET_SUGERENCIA_ESTADO':
         return _auditar(ctx, accion, () => setSugerenciaEstado(datos), datos);
       case 'INGRESAR_PACIENTE':
-        return _auditar(ctx, accion, () => ingresarPaciente(datos, ctx), datos);
+        return _auditar(ctx, accion, () => ingresarPaciente(datos, ctx, _epDeDatos(datos)), datos);
       case 'DAR_ALTA':
         return _auditar(ctx, accion, () => darAltaPaciente(datos, ctx, _epDeDatos(datos)), datos);
       case 'INTERCAMBIAR_CAMAS':
@@ -117,7 +117,7 @@ function api(accion, datos, token) {
       case 'LIMPIAR_CAMA':
         return _auditar(ctx, accion, () => limpiarCama(datos.idCama, _epDeDatos(datos)), datos);
       case 'GUARDAR_EVOLUCION':
-        return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx), datos);
+        return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx, _epDeDatos(datos)), datos);
       case 'AGREGAR_HITO':
         return _auditar(ctx, accion, () => agregarHito(Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos), _epDeDatos(datos)), datos);
       case 'SET_ASIGNACION_TURNO':

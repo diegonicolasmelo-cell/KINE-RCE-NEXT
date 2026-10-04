@@ -1053,7 +1053,32 @@ function _apacheNorm(x) {
   return (!isNaN(n) && n >= 0 && n <= 71 && String(n) === String(x).trim()) ? n : '';
 }
 
-function ingresarPaciente(datos, ctx) {
+/**
+ * 🔐 G15 · EL INGRESO CONCURRENTE (tanda 2 del guardado seguro, paso 8, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Esta puerta ingresaba a quien llegara primero a una cama libre y a todos los demás les contestaba «ya está
+ * ocupada», sin poder distinguir a dos personas que ingresan a la misma cama de UNA que repite su propio ingreso porque la
+ * respuesta se perdió: el reintento honesto se veía igual que el ajeno y se rechazaba («no se guardó» de algo que sí se
+ * guardó). Ni siquiera podía reconocerlo: el pid lo acuñaba el servidor (Utilities.getUuid) y quien llamaba no tenía cómo
+ * decir «este ingreso es el mío».
+ *
+ * LA SALIDA: `datos.PATIENT_ID`, el pid que quien llama acuña ANTES de enviar (la pantalla, al abrir el formulario sobre una
+ * cama libre; forma [A-Za-z0-9_-]{8,64}, la valida `validarPayloadIngreso`). Dentro del lock y antes de escribir, con la misma
+ * regla que el ingreso por `guardarEvolucion` (`decidirEpisodioPuerta('INGRESO')`, dominio_validacion.gs):
+ *   · cama libre ⇒ entra, y el pid acuñado queda en la cama (no uno del servidor);
+ *   · cama ocupada con ESE MISMO pid ⇒ es el reintento de su propio ingreso: ok «ya estaba» y CERO escrituras;
+ *   · cama ocupada con OTRO pid ⇒ ERR.CONFLICTO, sin tocar nada;
+ *   · sin PATIENT_ID ⇒ como siempre: una cama ocupada es VALIDACION «ya está ocupada». Solo en MODO ESTRICTO
+ *     (CONFIG.CONTRATO_ESTRICTO = TRUE) un ingreso sin identidad propia sobre una cama con paciente es CONFLICTO.
+ * Una cama ocupada por un episodio SIN ingreso formal (sin PATIENT_ID) sigue siendo «ya está ocupada»: esta puerta nunca
+ * ingresa encima de una cama ocupada.
+ *
+ * `ep` es el último parámetro y NO es obligatorio (los bancos antiguos, las llamadas internas): solo cuenta su `estricto`.
+ * La regla solo se invoca con identidad propia o en modo estricto: un banco antiguo —que le pone un doble a
+ * `validarPayloadIngreso` y no carga dominio_validacion.gs— no tiene por qué traerla; uno nuevo que SÍ manda PATIENT_ID sin
+ * cargarla REVIENTA (INTERNO) en vez de saltarse el candado en silencio.
+ */
+function ingresarPaciente(datos, ctx, ep) {
   const errores = validarPayloadIngreso(datos);
   if (errores.length) return err('Validación: ' + errores.join('; '), ERR.VALIDACION);
   ctx = ctx || {};
@@ -1063,7 +1088,21 @@ function ingresarPaciente(datos, ctx) {
       const idCama = String(datos.idCama || datos.ID_CAMA);
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
       if (!cama) return err('Cama "' + idCama + '" no encontrada.', ERR.NO_ENCONTRADO);
-      if (esVerdadero(cama.OCUPADA)) return err('La cama ' + idCama + ' ya está ocupada.', ERR.VALIDACION);
+      const ocupada = esVerdadero(cama.OCUPADA);
+
+      // El pid acuñado por quien llama ('' si no trae; su forma ya la validó validarPayloadIngreso).
+      const propio = (datos.PATIENT_ID === undefined || datos.PATIENT_ID === null) ? '' : String(datos.PATIENT_ID).trim();
+      const estricto = !!ep && ep.estricto === true;
+      if (propio || estricto) {
+        const d = decidirEpisodioPuerta('INGRESO', {
+          propio: propio, pid: ocupada ? String(cama.PATIENT_ID || '').trim() : '', idCama: idCama, estricto: estricto,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') {
+          return ok({ idCama, accion: 'ingreso (ya estaba)', patientId: propio, cod: cama.COD_PACIENTE, entidad: 'CAMAS_ESTADO', yaEstaba: true });
+        }
+      }
+      if (ocupada) return err('La cama ' + idCama + ' ya está ocupada.', ERR.VALIDACION);
 
       const nombre = String(datos.nombre || datos.NOMBRE || '').trim();
       const edad   = datos.edad || datos.EDAD || '';
@@ -1083,7 +1122,7 @@ function ingresarPaciente(datos, ctx) {
       const tieneVA = esTOT || esTQT;
       const tieneVM = sop === 'VM' || sop === 'VNI';
 
-      const patientId = Utilities.getUuid();
+      const patientId = propio || Utilities.getUuid();
       const cod = _codUnico(generarCodPaciente(nombre, edad, fecha));
 
       repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, {
@@ -5311,8 +5350,59 @@ function validarEpisodioAbierto(abierto, pidCama, idCama) {
     'así que no se guardó nada. Cierra el formulario y vuelve a abrir la cama para ver cómo está ahora.';
 }
 
+/**
+ * _candadoDeIngreso — el INGRESO CONCURRENTE y el modo estricto en el guardado de la evolución (G15, tanda 2 del guardado
+ * seguro, paso 8, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Dos kinesiólogos abren el formulario de ingreso sobre la MISMA cama libre, cada uno con su paciente. El
+ * primero en guardar gana la cama. El segundo guardaba DESPUÉS y `validarEpisodioAbierto` no lo frenaba: su
+ * `EPISODIO_ABIERTO` iba vacío (la tarjeta no tenía episodio al abrir) y el vacío no reclama nada, a propósito —si
+ * rechazara sobre una cama con paciente, el REINTENTO de un ingreso cuyo primer intento sí aterrizó se vería idéntico a
+ * «otro ingreso en la misma cama»—. Y el pid salía de `datos.PATIENT_ID || cama.PATIENT_ID`: el segundo ingreso se
+ * escribía encima del primero, con el nombre, la edad y el diagnóstico de uno bajo el episodio del otro, y nadie lo veía.
+ *
+ * LA SALIDA: el ingreso trae su identidad propia, `datos.PATIENT_ID`, que la pantalla acuña al abrir el formulario sobre
+ * una cama LIBRE y manda junto con `EPISODIO_ABIERTO = ''`. Con ella el vacío sí se puede juzgar (la regla vive en
+ * `decidirEpisodioPuerta('INGRESO')`, dominio_validacion.gs): cama libre o sin PATIENT_ID ⇒ sigue; cama con ESE MISMO pid ⇒
+ * es el reintento de su propio ingreso y sigue, idempotente (el hito de ingreso único por pid ya lo asegura
+ * `_timelineDelGuardado`); cama con OTRO pid ⇒ ERR.CONFLICTO, sin escribir nada.
+ *
+ * MODO ESTRICTO (`ep.estricto`, CONFIG.CONTRATO_ESTRICTO = TRUE, nace APAGADO): el EPISODIO_ABIERTO AUSENTE se rechaza
+ * —«esta pantalla es de una versión anterior, recárgala»—, y el vacío SIN identidad propia no se acepta sobre una cama con
+ * paciente (CONFLICTO). Sin identidad propia y con el modo tolerante no se compara nada: es el hueco que dejan las
+ * pantallas viejas hasta que se enciende el modo estricto, y no se disimula.
+ *
+ * Con VALOR en EPISODIO_ABIERTO no hace nada: eso ya lo comparó `validarEpisodioAbierto`. Va DENTRO del lock, con la cama
+ * que se leyó adentro, y ANTES de la primera escritura. Devuelve la respuesta de rechazo para devolver tal cual, o null si
+ * se puede seguir.
+ *
+ * 🪤 Solo invoca las reglas de dominio_validacion.gs cuando el payload trae identidad propia o está el modo estricto: varios
+ * bancos antiguos cargan una lista FIJA de archivos que trae este servicio y no aquel. Uno nuevo que sí manda el reclamo
+ * sin cargarlas REVIENTA (INTERNO) en vez de saltarse el candado en silencio.
+ *
+ * @param  cama  la fila de la cama leída dentro del lock ({} si no existe)
+ * @param  ep    {a, b, estricto, ausente} de api.gs (`_epDeDatos`); sin él (bancos, llamadas internas) es el modo tolerante
+ */
+function _candadoDeIngreso(datos, cama, idCama, ep) {
+  const abierto = datos.EPISODIO_ABIERTO;
+  const estricto = !!ep && ep.estricto === true;
+  if (abierto === undefined || abierto === null) {
+    if (!estricto) return null;   // ausente en modo tolerante: no se compara (compatibilidad con llamadas sin pantalla)
+    const m = validarEpisodioPuerta(abierto, '', idCama, true);
+    return m ? err(m, ERR.VALIDACION) : null;
+  }
+  if (String(abierto).trim() !== '') return null;   // con valor: ya lo comparó validarEpisodioAbierto
+  const propio = (datos.PATIENT_ID === undefined || datos.PATIENT_ID === null) ? '' : String(datos.PATIENT_ID).trim();
+  if (!propio && !estricto) return null;            // vacío sin identidad propia en modo tolerante: como hasta hoy
+  // Quien ocupa la cama AHORA: una cama libre no tiene dueño aunque la fila conserve un pid viejo, y un episodio sin
+  // ingreso formal (ocupada, sin PATIENT_ID) tampoco tiene a quién reclamarle.
+  const pidAhora = esVerdadero(cama.OCUPADA) ? String(cama.PATIENT_ID || '').trim() : '';
+  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto });
+  return d.estado === 'rechazo' ? err(d.error, d.codigo) : null;   // «yaHecho» aquí es el reintento propio: sigue (idempotente)
+}
+
 // ═══ ESCRITURA ════════════════════════════════════════════
-function guardarEvolucion(datos, ctx) {
+function guardarEvolucion(datos, ctx, ep) {
   const errs = validarPayloadEvolucion(datos);
   if (errs.length) return err('Validación: ' + errs.join('; '), ERR.VALIDACION);
   ctx = ctx || {};
@@ -5394,6 +5484,14 @@ function guardarEvolucion(datos, ctx) {
          produce un mensaje que habla de otro paciente. */
       const _errEpisodio = validarEpisodioAbierto(datos.EPISODIO_ABIERTO, cama.PATIENT_ID, idCama);
       if (_errEpisodio) return err(_errEpisodio, ERR.VALIDACION);
+
+      /* 🔐 EL INGRESO CONCURRENTE (G15, 4-oct-2026). Con el episodio abierto VACÍO —el formulario se abrió sobre una cama
+         libre— la regla de arriba no puede juzgar nada; la identidad propia del ingreso (`datos.PATIENT_ID`, acuñado por
+         la pantalla al abrir) sí: cama de OTRO pid ⇒ CONFLICTO sin escribir; del MISMO pid ⇒ el reintento de su propio
+         ingreso, que sigue. Y el modo estricto: el ausente se rechaza y el vacío sin identidad propia no pasa sobre una
+         cama con paciente. Va justo DESPUÉS de la regla de arriba y antes de cualquier escritura. */
+      const _rIngreso = _candadoDeIngreso(datos, cama, idCama, ep);
+      if (_rIngreso) return _rIngreso;
 
       // 🗂️ Dos reglas del episodio que necesitan la CAMA para decidir, y por
       // eso no caben en validarPayloadEvolucion (que es puro). Se evalúan

@@ -63,7 +63,7 @@ const E = (accion, razon, hecho) => ({ accion, clase: 'episodio', epImplementado
 const SIN = (accion, razon) => ({ accion, clase: 'sinEpisodio', razon });
 const TABLA = [
   // ── Actúan sobre «quien esté en la cama» ──
-  E('GUARDAR_EVOLUCION',       'EPISODIO_ABIERTO del formulario, capturado al abrirlo; y en un ingreso, el PATIENT_ID acuñado por la pantalla (G15).'),
+  E('GUARDAR_EVOLUCION',       'EPISODIO_ABIERTO del formulario, capturado al abrirlo; y en un ingreso, el PATIENT_ID acuñado por la pantalla (G15).', true),   // paso 8
   E('DAR_ALTA',                'EPISODIO_ABIERTO tomado al abrir el diálogo de egreso y pasado por argumento, nunca releído de la base al confirmar.', true),   // paso 5
   E('LIMPIAR_CAMA',            'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: nunca se limpia al ocupante nuevo.', true),   // paso 5
   E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.', true),   // paso 5
@@ -79,7 +79,7 @@ const TABLA = [
   E('PEND_CERRAR',             'EPISODIO_ABIERTO de la tarjeta al abrir: ya la protege el id del pendiente, se agrega para que el censo no tenga excepciones.', true),   // paso 7
   E('GSA_ASIGNAR',             'EPISODIO_ABIERTO = el paciente de la cama elegida en la bandeja al abrir el selector de asignación.', true),   // paso 7
   // ── Crea el episodio ──
-  { accion: 'INGRESAR_PACIENTE', clase: 'ingreso', epImplementado: false,
+  { accion: 'INGRESAR_PACIENTE', clase: 'ingreso', epImplementado: true,   // paso 8
     razon: 'Crea el episodio: no puede reclamar uno que no existe. Lleva datos.PATIENT_ID acuñado por quien llama (la pantalla actual ingresa por GUARDAR_EVOLUCION y no usa esta acción).' },
   // ── Fuera de _auditar: se audita sola, con la firma del modo coordinación ──
   { accion: 'COORD_CORREGIR', clase: 'episodio', viaAuditar: false, epImplementado: true,   // paso 7

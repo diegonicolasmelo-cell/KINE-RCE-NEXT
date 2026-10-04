@@ -82,7 +82,32 @@ function _apacheNorm(x) {
   return (!isNaN(n) && n >= 0 && n <= 71 && String(n) === String(x).trim()) ? n : '';
 }
 
-function ingresarPaciente(datos, ctx) {
+/**
+ * 🔐 G15 · EL INGRESO CONCURRENTE (tanda 2 del guardado seguro, paso 8, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Esta puerta ingresaba a quien llegara primero a una cama libre y a todos los demás les contestaba «ya está
+ * ocupada», sin poder distinguir a dos personas que ingresan a la misma cama de UNA que repite su propio ingreso porque la
+ * respuesta se perdió: el reintento honesto se veía igual que el ajeno y se rechazaba («no se guardó» de algo que sí se
+ * guardó). Ni siquiera podía reconocerlo: el pid lo acuñaba el servidor (Utilities.getUuid) y quien llamaba no tenía cómo
+ * decir «este ingreso es el mío».
+ *
+ * LA SALIDA: `datos.PATIENT_ID`, el pid que quien llama acuña ANTES de enviar (la pantalla, al abrir el formulario sobre una
+ * cama libre; forma [A-Za-z0-9_-]{8,64}, la valida `validarPayloadIngreso`). Dentro del lock y antes de escribir, con la misma
+ * regla que el ingreso por `guardarEvolucion` (`decidirEpisodioPuerta('INGRESO')`, dominio_validacion.gs):
+ *   · cama libre ⇒ entra, y el pid acuñado queda en la cama (no uno del servidor);
+ *   · cama ocupada con ESE MISMO pid ⇒ es el reintento de su propio ingreso: ok «ya estaba» y CERO escrituras;
+ *   · cama ocupada con OTRO pid ⇒ ERR.CONFLICTO, sin tocar nada;
+ *   · sin PATIENT_ID ⇒ como siempre: una cama ocupada es VALIDACION «ya está ocupada». Solo en MODO ESTRICTO
+ *     (CONFIG.CONTRATO_ESTRICTO = TRUE) un ingreso sin identidad propia sobre una cama con paciente es CONFLICTO.
+ * Una cama ocupada por un episodio SIN ingreso formal (sin PATIENT_ID) sigue siendo «ya está ocupada»: esta puerta nunca
+ * ingresa encima de una cama ocupada.
+ *
+ * `ep` es el último parámetro y NO es obligatorio (los bancos antiguos, las llamadas internas): solo cuenta su `estricto`.
+ * La regla solo se invoca con identidad propia o en modo estricto: un banco antiguo —que le pone un doble a
+ * `validarPayloadIngreso` y no carga dominio_validacion.gs— no tiene por qué traerla; uno nuevo que SÍ manda PATIENT_ID sin
+ * cargarla REVIENTA (INTERNO) en vez de saltarse el candado en silencio.
+ */
+function ingresarPaciente(datos, ctx, ep) {
   const errores = validarPayloadIngreso(datos);
   if (errores.length) return err('Validación: ' + errores.join('; '), ERR.VALIDACION);
   ctx = ctx || {};
@@ -92,7 +117,21 @@ function ingresarPaciente(datos, ctx) {
       const idCama = String(datos.idCama || datos.ID_CAMA);
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
       if (!cama) return err('Cama "' + idCama + '" no encontrada.', ERR.NO_ENCONTRADO);
-      if (esVerdadero(cama.OCUPADA)) return err('La cama ' + idCama + ' ya está ocupada.', ERR.VALIDACION);
+      const ocupada = esVerdadero(cama.OCUPADA);
+
+      // El pid acuñado por quien llama ('' si no trae; su forma ya la validó validarPayloadIngreso).
+      const propio = (datos.PATIENT_ID === undefined || datos.PATIENT_ID === null) ? '' : String(datos.PATIENT_ID).trim();
+      const estricto = !!ep && ep.estricto === true;
+      if (propio || estricto) {
+        const d = decidirEpisodioPuerta('INGRESO', {
+          propio: propio, pid: ocupada ? String(cama.PATIENT_ID || '').trim() : '', idCama: idCama, estricto: estricto,
+        });
+        if (d.estado === 'rechazo') return err(d.error, d.codigo);
+        if (d.estado === 'yaHecho') {
+          return ok({ idCama, accion: 'ingreso (ya estaba)', patientId: propio, cod: cama.COD_PACIENTE, entidad: 'CAMAS_ESTADO', yaEstaba: true });
+        }
+      }
+      if (ocupada) return err('La cama ' + idCama + ' ya está ocupada.', ERR.VALIDACION);
 
       const nombre = String(datos.nombre || datos.NOMBRE || '').trim();
       const edad   = datos.edad || datos.EDAD || '';
@@ -112,7 +151,7 @@ function ingresarPaciente(datos, ctx) {
       const tieneVA = esTOT || esTQT;
       const tieneVM = sop === 'VM' || sop === 'VNI';
 
-      const patientId = Utilities.getUuid();
+      const patientId = propio || Utilities.getUuid();
       const cod = _codUnico(generarCodPaciente(nombre, edad, fecha));
 
       repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, {
