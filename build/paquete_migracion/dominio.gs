@@ -553,6 +553,169 @@ function validarTransicionVA(d, cama) {
   return errs;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  🔐 G14 en TODAS las puertas que actúan sobre una cama (tanda 2 del guardado seguro, 4-oct-2026).
+//  Puras, como el resto de este archivo: reciben lo que necesitan y no leen ninguna hoja. Quien llama (el servicio
+//  de cada puerta) lee la cama DENTRO del lock, llama a estas y rechaza ANTES de la primera escritura.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Los dos mensajes de rechazo del candado de episodio. Son funciones y no constantes para que el texto exista en un
+ * solo lugar y se pueda comparar con el de `validarEpisodioAbierto` (svc_evoluciones.gs) palabra por palabra: una
+ * sola frase para todas las puertas. Ninguno nombra a nadie ni lleva el identificador de un episodio: el otro
+ * paciente no es asunto de quien tenía el formulario abierto (Ley 19.628); lo que pasó queda en AUDIT_LOG.
+ */
+function _msgCambioDePaciente(idCama) {
+  // 🪤 La pantalla reconoce este rechazo por la frase «cambió de paciente» (`_EP_CAMBIO_RE` en index.html): si se
+  // reescribe, se reescribe en los dos lados — la guardia lo ata.
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste este formulario, ' +
+    'así que no se guardó nada. Cierra el formulario y vuelve a abrir la cama para ver cómo está ahora.';
+}
+function _msgPantallaVieja() {
+  // 🪤 SIN la frase «cambió de paciente»: la pantalla mostraría la salida del cambio de paciente («Cerrar la cama») y
+  // lo que hay que hacer aquí es otra cosa —recargar—.
+  return 'Esta pantalla es de una versión anterior y no puede guardar con seguridad. ' +
+    'Recárgala (cierra y vuelve a abrir la aplicación) y repite lo que hacías. No se guardó nada.';
+}
+
+/**
+ * validarEpisodioPuerta — la pantalla que se abrió para un paciente no actúa sobre otro, en CUALQUIER puerta
+ * (G14, tanda 2, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `validarEpisodioAbierto` (svc_evoluciones.gs) cerró el hueco en UNA puerta, el guardado de la
+ * evolución. Las demás —dar el alta, limpiar la cama, moverla, intercambiarla, anular un evento, anexar, medir,
+ * abrir un pendiente…— siguen atribuyendo lo que hacen a «quien tenga la cama AHORA»: el diálogo que quedó abierto
+ * mientras la cama se daba de alta y se reingresaba a OTRO paciente limpia, mueve o le anula el evento al nuevo, y
+ * nadie lo ve. Esta es la MISMA regla, extendida: una función pura que cada puerta llama con la cama que leyó
+ * dentro de su lock.
+ *
+ * LAS REGLAS (las mismas de `validarEpisodioAbierto`, más el modo estricto):
+ *  · AUSENTE (undefined/null) ⇒ no se compara. Es COMPATIBILIDAD con las llamadas sin pantalla (smoke tests,
+ *    build/sim) y con las pantallas viejas que todavía no mandan el campo. La pantalla nueva SIEMPRE lo manda.
+ *  · VACÍO ⇒ la pantalla no abrió ningún episodio (ingreso en cama libre, o episodio sin ingreso formal): no
+ *    reclama ninguno. 🪤 A propósito: si el vacío rechazara sobre una cama ocupada, el reintento de un ingreso cuyo
+ *    primer intento sí aterrizó se vería idéntico a «otro ingreso en la misma cama» (esa ambigüedad la resuelve el
+ *    PATIENT_ID que la pantalla acuña al abrir el ingreso, G15, no esta función).
+ *  · CON VALOR ⇒ igualdad EXACTA con el PATIENT_ID de la cama (tras recortar espacios): si la cama pasó a otro
+ *    paciente, o quedó libre, se rechaza.
+ *  · ESTRICTO (CONFIG.CONTRATO_ESTRICTO = TRUE, nace APAGADO): el AUSENTE se rechaza —«esta pantalla es de una versión
+ *    anterior, recárgala»— y el VACÍO no se acepta sobre una cama que tiene paciente. 🪤 La excepción «un ingreso con
+ *    PATIENT_ID propio sí entra con vacío» la decide quien ingresa (G15) ANTES de llamar aquí: esta función no
+ *    conoce ingresos.
+ *
+ * Devuelve '' si la puerta puede seguir, o el mensaje en palabras simples si no. Quien llama lo devuelve como
+ * `err(msg, ERR.VALIDACION)` sin haber escrito nada. (El CONFLICTO —«otro se adelantó, no es un reintento»— lo
+ * decide `decidirEpisodioPuerta`, que además reconoce el reintento de una operación que sí aterrizó.)
+ *
+ * @param  abierto   EPISODIO_ABIERTO del payload (el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el diálogo)
+ * @param  pidCama   PATIENT_ID que tiene la cama AHORA (leída dentro del lock)
+ * @param  idCama    número de la cama, solo para el mensaje
+ * @param  estricto  true solo en modo estricto; cualquier otra cosa (incluido no pasarlo) es el modo tolerante
+ */
+function validarEpisodioPuerta(abierto, pidCama, idCama, estricto) {
+  const pid = (pidCama === undefined || pidCama === null) ? '' : String(pidCama).trim();
+  if (abierto === undefined || abierto === null) return estricto === true ? _msgPantallaVieja() : '';
+  const ab = String(abierto).trim();
+  if (!ab) return (estricto === true && pid) ? _msgCambioDePaciente(idCama) : '';
+  return ab === pid ? '' : _msgCambioDePaciente(idCama);
+}
+
+/**
+ * decidirEpisodioPuerta — qué hace cada puerta de CAMA ante un reclamo de episodio, incluido el «ya hecho»
+ * (G14, tanda 2, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `validarEpisodioPuerta` sola trata todo desacuerdo como «la cama cambió de paciente». Pero hay
+ * un desacuerdo que NO es un conflicto: el REINTENTO de una operación que sí aterrizó. La respuesta se perdió, la
+ * pantalla reenvía lo mismo, y la cama ya no es la de antes PORQUE ESA OPERACIÓN YA SE HIZO (el alta ya archivó y
+ * limpió; el traslado ya movió; el intercambio ya cruzó). Rechazarlo le diría a la persona «no se guardó» sobre algo
+ * que sí se guardó. Y hay otro desacuerdo que no se puede tratar como reintento: limpiar la cama que ahora ocupa
+ * OTRO paciente borraría al ocupante nuevo.
+ *
+ * Devuelve `{estado, codigo, error}`:
+ *  · 'seguir'   — el reclamo coincide (o no hay reclamo que comparar): la puerta hace lo suyo.
+ *  · 'yaHecho'  — la operación ya aterrizó: la puerta responde ok `yaEstaba` y, donde quedan pasos por completar
+ *                 (intercambio, traslado), completa los que falten sin repetir el cambio de camas.
+ *  · 'rechazo'  — no se toca nada; `codigo` es VALIDACION (la cama no es la de la pantalla) o CONFLICTO (otra
+ *                 persona se adelantó), y `error` el mensaje, sin nombres ni identificadores.
+ *
+ * LAS PUERTAS (`e` trae lo que cada una lee dentro de su lock):
+ *  · DAR_ALTA — reclamo `abierto` contra la cama `pid`. Si no coincide, es un reintento SOLO si ARCHIVO_PACIENTES ya
+ *    tiene la fila de ese paciente (`hayArchivo`): cama libre u ocupada por otro, da igual, el alta ya se hizo. Sin
+ *    esa fila, el paciente se trasladó o la cama se limpió, no se le dio el alta: rechazo como hoy.
+ *  · LIMPIAR_CAMA — cama libre: ya hecho. Ocupada por OTRO: CONFLICTO (nunca se limpia al ocupante nuevo).
+ *  · INTERCAMBIAR_CAMAS — `abierto`/`pid` es la cama A y `abiertoB`/`pidB` la B. Ya hecho si A tiene el paciente que
+ *    la pantalla vio en B y B el que vio en A. Cualquier otra diferencia rechaza (también la mitad hecha: con un
+ *    solo setValues para las dos filas no debería existir, y si existe no es un reintento seguro).
+ *  · MOVER_A_CAMA_VACIA — `abierto`/`pid` es el origen y `abiertoB`/`pidB` el destino (`''` = estaba libre al
+ *    elegir). Ya hecho si el destino ya tiene al paciente y el origen quedó libre. Un destino que ahora ocupa OTRO
+ *    paciente es CONFLICTO. Se juzga primero el origen. 🪤 Se decide por PATIENT_ID: una cama ocupada SIN
+ *    PATIENT_ID (episodio sin ingreso formal) se ve igual que una libre, y la comprobación de «ocupada» que el
+ *    servicio ya hace se queda como está.
+ *
+ * Una puerta que no está aquí REVIENTA: un candado que se saltara callando cuando le falta la fila de su puerta
+ * sería peor que no tenerlo.
+ *
+ * @param  puerta  'DAR_ALTA' | 'LIMPIAR_CAMA' | 'INTERCAMBIAR_CAMAS' | 'MOVER_A_CAMA_VACIA'
+ * @param  e       { abierto, abiertoB, pid, pidB, idCama, idCamaB, hayArchivo, estricto }
+ */
+function decidirEpisodioPuerta(puerta, e) {
+  e = e || {};
+  const estricto = e.estricto === true;
+  const txt = function (x) { return (x === undefined || x === null) ? '' : String(x).trim(); };
+  const ab = txt(e.abierto), abB = txt(e.abiertoB), pid = txt(e.pid), pidB = txt(e.pidB);
+  const seguir = { estado: 'seguir' }, yaHecho = { estado: 'yaHecho' };
+  const rechazo = function (codigo, error) { return { estado: 'rechazo', codigo: codigo, error: error }; };
+  const invalida = function (msg) { return rechazo(ERR.VALIDACION, msg); };
+
+  switch (String(puerta)) {
+    case 'DAR_ALTA': {
+      const m = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (!m) return seguir;
+      // Con un episodio reclamado que no coincide, el alta ya hecha lo explica. Sin episodio reclamado (ausente o
+      // vacío) no hay a quién buscar en el archivo: el «ya hecho» no se inventa.
+      if (ab && e.hayArchivo === true) return yaHecho;
+      return invalida(m);
+    }
+    case 'LIMPIAR_CAMA': {
+      const m = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (!m) return seguir;
+      if (ab && !pid) return yaHecho;
+      if (ab && pid) {
+        return rechazo(ERR.CONFLICTO, 'La cama ' + e.idCama + ' ya está ocupada por otro paciente (la limpieza que pediste era para quien estaba antes), ' +
+          'así que no se limpió nada. Cierra esta ventana y mira cómo está la cama ahora.');
+      }
+      return invalida(m);
+    }
+    case 'INTERCAMBIAR_CAMAS': {
+      if (ab && abB && ab !== abB && pid === abB && pidB === ab) return yaHecho;
+      const mA = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (mA) return invalida(mA);
+      const mB = validarEpisodioPuerta(e.abiertoB, e.pidB, e.idCamaB, estricto);
+      if (mB) return invalida(mB);
+      return seguir;
+    }
+    case 'MOVER_A_CAMA_VACIA': {
+      if (ab && !pid && pidB === ab) return yaHecho;
+      const mA = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (mA) return invalida(mA);
+      if (e.abiertoB === undefined || e.abiertoB === null) {
+        return estricto ? invalida(_msgPantallaVieja()) : seguir;
+      }
+      if (!abB) {
+        // La pantalla vio el destino LIBRE al elegir: si ahora tiene a alguien, otra persona se adelantó.
+        return pidB
+          ? rechazo(ERR.CONFLICTO, 'La cama ' + e.idCamaB + ' ya fue ocupada por otro paciente mientras elegías el traslado, ' +
+              'así que no se movió a nadie. Mira cómo está la cama ahora y vuelve a elegir.')
+          : seguir;
+      }
+      const mB = validarEpisodioPuerta(e.abiertoB, e.pidB, e.idCamaB, estricto);
+      return mB ? invalida(mB) : seguir;
+    }
+    default:
+      throw new Error('decidirEpisodioPuerta: la puerta «' + puerta + '» no está en la tabla (DAR_ALTA, LIMPIAR_CAMA, INTERCAMBIAR_CAMAS, MOVER_A_CAMA_VACIA).');
+  }
+}
+
 
 // ════════════════════════════════════════════════════════════════════
 // ── dominio_texto.gs ──

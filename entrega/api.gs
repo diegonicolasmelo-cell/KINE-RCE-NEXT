@@ -305,15 +305,87 @@ function obtenerBoot(datos, ctx, auth) {
   } catch (e) { return err('obtenerBoot: ' + e.message, ERR.INTERNO, e); }
 }
 
+/**
+ * 🔐 EL CANDADO DE EPISODIO EN CADA PUERTA (G14, tanda 2 del guardado seguro, 4-oct-2026).
+ *
+ * `_ACC_EPISODIO` son las escrituras que actúan sobre «quien esté en la cama» y por eso la pantalla tiene que mandar
+ * `EPISODIO_ABIERTO` (el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el diálogo): sin él, lo que se hace se
+ * atribuye al ocupante de AHORA, que puede ser otro. Es la lista de las filas 'episodio' del censo de
+ * build/checks/guardado_seguro_cobertura.js, y la guardia exige que sean exactamente las mismas: dos listas escritas
+ * a mano que no se pueden separar. COORD_CORREGIR no está aquí: no pasa por `_auditar` y su reclamo es `patientId`.
+ * `var` y no `const`: las const no cuelgan de globalThis en el eval del simulador.
+ */
+var _ACC_EPISODIO = [
+  'GUARDAR_EVOLUCION', 'DAR_ALTA', 'LIMPIAR_CAMA', 'INTERCAMBIAR_CAMAS', 'MOVER_A_CAMA_VACIA',
+  'ANULAR_EVENTO', 'ANEXAR_EVENTO', 'ANULAR_ANEXO', 'CONFIRMAR_DISPOSITIVOS', 'AGREGAR_HITO',
+  'EVAL_REGISTRAR', 'EPISODIO_ESCALA', 'PEND_ABRIR', 'PEND_CERRAR', 'GSA_ASIGNAR',
+];
+
+/**
+ * ¿La pantalla omitió EPISODIO_ABIERTO? AUSENTE (undefined/null) no es lo mismo que VACÍO (`''`): el vacío es una
+ * declaración («la tarjeta no tenía episodio al abrir»), la ausencia es una pantalla que no sabe decirlo. PURA, sin
+ * leer configuración: la usa `_auditar`, que corre DESPUÉS de que la escritura ya aterrizó, y que un detalle de la
+ * bitácora no puede convertir en error.
+ */
+function _epAusente(datos) {
+  const d = datos || {};
+  return d.EPISODIO_ABIERTO === undefined || d.EPISODIO_ABIERTO === null;
+}
+
+/**
+ * `ep` — el reclamo de episodio de una petición, armado UNA vez y pasado como ÚLTIMO parámetro de la función de
+ * servicio de cada puerta de episodio (limpiarCama(id, ep), darAltaPaciente(datos, ctx, ep)…). Cada servicio, dentro
+ * de su lock y antes de su primera escritura, lo compara con la cama que leyó (dominio_validacion.gs).
+ *
+ *   a        EPISODIO_ABIERTO tal como llegó (sin tocar: la regla distingue undefined, null y '')
+ *   b        EPISODIO_ABIERTO_B, de las dos puertas que tocan dos camas (intercambio y traslado)
+ *   estricto CONFIG.CONTRATO_ESTRICTO = TRUE. Nace APAGADO para no tumbar las pantallas viejas, y se lee con su valor
+ *            por defecto (no hace falta tocar la planilla ni correr crearORepararEstructura): en estricto, la
+ *            pantalla que no manda el reclamo se rechaza. Se lee sin distinguir mayúsculas: un interruptor de
+ *            SEGURIDAD que se queda apagado porque alguien escribió «true» y no «TRUE» es un candado que parece
+ *            puesto y no lo está, y ese olvido no se ve en ninguna pantalla
+ *   ausente  no vino `a` (ver `_epAusente`); una `b` suelta no la llena
+ */
+function _epDeDatos(datos) {
+  const d = datos || {};
+  return {
+    a: d.EPISODIO_ABIERTO,
+    b: d.EPISODIO_ABIERTO_B,
+    estricto: String(leerConfig('CONTRATO_ESTRICTO', 'FALSE')).trim().toUpperCase() === 'TRUE',
+    ausente: _epAusente(d),
+  };
+}
+
+/**
+ * « [sin episodio]» — la marca que `_auditar` agrega al resumen de la fila de AUDIT_LOG cuando una puerta de episodio
+ * llega SIN EPISODIO_ABIERTO. Es el único hueco que el modo tolerante deja abierto (una pantalla vieja: el service
+ * worker cachea el armazón por sello de versión), y esta marca es cómo se mide cuántas llamadas siguen sin candado
+ * antes de decidir cuándo encender el modo estricto. Vale también para el rechazo: una llamada sin candado que
+ * igual fue rechazada sigue siendo una llamada sin candado.
+ *
+ * 🪤 GUARDAR_EVOLUCION es la ÚNICA puerta de episodio que NO se anota, y es una excepción a propósito, no un olvido.
+ * Su fila de AUDIT_LOG es la que build/checks/guardado_viajes.js compara byte a byte contra el árbol de antes de la
+ * Ola 4, con payloads sin navegador (sin EPISODIO_ABIERTO): anotarla ponía roja esa A/B por una diferencia que no
+ * tiene nada que ver con los viajes, y una guardia existente no se afloja para acomodar un detalle de la bitácora.
+ * Es además la puerta que YA compara el episodio hoy (G14 original: ausente no rechaza, pero la pantalla lo manda
+ * siempre), así que es donde menos hace falta medir el hueco. Si algún día los payloads de esa A/B mandan
+ * EPISODIO_ABIERTO, la excepción sobra y se quita.
+ */
+function _marcaSinEpisodio(accion, datos) {
+  if (accion === 'GUARDAR_EVOLUCION') return '';
+  return (_ACC_EPISODIO.indexOf(accion) !== -1 && _epAusente(datos)) ? ' [sin episodio]' : '';
+}
+
 /** Ejecuta fn y, si resultó ok, deja registro en AUDIT_LOG. */
 function _auditar(ctx, accion, fn, datos) {
   const r = fn();
+  const marca = _marcaSinEpisodio(accion, datos);
   if (r && r.ok) {
     const d = r.data || {};
     auditar({
       email: ctx.email, firma: ctx.firma, accion: accion,
       entidad: d.entidad || '', idEntidad: d.idCama || d.idEvolucion || d.id || '',
-      patientId: d.patientId || '', resumen: d.accion || accion,
+      patientId: d.patientId || '', resumen: (d.accion || accion) + marca,
     });
     return r;
   }
@@ -325,8 +397,11 @@ function _auditar(ctx, accion, fn, datos) {
      corregir un turno, no pudo, y abandonó — que es el riesgo que el propio
      diseño del candado reconoce y no podía detectar.
 
-     Solo `VALIDACION`: un `INTERNO` es una excepción y ya se registra en el log
-     de ejecuciones; duplicarlo aquí llenaría AUDIT_LOG de ruido.
+     Solo `VALIDACION` y `CONFLICTO` (G14, tanda 2): un `INTERNO` es una
+     excepción y ya se registra en el log de ejecuciones; duplicarlo aquí
+     llenaría AUDIT_LOG de ruido. El `CONFLICTO` —«otra persona se adelantó»:
+     la cama la ocupó otro, la limpió otro— es justo el rechazo del que más
+     interesa dejar rastro: es el que dice que dos personas pisaron la misma cama.
 
      El `idEntidad` sale del payload de ENTRADA, porque una respuesta de rechazo
      no trae `data`. Y el resumen se acota: lleva el motivo tal como se le mostró
@@ -336,12 +411,12 @@ function _auditar(ctx, accion, fn, datos) {
      manda la cama así, en mayúsculas, y sin esto el rechazo de un guardado
      —justo el que dice «la cama cambió de paciente»— quedaba en la bitácora con
      la cama VACÍA. */
-  if (r && r.ok === false && r.codigo === ERR.VALIDACION) {
+  if (r && r.ok === false && (r.codigo === ERR.VALIDACION || r.codigo === ERR.CONFLICTO)) {
     const dd = datos || {};
     auditar({
       email: ctx.email, firma: ctx.firma, accion: accion + '_RECHAZADO',
       entidad: '', idEntidad: dd.idCama || dd.ID_CAMA || dd.idEvolucion || dd.id || '',
-      patientId: dd.patientId || '', resumen: String(r.error || '').slice(0, 300),
+      patientId: dd.patientId || '', resumen: String(r.error || '').slice(0, 300) + marca,
     });
   }
   return r;
