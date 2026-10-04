@@ -69,10 +69,32 @@ function _sincronizarTimelineCama(idCama) {
 }
 
 // ── Público con lock ───────────────────────────────────────
-function agregarHito(hito) {
+/**
+ * Agrega un hito a la línea de tiempo de una cama.
+ *
+ * 🔐 G14 (tanda 2 del guardado seguro, paso 6, 4-oct-2026). Sin `hito.patientId` el hito se atribuye a quien esté en la cama
+ * AHORA (`_agregarHitoInternoSinSync`), y la tarjeta de esa cama re-sincroniza su caché con él: un formulario que quedó abierto
+ * para P, con la cama ya de Q, le colgaba el hito a Q. Con `ep` (el reclamo de episodio de la petición, api.gs `_epDeDatos`),
+ * lo que la pantalla abrió (`ep.a`, EPISODIO_ABIERTO) tiene que ser el episodio AL QUE SE ATRIBUYE el hito: el que el propio
+ * hito nombra o, si no nombra ninguno, el de quien ocupa la cama (una cama libre no tiene dueño). Se compara DENTRO del lock y
+ * ANTES de escribir. Un hito que nombra a su episodio es de ese episodio, esté o no en la cama: no se le inventa un conflicto.
+ * Sin `ep` (los bancos antiguos y las llamadas internas) no se compara nada, y solo se invoca con reclamo o con el modo estricto:
+ * esos bancos no cargan dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA (INTERNO) en vez de saltarse el candado.
+ */
+function agregarHito(hito, ep) {
   return conLock(() => {
-    try { const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r); }
-    catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
+    try {
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const idCama = String((hito && hito.idCama) || '');
+        const cama = idCama ? repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama) : null;
+        const _atribuido = String((hito && hito.patientId) || '').trim() ||
+          ((cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '').trim() : '');
+        const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
+      const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r);
+    } catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
   });
 }
 

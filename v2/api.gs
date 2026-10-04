@@ -119,7 +119,7 @@ function api(accion, datos, token) {
       case 'GUARDAR_EVOLUCION':
         return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx), datos);
       case 'AGREGAR_HITO':
-        return _auditar(ctx, accion, () => agregarHito(Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos)), datos);
+        return _auditar(ctx, accion, () => agregarHito(Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos), _epDeDatos(datos)), datos);
       case 'SET_ASIGNACION_TURNO':
         return _auditar(ctx, accion, () => guardarAsignacionTurno(datos), datos);
       case 'AGREGAR_FASE':
@@ -134,11 +134,11 @@ function api(accion, datos, token) {
       case 'ANULAR_EVENTO':
         return _auditar(ctx, accion, () => anularEvento(datos, ctx, _epDeDatos(datos)), datos);
       case 'ANEXAR_EVENTO':
-        return _auditar(ctx, accion, () => anexarEventoRapido(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anexarEventoRapido(datos, ctx, _epDeDatos(datos)), datos);
       case 'ANULAR_ANEXO':
-        return _auditar(ctx, accion, () => anularAnexo(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anularAnexo(datos, ctx, _epDeDatos(datos)), datos);
       case 'CONFIRMAR_DISPOSITIVOS':
-        return _auditar(ctx, accion, () => confirmarDispositivos(datos, ctx), datos);
+        return _auditar(ctx, accion, () => confirmarDispositivos(datos, ctx, _epDeDatos(datos)), datos);
       case 'GUARDAR_ENTREGA_TURNO':
         return _auditar(ctx, accion, () => guardarEntregaTurno(datos, ctx), datos);
       case 'GENERAR_REM':

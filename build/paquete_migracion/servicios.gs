@@ -4682,8 +4682,12 @@ function cambiosEstaNoche(fecha) {
  * Anexa un evento rápido al turno. datos: { idCama, turnoKey, tipo, hora,
  * detalle, proc (nombre de catálogo si tipo=procedimiento), cultTipo,
  * cultHallazgo (si tipo=cultivo) }.
+ *
+ * @param ep  el reclamo de episodio de la petición ({a, b, estricto, ausente}, api.gs `_epDeDatos`): `a` es
+ *            EPISODIO_ABIERTO, el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el ➕. Sin él (los bancos antiguos y
+ *            las llamadas internas) no se compara nada: es el modo tolerante de siempre.
  */
-function anexarEventoRapido(datos, ctx) {
+function anexarEventoRapido(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
@@ -4734,6 +4738,39 @@ function anexarEventoRapido(datos, ctx) {
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA));
       const pid = ubic ? pidEvo : pidCama;
+
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2 del guardado seguro, paso 6, 4-oct-2026).
+
+         🔴 EL HUECO. El ➕ se abre sobre la tarjeta de P y se envía después. Si entremedio P recibió el alta y entró Q a
+         la misma cama, lo anotado se le atribuía a Q sin que nadie lo notara, por dos caminos. (1) Un turno que nadie
+         guardó (un cultivo, una nota, el cambio de un filtro: nada de eso exige evolución) no tiene fila que ubicar, y el
+         ➕ caía a «quien esté en la cama»: al cambio de HME/HEPA/sonda le reiniciaba el reloj a Q —y `cambiosEstaNoche`
+         dejaba de avisar un cambio que sí tocaba—, y el cultivo y la nota le quedaban colgados en su línea de tiempo.
+         (2) Un procedimiento sí necesita su evolución, y la clave del turno es de la CAMA, no de la persona: si Q ya había
+         guardado ese turno, el localizador devolvía la fila de Q y el anexo se sumaba a SU estadística (y al REM).
+
+         LA REGLA: lo que la pantalla abrió (EPISODIO_ABIERTO; en el Registro Diario, el de la fila que se mira) tiene que
+         ser el episodio AL QUE SE ATRIBUYE lo que se anota: el de la evolución ubicada o —si no hay ninguna, o es una
+         fila sin episodio— el de quien ocupa la cama AHORA (una cama libre no tiene dueño, aunque la fila conserve un
+         pid viejo). Se compara DENTRO del lock y ANTES de la primera escritura.
+
+         🪤 Con el episodio CERRADO el candado de coordinación (más abajo) no se toca: quien anota sobre P ya egresado
+         declara a P, la evolución que se ubica es la de P y la comparación pasa, pero eso no abre nada: `enCama`
+         sigue siendo falso y la clave se pide igual que antes. Y `datos.patientId`, el episodio
+         declarado de siempre, hace de RESPALDO cuando falta EPISODIO_ABIERTO: solo importa en modo estricto (una
+         pantalla que declara su episodio a la antigua no es una pantalla vieja).
+
+         Solo se invoca con reclamo o con el modo estricto: los bancos antiguos, que cargan una lista fija de archivos, no
+         traen dominio_validacion.gs. Si alguien lo pide sin cargarlo REVIENTA (INTERNO) en vez de saltarse el candado. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _declarado = String(datos.patientId || '').trim();
+        const _reclamo = (_ep.a !== undefined && _ep.a !== null) ? _ep.a : (_declarado || undefined);
+        const _atribuido = pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _msgEp = validarEpisodioPuerta(_reclamo, _atribuido, idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
+
       // 15 caracteres cortaban «Klgo. Ana Pérez» (son 16) y la línea de tiempo
       // mostraba «Klgo. Diego Mel». El límite existe solo para que un valor
       // absurdo no reviente la celda; 60 es el mismo techo que usa la
@@ -4955,8 +4992,12 @@ function anexarEventoRapido(datos, ctx) {
  *    exigen sesión de coordinación; el anexo de HOY del paciente en su cama
  *    se borra sin fricción.
  *  · si un flujo borra hitos, TIMELINE_JSON de la cama se reescribe SIEMPRE.
+ *
+ * @param ep  el reclamo de episodio de la petición ({a, b, estricto, ausente}, api.gs `_epDeDatos`): `a` es
+ *            EPISODIO_ABIERTO, el PATIENT_ID de la tarjeta (o de la fila del Registro Diario) TAL COMO ESTABA AL ABRIR
+ *            la lista de anexos. Sin él no se compara nada: es el modo tolerante de siempre.
  */
-function anularAnexo(datos, ctx) {
+function anularAnexo(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
@@ -4987,6 +5028,21 @@ function anularAnexo(datos, ctx) {
       const pidEvo = String((ubic && ubic.obj && ubic.obj.PATIENT_ID) || '');
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA) && (!pidProc || pidProc === pidCama));
+
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2, paso 6, 4-oct-2026). El anexo se borra POR IDENTIDAD (`ID_PROC`), pero
+         la lista de anexos que la pantalla muestra sale de la CLAVE del turno, y esa clave es de la cama: en una cama
+         que rotó, la tarjeta de Q lista también el anexo de P. Lo que la pantalla abrió (EPISODIO_ABIERTO) tiene que ser el
+         episodio al que pertenece el anexo que se borra: el del propio procedimiento o, si es una fila antigua sin
+         episodio, el de la evolución ubicada o el de quien ocupa la cama ahora. Se compara DENTRO del lock y ANTES de
+         borrar nada, y va ANTES de la clave de coordinación: una pantalla que se equivocó de paciente tiene que oír eso, no
+         «pide la clave». Quien corrige el pasado de P con la clave declara a P, y esa comparación pasa: el candado de
+         coordinación de abajo queda tal cual. Solo se invoca con reclamo o con el modo estricto (ver anexarEventoRapido). */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _atribuido = pidProc || pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
 
       // 🔐 Borrar el pasado tiene la MISMA llave que escribirlo (anexarEventoRapido).
       const fechaEf = _fechaEfectivaTurno(fecha, turno);
@@ -5083,14 +5139,28 @@ function anularAnexo(datos, ctx) {
 /**
  * Confirma (o ajusta) la instalación asumida de dispositivos al conectar a VM.
  * datos: { idCama, fecha (opcional: corrige la fecha de instalación de los 3) }.
+ *
+ * @param ep  el reclamo de episodio de la petición ({a, b, estricto, ausente}, api.gs `_epDeDatos`): `a` es
+ *            EPISODIO_ABIERTO, el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el diálogo. Sin él no se compara nada.
  */
-function confirmarDispositivos(datos, ctx) {
+function confirmarDispositivos(datos, ctx, ep) {
   ctx = ctx || {};
   return conLock(() => {
     try {
       const idCama = String(datos.idCama || '');
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
       if (!cama || !esVerdadero(cama.OCUPADA)) return err('La cama ' + idCama + ' no está ocupada.', ERR.VALIDACION);
+
+      /* 🔐 EL CANDADO DE EPISODIO (G14, tanda 2, paso 6, 4-oct-2026). Bastaba con que la cama estuviera ocupada: un
+         diálogo que quedó abierto para P confirmaba los dispositivos de Q —y, con `fecha`, le pisaba a Q las tres fechas
+         de instalación, o sea los tres relojes de cambio— sin que nadie lo hubiera elegido. Lo que la pantalla abrió
+         (EPISODIO_ABIERTO) tiene que ser quien ocupa la cama AHORA; se compara DENTRO del lock y ANTES de escribir. La cama
+         libre ya se rechazaba arriba, con su propio motivo. Solo se invoca con reclamo o con el modo estricto. */
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const _msgEp = validarEpisodioPuerta(_ep.a, String(cama.PATIENT_ID || ''), idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
       const campos = { DISP_CONFIRMADO: true };
       const fecha = String(datos.fecha || '').slice(0, 10);
       if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
@@ -9907,10 +9977,32 @@ function _sincronizarTimelineCama(idCama) {
 }
 
 // ── Público con lock ───────────────────────────────────────
-function agregarHito(hito) {
+/**
+ * Agrega un hito a la línea de tiempo de una cama.
+ *
+ * 🔐 G14 (tanda 2 del guardado seguro, paso 6, 4-oct-2026). Sin `hito.patientId` el hito se atribuye a quien esté en la cama
+ * AHORA (`_agregarHitoInternoSinSync`), y la tarjeta de esa cama re-sincroniza su caché con él: un formulario que quedó abierto
+ * para P, con la cama ya de Q, le colgaba el hito a Q. Con `ep` (el reclamo de episodio de la petición, api.gs `_epDeDatos`),
+ * lo que la pantalla abrió (`ep.a`, EPISODIO_ABIERTO) tiene que ser el episodio AL QUE SE ATRIBUYE el hito: el que el propio
+ * hito nombra o, si no nombra ninguno, el de quien ocupa la cama (una cama libre no tiene dueño). Se compara DENTRO del lock y
+ * ANTES de escribir. Un hito que nombra a su episodio es de ese episodio, esté o no en la cama: no se le inventa un conflicto.
+ * Sin `ep` (los bancos antiguos y las llamadas internas) no se compara nada, y solo se invoca con reclamo o con el modo estricto:
+ * esos bancos no cargan dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA (INTERNO) en vez de saltarse el candado.
+ */
+function agregarHito(hito, ep) {
   return conLock(() => {
-    try { const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r); }
-    catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
+    try {
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const idCama = String((hito && hito.idCama) || '');
+        const cama = idCama ? repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama) : null;
+        const _atribuido = String((hito && hito.patientId) || '').trim() ||
+          ((cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '').trim() : '');
+        const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
+      const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r);
+    } catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
   });
 }
 

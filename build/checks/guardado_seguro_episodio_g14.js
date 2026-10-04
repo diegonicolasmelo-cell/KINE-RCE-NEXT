@@ -10,7 +10,8 @@
 // Esta guardia va sumando, puerta por puerta, el caso «formulario abierto para P, entremedio alta de P e
 // ingreso de Q: la puerta rechaza con CERO escrituras». La sección A (paso 2) fija lo que todas comparten; la B
 // (paso 4) es la primera puerta, la más grave: ANULAR_EVENTO; la C (paso 5) son las cuatro que MUEVEN la cama (alta,
-// limpiar, intercambiar, mover). Las demás se suman en los pasos 6 y 7.
+// limpiar, intercambiar, mover); la D (paso 6) son las de eventos y línea de tiempo (anexar, anular un anexo, confirmar
+// dispositivos, agregar un hito). Las demás se suman en el paso 7.
 //
 //   A1 · ERR.CONFLICTO existe y no movió a ningún otro código.
 //   A2 · validarEpisodioPuerta(abierto, pidCama, idCama, estricto): la TABLA DE VERDAD. Ausente (undefined/null) no
@@ -60,6 +61,22 @@
 //        🪤 DAR_ALTA tiene DOS desenlaces según el archivo: si P ya tiene su fila en ARCHIVO_PACIENTES el alta YA se
 //        hizo (ok «ya estaba», sin tocar al ocupante nuevo); si no la tiene, P se limpió o se trasladó (rechazo).
 //        C5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes.
+//   D  · LAS PUERTAS DE EVENTOS Y LÍNEA DE TIEMPO (paso 6): ANEXAR_EVENTO, ANULAR_ANEXO, CONFIRMAR_DISPOSITIVOS y
+//        AGREGAR_HITO. El ➕ se abre sobre la tarjeta de P y se envía después: si entremedio P recibió el alta y entró Q a la
+//        misma cama, lo anotado se atribuía a Q. Un turno que nadie guardó no tiene fila que ubicar y el ➕ caía a «quien esté
+//        en la cama» (reiniciaba el reloj del filtro de Q, le colgaba el cultivo y la nota); un procedimiento hallaba la
+//        evolución de Q por la clave del turno (que es de la CAMA) y se sumaba a SU estadística; confirmar dispositivos
+//        bastaba con que la cama estuviera ocupada; el hito se atribuía a quien estuviera en la cama. La regla: lo que la
+//        pantalla abrió tiene que ser el episodio AL QUE SE ATRIBUYE lo anotado (el de la evolución ubicada, o el de quien
+//        ocupa la cama si no hay ninguna), comparado DENTRO del lock y antes de escribir. Con el candado REAL y el gancho
+//        antesDelCuerpo, por puerta:
+//          Dx.a · el episodio vigente y la pantalla vieja siguen pasando (la vieja queda anotada « [sin episodio]»);
+//          Dx.b · formulario de P y la cama ya de Q: rechazo con CERO escrituras y la base idéntica, ya ocurrido y
+//                 ocurriendo MIENTRAS se espera el candado (en ANEXAR, para dispositivo, cultivo, «otro» y procedimiento);
+//          Dx.c · modo estricto (ausente rechaza; el patientId declarado hace de respaldo en el ➕).
+//        🪤 CON EL EPISODIO CERRADO EL CANDADO DE COORDINACIÓN NO SE TOCA: quien anota sobre P ya egresado declara a P, la
+//        comparación pasa y la clave se pide igual que antes (sin clave, NO_AUTORIZADO; con clave, entra y el hito es de P).
+//        D5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes.
 //
 // Uso: node build/checks/guardado_seguro_episodio_g14.js
 //
@@ -89,7 +106,7 @@ const si = (l, c) => eq(l, !!c, true);
 const no = (l, c) => eq(l, !!c, false);
 const terminar = () => {
   console.log(fails.length ? `\n❌ ${fails.length} fallos:\n  - ${fails.join('\n  - ')}`
-    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio, su rastro en la bitácora, ANULAR_EVENTO y las cuatro puertas que mueven la cama con candado.');
+    : '\n✅ guardado_seguro_episodio_g14: la regla pura del episodio, su rastro en la bitácora, ANULAR_EVENTO, las cuatro puertas que mueven la cama y las de eventos y línea de tiempo con candado.');
   process.exit(fails.length ? 1 : 0);
 };
 // Un tramo que revienta no tumba a los demás: da UN rojo con su razón y la guardia sigue (así el rojo de antes de
@@ -1034,6 +1051,341 @@ tramo('C', () => {
     si('   …solo se invoca si el reclamo viene (o está el modo estricto): los bancos antiguos no cargan la regla', /_epReclamado\(ep\)/.test(c));
   });
   si('★ el reclamo se lee de la cama con el helper común (una cama libre tiene pid vacío aunque la fila conserve uno viejo)', /function _pidDeCama\(/.test(svc));
+});
+
+/* ══ D · LAS PUERTAS DE EVENTOS Y DE LA LÍNEA DE TIEMPO (paso 6) ═══════════ */
+console.log('\nD · ANEXAR_EVENTO, ANULAR_ANEXO, CONFIRMAR_DISPOSITIVOS y AGREGAR_HITO (paso 6): candado dentro del lock');
+tramo('D', () => {
+  const ctl = S.activarLockReal();
+  const M = require('../sim/sim_muerte.js');
+  global.Utilities.formatDate = (d) => {
+    const p2 = n => ('0' + n).slice(-2);
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  };
+
+  // ── Datos inventados, en camas que B y C no tocaron: P en la 7, R en la 8 ──
+  // TK2 (la noche del día 10) es un turno donde NADIE guardó evolución: ahí el ➕ de un cultivo o de un cambio de filtro
+  // no encuentra turno que ubicar y cae a «quien esté en la cama», que es donde el hueco vivía.
+  const TK0 = '2026-08-09-Dia', TK1 = '2026-08-10-Dia', TK2 = '2026-08-10-Noche';
+  const camaDe = id => DB.CAMAS_ESTADO.find(c => String(c.ID_CAMA) === String(id)) || {};
+  const payload = (idCama, tk, extra) => Object.assign({
+    ID_CAMA: String(idCama), TURNO_KEY: tk, PLAN_FIRMA_KINE: 'DMV',
+    VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC',
+    VENT_VT: 450, VENT_FR: 16, VENT_PEEP: 8, VENT_FIO2: 50, HEMO_ESTADO: 'Estable', SED_TIPO: 'Sin sedación',
+  }, extra || {});
+  const ingresa = (idCama, nombre) => api('INGRESAR_PACIENTE', { idCama: String(idCama), nombre, edad: 61, sexo: 'M',
+    diagnostico: 'Dx de prueba', fechaIngreso: '2026-08-08', viaAerea: 'TOT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV' }, null);
+  // «La otra persona»: lo que pasa entremedio, SIN declarar episodio (es otra pantalla, no la que se prueba).
+  const altaDe = idCama => api('DAR_ALTA', { idCama: String(idCama), motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV' }, null);
+  let PID_Q = '';
+  const entraQ = (idCama, conTurno) => {
+    const a = ingresa(idCama, 'Paciente Charly');
+    PID_Q = camaDe(idCama).PATIENT_ID;
+    const b = conTurno ? api('GUARDAR_EVOLUCION', payload(idCama, TK1, { EPISODIO_ABIERTO: PID_Q }), null) : { ok: true };
+    return a.ok && b.ok;
+  };
+
+  // ── El montaje: P (cama 7) con sus dos turnos y un anexo en el segundo; R (cama 8) con el primero y SIN el segundo ──
+  SIM.fecha = '2026-08-07'; SIM.hora = '12:00:00';
+  const rIngP = ingresa('7', 'Paciente Alfa'); const PID_P = camaDe('7').PATIENT_ID;
+  const rIngR = ingresa('8', 'Paciente Bravo'); const PID_R = camaDe('8').PATIENT_ID;
+  SIM.fecha = '2026-08-09';
+  const rT0 = [api('GUARDAR_EVOLUCION', payload('7', TK0, { EPISODIO_ABIERTO: PID_P }), null), api('GUARDAR_EVOLUCION', payload('8', TK0, { EPISODIO_ABIERTO: PID_R }), null)];
+  SIM.fecha = '2026-08-10';
+  const rT1 = api('GUARDAR_EVOLUCION', payload('7', TK1, { EPISODIO_ABIERTO: PID_P }), null);
+  const rAnexo = api('ANEXAR_EVENTO', { idCama: '7', turnoKey: TK1, tipo: 'procedimiento', proc: 'ECOGRAFÍA', hora: '09:30', firmaKine: 'DMV' }, null);
+  si('(el montaje) P y R ingresan, guardan sus turnos y P anota un anexo', rIngP.ok && rIngR.ok && rT0.every(r => r.ok) && rT1.ok && rAnexo.ok);
+  si('(el montaje) son dos episodios distintos', PID_P && PID_R && PID_P !== PID_R);
+  const ID_PROC_P = ((DB.PROCEDIMIENTOS.filter(p => p.PATIENT_ID === PID_P && p.TIPO_PROC === 'anexo')[0]) || {}).ID_PROC;
+  si('(el montaje) el anexo de P quedó en PROCEDIMIENTOS con su id', !!ID_PROC_P);
+  const FOTO_D = M.foto();
+
+  const volver = () => {
+    M.restaurar(FOTO_D); M.reiniciar();
+    SIM.fecha = '2026-08-10'; SIM.hora = '12:00:00';
+    ctl.antesDelCuerpo = null; ctl.cache.fallar(false);
+    delete CONFIG.CONTRATO_ESTRICTO;
+    PID_Q = '';
+  };
+  const sinBit = () => M.instantanea({ sinHojas: ['AUDIT_LOG'] });
+  const ajenos = () => [PID_P, PID_R, PID_Q].filter(Boolean);
+  const sinDatosAjenosD = txt => !ajenos().some(p => String(txt).includes(p)) && !/Alfa|Bravo|Charly/.test(String(txt));
+  const hitosDe = pid => DB.TIMELINE.filter(h => h.PATIENT_ID === pid);
+  const anexosDe = pid => DB.PROCEDIMIENTOS.filter(p => p.PATIENT_ID === pid && p.TIPO_PROC === 'anexo').length;
+
+  // La sesión de coordinación es el CONTRATO que el servicio exige (la real la vigilan las guardias de coordinación,
+  // igual que hace candado_mas.js): un solo token bueno, cualquier otro es una sesión vencida o inexistente.
+  const conClave = fn => {
+    const orig = global.coordExigirSesion;
+    global.coordExigirSesion = t => t === 'COORD_OK'
+      ? { ok: true, firma: 'MCC', usuario: 'coord1' }
+      : { ok: false, error: 'Tu sesión de coordinación expiró. Vuelve a entrar con tu clave.', codigo: 'NO_AUTORIZADO' };
+    try { return fn(); } finally { global.coordExigirSesion = orig; }
+  };
+
+  // Una llamada y todo lo que hay que mirar de ella. `hook` es «la otra petición»: corre DENTRO de la espera del candado.
+  function corre(accion, datos, hook) {
+    M.reiniciar();
+    let n0 = 0, foto = sinBit(), hookOk = null, a0 = DB.AUDIT_LOG.length;
+    if (hook) ctl.antesDelCuerpo = () => { hookOk = hook(); n0 = M.total(); foto = sinBit(); a0 = DB.AUDIT_LOG.length; };
+    const r = callando(() => api(accion, datos, null));
+    ctl.antesDelCuerpo = null;
+    return {
+      r, hookOk, escrituras: M.registro().slice(n0), igual: sinBit() === foto,
+      bit: DB.AUDIT_LOG.slice(a0).filter(f => String(f.accion).indexOf(accion) === 0),
+    };
+  }
+  function rechazo(etiqueta, i, accion, codigo, frase, cama) {
+    no('★ ' + etiqueta + ': se RECHAZA', i.r.ok);
+    eq('   …con código ' + codigo, i.r.codigo, codigo);
+    si('   …y el motivo que se le muestra a la persona (' + frase + ')', frase.test(i.r.error || ''));
+    if (cama) si('   …nombra la cama ' + cama, new RegExp('\\bcama ' + cama + '\\b').test(i.r.error || ''));
+    si('★★ …sin nombrar a nadie ni dar el identificador de ningún paciente (Ley 19.628)', sinDatosAjenosD(i.r.error || ''));
+    eq('★★ ' + etiqueta + ': NINGUNA escritura aterrizó', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+    si('★★ …y la base COMPLETA quedó idéntica (salvo la bitácora)', i.igual);
+    eq('   …la bitácora gana UNA fila: ' + accion + '_RECHAZADO', i.bit.map(f => f.accion).join(','), accion + '_RECHAZADO');
+  }
+  const VAL = 'VALIDACION', NA = 'NO_AUTORIZADO';
+  const ESTRICTO = () => { CONFIG.CONTRATO_ESTRICTO = 'TRUE'; };
+  const VIEJA = /versi[oó]n anterior/i;
+  const MARCA_ = ' [sin episodio]';
+  const sinMarca = i => !String((i.bit[0] || {}).resumen || '').endsWith(MARCA_);
+
+  /* ═════════ D1 · ANEXAR_EVENTO ═════════ */
+  console.log('   · D1 · ANEXAR_EVENTO');
+  // Los tres tipos que escriben sobre «quien esté en la cama» sin pasar por una evolución, y el que sí la necesita.
+  const evento = (tipo, extra) => Object.assign({ idCama: '7', turnoKey: TK2, tipo, hora: '14:00', firmaKine: 'DMV' },
+    tipo === 'cultivo' ? { cultTipo: 'Aspirado traqueal', cultHallazgo: 'Pendiente' } : {},
+    tipo === 'otro' ? { detalle: 'Evento de prueba' } : {},
+    tipo === 'procedimiento' ? { proc: 'ECOGRAFÍA' } : {},
+    extra || {});
+  const SIN_TURNO = ['hme', 'sonda', 'cultivo', 'otro'];   // dos de los tres relojes de dispositivos, el cultivo y «otro»
+
+  // — Lo de todos los días sigue igual —
+  SIN_TURNO.forEach(tipo => {
+    volver();
+    let i = corre('ANEXAR_EVENTO', evento(tipo, { EPISODIO_ABIERTO: PID_P }));
+    si('★ «' + tipo + '» con el episodio vigente (EPISODIO_ABIERTO = el de la cama) PASA', i.r.ok);
+    si('   …y NO lleva la marca « [sin episodio]» (declaró episodio)', sinMarca(i));
+    if (tipo === 'hme' || tipo === 'sonda') {
+      const campo = tipo === 'hme' ? 'DISP_HME_FECHA' : 'DISP_TC_FECHA';
+      eq('   …reinicia el reloj del dispositivo con la fecha efectiva del turno (la noche del 10 fecha el 11)', camaDe('7')[campo], '2026-08-11');
+    } else {
+      eq('   …y el hito es de P', hitosDe(PID_P).filter(h => h.TIPO === (tipo === 'cultivo' ? 'cultivo' : 'evento')).length, 1);
+    }
+    volver();
+    i = corre('ANEXAR_EVENTO', evento(tipo));
+    si('   …la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en tolerante: compatibilidad', i.r.ok);
+    eq('   …y la bitácora la anota « [sin episodio]» para medir cuántas llamadas siguen sin candado', String((i.bit[0] || {}).resumen || '').endsWith(MARCA_), true);
+  });
+  volver();
+  let i = corre('ANEXAR_EVENTO', evento('procedimiento', { turnoKey: TK1, EPISODIO_ABIERTO: PID_P }));
+  si('★ «procedimiento» con el episodio vigente PASA y suma su anexo a P', i.r.ok && anexosDe(PID_P) === 2);
+  volver();
+  i = corre('ANEXAR_EVENTO', evento('procedimiento', { turnoKey: TK1 }));
+  si('   …la pantalla vieja también', i.r.ok);
+
+  // — EL HUECO: formulario abierto para P, entremedio alta de P e ingreso de Q en la misma cama —
+  // Sin episodio que ubicar (nadie guardó la noche), el ➕ caía a «quien esté en la cama» y le escribía a Q: le reiniciaba
+  // el reloj del filtro, o le colgaba el cultivo y la nota en la línea de tiempo.
+  SIN_TURNO.forEach(tipo => {
+    volver(); altaDe('7'); entraQ('7');
+    si('(montaje) la cama 7 es de Q y P ya salió', camaDe('7').PATIENT_ID === PID_Q && DB.ARCHIVO_PACIENTES.some(a => a.PATIENT_ID === PID_P));
+    const antes = JSON.stringify(camaDe('7')), hitosQ0 = hitosDe(PID_Q).length;
+    i = corre('ANEXAR_EVENTO', evento(tipo, { EPISODIO_ABIERTO: PID_P }));
+    rechazo('«' + tipo + '» con el formulario de P sobre la cama de Q (sin patientId declarado)', i, 'ANEXAR_EVENTO', VAL, EP_CAMBIO_RE, '7');
+    eq('★★ …la cama 7 sigue siendo de Q y NADA de ella cambió (ni el reloj del filtro, ni el cultivo en su tarjeta)', JSON.stringify(camaDe('7')) === antes, true);
+    eq('   …y ningún hito nuevo cayó en la línea de tiempo de Q', hitosDe(PID_Q).length, hitosQ0);
+    // Lo mismo, pero el alta y el ingreso ocurren MIENTRAS esta petición espera el candado.
+    volver();
+    i = corre('ANEXAR_EVENTO', evento(tipo, { EPISODIO_ABIERTO: PID_P }), () => { const a = altaDe('7'); return a.ok && entraQ('7'); });
+    si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+    rechazo('«' + tipo + '»: el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'ANEXAR_EVENTO', VAL, EP_CAMBIO_RE, '7');
+    eq('★★ …la cama 7 sigue siendo de Q', camaDe('7').PATIENT_ID, PID_Q);
+  });
+  // El procedimiento sí necesita su evolución, y la encuentra por la clave de la cama: la de Q, que guardó ese turno.
+  volver(); altaDe('8'); entraQ('8', true);
+  si('(montaje) la cama 8 es de Q con su turno guardado y R ya salió', camaDe('8').PATIENT_ID === PID_Q && DB.EVOLUCIONES.some(e => e.PATIENT_ID === PID_Q && e.TURNO_KEY === TK1));
+  const procsQ = () => String((DB.EVOLUCIONES.find(e => e.PATIENT_ID === PID_Q && e.TURNO_KEY === TK1) || {}).PROC_JSON);
+  const procsQ0 = procsQ();
+  i = corre('ANEXAR_EVENTO', evento('procedimiento', { idCama: '8', turnoKey: TK1, EPISODIO_ABIERTO: PID_R }));
+  rechazo('«procedimiento» con el formulario de R: el turno que se encuentra es el de Q', i, 'ANEXAR_EVENTO', VAL, EP_CAMBIO_RE, '8');
+  eq('★★ …Q no ganó ningún anexo y su lista de procedimientos quedó como estaba', anexosDe(PID_Q) + '/' + (procsQ() === procsQ0), '0/true');
+  volver();
+  i = corre('ANEXAR_EVENTO', evento('procedimiento', { idCama: '8', turnoKey: TK1, EPISODIO_ABIERTO: PID_R }), () => { const a = altaDe('8'); return a.ok && entraQ('8', true); });
+  si('(la otra petición dio el alta a R e ingresó a Q con su turno mientras esta esperaba el candado)', i.hookOk && PID_Q);
+  rechazo('«procedimiento»: el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'ANEXAR_EVENTO', VAL, EP_CAMBIO_RE, '8');
+
+  // — Con el episodio CERRADO el candado de coordinación sigue exactamente como hoy (no se toca) —
+  console.log('      · D1 · episodio cerrado: la clave de coordinación sigue como hoy');
+  volver(); altaDe('7'); entraQ('7');
+  const cerrado = (tipo, extra) => evento(tipo, Object.assign({ turnoKey: TK1, EPISODIO_ABIERTO: PID_P, patientId: PID_P }, extra || {}));
+  i = corre('ANEXAR_EVENTO', cerrado('cultivo'));
+  no('★ P ya salió, patientId declarado, SIN clave de coordinación: se pide la clave (como hoy)', i.r.ok);
+  eq('   …con el código de la clave', i.r.codigo, NA);
+  si('   …y dice que hace falta la clave de coordinación', /clave de coordinaci[oó]n/i.test(i.r.error || ''));
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  i = corre('ANEXAR_EVENTO', cerrado('cultivo', { patientId: undefined }));
+  no('   …lo mismo si el episodio viaja solo en EPISODIO_ABIERTO (el turno se encuentra por la clave y es el de P)', i.r.ok);
+  eq('   …con el código de la clave', i.r.codigo, NA);
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  i = conClave(() => corre('ANEXAR_EVENTO', cerrado('cultivo', { coordToken: 'COORD_OK' })));
+  si('★ CON la clave de coordinación entra: el hito se anota en el turno de P', i.r.ok);
+  eq('   …el hito es de P y no de Q', hitosDe(PID_P).filter(h => h.TIPO === 'cultivo').length + '/' + hitosDe(PID_Q).filter(h => h.TIPO === 'cultivo').length, '1/0');
+  eq('   …la cama 7 sigue siendo de Q', camaDe('7').PATIENT_ID, PID_Q);
+  si('   …y la bitácora dice quién de coordinación abrió el candado', /autorizado por coordinaci[oó]n \(MCC\)/.test((i.bit[0] || {}).resumen || ''));
+  volver(); altaDe('7'); entraQ('7');
+  i = conClave(() => corre('ANEXAR_EVENTO', cerrado('hme', { coordToken: 'COORD_OK' })));
+  no('★ un dispositivo del pasado de P no se anota ni con clave: el reloj es de la cama, que hoy es de Q (como hoy)', i.r.ok);
+  si('   …y lo dice (hacia atrás)', /hacia atr[aá]s/i.test(i.r.error || ''));
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+
+  console.log('      · D1 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('ANEXAR_EVENTO', evento('cultivo'));
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'ANEXAR_EVENTO', VAL, VIEJA, null);
+  no('   …SIN la frase «cambió de paciente»', EP_CAMBIO_RE.test(i.r.error || ''));
+  i = corre('ANEXAR_EVENTO', evento('cultivo', { EPISODIO_ABIERTO: '' }));
+  no('★ el VACÍO tampoco se acepta sobre una cama con paciente', i.r.ok);
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  i = corre('ANEXAR_EVENTO', evento('cultivo', { EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  i = corre('ANEXAR_EVENTO', evento('procedimiento', { turnoKey: TK1, patientId: PID_P }));
+  si('★ el patientId declarado hace de respaldo cuando falta EPISODIO_ABIERTO (la pantalla del Registro Diario ya lo mandaba)', i.r.ok);
+  volver();
+
+  /* ═════════ D2 · ANULAR_ANEXO ═════════ */
+  console.log('   · D2 · ANULAR_ANEXO');
+  const anula = extra => Object.assign({ idProc: ID_PROC_P, idCama: '7' }, extra || {});
+  volver();
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente el anexo se BORRA', i.r.ok && anexosDe(PID_P) === 0);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('ANULAR_ANEXO', anula());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok);
+  eq('   …y la bitácora la anota « [sin episodio]»', String((i.bit[0] || {}).resumen || '').endsWith(MARCA_), true);
+  // La pantalla mostraba OTRO episodio: el anexo que se quiere borrar no es de él.
+  volver();
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_R }));
+  rechazo('el formulario de R con el anexo de P', i, 'ANULAR_ANEXO', VAL, EP_CAMBIO_RE, '7');
+  eq('★★ …el anexo de P sigue en el registro', anexosDe(PID_P), 1);
+  // La cama rotó: la tarjeta de Q lista el anexo de P (la clave del turno es de la cama, no de la persona).
+  volver(); altaDe('7'); entraQ('7');
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_Q }));
+  rechazo('la tarjeta de Q, que lista el anexo de P, intenta borrarlo (sin clave)', i, 'ANULAR_ANEXO', VAL, EP_CAMBIO_RE, '7');
+  eq('★★ …el anexo de P sigue en el registro', anexosDe(PID_P), 1);
+  i = conClave(() => corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_Q, coordToken: 'COORD_OK' })));
+  no('★★ …y ni con la clave de coordinación: el candado de episodio va antes que el de la clave', i.r.ok);
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  // Con el episodio CERRADO y declarado como es debido, la clave sigue siendo lo que manda (como hoy).
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P }));
+  no('★ el formulario de P (ya salió) sin clave de coordinación: se pide la clave (como hoy)', i.r.ok);
+  eq('   …con el código de la clave', i.r.codigo, NA);
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  i = conClave(() => corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P, coordToken: 'COORD_OK' })));
+  si('★ CON la clave y el episodio de P entra: se borra el anexo de P', i.r.ok && anexosDe(PID_P) === 0);
+  eq('   …y la cama 7 sigue siendo de Q', camaDe('7').PATIENT_ID, PID_Q);
+  console.log('      · D2 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('ANULAR_ANEXO', anula());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'ANULAR_ANEXO', VAL, VIEJA, null);
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ D3 · CONFIRMAR_DISPOSITIVOS ═════════ */
+  console.log('   · D3 · CONFIRMAR_DISPOSITIVOS');
+  const confirma = extra => Object.assign({ idCama: '7' }, extra || {});
+  volver();
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente los dispositivos de P se confirman', i.r.ok && camaDe('7').DISP_CONFIRMADO === true);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok);
+  eq('   …y la bitácora la anota « [sin episodio]»', String((i.bit[0] || {}).resumen || '').endsWith(MARCA_), true);
+  // Hoy basta con que la cama esté ocupada: el formulario de P confirma los dispositivos del ocupante nuevo.
+  volver(); altaDe('7'); entraQ('7');
+  si('(montaje) los dispositivos de Q todavía no están confirmados', camaDe('7').DISP_CONFIRMADO !== true);
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma({ EPISODIO_ABIERTO: PID_P, fecha: '2026-08-01' }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'CONFIRMAR_DISPOSITIVOS', VAL, EP_CAMBIO_RE, '7');
+  eq('★★ …los dispositivos de Q siguen sin confirmar y sin fecha puesta', camaDe('7').DISP_CONFIRMADO !== true && camaDe('7').DISP_HME_FECHA !== '2026-08-01', true);
+  volver();
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma({ EPISODIO_ABIERTO: PID_P }), () => { const a = altaDe('7'); return a.ok && entraQ('7'); });
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'CONFIRMAR_DISPOSITIVOS', VAL, EP_CAMBIO_RE, '7');
+  // La cama libre ya se rechazaba («no está ocupada»): se sigue rechazando, con su motivo.
+  volver(); altaDe('7');
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma({ EPISODIO_ABIERTO: PID_P }));
+  no('control: la cama libre se rechaza (como hoy)', i.r.ok);
+  si('   …con su motivo de siempre', /no est[aá] ocupada/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  console.log('      · D3 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'CONFIRMAR_DISPOSITIVOS', VAL, VIEJA, null);
+  i = corre('CONFIRMAR_DISPOSITIVOS', confirma({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ D4 · AGREGAR_HITO ═════════ */
+  console.log('   · D4 · AGREGAR_HITO');
+  const hito = extra => Object.assign({ idCama: '7', fecha: '2026-08-10', turno: 'Dia', tipo: 'general', texto: 'Nota de prueba' }, extra || {});
+  const hitosDeTexto = pid => hitosDe(pid).filter(h => h.TEXTO === 'Nota de prueba').length;
+  volver();
+  i = corre('AGREGAR_HITO', hito({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente el hito se agrega y es de P', i.r.ok && hitosDeTexto(PID_P) === 1);
+  si('   …y NO lleva la marca « [sin episodio]»', sinMarca(i));
+  volver();
+  i = corre('AGREGAR_HITO', hito());
+  si('★ la pantalla VIEJA (sin EPISODIO_ABIERTO) también pasa en modo tolerante: compatibilidad', i.r.ok && hitosDeTexto(PID_P) === 1);
+  eq('   …y la bitácora la anota « [sin episodio]»', String((i.bit[0] || {}).resumen || '').endsWith(MARCA_), true);
+  // Hoy el hito se atribuye a quien esté en la cama.
+  volver(); altaDe('7'); entraQ('7');
+  i = corre('AGREGAR_HITO', hito({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('el formulario de P sobre la cama de Q', i, 'AGREGAR_HITO', VAL, EP_CAMBIO_RE, '7');
+  eq('★★ …Q no ganó el hito', hitosDeTexto(PID_Q), 0);
+  volver();
+  i = corre('AGREGAR_HITO', hito({ EPISODIO_ABIERTO: PID_P }), () => { const a = altaDe('7'); return a.ok && entraQ('7'); });
+  si('(la otra petición dio el alta a P e ingresó a Q mientras esta esperaba el candado)', i.hookOk && PID_Q && PID_Q !== PID_P);
+  rechazo('el alta y el ingreso llegan MIENTRAS se espera el candado', i, 'AGREGAR_HITO', VAL, EP_CAMBIO_RE, '7');
+  // Un hito que NOMBRA su episodio es de ese episodio, esté o no en la cama: lo que se compara es a quién se atribuye.
+  volver(); altaDe('7'); entraQ('7');
+  i = corre('AGREGAR_HITO', hito({ EPISODIO_ABIERTO: PID_P, patientId: PID_P }));
+  si('control: el hito que nombra a P (patientId) y reclama a P se atribuye a P, como hoy', i.r.ok && hitosDeTexto(PID_P) === 1 && hitosDeTexto(PID_Q) === 0);
+  console.log('      · D4 · modo estricto');
+  volver(); ESTRICTO();
+  i = corre('AGREGAR_HITO', hito());
+  rechazo('sin EPISODIO_ABIERTO en modo estricto', i, 'AGREGAR_HITO', VAL, VIEJA, null);
+  i = corre('AGREGAR_HITO', hito({ EPISODIO_ABIERTO: PID_P }));
+  si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ D5 · la forma ═════════ */
+  console.log('   · D5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes');
+  const cuerpoDeEn = (archivo, nombre) => {
+    const src = leer(archivo);
+    const ini = src.indexOf('function ' + nombre + '(');
+    const fin = ini === -1 ? -1 : src.indexOf('\n}\n', ini);
+    return (ini === -1 || fin === -1) ? '' : src.slice(ini, fin).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  };
+  [
+    ['svc_eventos.gs', 'anexarEventoRapido', /^function anexarEventoRapido\(datos, ctx, ep\)/],
+    ['svc_eventos.gs', 'anularAnexo', /^function anularAnexo\(datos, ctx, ep\)/],
+    ['svc_eventos.gs', 'confirmarDispositivos', /^function confirmarDispositivos\(datos, ctx, ep\)/],
+    ['svc_timeline.gs', 'agregarHito', /^function agregarHito\(hito, ep\)/],
+  ].forEach(([archivo, fn, firma]) => {
+    const c = cuerpoDeEn(archivo, fn);
+    si('★ ' + fn + ' recibe el reclamo de episodio como ÚLTIMO parámetro', firma.test(c));
+    const iLock = c.indexOf('conLock(');
+    const iVal = c.indexOf('validarEpisodioPuerta(');
+    const escritura = c.search(/\b(repoInsertar|repoActualizar|repoEscribirFila|repoEliminarFilas|repoEliminarDonde|repoUpsert|_agregarHitoInterno|_agregarHitoInternoSinSync)\(/);
+    si('   …toma el lock y DENTRO compara con validarEpisodioPuerta', iLock > -1 && iVal > iLock);
+    si('★★ …y la comparación va ANTES de la primera escritura', iVal > -1 && escritura > iVal);
+    eq('   …y ANTES del conLock no se lee ninguna hoja', (c.slice(0, iLock).match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+)\(/g) || []).join(',') || '(nada)', '(nada)');
+    si('   …solo se invoca si el reclamo viene (o está el modo estricto): los bancos antiguos no cargan la regla', /estricto === true/.test(c) && /\.a !== undefined/.test(c));
+  });
 });
 
 function esVerdaderoB(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }

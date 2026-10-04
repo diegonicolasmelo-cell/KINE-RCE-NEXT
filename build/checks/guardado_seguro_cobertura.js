@@ -67,10 +67,10 @@ const TABLA = [
   E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.', true),   // paso 5
   E('MOVER_A_CAMA_VACIA',      'EPISODIO_ABIERTO (origen) y EPISODIO_ABIERTO_B (destino; vacío = libre al elegir).', true),   // paso 5
   E('ANULAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta mostrada al abrir el menú del evento; la comparación va DENTRO del lock.', true),   // paso 4
-  E('ANEXAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta al abrir el ➕; datos.patientId declarado queda como respaldo.'),
-  E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.'),
-  E('CONFIRMAR_DISPOSITIVOS',  'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: hoy basta con que la cama esté ocupada.'),
-  E('AGREGAR_HITO',            'EPISODIO_ABIERTO de la tarjeta al abrir: hoy el hito se atribuye a quien esté en la cama.'),
+  E('ANEXAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta al abrir el ➕; datos.patientId declarado queda como respaldo.', true),   // paso 6
+  E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.', true),   // paso 6
+  E('CONFIRMAR_DISPOSITIVOS',  'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: hoy basta con que la cama esté ocupada.', true),   // paso 6
+  E('AGREGAR_HITO',            'EPISODIO_ABIERTO de la tarjeta al abrir: hoy el hito se atribuye a quien esté en la cama.', true),   // paso 6
   E('EVAL_REGISTRAR',          'EPISODIO_ABIERTO de la tarjeta al abrir la medición: además escribe el espejo ULT_* en la cama del ocupante actual.'),
   E('EPISODIO_ESCALA',         'EPISODIO_ABIERTO de la tarjeta al abrir la escala previa a la UCI: hoy escribe sobre la cama que esté ocupada.'),
   E('PEND_ABRIR',              'EPISODIO_ABIERTO de la tarjeta al abrir el chip de pendientes.'),
