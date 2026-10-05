@@ -43,6 +43,12 @@
 //     se vería igual que «otro ingreso en la misma cama» y se rechazaría por error. Lo que sí se hace es que,
 //     al guardar bien, la pantalla toma el episodio que el servidor le devuelve: desde ahí el formulario ya
 //     es de ese paciente y queda protegido.
+//     🔴 RECONCILIADO el 5-oct-2026 (tanda 2 del guardado seguro, G15, paso 16). Ese `''` solo es «como hoy» cuando el
+//     ingreso NO trae identidad propia (pantalla vieja, API sin navegador, modo tolerante): ahí no hay con qué distinguir el
+//     reintento propio de un ingreso ajeno, y el servidor sigue dejándolo pasar. La pantalla de ahora acuña un PATIENT_ID
+//     al abrir el ingreso sobre una cama LIBRE y lo manda junto al `''`; CON él sí se distingue: cama libre o con ESE mismo
+//     pid sigue (el reintento propio, sin duplicar nada), cama con OTRO pid es CONFLICTO sin escribir. Esta guardia ata las
+//     dos mitades (4b en el servidor, 6 en la pantalla); la carrera completa la ata guardado_seguro_ingreso_g15.js.
 //   · Episodio con valor ⇒ tiene que ser EL de la cama. Cama de otro paciente, o libre (alta, traslado,
 //     limpieza): se rechaza.
 //
@@ -213,11 +219,34 @@ function rechazado(etiqueta, payload, idCama) {
   si('   …el servidor devuelve el episodio recién creado', !!PID_G && PID_G === camaDe('9').PATIENT_ID);
   r = api('GUARDAR_EVOLUCION', evo('9', { EPISODIO_ABIERTO: PID_G, PAC_NOMBRE: 'Paciente Golf' }), null);
   eq('★ re-guardar ese formulario con el episodio que la pantalla recibió: pasa', r.ok, true);
-  // El reintento del PROPIO ingreso cuyo primer intento aterrizó y la respuesta se perdió: la pantalla todavía
-  // dice `''`. No puede rechazarse (se vería igual que un ingreso ajeno).
+  // El reintento del PROPIO ingreso cuyo primer intento aterrizó y la respuesta se perdió, SIN identidad propia (una
+  // pantalla vieja, o una llamada por API): el formulario dice `''` y no trae PATIENT_ID. No hay con qué distinguirlo de
+  // un ingreso ajeno, así que NO puede rechazarse por error (el servidor tolerante lo deja pasar como siempre).
   r = api('GUARDAR_EVOLUCION', evo('9', { ES_INGRESO: true, EPISODIO_ABIERTO: '', PAC_NOMBRE: 'Paciente Golf' }), null);
-  eq('★ el reintento del propio ingreso (formulario aún sin episodio) NO se rechaza por error', r.ok, true);
+  eq('★ el reintento del propio ingreso SIN identidad propia (pantalla vieja, modo tolerante) NO se rechaza: como siempre', r.ok, true);
   eq('   …y no se abrió una segunda fila: sigue siendo UNA', filasCama('9').length, 1);
+
+  // 🔴 5-oct-2026 · El MISMO `''`, pero con la identidad propia que la pantalla de ahora acuña al abrir el ingreso. Con ella el
+  // servidor ya distingue las dos cosas que sin ella se veían idénticas.
+  no('la cama 2 está libre', camaDe('2').OCUPADA);
+  const PID_PROPIO = 'ing-propio-0002', PID_AJENO = 'ing-ajeno-0002';             // la forma que el servidor acepta: 8 a 64 de [A-Za-z0-9_-]
+  const ingresoConIdentidad = (pid, nombre) => api('GUARDAR_EVOLUCION', evo('2', { ES_INGRESO: true, EPISODIO_ABIERTO: '', PATIENT_ID: pid,
+    PAC_NOMBRE: nombre, PAC_EDAD: 48, PAC_SEXO: 'M', PAC_TALLA: 170 }), null);
+  r = ingresoConIdentidad(PID_PROPIO, 'Paciente Kilo');
+  eq('★ ingreso con identidad propia en cama libre: guarda, y la cama queda con ESA identidad', r.ok && camaDe('2').PATIENT_ID === PID_PROPIO, true);
+  r = ingresoConIdentidad(PID_PROPIO, 'Paciente Kilo');
+  eq('★ el reintento del propio ingreso (el mismo PATIENT_ID, el primero sí aterrizó): pasa', r.ok, true);
+  eq('   …y sigue siendo UNA fila', filasCama('2').length, 1);
+  {
+    const foto = sinBitacora(); ESCRITURAS = [];
+    r = ingresoConIdentidad(PID_AJENO, 'Paciente Lima');
+    no('★★ OTRO ingreso sobre esa misma cama (otro PATIENT_ID, el mismo `\'\'` vacío): se RECHAZA', r.ok);
+    eq('   …con código CONFLICTO (alguien se adelantó: no es un error de la pantalla)', r.codigo, 'CONFLICTO');
+    eq('★★ …sin NINGUNA escritura a ninguna hoja (ni intentada)', ESCRITURAS.join(' | ') || '(ninguna)', '(ninguna)');
+    si('   …y la base quedó idéntica (salvo la bitácora)', sinBitacora() === foto);
+    si('   …sin nombrar al paciente de quien se adelantó (Ley 19.628)', !/Kilo/i.test(r.error || '') && !new RegExp(PID_PROPIO).test(r.error || ''));
+    eq('   …la cama sigue siendo del primero', camaDe('2').PATIENT_ID, PID_PROPIO);
+  }
 
   // c) Compatibilidad: sin el campo (API sin navegador), o con él nulo, no se rechaza.
   ingresar('10', 'Paciente Hotel');
@@ -376,8 +405,17 @@ function rechazado(etiqueta, payload, idCama) {
   });
   si('★ ingreso en cama libre: la clave VIAJA (no se omite)', D[0] && 'EPISODIO_ABIERTO' in D[0]);
   eq('   …vacía, porque el formulario no abrió ningún episodio', (D[0] || {}).EPISODIO_ABIERTO, '');
+  si('★ 5-oct-2026 · …y trae su IDENTIDAD PROPIA: un PATIENT_ID acuñado por la pantalla (8 a 64 de [A-Za-z0-9_-])', /^[A-Za-z0-9_-]{8,64}$/.test((D[0] || {}).PATIENT_ID || ''));
   D = await p.evaluate(async () => { __llenar(); return await __guardar(); });
   eq('★ tras guardar bien, el MISMO formulario manda el episodio que recibió del servidor', (D[0] || {}).EPISODIO_ABIERTO, 'pid-nuevo-ingreso');
+  eq('   …y ya no manda la identidad de ingreso: desde ahí vale el episodio', (D[0] || {}).PATIENT_ID, undefined);
+  // Un episodio sin ingreso formal (cama OCUPADA, sin PATIENT_ID) no tiene a quién acuñarle nada: el primer guardado fija el que devuelva el servidor.
+  D = await p.evaluate(async () => {
+    await __abrir('8', false, { ID_CAMA: '8', OCUPADA: true, PATIENT_ID: '', NOMBRE: 'Ocho', VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' });
+    __llenar(); window.__pidResp = 'pid-ocho';
+    return await __guardar();
+  });
+  eq('★ sobre una cama OCUPADA sin ingreso formal viaja vacío y SIN identidad propia (no se acuña)', [(D[0] || {}).EPISODIO_ABIERTO, (D[0] || {}).PATIENT_ID].join('|'), '|');
 
   // El formulario que NO es el abierto no se re-basa con la respuesta tardía de otro guardado.
   D = await p.evaluate(async () => {
@@ -452,17 +490,29 @@ function rechazado(etiqueta, payload, idCama) {
   eq('   …ni queda marcada con cambios sin guardar', RB.otro.dirty, false);
   eq('★ la cama reabierta con el MISMO paciente sí recupera su borrador', RB.mismo.planes + '/' + RB.mismo.estado, 'bipedestación asistida/borrador');
 
-  // Un fallo de RED sigue reintentándose una vez (lo que ya protegía fallo_guardado_visible.js).
+  // 🔴 RECONCILIADO el 5-oct-2026 (tanda 2, G17). El contraste de este control: el rechazo deliberado de arriba es UN viaje y rojo
+  // (el servidor contestó que no); una red caída —el embudo la entrega como `sinRespuesta`, no como un rechazo— se reintenta
+  // sola (3 s; luego 10 y 30) y se queda en ÁMBAR «No confirmado», porque el primer intento pudo haber aterrizado: decir «NO se
+  // guardó» sería afirmar lo que no se sabe. Antes se simulaba con un `Error` pelado y daba «dos viajes y NO se guardó»: ese camino
+  // ya no es el de una red caída. Los 10 y 30 s los ata fallo_guardado_visible.js (con reloj falso) y los OP_ID, guardado_seguro_no_confirmado_g17.js.
   const RN = await p.evaluate(async () => {
     localStorage.clear();
-    window.api = (a, d) => { window.__ll.push({ a, d: JSON.parse(JSON.stringify(d || {})) }); return a === 'GUARDAR_EVOLUCION' ? Promise.reject(new Error('red caída')) : Promise.resolve(null); };
+    window.api = (a, d) => { window.__ll.push({ a, d: JSON.parse(JSON.stringify(d || {})) }); return a === 'GUARDAR_EVOLUCION' ? Promise.reject(Object.assign(new Error('red caída'), { sinRespuesta: true })) : Promise.resolve(null); };
     _formDirty = false; cerrarPanel(true);
     await __abrir('6', false, { ID_CAMA: '6', OCUPADA: true, PATIENT_ID: 'pid-seis', NOMBRE: 'Seis', VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' });
     __llenar(); window.__ll.length = 0; guardar();
     await new Promise(r => setTimeout(r, 3700));
-    return window.__ll.filter(x => x.a === 'GUARDAR_EVOLUCION').length;
+    const pil = $('gEstadoGuardado');
+    const out = { viajes: window.__ll.filter(x => x.a === 'GUARDAR_EVOLUCION').length, estado: pil.dataset.estado,
+      afirma: /NO se guardó|No se guardó|Guardado/.test(pil.textContent), texto: pil.textContent.replace(/\s+/g, ' ').trim() };
+    // Se da por terminada la intención: sus reintentos de 10 y 30 s no pueden salir en medio de las secciones que siguen.
+    if (_sesionGuardado) _sesionGuardado.cancelar();
+    _estadoGuardado(null); _formDirty = false; cerrarPanel(true); avErrCerrar();
+    return out;
   });
-  eq('control: una caída de RED sí se reintenta una vez (dos viajes)', RN, 2);
+  eq('control: una caída de RED sí se reintenta sola (dos viajes a los 3,7 s)', RN.viajes, 2);
+  eq('★ …y se queda en ÁMBAR «No confirmado»', RN.estado, 'noconfirmado');
+  eq('★★ …sin afirmar lo que no sabe: ni «NO se guardó» ni «Guardado»', RN.afirma, false);
 
   /* ══ 8 · LA VISTA RETROSPECTIVA: EL FORMULARIO RECLAMA AL DE LA TARJETA ═ */
   // 🔴 F2 (hallazgo de la revisión adversarial, 4-oct-2026). `abrirPanel` anotaba el episodio leyendo el censo EN
@@ -557,8 +607,9 @@ function rechazado(etiqueta, payload, idCama) {
     await __abrir('6', false, { ID_CAMA: '6', OCUPADA: true, PATIENT_ID: 'pid-seis', NOMBRE: 'Seis', VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' });
     const reabierta = $('fPlanes').value;
     _formDirty = false; cerrarPanel(true);
-    // Control: un fallo de RED en el MISMO componente vuelve a ofrecer «Reintentar» (el rótulo no se queda pegado).
-    _marcaGuardadoError('red caída (prueba)');
+    // Control: un rechazo que NO es de episodio (el servidor contestó, p. ej. VALIDACION) en el MISMO componente vuelve a ofrecer
+    // «Reintentar» (el rótulo no se queda pegado). Una red caída ya no pasa por acá: va al ámbar «No confirmado».
+    _marcaGuardadoError('Falta la firma del kinesiólogo (prueba)');
     const red = { principal: $('avErrReint').textContent.trim(), botonesFranja: [...$('gEstadoGuardado').querySelectorAll('button')].map(b => b.textContent.trim()) };
     avErrCerrar(); _estadoGuardado(null);
     return { antes, despues, reabierta, red };
@@ -577,7 +628,7 @@ function rechazado(etiqueta, payload, idCama) {
   eq('   …con el censo pedido de nuevo (para ver la cama como está ahora)', SAL.despues.recargas, 1);
   eq('★ lo escrito NO se pierde: queda su borrador local', SAL.despues.borrador, 1);
   eq('   …y al reabrir la cama con el mismo paciente, vuelve', SAL.reabierta, 'bipedestación asistida');
-  eq('control: un fallo de RED en el mismo cuadro sí ofrece «Reintentar» (el rótulo se repone)', SAL.red.principal, 'Reintentar');
+  eq('control: un rechazo que no es de episodio, en el mismo cuadro, sí ofrece «Reintentar» (el rótulo se repone)', SAL.red.principal, 'Reintentar');
   eq('control: …y la franja también', SAL.red.botonesFranja.join('|'), 'Reintentar');
 
   /* ══ 10 · EL AVISO DE FIN DE TURNO NO CUENTA EL BORRADOR DE OTRO PACIENTE ═ */

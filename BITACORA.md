@@ -3367,3 +3367,58 @@ las guardias nuevas se borran con él. Las cuatro son compatibles hacia atrás: 
   la pantalla solo conocía «Inicia sesión»: con sesión cortada el guardado caía a «Reintentar» y parecía una falla de red.
 
 Sello `NEXT-5.5-integridad`.
+
+
+---
+
+## 5-oct-2026 · Guardado seguro (tanda 2), paso 16: dos guardias cambian de convención, con su razón
+
+**De dónde sale.** El diseño de la tanda 2 (G14 a G17) cambia lo que la pantalla le dice a la persona cuando un guardado no
+tiene respuesta: antes, dos intentos fallidos eran «NO se guardó»; ahora una red caída o un tiempo agotado es **«No
+confirmado»** (ámbar), con reintentos a los 3, 10 y 30 s, porque el primer intento pudo haber aterrizado y solo perderse la
+respuesta. El paso 16 pide reconciliar las guardias viejas que asertaban lo de antes, **solo las que cambian de convención
+de verdad**, y escribir la razón. Cualquier otra que se hubiera puesto roja se arreglaba en el código; ninguna se puso roja.
+
+**Por qué las dos siguieron verdes sin que nadie las tocara (y por qué eso era el problema).** Al construir la pantalla
+(paso 13) se dejó un camino de compatibilidad: un `Error` que **no salió del embudo `api()`** (sin `e.codigo` ni
+`e.sinRespuesta`) conserva lo de siempre, un reintento a los 3 s y «NO se guardó». Las dos guardias simulaban «la red cayó»
+con ese `Error` pelado, así que seguían viendo el camino viejo. Pero una red caída **de verdad** ya no llega así: el embudo
+la entrega con `sinRespuesta` y la pantalla va al ámbar. Las guardias estaban verdes midiendo un camino que la red real ya no
+recorre. Rojo visto antes de tocar nada: `fallo_guardado_visible.js` con el fallo tal como lo entrega el embudo y **sin
+tocar ninguna de sus afirmaciones** dio 5 fallos: no sale el toast «No se pudo guardar», la franja queda en
+`noconfirmado` y no en `error` (a los 3,5 s y también pasados los 3,2 s del toast), no dice «NO se guardó», y a los 3,5 s no
+hay borrador local.
+
+| Guardia | Qué cambia | Razón |
+|---|---|---|
+| `fallo_guardado_visible.js` | Tres escenarios con el reloj falso de Playwright (día inventado, lunes 10-ago-2026 11:00; los 3, 10, 30 y 45 s no se esperan). **A**: sin respuesta → ámbar «No confirmado · Reintentando…» → reintentos a los 3, 10 y 30 s con la **misma foto** del paquete (4 viajes), cuadro «No confirmado», borrador, y pasados los 45 s nada sale solo ni la franja cambia; nunca dice «NO se guardó» ni «Guardado». **B**: el servidor contestó (`VALIDACION`) → «NO se guardó» rojo, **un** viaje, con su «Reintentar». **C**: el `Error` sin bandera, con las afirmaciones **de antes tal cual**: queda atado para que nadie quite el camino de compatibilidad sin querer. | La convención del texto y de los reintentos cambió de verdad: «NO se guardó» afirmaba lo que no se sabía. Las tres comparten lo que no cambió: franja que no se apaga sola, `_formDirty` en true, texto intacto, borrador, y «Reintentar» que manda los **mismos datos** y al salir bien pasa a «✓ Guardado hh:mm». También corre ahora con reloj congelado: antes esperaba segundos de verdad y no fijaba la fecha. |
+| `episodio_al_guardar.js` | **Solo** lo que asierta del ingreso con vacío y de la caída de red. Servidor: el reintento del propio ingreso **sin** identidad propia queda rotulado como «pantalla vieja, modo tolerante»; al lado se ata el caso **con** identidad (`PATIENT_ID` acuñado): el reintento propio pasa y es una sola fila; **otro** ingreso sobre esa cama (otro `PATIENT_ID`, mismo `''`) es `CONFLICTO`, cero escrituras, base idéntica, sin nombrar al primero. Pantalla: el ingreso en cama libre manda su `PATIENT_ID` (8 a 64 de `[A-Za-z0-9_-]`), tras guardar bien deja de mandarlo, y sobre una cama ocupada sin ingreso formal no se acuña. El control de red pasa a «dos viajes a los 3,7 s, en ámbar, sin afirmar nada». | El `''` solo era «como hoy» mientras el ingreso no traía identidad: el comentario de la cabecera explicaba que no se podía distinguir el reintento propio de un ingreso ajeno, y desde el paso 15 sí se puede. La guardia ata las dos mitades para que la regla no quede medio documentada. |
+
+**Lo que se miró y NO cambia de convención** (quedan igual, y el porqué):
+- `acceso_pantalla.js` («NO se guardó» tras sesión cortada y tras «No se pudo comprobar tu sesión» dos veces),
+  `episodio_al_guardar.js` (el rechazo por «cambió de paciente») y `aviso_error_al_centro.js` (llama a
+  `_marcaGuardadoError` directo): en los tres **el servidor sí contestó** que no, y eso sigue siendo rojo.
+- `panel_ux.js` (la red parpadea una vez y el segundo intento a los 3 s guarda solo): sigue cierto, con
+  `withFailureHandler` real. Solo su comentario de cabecera dice «UNA vez» y es anterior a los 10 y 30 s; se deja como estaba
+  a propósito (no cambia lo que asierta).
+- `grep` de `NO se guardó` y de `falloFinal` en `build/checks/`: ninguna otra guardia asierta el texto viejo para una red caída.
+
+**Las guardias se probaron mutando el código** (cada mutación se deshizo y se comprobó con `cmp`): tratar `sinRespuesta` como
+reintentable, dejar solo el reintento de 3 s, no guardar el borrador al agotar el ámbar, que el servidor no distinga el
+ingreso ajeno, que la pantalla no acuñe, que siga mandando la identidad tras guardar bien, que acuñe sobre una cama ocupada:
+las siete dejan alguna de las dos guardias en rojo.
+
+**Pendiente a propósito (decisión de código del paso 13, no de este paso).** Mientras el ámbar tiene reintentos pendientes
+(hasta los 30 s) **no hay borrador local**: se guarda recién cuando se agotan o a los 45 s sin respuesta. Antes se guardaba a
+los 3 s. Si el equipo se apaga en esa ventana, lo escrito se pierde. Se dice aquí, y la guardia ata lo diseñado (borrador al
+agotar), no lo que falta.
+
+### Para no olvidar
+
+- 🪤 **Una guardia que simula «la red cayó» con un `Error` pelado puede quedar verde por un camino de compatibilidad** aunque el
+  camino real haya cambiado. El doble tiene que ser lo que el embudo de verdad entrega (`sinRespuesta`, `codigo`), no lo que
+  a uno se le ocurre que es un error.
+- 🪤 **Un control con reintentos programados deja temporizadores vivos** (10 y 30 s) que disparan dentro de las secciones
+  siguientes y las contaminan. Al terminar, se da por cancelada la intención (`_sesionGuardado.cancelar()`).
+- 🪤 **Reconciliar no es aflojar**: las afirmaciones de antes quedaron (sección C) y se sumaron las nuevas; ninguna aserción
+  se borró para tapar un rojo, porque no hubo rojo que tapar.
