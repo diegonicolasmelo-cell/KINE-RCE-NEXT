@@ -6028,13 +6028,16 @@ function _opsHuella(datos) {
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36) + '.' + t.length.toString(36);
 }
-function _opIdNuevo() {
+/* Un identificador al azar, de los que acuña la propia pantalla: el OP_ID de una intención (`_opIdNuevo`) y el PATIENT_ID de un
+   ingreso (`_pidNuevoIngreso`, G15). UNA sola fábrica: dos copias del respaldo para navegadores viejos acabarían distintas. */
+function _uuidCliente() {
   let u = '';
   try { if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') u = crypto.randomUUID(); } catch (e) { u = ''; }
   // Navegador sin randomUUID: reloj + azar. Basta con que no se repita entre intenciones del mismo aparato.
   if (!u) u = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
-  return 'op_' + u;
+  return u;
 }
+function _opIdNuevo() { return 'op_' + _uuidCliente(); }
 const _opsVigente = (e, ahora) => !!e && typeof e.id === 'string' && _OP_ID_RE.test(e.id) && typeof e.t === 'number' && (ahora - e.t) < _OPS_VIDA_MS;
 
 /* localStorage: SIEMPRE en try/catch y SIEMPRE sin saltarse el resto. Que el
@@ -7764,6 +7767,14 @@ function abrirPanel(id, esIng, verFicha) {
   // día: NO siempre la cama en vivo (ver `_episodioDeTarjeta`).
   // Se anota primero de todo: `_borradorRestaurar`, al final de esta función, lo necesita.
   _episodioAbierto=_episodioDeTarjeta(id, fecha, tkey);
+  /* 🔐 G15 · Un INGRESO sobre una cama LIBRE nace con su propia identidad (ver `_pidIngreso`): se acuña aquí, al abrir, y vive con
+     el formulario. Una cama libre no tiene dueño aunque su fila conserve un pid viejo (`_epVivo`), así que el episodio que
+     reclama es VACÍO. Sobre una cama ocupada —con paciente o sin ingreso formal— o que no está en el censo no se acuña nada. */
+  _pidIngreso='';
+  if(esIng){
+    const _cIng=((typeof DB!=='undefined'&&DB)||[]).find(x=>String(x.ID_CAMA)===String(id));
+    if(_cIng && !(_cIng.OCUPADA===true||_cIng.OCUPADA==='TRUE')){ _episodioAbierto=''; _pidIngreso=_pidNuevoIngreso(); }
+  }
   $('spBed').textContent=`CAMA ${id}`;
   const _tipo = esIng ? 'Ingreso' : 'Evolución';
   const _st = $('spTitle'); if(_st){ _st.dataset.tipo=_tipo; _st.textContent=_tipo; }
@@ -8062,6 +8073,24 @@ let _guardadoVuelo = null;
    Al guardar BIEN toma el episodio que el servidor devuelve: un ingreso nace sin episodio y desde su primer
    guardado el formulario ya es de ese paciente. Guardia: episodio_al_guardar.js. */
 let _episodioAbierto = '';
+/* 🔐 LA IDENTIDAD PROPIA DE UN INGRESO (G15, tanda 2 del guardado seguro, paso 15). Un ingreso CREA el episodio, así que no puede
+   reclamar uno que todavía no existe: `_episodioAbierto` va vacío, y el servidor no distingue «el reintento de MI ingreso, cuyo
+   primer intento sí aterrizó» de «otro kinesiólogo ingresó a SU paciente en esta misma cama». Para poder distinguirlos el ingreso
+   trae identidad propia desde ANTES de enviar: al abrir el formulario sobre una cama LIBRE la pantalla acuña un PATIENT_ID, y
+   `guardar()` lo manda en `datos.PATIENT_ID` junto con el episodio vacío. El servidor (`_candadoDeIngreso`, svc_evoluciones.gs):
+   cama libre o con ESE MISMO pid ⇒ sigue (primer ingreso o reintento propio, sin duplicar nada); cama con OTRO pid ⇒ CONFLICTO
+   sin escribir nada.
+     · Es del FORMULARIO, no de cada intento: los reintentos de 3, 10 y 30 s, «Reintentar ahora», y un guardado después de editar
+       lo escrito llevan el MISMO. Acuñar otro por intento haría que un reintento propio pareciera «otro ingreso».
+     · Se guarda con el borrador (`pidIngreso`): cerrar conservando y reabrir el ingreso en la misma cama trae la misma identidad.
+     · Tras guardar bien el formulario ya es de ese paciente: la identidad queda en `_episodioAbierto` y se suelta de aquí.
+     · Solo sobre una cama LIBRE. Una cama OCUPADA —con paciente o sin ingreso formal— no acuña nada: el primer guardado fija el
+       pid que el servidor devuelve, como siempre.
+   '' = este formulario no es un ingreso sobre una cama libre. La forma es la que el servidor acepta (`_PATIENT_ID_ACUNADO_RE`,
+   dominio_validacion.gs). Guardia: guardado_seguro_no_confirmado_g17.js (sección H). */
+let _pidIngreso = '';
+const _PID_ACUNADO_RE = /^[A-Za-z0-9_-]{8,64}$/;
+function _pidNuevoIngreso() { return _uuidCliente(); }
 /* El rechazo del servidor por cambio de paciente se reconoce por su frase (`validarEpisodioAbierto`, en
    svc_evoluciones.gs): no es un fallo de red, así que no se reintenta solo ni manda a «revisar la red». */
 const _EP_CAMBIO_RE = /cambi[oó] de paciente/i;
@@ -8126,7 +8155,16 @@ function _marcaNoConfirmado(quedan){
 // O3b · estado de ERROR persistente: se queda hasta que un guardado termine bien.
 // 🔴 La píldora NO se toca ni se reemplaza — es el estado PERSISTENTE del PRD y
 // la mide build/checks/sin_guardar.js. El cuadro al centro se SUMA encima.
-function _marcaGuardadoError(detalle){
+function _marcaGuardadoError(detalle, codigo){
+  /* 🔐 G15 · CONFLICTO: otro kinesiólogo ingresó a SU paciente en esta cama mientras se llenaba este ingreso. El servidor no escribió
+     nada y reenviar lo mismo recibe lo mismo: no hay «Reintentar» ni «Cerrar la cama» (el formulario sigue siendo lo que vale:
+     lo escrito, el borrador y la identidad se conservan). Rojo, porque ESTO sí se sabe. Sin botones: la salida es «Seguir editando»
+     del cuadro del centro, y la franja se queda de rastro. No nombra a nadie: dice solo lo que ya dice el servidor. */
+  if(codigo==='CONFLICTO'){
+    _estadoGuardado('error','❌ NO se guardó · la cama ya fue ocupada por otro paciente');
+    avisoErrorGuardado(detalle, codigo);
+    return;
+  }
   /* 🔴 F2 · «La cama cambió de paciente» es un rechazo DELIBERADO: reenviar lo mismo recibe lo mismo. Su salida
      principal es cerrar la cama (y volver a abrirla para verla como está ahora), no «Reintentar». Lo escrito no
      se pierde: `_falloFinal` ya lo dejó de borrador de SU paciente. */
@@ -8160,7 +8198,7 @@ function cerrarCamaTrasRechazo(){
 let _avErrModo = null;      // 'guardado' | 'carga' | null
 let _avErrAccion = null;    // lo que corre el botón «Reintentar»
 
-function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim, tono){
+function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim, tono, soloSec){
   const o=$('avErrOvl'); if(!o) return;
   _avErrModo=modo; _avErrAccion=(typeof accion==='function')?accion:null;
   // G17 · 'ambar' = «No confirmado» (no sabemos): mismo cuadro, otro color y otro símbolo. El rojo es solo de lo que SE SABE que falló.
@@ -8173,8 +8211,11 @@ function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim, tono){
   // un «Cerrar la cama» dejado por el rechazo de cambio de paciente no puede quedarse pegado al siguiente fallo.
   $('avErrReint').textContent=textoPrim||'Reintentar';
   $('avErrSec').textContent=textoSec||'Cerrar';
+  /* G15 · `soloSec`: un rechazo que NO se arregla reintentando (el CONFLICTO del ingreso: reenviar lo mismo recibe lo mismo) deja
+     solo la salida «Seguir editando». Se repone en CADA apertura, igual que el rótulo de arriba: el cuadro es uno solo. */
+  const _bp=$('avErrReint'); if(_bp){ _bp.hidden=!!soloSec; _bp.style.display=soloSec?'none':''; }
   o.classList.add('on');
-  setTimeout(()=>{ try{ $('avErrReint').focus(); }catch(_){} }, 60);
+  setTimeout(()=>{ try{ (soloSec?$('avErrSec'):$('avErrReint')).focus(); }catch(_){} }, 60);
 }
 
 function avErrCerrar(){ $('avErrOvl')?.classList.remove('on'); _avErrModo=null; }
@@ -8189,7 +8230,13 @@ function avErrReintentar(){
 // re-guarda el mismo turno: actualiza, no duplica). «Seguir editando» solo
 // cierra el cuadro: la evolución sigue entera en pantalla y la píldora roja
 // queda de rastro hasta que un guardado termine bien.
-function avisoErrorGuardado(detalle){
+function avisoErrorGuardado(detalle, codigo){
+  // G15 · el CONFLICTO del ingreso no tiene nada que reintentar ni que cerrar: solo «Seguir editando» (decisión 4 del diseño: reasignar
+  // el ingreso a otra cama es otro diseño de uso, y el selector de cama del formulario no se puede cambiar).
+  if(codigo==='CONFLICTO'){
+    _avErrAbrir('guardado', 'No se guardó', detalle||'', null, 'Seguir editando', null, null, true);
+    return;
+  }
   // F2 · el rechazo por cambio de paciente no ofrece «Reintentar» (mandaría lo mismo): lo principal es cerrar la cama.
   if(_EP_CAMBIO_RE.test(detalle||'')){
     _avErrAbrir('guardado', 'No se guardó', detalle||'', cerrarCamaTrasRechazo, 'Seguir editando', 'Cerrar la cama');
@@ -8249,6 +8296,9 @@ function _borradorEstado(){
     // por cambio de paciente, «reabrir la cama» le devolvía al formulario del ocupante NUEVO los parámetros del
     // anterior (todo menos nombre, RUT, edad y diagnóstico), y el siguiente guardado los habría escrito.
     ep:_episodioAbierto,
+    // 🔐 G15 · la identidad propia del ingreso (`_pidIngreso`): un código opaco, no nombre ni RUT. Con ella, reabrir ESTE ingreso
+    // (misma cama, mismo turno, cama aún libre) sigue siendo el mismo ingreso y no «otro» frente a un primer intento que sí aterrizó.
+    pidIngreso:_pidIngreso,
     campos,
     procs:[...(PROCS||[])],
     fases:[...FASES_SEL], pend:_PEND_PUESTOS.slice(), aisl:[..._aislTags],
@@ -8319,6 +8369,9 @@ function _borradorRestaurar(idCama){
   // donde está —no se borra: es trabajo de alguien—, solo no entra a este formulario. Un borrador de antes de
   // este cambio no trae `ep` y se restaura como siempre.
   if(!_borradorEsDe(d, _episodioAbierto)) return false;
+  // 🔐 G15 · el ingreso vuelve CON la identidad que traía. Solo si este formulario es un ingreso sobre cama libre (`_pidIngreso`
+  // acuñado al abrir) y la identidad guardada tiene la forma válida: nunca se le pone a la evolución de un paciente.
+  if(_pidIngreso && typeof d.pidIngreso==='string' && _PID_ACUNADO_RE.test(d.pidIngreso)) _pidIngreso=d.pidIngreso;
   Object.keys(d.campos).forEach(id=>{
     if(_BORR_SIN_IDENTIDAD.indexOf(id)!==-1) return;
     const e=document.getElementById(id); if(!e) return;
@@ -10536,6 +10589,10 @@ function guardar() {
      campo del formulario —no lo escribe nadie— sino lo que el formulario ya traía cuando se abrió. No es columna
      de ninguna hoja. Ver `_episodioAbierto`. */
   datos.EPISODIO_ABIERTO=_episodioAbierto;
+  /* 🔐 G15 · Y un ingreso sobre una cama libre manda además SU identidad (ver `_pidIngreso`): el servidor distingue con ella el
+     reintento de este mismo ingreso de otro ingreso en la misma cama. Solo mientras el formulario no tenga episodio —el
+     guardado bueno lo rebasa a `_episodioAbierto`— y NUNCA sobre una cama ocupada (ahí `_pidIngreso` está vacío). */
+  if(_pidIngreso && _episodioAbierto==='') datos.PATIENT_ID=_pidIngreso;
   // Editor de texto (opción A): lo que está EN PANTALLA es el texto oficial y
   // se guarda tal cual; la salida cruda del motor viaja aparte (TEXTO_AUTO)
   // para trazabilidad y refinamiento del generador. Sin edición manual, ambos
@@ -10650,7 +10707,7 @@ function _guardadoIniciar(foto, id, tkey){
        primer guardado el siguiente ya viaja con el suyo (y queda protegido si la cama cambia de dueño).
        Solo si el panel SIGUE siendo este: la respuesta de un guardado lento puede llegar cuando ya se abrió otra
        cama, y entonces el episodio de aquella no le corresponde a esta. */
-    if(r && r.patientId && _episodioAbierto===ctx.ep && String(v('cBed'))===ctx.id) _episodioAbierto=String(r.patientId);
+    if(r && r.patientId && _episodioAbierto===ctx.ep && String(v('cBed'))===ctx.id){ _episodioAbierto=String(r.patientId); _pidIngreso=''; }   // la identidad del ingreso ya vive en el episodio
     if(vig){
       /* Texto DEFINITIVO. Si hubo edición manual, lo de pantalla ES lo guardado y
          no se toca. Si no, se refleja el que confirmó el servidor — y desde aquí
@@ -10688,15 +10745,18 @@ function _guardadoIniciar(foto, id, tkey){
      caída: el aviso dice qué pasó y qué hacer, sin «revisa la red»; el formulario NO se toca y `_reintentoGuardado` queda armado: al
      entrar con la clave, Reintentar manda estos mismos datos con la sesión nueva) · 'servidor' (el servidor contestó y
      dijo que no) · 'red' (un Error que no salió del embudo). */
-  const falloFinal=(m,tipo)=>{
+  const falloFinal=(m,tipo,codigo)=>{
     apagar(); rechazada=true; liberar('rojo');
     if(!vigente()){ toast('❌ La evolución de la cama '+ctx.id+' no se guardó: '+(m||'sin conexión')); return; }
     _guardadoBotones(false,'💾 Guardar Evolución');
     // 🔴 G14 · «La cama cambió de paciente» ya dice qué pasó y qué hacer; mandar a «revisar la red» sería mentir.
     const cambioPac=_EP_CAMBIO_RE.test(m||'');
-    toast(cambioPac
-      ? '❌ '+m
-      : tipo==='sesion'
+    // 🔐 G15 · CONFLICTO (otro ingresó en esta cama): el servidor contestó que no y reenviar lo mismo recibe lo mismo.
+    const conflicto=(codigo==='CONFLICTO');
+    // El candado de episodio haciendo su trabajo (cambió de paciente o CONFLICTO) se lee EN ROJO y más rato, como en el resto de
+    // las puertas (`toastError`): una sola regla para reconocerlo (`_esRechazoDeEpisodio`).
+    if(_esRechazoDeEpisodio({ codigo:codigo, message:m })) toast('❌ '+m, 8000, 'rojo');
+    else toast(tipo==='sesion'
         ? '🔐 Se cerró tu sesión: entra con tu clave y aprieta Reintentar — tu evolución sigue en pantalla'
         : tipo==='servidor'
           ? '❌ No se guardó: '+(m||'sin respuesta')+' — tu evolución sigue en pantalla'
@@ -10705,9 +10765,10 @@ function _guardadoIniciar(foto, id, tkey){
     // bien, con su Reintentar que remanda los MISMOS datos. _formDirty sigue en true y el formulario no se toca. Y se deja
     // borrador local por si el equipo se apaga ahora.
     _cerrarTrasGuardar=false;
-    // F2 · el rechazo por cambio de paciente no deja nada que reintentar: reenviaría lo mismo y recibiría lo mismo.
-    _reintentoGuardado=cambioPac?null:reintentarAhora;
-    _marcaGuardadoError(tipo==='sesion' ? 'Tu sesión se cerró. Entra con tu clave y aprieta Reintentar: lo que escribiste sigue aquí.' : (m||'sin conexión'));
+    // F2 · el rechazo por cambio de paciente no deja nada que reintentar: reenviaría lo mismo y recibiría lo mismo. G15 · el CONFLICTO, igual.
+    _reintentoGuardado=(cambioPac||conflicto)?null:reintentarAhora;
+    _marcaGuardadoError(tipo==='sesion' ? 'Tu sesión se cerró. Entra con tu clave y aprieta Reintentar: lo que escribiste sigue aquí.' : (m||'sin conexión'), codigo);
+    // El borrador deja SU identidad (`pidIngreso`) y su episodio vacío: no se restaura sobre quien ocupó la cama (`_borradorEsDe`).
     _borradorGuardar();
   };
 
@@ -10760,7 +10821,7 @@ function _guardadoIniciar(foto, id, tkey){
     const clase=_guardadoClase(e);
     // 🔴 G14 · Un rechazo DELIBERADO del servidor (la cama cambió de paciente) no es una red que parpadeó: reintentar a los 3 s
     // manda lo mismo y recibe lo mismo, y mientras tanto el aviso diría «sin respuesta».
-    if(clase==='rechazo'){ falloFinal(m, 'servidor'); return; }
+    if(clase==='rechazo'){ falloFinal(m, 'servidor', e&&e.codigo); return; }
     ultimo={ m:m, tipo:(e&&e.codigo)?'servidor':'red' };
     if(clase==='ambiguo') ambiguos++;
     else {

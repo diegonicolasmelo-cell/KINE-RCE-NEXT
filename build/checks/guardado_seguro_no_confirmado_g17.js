@@ -8,7 +8,8 @@
 //
 // Esta guardia nace en el paso 12 con la parte del EMBUDO (el único `api()` por el que sale toda llamada); los pasos
 // 13 a 15 le suman las pantallas (guardar(), el episodio capturado en cada puerta, el ingreso con PATIENT_ID acuñado).
-// El paso 13 trae la sección F: guardar(). El paso 14 trae la G: el episodio capturado en cada puerta.
+// El paso 13 trae la sección F: guardar(). El paso 14 trae la G: el episodio capturado en cada puerta. El paso 15 trae la H:
+// el ingreso con PATIENT_ID acuñado y el CONFLICTO.
 //
 //   A · EL MISMO CONTRATO POR LOS DOS CAMINOS. `_apiGas` (google.script.run, dentro del iframe) y `_apiHttp` (fetch
 //       `text/plain`, la app instalada) entregan lo mismo: resuelven con los datos, o rechazan con un `Error` que lleva
@@ -35,6 +36,13 @@
 //       abre el diálogo para P, un sondeo REAL entrega la cama ya ocupada por Q (control: `DB` dice Q), y lo que sale al
 //       servidor tiene que seguir diciendo P. También con la cama de destino libre (viaja vacío, no se omite), y con el
 //       rechazo del servidor (CONFLICTO o «cambió de paciente») a la vista EN ROJO y no como un aviso cualquiera.
+//   H · EL INGRESO LLEVA SU PROPIA IDENTIDAD (paso 15). El servidor (paso 8) ya distingue «el reintento de mi propio ingreso» de «otro
+//       ingreso en la misma cama», pero solo si el ingreso trae un PATIENT_ID propio, y a la pantalla nadie se lo daba. Al abrir el
+//       formulario de ingreso sobre una cama LIBRE la pantalla acuña uno (de la forma que el servidor acepta), lo guarda con el formulario
+//       y con su borrador, y lo manda con el guardado junto a EPISODIO_ABIERTO vacío. Los reintentos y los guardados siguientes del mismo
+//       formulario llevan el MISMO (la identidad es del formulario, no de cada intento). Si otro se adelantó (CONFLICTO) sale EN ROJO,
+//       el formulario, el borrador y el PATIENT_ID se conservan y SOLO se ofrece «Seguir editando»: reintentar mandaría lo mismo y
+//       recibiría lo mismo. Y ese borrador no se restaura sobre el paciente que ocupó la cama. Sobre una cama OCUPADA no se acuña nada.
 //
 // 🪤 RELOJ CONGELADO. El vencimiento de 6 h depende de la hora: `Date` se congela en la página en un día inventado
 // (lunes 10-ago-2026, 11:00; ni Fiestas Patrias, ni cambio de turno, ni cierre de año) y se ADELANTA a mano con
@@ -1085,8 +1093,260 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     await p.cerrar();
   }
 
+  /* ══ H · EL INGRESO LLEVA SU PROPIA IDENTIDAD, Y EL CONFLICTO SE ENTIENDE ═ */
+  console.log('\nH · El ingreso acuña su PATIENT_ID al abrir; el CONFLICTO sale en rojo y lo conserva todo');
+  const PID_RE = /^[A-Za-z0-9_-]{8,64}$/;                 // la forma que el servidor acepta (dominio_validacion.gs, _PATIENT_ID_ACUNADO_RE)
+  // 🪤 Igual que `valido` para el OP_ID: «el mismo PATIENT_ID» exige que sea UNO válido; comparar `undefined` con `undefined` daba verde
+  // sin que existiera ninguna identidad (nació roja contra una pantalla que no acuña nada).
+  const pidOk = x => typeof x === 'string' && PID_RE.test(x);
+  const NOMBRE_H = 'SENTINELA-NOMBRE-INVENTADO', RUT_H = '11111111-1', DX_H = 'SENTINELA-DIAGNOSTICO-INVENTADO';
+  const Q_EN_5 = { 5: { OCUPADA: true, PATIENT_ID: 'pQ', NOMBRE: 'Otro paciente' } };   // el que se adelantó
+  const MSG_CONF = 'La cama 5 ya fue ocupada por otro paciente mientras llenabas este ingreso. No se guardó nada. Tu formulario sigue abierto con lo que escribiste.';
+  // La 5 y la 6 están libres; la 2 tiene a pP; la 7 está OCUPADA sin PATIENT_ID (un episodio sin ingreso formal).
+  // Todas con vía aérea natural y sin soporte: con un tubo el formulario exige declarar la PVE y el caso no es ése (una cama libre,
+  // además, vuelve así: `_camaVacia`).
+  const SIN_SOPORTE = { VIA_AEREA: 'Natural', SOPORTE: 'Ambiente', MODO: 'Sin soporte' };
+  const CAMAS_H = () => [CAMA_G(2, 'pP', SIN_SOPORTE), CAMA_G(5, '', Object.assign({ OCUPADA: false }, SIN_SOPORTE)),
+    CAMA_G(6, '', Object.assign({ OCUPADA: false }, SIN_SOPORTE)), CAMA_G(7, '', Object.assign({ OCUPADA: true }, SIN_SOPORTE))];
+  // Una página con el reloj de Playwright (la fecha se INVENTA) y el censo de arriba. `stubRecarga`: el refresco del censo no hace nada
+  // (los guardados buenos lo llaman y con la respuesta por defecto dejarían el censo vacío); donde se prueba un sondeo, es el REAL.
+  async function abrirH(opc) {
+    const o = Object.assign({ stubRecarga: true, sinUUID: false }, opc || {});
+    const p = await abrir({ modo: 'gas', relojPW: true, sinUUID: o.sinUUID });
+    await p.evaluate(([c, stub]) => {
+      localStorage.clear();
+      window.__toasts = []; const t0 = window.toast; window.toast = (m, t, tono) => { window.__toasts.push(String(m)); return t0(m, t, tono); };
+      window.__recargas = 0; if (stub) window.recargarSilencioso = () => { window.__recargas++; };
+      $('gDate').value = '2026-08-10'; $('gDate').classList.add('turno-hoy'); SHIFT = 'Dia';
+      DB = c; renderGrid();
+      const f = $('fFirma'); if (![...f.options].some(x => x.value === 'KIN')) f.insertAdjacentHTML('beforeend', '<option value="KIN">KIN</option>');
+    }, [CAMAS_H(), o.stubRecarga]);
+    p.t = 0;
+    return p;
+  }
+  const abrirFormH = async (p, id, esIng) => { await p.evaluate(([i, e]) => { abrirPanel(i, e, false); }, [id, esIng]); await p.clock.runFor(600); };
+  // `typeof`: contra una pantalla que todavía no acuña nada la guardia se ve ROJA con un valor, no con un ReferenceError.
+  const estadoH = p => p.evaluate(() => ({ pid: typeof _pidIngreso === 'undefined' ? null : _pidIngreso, ep: _episodioAbierto }));
+  const llenarIngreso = async p => {
+    await llenar(p);
+    await p.evaluate(([n, r, d]) => { $('fNombre').value = n; $('fRut').value = r; $('fEdad').value = '58'; $('fDx').value = d; }, [NOMBRE_H, RUT_H, DX_H]);
+  };
+  const cerrarH = p => p.evaluate(() => { _formDirty = false; cerrarPanel(true); });
+  const borradorH = (p, cama) => p.evaluate(c => {
+    const k = Object.keys(localStorage).filter(x => new RegExp('^CAMA_' + c + '_').test(x))[0];
+    if (!k) return null;
+    const crudo = localStorage.getItem(k); let d = null; try { d = JSON.parse(crudo); } catch (e) {}
+    return { llave: k, crudo, d };
+  }, cama);
+  // Un sondeo REAL: el servidor entrega el censo y corre `recargarSilencioso()`, lo que hace la pantalla sola cada tanto. El censo
+  // se arma de nuevo desde CAMAS_H más `cambios` (no desde `DB`): un guardado que sale bien refresca el censo y, con la respuesta
+  // por defecto, lo deja vacío; así cada sondeo deja el censo que se quiere, pase lo que pase antes.
+  async function sondearH(p, cambios) {
+    await p.evaluate(([base, cambios]) => {
+      const nuevas = base.map(c => Object.assign(c, cambios[c.ID_CAMA] || {}));
+      window.__srv.reglas['GET_TODAS_CAMAS'] = [{ tipo: 'ok', data: nuevas }];
+      recargarSilencioso();
+    }, [CAMAS_H(), cambios]);
+    await p.clock.runFor(300);
+    return p.evaluate(() => Object.fromEntries(DB.map(c => [c.ID_CAMA, (c.OCUPADA === true || c.OCUPADA === 'TRUE') ? c.PATIENT_ID : ''])));
+  }
+
+  /* ── H1 · al abrir el ingreso sobre una cama LIBRE se acuña el PATIENT_ID; viaja con el guardado y queda en el borrador ── */
+  {
+    const p = await abrirH();
+    await abrirFormH(p, '5', true);
+    const e0 = await estadoH(p);
+    si('★★ H1 · al abrir el ingreso sobre una cama LIBRE la pantalla acuña un PATIENT_ID de la forma válida (8 a 64 de [A-Za-z0-9_-])',
+      typeof e0.pid === 'string' && PID_RE.test(e0.pid), JSON.stringify(e0));
+    eq('   …y el episodio que reclama sigue VACÍO (la tarjeta no tenía ninguno)', e0.ep, '');
+    await llenarIngreso(p);
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p); await p.clock.runFor(30);
+    const d = await unaSalida(p, GUARDAR);
+    eq('★★ H1 · el guardado del ingreso manda ES_INGRESO, EPISODIO_ABIERTO vacío (la clave viaja) Y el PATIENT_ID acuñado al abrir',
+      [d && d.ES_INGRESO, d && d.EPISODIO_ABIERTO, !!d && pidOk(e0.pid) && d.PATIENT_ID === e0.pid], [true, '', true]);
+    si('   …y su OP_ID de siempre', !!d && valido(d.OP_ID), d && d.OP_ID);
+    await p.evaluate(() => { _borradorGuardar(); });
+    const b = await borradorH(p, '5');
+    eq('★★ H1 · el borrador del ingreso lleva el PATIENT_ID acuñado (y el episodio vacío): con él se reabre la misma identidad',
+      [!!b && !!b.d && pidOk(e0.pid) && b.d.pidIngreso === e0.pid, b && b.d && b.d.ep], [true, '']);
+    si('★ …y SIGUE sin llevar nombre, RUT ni diagnóstico (el PATIENT_ID es un código opaco, no una identidad)',
+      !!b && [NOMBRE_H, RUT_H, DX_H, '11.111.111'].every(t => b.crudo.indexOf(t) === -1), b && b.crudo.slice(0, 120));
+    const ops = await p.evaluate(() => { try { return localStorage.getItem('rce_ops') || ''; } catch (e) { return 'ERR'; } });
+    si('★ 🔒 …y el mapa de OP_ID de localStorage no guarda el PATIENT_ID (solo huella y OP_ID)', ops !== 'ERR' && ops.indexOf(e0.pid) === -1, ops);
+    await p.cerrar();
+  }
+
+  /* ── H1b · cada formulario acuña el SUYO; sin crypto.randomUUID el respaldo también da identidades válidas y distintas ── */
+  for (const sinUUID of [false, true]) {
+    const p = await abrirH({ sinUUID });
+    const ids = [];
+    const N = sinUUID ? 12 : 4;
+    for (let i = 0; i < N; i++) {
+      await abrirFormH(p, ['5', '6', '5', '5'][i % 4], true);
+      ids.push((await estadoH(p)).pid);
+      await cerrarH(p);
+    }
+    si('★ H1b · ' + (sinUUID ? 'SIN crypto.randomUUID (navegador viejo)' : 'con cuatro aperturas de un ingreso') + ': cada formulario acuña su identidad (válida y distinta de las demás)',
+      ids.every(x => typeof x === 'string' && PID_RE.test(x)) && new Set(ids).size === N, JSON.stringify(ids));
+    await p.cerrar();
+  }
+
+  /* ── H2 · la identidad es del FORMULARIO: los reintentos y los guardados siguientes llevan la misma ── */
+  {
+    const p = await abrirH();
+    await abrirFormH(p, '5', true); await llenarIngreso(p);
+    const pid = (await estadoH(p)).pid;
+    await regla(p, GUARDAR, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' });
+    await apretar(p);
+    await irA(p, 31);
+    let ll = await llamadasG(p);
+    si('★★ H2 · el envío original y los reintentos de 3, 10 y 30 s llevan el MISMO PATIENT_ID acuñado al abrir',
+      ll.length === 4 && pidOk(pid) && ll.every(x => x.datos.PATIENT_ID === pid), JSON.stringify([ll.length, pid, ll.map(x => x.datos.PATIENT_ID)]));
+    await p.evaluate(() => { const t = $('fPlanes'); t.value = 'cambié el ingreso'; t.dispatchEvent(new Event('input', { bubbles: true })); });
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p);
+    ll = await llamadasG(p);
+    const nuevo = ll[ll.length - 1] || { datos: {} };
+    eq('★★ …y tras editar lo escrito y guardar de nuevo (intención nueva: otro paquete, OP_ID nuevo) sigue siendo el MISMO PATIENT_ID',
+      [ll.length, nuevo.datos.PLAN_PLANES, !!ll[0] && valido(nuevo.datos.OP_ID) && nuevo.datos.OP_ID !== ll[0].datos.OP_ID, pidOk(pid) && nuevo.datos.PATIENT_ID === pid], [5, 'cambié el ingreso', true, true]);
+    await p.cerrar();
+  }
+  {
+    // «Cerrar y conservar borrador» y reabrir el ingreso en la misma cama: el borrador vuelve CON su identidad
+    const p = await abrirH();
+    await abrirFormH(p, '5', true); await llenarIngreso(p);
+    const pid = (await estadoH(p)).pid;
+    await p.evaluate(() => { _borradorGuardar(); _formDirty = false; cerrarPanel(true); });
+    await abrirFormH(p, '5', true);
+    const e1 = await estadoH(p), t = await pantalla(p);
+    eq('★★ H2b · reabrir el ingreso en la MISMA cama y turno restaura el borrador Y la identidad que traía (el mismo PATIENT_ID)',
+      [t.planes, t.estado, pidOk(pid) && e1.pid === pid], [FORM_TXT, 'borrador', true]);
+    // El aviso previo a guardar es de esta sesión (no se restaura con el borrador) y la lista de firmas se rearma al abrir: lo que se
+    // prueba aquí es la identidad del ingreso, no esos dos.
+    await p.evaluate(() => {
+      _transAvisoOk = true;
+      const f = $('fFirma'); if (![...f.options].some(x => x.value === 'KIN')) f.insertAdjacentHTML('beforeend', '<option value="KIN">KIN</option>');
+      f.value = 'KIN';
+    });
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p); await p.clock.runFor(30);
+    const d = await unaSalida(p, GUARDAR);
+    eq('   …y el guardado de ese formulario manda ese PATIENT_ID', [pidOk(pid), d && d.PATIENT_ID === pid], [true, true]);
+    await p.cerrar();
+  }
+
+  /* ── H3 · CONFLICTO: rojo, y se conserva TODO; solo se ofrece «Seguir editando» ── */
+  {
+    const p = await abrirH({ stubRecarga: false });
+    await abrirFormH(p, '5', true); await llenarIngreso(p);
+    const pid = (await estadoH(p)).pid;
+    // Mientras se llena, OTRO ingresa a su paciente en la cama 5 y el sondeo REAL entrega el censo nuevo (control: DB dice pQ).
+    const v = await sondearH(p, Q_EN_5);
+    const e1 = await estadoH(p);
+    eq('H3 · (control) el sondeo SÍ dejó la cama 5 en manos de otro; el formulario sigue con su identidad y su episodio vacío (no los relee)',
+      [v['5'], pidOk(pid) && e1.pid === pid, e1.ep], ['pQ', true, '']);
+    await regla(p, GUARDAR, { tipo: 'rechazo', error: MSG_CONF, codigo: 'CONFLICTO' });
+    await apretar(p); await p.clock.runFor(30);
+    const ll = await llamadasG(p);
+    eq('★ H3 · lo que sale al servidor es el PATIENT_ID de AL ABRIR y el episodio vacío, aunque el censo ya diga pQ',
+      [ll.length, !!ll[0] && pidOk(pid) && ll[0].datos.PATIENT_ID === pid, ll[0] && ll[0].datos.EPISODIO_ABIERTO], [1, true, '']);
+    let e = await pantalla(p);
+    const modal = await p.evaluate(() => ({ prim: getComputedStyle($('avErrReint')).display, primHidden: $('avErrReint').hidden, sec: $('avErrSec').textContent.trim(),
+      secVisible: getComputedStyle($('avErrSec')).display !== 'none', tit: $('avErrTit').textContent.trim(), card: $('avErrCard').className }));
+    const tos = (await toastsDe(p)).filter(x => x.texto.indexOf(MSG_CONF) > -1);
+    eq('★★ H3 · el CONFLICTO es «No se guardó» (rojo) con el motivo del servidor, en la franja y en el cuadro del centro',
+      [e.estado, /NO se guardó/.test(e.texto), e.modal, e.modalTit, e.modalMsg], ['error', true, true, 'No se guardó', MSG_CONF]);
+    si('★★ …y el aviso del motivo sale EN ROJO (el mismo rojo de tema claro del paso 14)', tos.length === 1 && tos[0].rojo === true && claro(tos[0].fondo) && !claro(tos[0].color), JSON.stringify(tos));
+    si('★★ …y SOLO se ofrece «Seguir editando»: el cuadro no trae «Reintentar» (ni «Cerrar la cama») y la franja no trae ningún botón',
+      (modal.prim === 'none' || modal.primHidden === true) && modal.sec === 'Seguir editando' && modal.secVisible && e.botones.length === 0, JSON.stringify([modal, e.botones]));
+    eq('   …no hay nada que reintentar (reenviar lo mismo recibiría lo mismo) y la franja no ofrece el reintento', e.reintento, false);
+    eq('★★ …el formulario, el estado «sin guardar» y el borrador se CONSERVAN', [e.planes, e.dirty, e.borrador], [FORM_TXT, true, 1]);
+    const b = await borradorH(p, '5');
+    eq('★★ …y el borrador conserva el PATIENT_ID acuñado y el episodio vacío (no se acuña otro para esquivar el conflicto)',
+      [pidOk(pid) && !!b && !!b.d && b.d.pidIngreso === pid, b && b.d && b.d.ep, (await estadoH(p)).pid === pid], [true, '', true]);
+    si('   …sin nombre, RUT ni diagnóstico en el borrador', !!b && [NOMBRE_H, RUT_H, DX_H].every(t => b.crudo.indexOf(t) === -1));
+    si('   …en tema claro (franja y cuadro) y sin emojis posteriores a 2019',
+      claro(await p.evaluate(() => getComputedStyle($('gEstadoGuardado')).backgroundColor)) && claro(await p.evaluate(() => getComputedStyle($('avErrCard')).backgroundColor))
+        && [...(e.texto + ' ' + e.modalTit + ' ' + e.modalMsg + ' ' + modal.sec)].every(c => c.codePointAt(0) < 0x2800));
+    await irA(p, 120);
+    eq('★ …y NO se reintenta solo: pasado el tiempo sigue UNA sola llamada', (await llamadasG(p)).length, 1);
+    // «Seguir editando»: el cuadro se cierra y el formulario queda exactamente como estaba
+    await p.evaluate(() => { $('avErrSec').click(); });
+    e = await pantalla(p);
+    eq('   …«Seguir editando» cierra el cuadro y deja el formulario y la franja roja como estaban', [e.modal, e.estado, e.planes, e.dirty], [false, 'error', FORM_TXT, true]);
+    await p.evaluate(() => { reintentarGuardado(); });
+    await p.clock.runFor(30);
+    eq('   …y un «Reintentar» forzado (no hay ninguno armado) tampoco manda nada: sigue UNA sola llamada', (await llamadasG(p)).length, 1);
+    // Guardar otra vez: sale de nuevo con la MISMA identidad (no se acuña otra) y recibe lo mismo
+    await regla(p, GUARDAR, { tipo: 'rechazo', error: MSG_CONF, codigo: 'CONFLICTO' });
+    await apretar(p); await p.clock.runFor(30);
+    const ll2 = await llamadasG(p);
+    eq('   …y guardar de nuevo manda el MISMO PATIENT_ID (la identidad del ingreso no cambia para colarse) y recibe el mismo CONFLICTO',
+      [ll2.length, !!ll2[1] && pidOk(pid) && ll2[1].datos.PATIENT_ID === pid, (await pantalla(p)).estado], [2, true, 'error']);
+
+    /* ── H4 · ese borrador NO se restaura sobre el paciente que ocupó la cama ── */
+    await cerrarH(p);
+    await sondearH(p, Q_EN_5);                           // el siguiente sondeo: el censo sigue diciendo que la 5 es de pQ
+    await abrirFormH(p, '5', false);                     // la cama 5 ahora es de pQ: «Ver / editar»
+    const e2 = await estadoH(p), t2 = await pantalla(p), b2 = await borradorH(p, '5');
+    const hay = await p.evaluate(() => [_borradorHay('5', 'pQ'), _borradorHay('5', '')]);
+    eq('★★ H4 · la cama 5 reabierta (ahora de pQ) NO recibe el borrador del ingreso rechazado: formulario vacío, sin «borrador recuperado» ni cambios por guardar',
+      [t2.planes, t2.estado, t2.dirty, t2.toasts.slice(-3).some(m => /borrador/i.test(m))], ['', '', false, false]);
+    eq('   …el formulario abre el episodio de pQ y NO acuña ninguna identidad (la cama está OCUPADA)', [e2.ep, e2.pid], ['pQ', '']);
+    si('★ …pero el borrador NO se borra: sigue bajo su llave, con su identidad y su episodio vacío (es trabajo de alguien)',
+      !!b2 && !!b2.d && pidOk(pid) && b2.d.pidIngreso === pid && b2.d.ep === '', JSON.stringify(b2 && b2.d && [b2.d.pidIngreso, b2.d.ep]));
+    eq('   …y el aviso de «borrador sin guardar» no lo cuenta para pQ, pero sí para una cama libre', hay, [false, true]);
+    await llenar(p);
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p); await p.clock.runFor(30);
+    const dq = ((await llamadasG(p)).slice(-1)[0] || { datos: {} }).datos;
+    eq('★ H4 · y el guardado de la evolución de pQ reclama a pQ y NO lleva PATIENT_ID (no se acuña sobre una cama ocupada)', [dq.EPISODIO_ABIERTO, 'PATIENT_ID' in dq], ['pQ', false]);
+    // control positivo: con la cama LIBRE otra vez, ese mismo borrador sí vuelve (con su identidad): no está roto ni vacío
+    await cerrarH(p);
+    await sondearH(p, { 5: { OCUPADA: false, PATIENT_ID: '', NOMBRE: '' } });
+    await abrirFormH(p, '5', true);
+    const e3 = await estadoH(p), t3 = await pantalla(p);
+    eq('   H4 · (control) con la cama libre otra vez, el mismo borrador SÍ se restaura, con su PATIENT_ID', [t3.planes, t3.estado, pidOk(pid) && e3.pid === pid], [FORM_TXT, 'borrador', true]);
+    await p.cerrar();
+  }
+
+  /* ── H5 · una cama OCUPADA no acuña nada: ni el episodio sin ingreso formal ni la que tiene paciente ── */
+  for (const caso of [
+    { n: 'cama OCUPADA sin PATIENT_ID (episodio sin ingreso formal), abierta como evolución', id: '7', esIng: false, ep: '' },
+    { n: 'esa misma cama con un botón «Ingresar» viejo (el formulario de ingreso abierto sobre una cama que ya está ocupada)', id: '7', esIng: true, ep: '' },
+    { n: 'cama ocupada con su paciente (evolución)', id: '2', esIng: false, ep: 'pP' },
+  ]) {
+    const p = await abrirH();
+    await abrirFormH(p, caso.id, caso.esIng); await llenar(p);
+    const e0 = await estadoH(p);
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p); await p.clock.runFor(30);
+    const d = await unaSalida(p, GUARDAR);
+    eq('★ H5 · ' + caso.n + ': no se acuña PATIENT_ID y el paquete no lo lleva (EPISODIO_ABIERTO viaja como siempre)',
+      [e0.pid, d && 'PATIENT_ID' in d, d && d.EPISODIO_ABIERTO], ['', false, caso.ep]);
+    await p.cerrar();
+  }
+
+  /* ── H6 · tras guardar bien, el formulario ya es de ese paciente: reclama su episodio y deja de llevar el PATIENT_ID ── */
+  {
+    const p = await abrirH();
+    await abrirFormH(p, '5', true); await llenarIngreso(p);
+    const pid = (await estadoH(p)).pid;
+    await regla(p, GUARDAR, { tipo: 'ok', data: { TEXTO_GENERADO: 'texto del servidor', patientId: pid } });
+    await apretar(p); await p.clock.runFor(50);
+    const e1 = await estadoH(p), t = await pantalla(p);
+    eq('H6 · (control) el ingreso se guardó y la franja dice «Guardado»', [t.estado, pidOk(pid) && e1.ep === pid], ['ok', true]);
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p); await p.clock.runFor(30);
+    const ll = await llamadasG(p);
+    eq('★ H6 · el guardado siguiente del MISMO formulario reclama el episodio recién creado y ya no lleva PATIENT_ID',
+      [ll.length, !!ll[1] && pidOk(pid) && ll[1].datos.EPISODIO_ABIERTO === pid, ll[1] && 'PATIENT_ID' in ll[1].datos], [2, true, false]);
+    await p.cerrar();
+  }
+
   eq('sin errores de JavaScript en ningún escenario', errores.filter(e => !/favicon/.test(e)), []);
   await navegador.close();
-  console.log(fails.length ? `\n❌ ${fails.length} FALLOS:\n  - ${fails.join('\n  - ')}` : '\n✅ guardado_seguro_no_confirmado_g17 (embudo, OP_ID y guardar()): la pantalla distingue lo que el servidor contestó de lo que no y no afirma lo que no sabe.');
+  console.log(fails.length ? `\n❌ ${fails.length} FALLOS:\n  - ${fails.join('\n  - ')}` : '\n✅ guardado_seguro_no_confirmado_g17 (embudo, OP_ID, guardar(), episodio e ingreso): la pantalla distingue lo que el servidor contestó de lo que no, no afirma lo que no sabe y el ingreso lleva su propia identidad.');
   process.exit(fails.length ? 1 : 0);
 })().catch(e => { console.error('❌ la guardia reventó: ' + (e && e.stack || e)); process.exit(1); });
