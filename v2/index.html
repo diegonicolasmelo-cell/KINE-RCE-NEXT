@@ -5845,22 +5845,114 @@ function _enAppsScript() {
   return typeof google !== 'undefined' && google.script && google.script.run;
 }
 
+/* ══ EL EMBUDO ÚNICO — api() es la ÚNICA puerta, y dice lo que sabe ══════════
+   (tanda 2 del guardado seguro, G16/G17, 5-oct-2026). TODA llamada al servidor
+   sale por acá, dentro del iframe o como app instalada. Y la pantalla, hasta
+   hoy, trataba igual dos cosas que NO son iguales:
+     · que el servidor CONTESTE «no» (la cama cambió de paciente, el dato no
+       valida): el servidor respondió y la operación NO se hizo;
+     · que NO CONTESTE (la red se cayó, el celular pasó por un túnel, Apps
+       Script tardó de más): no se sabe NADA. El primer intento pudo haber
+       aterrizado.
+   Las dos llegaban a quien llama como un `Error` con un texto, y la pantalla
+   decidía por el TEXTO («sin conexión», «NO se guardó»): afirmaba una certeza
+   que no tenía, y de ahí salen el guardado repetido y la evolución dada por
+   perdida cuando sí estaba.
+
+   🔴 EL CONTRATO, igual por los dos caminos (`_apiGas` y `_apiHttp`): la
+   promesa resuelve con los DATOS, o rechaza con un `Error` que lleva
+     · `e.codigo` (VALIDACION, CONFLICTO, LOCK_TIMEOUT, NO_AUTORIZADO…) si el
+       servidor RESPONDIÓ. Una respuesta `ok:false` es SIEMPRE un rechazo
+       definitivo;
+     · `e.sinRespuesta === true` si no. Es SIEMPRE ambiguo: timeout, red caída,
+       `withFailureHandler`, una página que no es JSON, una respuesta vacía.
+   El texto del mensaje no cambió (otros sitios de la pantalla lo reconocen:
+   «offline», «sin-direccion»): lo nuevo es lo que se decide SIN mirar el texto.
+   Guardia: guardado_seguro_no_confirmado_g17.js (sección A).
+
+   🔐 EL OP_ID. A cada ESCRITURA (la lista `_ACC_ESCRITURA`) el embudo le suma un
+   `datos.OP_ID` por INTENCIÓN —no por clic ni por intento—: es lo que le
+   permite al servidor (el sello de operación de infra_lock.gs) reconocer que
+   «esto ya lo hice» cuando el reintento llega después de un éxito cuya
+   respuesta se perdió.
+     · El mismo CONTENIDO sin respuesta reutiliza el mismo OP_ID: el doble clic,
+       el reintento automático, el manual y la recarga de la página son la misma
+       intención. Contenido distinto es una intención nueva.
+     · Se SUELTA solo cuando el servidor RESPONDE (ok o rechazo definitivo): lo
+       que se vuelva a mandar igual después es otra intención. Con LOCK_TIMEOUT
+       («no se ejecutó») o sin respuesta NO se suelta: el reintento va con el
+       mismo.
+     · Vive en memoria y en localStorage ('rce_ops', vence a las 6 h, lo que
+       dura el sello en el servidor), SIEMPRE en try/catch: sin almacenamiento
+       (ventana privada, cuota llena) la pantalla funciona igual con la memoria
+       de esa pestaña. 🔒 Ahí queda una HUELLA y un id, nunca el contenido: el
+       paquete lleva texto clínico y no tiene por qué quedar en el aparato.
+     · Es una ayuda y no una puerta (FAIL-OPEN): si algo falla al acuñarlo —el
+       hash, el almacenamiento, el azar— la llamada sale como salía, sin OP_ID.
+     · NO muta el paquete de quien llama: manda una copia con el OP_ID. Un
+       paquete que ya trae un OP_ID válido lo conserva.
+   Guardia: guardado_seguro_no_confirmado_g17.js (secciones B a E) y, para que
+   la lista no se separe de la tabla de puertas, guardado_seguro_cobertura.js. */
+
+/* Las escrituras a las que el embudo les pone OP_ID: TODA acción de la tabla de
+   build/checks/guardado_seguro_cobertura.js, salvo las que ahí dicen por qué NO
+   (`sinSello`): las que se repiten sin daño —asignan un valor— y las que leen de
+   la respuesta más que ids (una respuesta REPETIDA solo trae ids: el informe del
+   REM, la plantilla, los PDF importados no vendrían). Sellar cuesta un flush en
+   el servidor: no se sella lo que no gana nada. 🪤 Si se agrega una escritura
+   nueva al dispatcher, la guardia obliga a decidirlo: va acá o va a `sinSello`
+   con su razón. */
+const _ACC_ESCRITURA = [
+  // — actúan sobre «quien esté en la cama» (lo que más daña si se repite o cae en el paciente equivocado)
+  'GUARDAR_EVOLUCION', 'INGRESAR_PACIENTE', 'DAR_ALTA', 'LIMPIAR_CAMA', 'INTERCAMBIAR_CAMAS', 'MOVER_A_CAMA_VACIA',
+  'ANULAR_EVENTO', 'ANEXAR_EVENTO', 'ANULAR_ANEXO', 'CONFIRMAR_DISPOSITIVOS', 'AGREGAR_HITO',
+  'EVAL_REGISTRAR', 'EPISODIO_ESCALA', 'PEND_ABRIR', 'PEND_CERRAR', 'GSA_ASIGNAR',
+  // — no actúan sobre un paciente, pero repetirlas duplica un registro o suma dos veces
+  'GUARDAR_ENTREGA_TURNO', 'GUARDAR_SUGERENCIA',
+  'GUARDAR_VENTILADOR', 'MOVER_VENTILADOR', 'MOVER_VENTILADORES_LOTE', 'BAJA_VENTILADOR', 'REGISTRAR_FALLA_VM',
+  'GUARDAR_STOCK', 'AJUSTAR_STOCK', 'ASIGNAR_STOCK',
+];
+
 function api(accion, datos) {
-  return _enAppsScript() ? _apiGas(accion, datos) : _apiHttp(accion, datos);
+  const op = _opPreparar(accion, datos);
+  const vuelo = _enAppsScript() ? _apiGas(accion, op.paquete) : _apiHttp(accion, op.paquete);
+  return vuelo.then(
+    r => { _opSoltar(op); return r; },
+    e => { if (!(e && (e.sinRespuesta || e.codigo === 'LOCK_TIMEOUT'))) _opSoltar(op); throw e; }
+  );
+}
+
+/* Un `Error` que dice QUÉ respondió el servidor. Dos fábricas y nada más: así no
+   se arma a mano una mezcla de las dos formas. */
+function _errDelServidor(r) {
+  const e = new Error((r && r.error) || 'Error desconocido');
+  e.codigo = (r && r.codigo) || 'INTERNO';
+  return e;
+}
+function _errSinRespuesta(mensaje) {
+  const e = new Error(mensaje);
+  e.sinRespuesta = true;
+  return e;
+}
+/* Lo que el servidor contestó, igual por los dos caminos. Algo que no tiene la
+   forma {ok:boolean,…} no es una respuesta: no sabemos qué pasó. */
+function _resolverRespuesta(r, res, rej) {
+  if (r && typeof r === 'object' && typeof r.ok === 'boolean') { if (r.ok) res(r.data); else rej(_errDelServidor(r)); }
+  else rej(_errSinRespuesta('Error desconocido'));
 }
 
 function _apiGas(accion, datos) {
   return new Promise((res, rej) => {
     google.script.run
-      .withSuccessHandler(r => { if (r && r.ok) res(r.data); else rej(new Error((r && r.error) || 'Error desconocido')); })
-      .withFailureHandler(e => rej(new Error(e && e.message ? e.message : String(e))))
+      .withSuccessHandler(r => _resolverRespuesta(r, res, rej))
+      .withFailureHandler(e => rej(_errSinRespuesta(e && e.message ? e.message : String(e))))
       .api(accion, datos || {}, TOKEN);
   });
 }
 
 function _apiHttp(accion, datos) {
   return new Promise((res, rej) => {
-    if (!RCE_EXEC) { rej(new Error('sin-direccion')); return; }
+    if (!RCE_EXEC) { rej(_errSinRespuesta('sin-direccion')); return; }
     fetch(RCE_EXEC, {
       method: 'POST',
       /* 🪤 TEXTO PLANO A PROPÓSITO, y es lo más fácil de «arreglar» mal.
@@ -5880,13 +5972,115 @@ function _apiHttp(accion, datos) {
       try { j = JSON.parse(t); }
       catch (e) {
         // Pasa cuando /exec no está publicado, o pide iniciar sesión, o la
-        // dirección quedó mal: Google devuelve una página HTML, no JSON.
-        rej(new Error('El servidor respondió algo que no es JSON. Revisa que la dirección sea la del /exec y que esté publicada.'));
+        // dirección quedó mal: Google devuelve una página HTML, no JSON. No se
+        // sabe si la petición llegó a ejecutarse: es AMBIGUA, no un rechazo.
+        rej(_errSinRespuesta('El servidor respondió algo que no es JSON. Revisa que la dirección sea la del /exec y que esté publicada.'));
         return;
       }
-      if (j && j.ok) res(j.data); else rej(new Error((j && j.error) || 'Error desconocido'));
-    }).catch(() => rej(new Error('offline')));
+      _resolverRespuesta(j, res, rej);
+    }).catch(() => rej(_errSinRespuesta('offline')));
   });
+}
+
+/* ── El mapa de OP_ID: contenido → intención ────────────────────────────────
+   Clave = ACCION|huella del contenido (sin el OP_ID); valor = {id, t}. La acción
+   entra a la clave porque el sello del servidor también la lleva: el mismo
+   contenido en otra acción es otra operación. */
+const _OP_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+const _OPS_KEY = 'rce_ops';
+const _OPS_VIDA_MS = 6 * 60 * 60 * 1000;   // lo que dura el sello en el servidor (CacheService, 21600 s)
+const _OPS_MEM = {};
+
+/* JSON con las claves ordenadas, para que el mismo contenido dé la misma huella
+   llegue en el orden que llegue. Es la misma idea que `_canonico` del servidor
+   (infra_lock.gs), no su copia: acá no hace falta que den el mismo número. */
+function _opsCanonico(v) {
+  if (v === undefined || v === null || typeof v === 'function') return 'null';
+  if (Array.isArray(v)) return '[' + v.map(_opsCanonico).join(',') + ']';
+  if (typeof v === 'object') {
+    return '{' + Object.keys(v).sort()
+      .filter(k => v[k] !== undefined && typeof v[k] !== 'function')
+      .map(k => JSON.stringify(k) + ':' + _opsCanonico(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+/* Huella de 53 bits (cyrb53) + el largo. No es criptografía: solo tiene que
+   distinguir un contenido de otro. Nada del contenido sale de acá. */
+function _opsHuella(datos) {
+  const d = {};
+  Object.keys(datos || {}).forEach(k => { if (k !== 'OP_ID') d[k] = datos[k]; });
+  const t = _opsCanonico(d);
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36) + '.' + t.length.toString(36);
+}
+function _opIdNuevo() {
+  let u = '';
+  try { if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') u = crypto.randomUUID(); } catch (e) { u = ''; }
+  // Navegador sin randomUUID: reloj + azar. Basta con que no se repita entre intenciones del mismo aparato.
+  if (!u) u = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
+  return 'op_' + u;
+}
+const _opsVigente = (e, ahora) => !!e && typeof e.id === 'string' && _OP_ID_RE.test(e.id) && typeof e.t === 'number' && (ahora - e.t) < _OPS_VIDA_MS;
+
+/* localStorage: SIEMPRE en try/catch y SIEMPRE sin saltarse el resto. Que el
+   almacenamiento no esté (ventana privada, cuota llena, sitio bloqueado) no
+   puede tumbar una llamada: la memoria de la pestaña alcanza, y solo se pierde
+   el reconocimiento tras una recarga. */
+function _opsLeerAlmacen() {
+  try {
+    const j = JSON.parse(localStorage.getItem(_OPS_KEY) || '{}');
+    return (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
+  } catch (e) { return {}; }
+}
+function _opsEscribirAlmacen(mapa) {
+  try { localStorage.setItem(_OPS_KEY, JSON.stringify(mapa)); } catch (e) { /* sin almacenamiento: la memoria alcanza */ }
+}
+/* Anota una intención nueva y poda lo vencido, en la memoria y en el almacenamiento. Se relee el almacenamiento antes
+   de escribirlo: otra pestaña pudo anotar la suya, y pisarla le quitaría el reconocimiento. */
+function _opsAnotar(clave, e, ahora) {
+  Object.keys(_OPS_MEM).forEach(k => { if (!_opsVigente(_OPS_MEM[k], ahora)) delete _OPS_MEM[k]; });
+  _OPS_MEM[clave] = e;
+  const m = _opsLeerAlmacen();
+  Object.keys(m).forEach(k => { if (!_opsVigente(m[k], ahora)) delete m[k]; });
+  m[clave] = e;
+  _opsEscribirAlmacen(m);
+}
+
+/* Prepara el envío: {paquete, clave, id}. `clave` e `id` vacíos = esta llamada va sin OP_ID (una lectura, una escritura
+   que dice por qué no, o algo falló al acuñarlo: ver FAIL-OPEN arriba). */
+function _opPreparar(accion, datos) {
+  const sin = { paquete: datos, clave: '', id: '' };
+  try {
+    if (_ACC_ESCRITURA.indexOf(accion) === -1) return sin;
+    const d = datos || {};
+    if (typeof d.OP_ID === 'string' && _OP_ID_RE.test(d.OP_ID)) return sin;   // trae el suyo: se respeta y no es del mapa
+    const clave = accion + '|' + _opsHuella(d);
+    const ahora = Date.now();
+    let e = _OPS_MEM[clave];
+    if (!_opsVigente(e, ahora)) {
+      e = _opsLeerAlmacen()[clave];                  // la recarga de la página, o la otra pestaña
+      if (_opsVigente(e, ahora)) _OPS_MEM[clave] = e;
+      else { e = { id: _opIdNuevo(), t: ahora }; _opsAnotar(clave, e, ahora); }
+    }
+    return { paquete: Object.assign({}, d, { OP_ID: e.id }), clave: clave, id: e.id };
+  } catch (e) { return sin; }
+}
+/* El servidor RESPONDIÓ: la intención terminó. Solo se suelta la propia (mismo id): una respuesta tardía de un intento
+   viejo no puede llevarse la intención nueva que se acuñó para el mismo contenido. */
+function _opSoltar(op) {
+  if (!op || !op.clave) return;
+  try {
+    if (_OPS_MEM[op.clave] && _OPS_MEM[op.clave].id === op.id) delete _OPS_MEM[op.clave];
+    const m = _opsLeerAlmacen();
+    if (m[op.clave] && m[op.clave].id === op.id) { delete m[op.clave]; _opsEscribirAlmacen(m); }
+  } catch (e) { /* ver arriba */ }
 }
 
 /* ══ ¿ESTE ERROR DICE «TU SESIÓN ESTÁ CORTADA»? — UN solo lugar ═══════════════

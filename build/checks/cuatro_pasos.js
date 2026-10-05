@@ -186,9 +186,14 @@ const no = (l, g) => eq(l, !!g, 'false');
   await p.evaluate(() => document.querySelector('#pendEpi [data-pend]').click());
   await p.waitForTimeout(250);
   const cerrar = await p.evaluate(() => window.__llamadas.filter(x => x.a === 'PEND_CERRAR'));
+  // 🔐 Desde el paso 12 del guardado seguro (5-oct-2026) el embudo `api()` le suma a TODA escritura un `OP_ID` por intención
+  // (campo transitorio, no es columna). Lo que esta línea fija es QUÉ pendiente se cierra, y eso no cambió: se compara el resto
+  // del paquete exacto y el OP_ID se mide aparte, en vez de dejarla roja por un campo que la convención nueva agrega.
+  const dCerrar = Object.assign({}, (cerrar[0] || {}).d || {}); const opCerrar = dCerrar.OP_ID; delete dCerrar.OP_ID;
   eq('★ cerrarlo manda PEND_CERRAR con la cama y el id',
-     JSON.stringify((cerrar[0] || {}).d || {}).replace(/"firma":"[^"]*"/, '"firma":"?"'),
+     JSON.stringify(dCerrar).replace(/"firma":"[^"]*"/, '"firma":"?"'),
      JSON.stringify({ idCama: '3', id: 'aa1', firma: '?' }));
+  si('…con el OP_ID de la intención que le puso el embudo', /^op_[A-Za-z0-9_-]{5,61}$/.test(opCerrar || ''));
 
   console.log('\n5 · ★ El guardado ocurre al SALIR DE PLANES');
   const nGuardar = () => p.evaluate(() => window.__llamadas.filter(x => x.a === 'GUARDAR_EVOLUCION').length);

@@ -56,6 +56,15 @@ const S = require(path.join(__dirname, '..', 'sim', 'sim_srv.js'));
 const V2 = path.resolve(__dirname, '..', '..', 'v2');
 (0, eval)(['infra_respuesta.gs', 'infra_auth.gs', 'svc_acceso.gs']
   .map(f => fs.readFileSync(path.join(V2, f), 'utf8')).join('\n;\n'));
+// 🔐 Desde el paso 12 del guardado seguro (5-oct-2026) la pantalla manda un OP_ID con cada escritura y `api()` (api.gs) arma el
+// sello con `_huellaPayload`, que vive en infra_lock.gs. El simulador no carga ese archivo (su `conLock` es un juguete), y sin él
+// el guardado reventaba con «_huellaPayload is not defined» —el banco no tenía el módulo que la app real siempre tiene—. Se
+// completa acá, como los módulos de identidad de arriba y por la misma razón (la lista del simulador no se toca). 🪤 Evaluar
+// infra_lock.gs también define su `conLock` de verdad, que pide LockService: se devuelve el juguete, porque este banco prueba
+// la puerta del turno y no el sello (eso lo hace guardado_seguro_operacion_g16.js con el candado real).
+{ const conLockJuguete = global.conLock;
+  (0, eval)(fs.readFileSync(path.join(V2, 'infra_lock.gs'), 'utf8'));
+  global.conLock = conLockJuguete; }
 
 const pad = n => String(n).padStart(2, '0');
 // Reloj INVENTADO y congelado también en la pantalla (ver `addInitScript` más abajo).

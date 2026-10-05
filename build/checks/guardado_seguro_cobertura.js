@@ -35,8 +35,17 @@
 // puerta, voltear una fila sin implementarla, vaciar una razón, separar las dos listas) y se exige que cada uno la
 // ponga roja.
 //
-// Esta guardia NO exige todavía que index.html mande OP_ID ni EPISODIO_ABIERTO desde cada puerta: eso lo exigen las
-// guardias de la pantalla (pasos 12 y 14), cuando la pantalla lo hace.
+// 🔐 EL SELLO EN LA PANTALLA (paso 12). `index.html` tiene una lista, `_ACC_ESCRITURA`: las acciones a las que el embudo
+// `api()` le pone un OP_ID por intención, para que un reintento que ya aterrizó no se ejecute dos veces (infra_lock.gs).
+// Una escritura que no esté en esa lista se manda sin OP_ID y, si la respuesta se pierde, se puede repetir. Por eso la
+// tabla manda: CADA acción de la tabla está en la lista, salvo las marcadas `sinSello` con su razón por escrito. La razón
+// existe porque sellar no es gratis (cuesta un `flush` por llamada) ni inocuo (la respuesta repetida solo trae ids, no el
+// informe ni la plantilla que la pantalla lee de la respuesta): «no lo pensé» no es una razón. Y en el otro sentido: la
+// lista no puede traer nada que no sea una escritura de la tabla (una lectura con OP_ID llenaría el almacenamiento del
+// aparato sin ganar nada), ni una marcada `sinSello`.
+//
+// Esta guardia NO exige todavía que index.html mande EPISODIO_ABIERTO desde cada puerta: eso lo exige la guardia de la
+// pantalla (paso 14), cuando la pantalla lo hace.
 //
 // Uso: node build/checks/guardado_seguro_cobertura.js
 'use strict';
@@ -45,6 +54,7 @@ const path = require('path');
 
 const V2 = path.resolve(__dirname, '..', '..', 'v2');
 const API_SRC = fs.readFileSync(path.join(V2, 'api.gs'), 'utf8');
+const INDEX_SRC = fs.readFileSync(path.join(V2, 'index.html'), 'utf8');
 
 const fails = [];
 const eq = (l, g, w) => {
@@ -60,7 +70,9 @@ const info = t => console.log('ℹ️  ' + t);
 // lo toma la pantalla; para 'sinEpisodio', por qué no necesita candado. epImplementado: nace en false.
 // `hecho` voltea la fila a epImplementado:true: es lo que cierra un paso (el dispatcher le pasa el reclamo a su servicio).
 const E = (accion, razon, hecho) => ({ accion, clase: 'episodio', epImplementado: hecho === true, razon });
-const SIN = (accion, razon) => ({ accion, clase: 'sinEpisodio', razon });
+// `sinSello` (opcional, tercer argumento): la RAZÓN por la que la pantalla NO le pone OP_ID a esta escritura. Sin él, la
+// acción tiene que estar en `_ACC_ESCRITURA` de index.html.
+const SIN = (accion, razon, sinSello) => Object.assign({ accion, clase: 'sinEpisodio', razon }, sinSello ? { sinSello } : {});
 const TABLA = [
   // ── Actúan sobre «quien esté en la cama» ──
   E('GUARDAR_EVOLUCION',       'EPISODIO_ABIERTO del formulario, capturado al abrirlo; y en un ingreso, el PATIENT_ID acuñado por la pantalla (G15).', true),   // paso 8
@@ -83,18 +95,28 @@ const TABLA = [
     razon: 'Crea el episodio: no puede reclamar uno que no existe. Lleva datos.PATIENT_ID acuñado por quien llama (la pantalla actual ingresa por GUARDAR_EVOLUCION y no usa esta acción).' },
   // ── Fuera de _auditar: se audita sola, con la firma del modo coordinación ──
   { accion: 'COORD_CORREGIR', clase: 'episodio', viaAuditar: false, epImplementado: true,   // paso 7
-    razon: 'Reclamo = datos.patientId (el episodio que la ficha mostró) más idCama, resueltos por _coordUbicar; exige además la sesión de coordinación.' },
+    razon: 'Reclamo = datos.patientId (el episodio que la ficha mostró) más idCama, resueltos por _coordUbicar; exige además la sesión de coordinación.',
+    sinSello: 'No pasa por _auditar: el servidor no arma OP_ACTUAL para ella, así que un OP_ID no tendría ningún efecto. Su candado es patientId más la sesión de coordinación.' },
   // ── No actúan sobre ningún paciente ──
-  SIN('PLANTILLA_GUARDAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.'),
-  SIN('PLANTILLA_RETIRAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.'),
-  SIN('GSA_IMPORTAR',               'Lee el archivo de gases y deja filas PENDIENTES en la bandeja: todavía no se asignan a ningún paciente (eso es GSA_ASIGNAR).'),
-  SIN('GSA_DESCARTAR',              'Descarta una fila de la bandeja de gases: no toca ningún paciente ni ninguna cama.'),
+  SIN('PLANTILLA_GUARDAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.',
+    'La pantalla lee la plantilla completa de la respuesta y una respuesta repetida solo trae ids (saldría un falso «el servidor no devolvió la plantilla»); un duplicado de plantilla es visible y se retira con PLANTILLA_RETIRAR.'),
+  SIN('PLANTILLA_RETIRAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.',
+    'Fija ACTIVO=false: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
+  SIN('GSA_IMPORTAR',               'Lee el archivo de gases y deja filas PENDIENTES en la bandeja: todavía no se asignan a ningún paciente (eso es GSA_ASIGNAR).',
+    'La pantalla lee de la respuesta los importados y los sin emparejar (una repetida solo trae ids), y importar ya es idempotente: los PDF ya leídos se cuentan como repetidos.'),
+  SIN('GSA_DESCARTAR',              'Descarta una fila de la bandeja de gases: no toca ningún paciente ni ninguna cama.',
+    'Marca una fila de la bandeja como descartada: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
   SIN('GUARDAR_SUGERENCIA',         'Buzón de sugerencias del equipo: no tiene paciente ni cama.'),
-  SIN('SET_SUGERENCIA_ESTADO',      'Cambia el estado de una sugerencia del buzón: no tiene paciente ni cama.'),
-  SIN('SET_ASIGNACION_TURNO',       'Reparte kinesiólogos por turno: la cama es un número de la asignación (quién cubre la cama N), no quién la ocupa.'),
-  SIN('AGREGAR_FASE',               'Catálogo de fases clínicas de la unidad: no tiene paciente ni cama.'),
-  SIN('SET_BANNER',                 'Texto de portada de cada pestaña, en la hoja CONFIG: no tiene paciente ni cama.'),
-  SIN('GENERAR_REM',                'Informe mensual agregado, sin RUT y sin episodio: se calcula del archivo, no de la cama.'),
+  SIN('SET_SUGERENCIA_ESTADO',      'Cambia el estado de una sugerencia del buzón: no tiene paciente ni cama.',
+    'Asigna un estado a una sugerencia: repetirla deja lo mismo, y su servicio ni siquiera toma el candado, así que el sello no entraría.'),
+  SIN('SET_ASIGNACION_TURNO',       'Reparte kinesiólogos por turno: la cama es un número de la asignación (quién cubre la cama N), no quién la ocupa.',
+    'Reemplaza la asignación entera del turno: repetirla deja lo mismo. La pantalla la manda en cada edición, y sellar costaría un flush cada vez.'),
+  SIN('AGREGAR_FASE',               'Catálogo de fases clínicas de la unidad: no tiene paciente ni cama.',
+    'El servicio ya rechaza solo la fase repetida («ya existe»), la pantalla lee la lista de fases de la respuesta y no toma el candado, así que el sello no entraría.'),
+  SIN('SET_BANNER',                 'Texto de portada de cada pestaña, en la hoja CONFIG: no tiene paciente ni cama.',
+    'Asigna un texto a la portada de una pestaña: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
+  SIN('GENERAR_REM',                'Informe mensual agregado, sin RUT y sin episodio: se calcula del archivo, no de la cama.',
+    'Calcula el informe del mes: repetirlo da lo mismo, y la pantalla lee el informe entero de la respuesta (una repetida solo trae ids).'),
   SIN('GUARDAR_ENTREGA_TURNO',      'Texto de la entrega de turno con las camas como números: no escribe sobre ningún paciente. Va con sello de operación (su id nace del reloj).'),
   SIN('GUARDAR_VENTILADOR',         'Inventario de ventiladores: la cama aparece como número de ubicación del equipo, no como quien la ocupa.'),
   SIN('MOVER_VENTILADOR',           'Ubicación de un ventilador: la cama es un número de destino. Va con sello de operación (inserta un movimiento).'),
@@ -203,6 +225,40 @@ function censar(src, tabla) {
   return P;
 }
 
+// La lista _ACC_ESCRITURA tal como la declara index.html (null si todavía no existe). Se lee el literal del arreglo sin sus
+// comentarios (un comentario puede nombrar acciones) y se sacan las cadenas: index.html es una página entera, no se evalúa.
+function listaAccEscritura(html) {
+  const m = /(?:const|let|var)\s+_ACC_ESCRITURA\s*=\s*\[([\s\S]*?)\]\s*;/.exec(html || '');
+  if (!m) return null;
+  const cuerpo = m[1].replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const out = []; const re = /'([^']*)'|"([^"]*)"/g; let x;
+  while ((x = re.exec(cuerpo))) out.push(x[1] !== undefined ? x[1] : x[2]);
+  return out;
+}
+
+// Los problemas del sello en la pantalla (vacío = cuadra). Aparte de `censar` porque mira OTRO archivo; PURA igual.
+function censarSello(html, tabla) {
+  const P = [];
+  const lista = listaAccEscritura(html);
+  if (!Array.isArray(lista)) return ['index.html: falta la lista _ACC_ESCRITURA (las acciones a las que el embudo api() le pone OP_ID)'];
+  const filas = {}; tabla.forEach(f => { filas[f.accion] = f; });
+  const vistas = {};
+  lista.forEach(a => {
+    if (vistas[a]) P.push('index.html: _ACC_ESCRITURA repite ' + a);
+    vistas[a] = true;
+    if (!filas[a]) P.push('index.html: _ACC_ESCRITURA trae ' + a + ', que no es una escritura de la tabla (¿una lectura? un OP_ID ahí no gana nada)');
+    else if (filas[a].sinSello) P.push('index.html: _ACC_ESCRITURA trae ' + a + ' pero la tabla la marca sinSello (' + filas[a].sinSello.slice(0, 40) + '…)');
+  });
+  tabla.forEach(f => {
+    if (f.sinSello !== undefined) {
+      if (String(f.sinSello).trim().length < 25) P.push('tabla: ' + f.accion + ' es sinSello y no dice su razón por escrito');
+    } else if (!vistas[f.accion]) {
+      P.push('index.html: _ACC_ESCRITURA no trae ' + f.accion + ' (la pantalla la mandaría sin OP_ID: una respuesta perdida la repetiría) y la tabla no la marca sinSello');
+    }
+  });
+  return P;
+}
+
 const CIERRE = (tabla) => tabla.filter(f => f.clase !== 'sinEpisodio' && !f.epImplementado).map(f => f.accion);
 
 /* ══ 1 · EL CENSO REAL ════════════════════════════════════════════════════ */
@@ -214,7 +270,11 @@ si('   …y varias pasan por _auditar (si el lector no ve ninguna, el censo no m
 const problemas = censar(API_SRC, TABLA);
 problemas.forEach(p => console.log('   · ' + p));
 eq('★★ el censo cuadra: ninguna puerta sin clasificar, ninguna fila huérfana, ninguna razón vacía', problemas.length, 0);
+const problemasSello = censarSello(INDEX_SRC, TABLA);
+problemasSello.forEach(p => console.log('   · ' + p));
+eq('★★ el sello en la pantalla cuadra: cada escritura de la tabla está en _ACC_ESCRITURA o dice por qué no', problemasSello.length, 0);
 const clases = c => TABLA.filter(f => f.clase === c).length;
+info('con sello de operación en la pantalla (_ACC_ESCRITURA): ' + TABLA.filter(f => f.sinSello === undefined).length + '; sin sello, con su razón: ' + TABLA.filter(f => f.sinSello !== undefined).length);
 info('puertas: ' + TABLA.length + ' (' + clases('episodio') + ' de episodio, ' + clases('ingreso') + ' de ingreso, ' + clases('sinEpisodio') + ' sin episodio); '
   + 'auditadas por _auditar en api.gs: ' + auditadosReales.length);
 const pend = CIERRE(TABLA);
@@ -288,6 +348,41 @@ rojo('una clase que no existe', API_SRC, TABLA.map(f => f.accion === 'SET_BANNER
 {
   const t = TABLA.map(f => f.accion === 'COORD_CORREGIR' ? Object.assign({}, f, { viaAuditar: undefined }) : f);
   rojo('COORD_CORREGIR sin viaAuditar:false mientras api.gs no la pasa por _auditar', API_SRC, t, 'COORD_CORREGIR');
+}
+
+// k) el sello en la pantalla: cada defecto se introduce a propósito en index.html o en la tabla
+{
+  const lista = listaAccEscritura(INDEX_SRC) || [];
+  const redefinir = nueva => INDEX_SRC.replace(/(const|let|var)(\s+_ACC_ESCRITURA\s*=\s*)\[[\s\S]*?\]\s*;/,
+    (_, k, r) => k + r + '[' + nueva.map(x => "'" + x + "'").join(', ') + '];');
+  // 🪤 La reescritura conserva las comillas simples del original: con JSON.stringify (comillas dobles) la lista quedaba
+  // ilegible y TODAS las mutaciones de abajo se ponían rojas por esa razón, no por la que decían (una guardia que da rojo
+  // por el motivo equivocado se ve igual que una que funciona).
+  si('(la lista reescrita se lee igual que la original: la mutación no la rompe por la forma)',
+    JSON.stringify(listaAccEscritura(redefinir(lista))) === JSON.stringify(lista));
+  si('(la lista de la pantalla se pudo leer y reescribir para las pruebas)', lista.length > 15 && redefinir(lista) !== undefined);
+  const casiTodas = a => redefinir(lista.filter(x => x !== a));
+  // una acción sellada que se cae de la lista: cualquiera, una a una
+  const sinCazarSello = [];
+  lista.forEach(a => { if (!censarSello(casiTodas(a), TABLA).some(x => x.indexOf(a) > -1)) sinCazarSello.push(a); });
+  eq('★★ quitar CUALQUIER acción de _ACC_ESCRITURA la pone roja (' + lista.length + ' acciones probadas, una a una)', sinCazarSello.join(',') || '(todas cazadas)', '(todas cazadas)');
+  const rojoSello = (l, html, tabla, pista) => {
+    const p = censarSello(html, tabla);
+    si('★ ' + l + ' → ROJO', p.length > 0 && p.some(x => x.indexOf(pista) > -1));
+  };
+  rojoSello('una acción que NO es escritura (una lectura) metida en _ACC_ESCRITURA', redefinir(lista.concat(['GET_BOOT'])), TABLA, 'GET_BOOT');
+  rojoSello('una acción repetida en _ACC_ESCRITURA', redefinir(lista.concat([lista[0]])), TABLA, lista[0]);
+  rojoSello('una acción marcada sinSello que aun así está en _ACC_ESCRITURA', redefinir(lista.concat(['GENERAR_REM'])), TABLA, 'GENERAR_REM');
+  rojoSello('una acción sinSello SIN su razón por escrito', INDEX_SRC, TABLA.map(f => f.accion === 'SET_BANNER' ? Object.assign({}, f, { sinSello: 'no' }) : f), 'SET_BANNER');
+  rojoSello('una acción de la tabla que pasa a sinSello y se nombra aun así (la tabla y la lista se separaron)',
+    INDEX_SRC, TABLA.map(f => f.accion === 'DAR_ALTA' ? Object.assign({}, f, { sinSello: 'Una razón escrita cualquiera que no cambia nada.' }) : f), 'DAR_ALTA');
+  rojoSello('index.html sin la lista _ACC_ESCRITURA', INDEX_SRC.replace(/_ACC_ESCRITURA/g, '_OTRA_LISTA'), TABLA, '_ACC_ESCRITURA');
+  // un comentario dentro de la lista que nombra una acción no la cuenta
+  {
+    const conComentario = INDEX_SRC.replace(/(const|let|var)(\s+_ACC_ESCRITURA\s*=\s*\[)/, (_, k, r) => k + r + "\n  // 'GET_BOOT' no va\n  /* 'GET_CAMAS' tampoco */");
+    const p = censarSello(conComentario, TABLA);
+    eq('un comentario dentro de la lista que nombra una lectura NO cuenta como un miembro de la lista', p.filter(x => /GET_BOOT|GET_CAMAS/.test(x)).length, 0);
+  }
 }
 
 /* ══ 3 · LA TABLA TAL COMO LA PIDE EL DISEÑO ══════════════════════════════ */
