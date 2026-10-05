@@ -118,16 +118,44 @@ function sinVolatiles(fila) {
 /**
  * Una línea por fila (HOJA {json}) y una por clave de CONFIG, en un orden estable, sin TIMESTAMP ni TS y con los ids
  * generados renombrados. Dos corridas iguales dan el MISMO texto, así que se compara con ===.
- * El orden físico de las filas CUENTA. @param {{sinHojas?: string[]}} [opts] sinHojas: hojas que no entran
- * (típicamente AUDIT_LOG, que en una matriz de muerte tiene filas de más por construcción; '__CONFIG' deja fuera
- * la configuración).
+ * El orden físico de las filas CUENTA, salvo en las hojas que se declaren en `sinOrden`.
+ * @param {{sinHojas?: string[], sinOrden?: string[]}} [opts]
+ *   sinHojas: hojas que no entran (típicamente AUDIT_LOG, que en una matriz de muerte tiene filas de más por
+ *     construcción; '__CONFIG' deja fuera la configuración).
+ *   sinOrden: hojas cuyas filas se comparan como CONJUNTO (se ordenan por su contenido). Es para las hojas donde el
+ *     orden físico no significa nada porque quien las lee las ordena por su cuenta (TIMELINE por fecha, EVALUACIONES
+ *     por fecha y momento): un reintento que borra y vuelve a insertar sus filas las deja en OTRO lugar físico y
+ *     eso, solo, no es una diferencia de estado. NO es para hojas donde la posición es la identidad (CAMAS_ESTADO).
+ *     Por omisión ninguna: el orden cuenta, como hasta ahora.
+ *   jsonComoConjunto: columnas (de cualquier hoja) cuyo valor es una LISTA en JSON que se compara como conjunto, con sus
+ *     elementos ordenados por contenido. Es para las cachés que son una vista ordenada por un TIMESTAMP (TIMELINE_JSON de
+ *     la cama: los 30 hitos más recientes): los hitos de un mismo guardado comparten el segundo, así que su orden entre sí es
+ *     el de la hoja, y un reintento que borró y reinsertó filas los deja en otro orden sin que el estado haya cambiado.
+ *     Por omisión ninguna.
  */
 function instantanea(opts) {
   const sin = new Set((opts && opts.sinHojas) || []);
+  const sinOrden = new Set((opts && opts.sinOrden) || []);
+  const comoConjunto = new Set((opts && opts.jsonComoConjunto) || []);
+  const normal = fila => {
+    const f = sinVolatiles(fila);
+    comoConjunto.forEach(k => {
+      if (typeof f[k] !== 'string' || f[k][0] !== '[') return;
+      let lista; try { lista = JSON.parse(f[k]); } catch (e) { return; }
+      if (!Array.isArray(lista)) return;
+      const clave = x => JSON.stringify(ordenado(x)).replace(RE_ID_GENERADO, '<id>');
+      f[k] = JSON.stringify(lista.slice().sort((a, b) => { const x = clave(a), y = clave(b); return x < y ? -1 : (x > y ? 1 : 0); }));
+    });
+    return f;
+  };
   const lineas = [];
   Object.keys(DB).sort().forEach(h => {
     if (sin.has(h)) return;
-    (DB[h] || []).forEach(fila => lineas.push(h + ' ' + JSON.stringify(ordenado(sinVolatiles(fila)))));
+    const ls = (DB[h] || []).map(fila => h + ' ' + JSON.stringify(ordenado(normal(fila))));
+    // El orden se decide con los ids generados YA enmascarados: dos corridas iguales los traen distintos (reloj, azar,
+    // contador) y ordenar por el id crudo las desordenaría entre sí.
+    if (sinOrden.has(h)) ls.sort((a, b) => { const x = a.replace(RE_ID_GENERADO, '<id>'), y = b.replace(RE_ID_GENERADO, '<id>'); return x < y ? -1 : (x > y ? 1 : 0); });
+    ls.forEach(l => lineas.push(l));
   });
   if (!sin.has('__CONFIG')) Object.keys(CONFIG).sort().forEach(k => lineas.push('__CONFIG ' + k + ' = ' + JSON.stringify(CONFIG[k])));
   const mapa = new Map();

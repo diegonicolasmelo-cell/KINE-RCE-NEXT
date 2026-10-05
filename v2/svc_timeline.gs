@@ -50,6 +50,10 @@ function _agregarHitoInterno(hito) {
  * Si la cama no tiene paciente (censo sin ingreso formal, fila legacy) se cae al
  * comportamiento de siempre: filtrar por cama. Esconder los hitos de una cama
  * así sería el error simétrico.
+ *
+ * 🔐 G16 (paso 10): devuelve `true` si el caché quedó al día y `false` si no pudo escribirlo (sigue sin lanzar: un caché
+ * viejo no tumba un guardado). Quien lo llama desde una COLA del guardado lo convierte en un aviso en vez de tragárselo;
+ * los demás callers lo ignoran, como siempre.
  */
 function _sincronizarTimelineCama(idCama) {
   try {
@@ -64,10 +68,11 @@ function _sincronizarTimelineCama(idCama) {
         return !hp || hp === pid;
       });
     }
-    if (!hitos.length) return;
+    if (!hitos.length) return true;
     hitos.sort((a, b) => String(b.TIMESTAMP).localeCompare(String(a.TIMESTAMP)));
     repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, { TIMELINE_JSON: JSON.stringify(hitos.slice(0, 30)) });
-  } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); }
+    return true;
+  } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); return false; }
 }
 
 // ── Público con lock ───────────────────────────────────────
@@ -166,6 +171,19 @@ const PROC_TO_HITO = {
 const _TIPOS_HITO_AUTO = ['via_aerea', 'procedimiento', 'kine', 'general', 'nota'];
 
 /**
+ * El hito de la vía aérea que cambió SIN un evento declarado y con su razón escrita (`TRANS_MOTIVO`). Un solo lugar para su
+ * texto y su detalle: lo arma `guardarEvolucion` la primera vez y lo rehace `_timelineDelGuardado` cuando el colega corrige la
+ * razón (con el «venía con» que el hito ya guardó: la cama a esas alturas dice la vía NUEVA).
+ */
+function _hitoTransicionSinEvento(de, a, motivo, firma, autor, autorEmail) {
+  const m = String(motivo || '').trim();
+  return { tipo: 'via_aerea',
+    texto: '⚠️ Vía aérea ' + de + ' → ' + a + ' sin evento declarado: «' + (m.length > 160 ? m.slice(0, 159) + '…' : m) + '»',
+    autor: autor, autorEmail: autorEmail,
+    datos: { evento: 'transicion_sin_evento', de: String(de), a: String(a), motivo: m, firma: String(firma || '') } };
+}
+
+/**
  * Prefijo del texto con que se escribe el hito de un procedimiento ANEXADO
  * por el botón ➕ (`anexarEventoRapido`).
  *
@@ -235,7 +253,12 @@ function _procLabelGenerico(proc) {
 // `datosPorProc` (rama episodio/turno): detalle estructurado por procedimiento
 // de vía aérea —hora, tipo, «queda con»— que viaja a DATOS_JSON del hito que
 // ese procedimiento genera. Opcional: sin él, los hitos nacen como siempre.
-function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, patientId, hitosExtra, datosPorProc) {
+// `conservar` (G16, paso 10): { a: la vía aérea con que QUEDA el turno, motivo: la razón que trae el payload, o '' si no trae }.
+// Es el hito «vía aérea cambió sin evento» (`transicion_sin_evento`) que el turno YA dejó: el barrido de abajo lo borraba porque
+// es de tipo `via_aerea` (automático) y `guardarEvolucion` no puede regenerarlo —se calcula contra la vía de la CAMA, que tras el
+// primer guardado ya dice la nueva—, así que un reintento o cualquier re-guardado del turno le quitaba al colega la razón que
+// había escrito. Sale de la MISMA lectura de arriba, sin un viaje más. Opcional: sin él, todo corre como siempre.
+function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, patientId, hitosExtra, datosPorProc, conservar) {
   const id = String(idCama);
   // UNA lectura: sirve para decidir qué borrar Y para armar el cache después.
   const todos = repoLeerTodosConFila('TIMELINE');
@@ -246,12 +269,34 @@ function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, pa
   // hito sin paciente se sigue tratando como propio, para no dejar basura
   // inmortal de las camas reparadas a mano.
   const _pidEp = String(patientId || '');
-  const esDelTurnoAuto = function (h) {
+  const _esAutoDelTurno = function (h) {
     if (!(String(h.ID_CAMA) === id && String(h.FECHA) === String(fecha) &&
           h.TURNO === turno && _TIPOS_HITO_AUTO.indexOf(h.TIPO) !== -1)) return false;
     const hp = String(h.PATIENT_ID || '');
     return !_pidEp || !hp || hp === _pidEp;
   };
+  // El hito de transición que el turno ya dejó, si sigue siendo el de la vía con que queda (misma `a`). Con la misma razón (o
+  // sin razón en el payload: la pantalla no la trae al reabrir un turno) se QUEDA tal cual; con una razón corregida se rehace
+  // con el «venía con» que ya tenía. Si la vía final cambió, es otra transición: se barre y se calcula como siempre.
+  let _transConservada = null, _transRehacer = null;
+  if (conservar && conservar.a) {
+    for (let i = 0; i < todos.length && !_transConservada && !_transRehacer; i++) {
+      const h = todos[i].obj;
+      if (h.TIPO !== 'via_aerea' || !_esAutoDelTurno(h) || String(h.DATOS_JSON || '').indexOf('transicion_sin_evento') === -1) continue;
+      let d = null; try { d = JSON.parse(String(h.DATOS_JSON)); } catch (e) { d = null; }
+      if (!d || d.evento !== 'transicion_sin_evento' || String(d.a) !== String(conservar.a)) continue;
+      const m = String(conservar.motivo || '').trim();
+      if (!m || m === String(d.motivo || '')) _transConservada = h; else _transRehacer = d;
+    }
+  }
+  const esDelTurnoAuto = function (h) { return h !== _transConservada && _esAutoDelTurno(h); };
+  if (_transConservada || _transRehacer) {
+    // El hito del turno ya existe (y manda): el que `guardarEvolucion` recalculó contra la cama no se escribe una segunda vez.
+    hitosExtra = (hitosExtra || []).filter(function (x) { return !(x && x.datos && x.datos.evento === 'transicion_sin_evento'); });
+    if (_transRehacer) {
+      hitosExtra.push(_hitoTransicionSinEvento(_transRehacer.de, _transRehacer.a, conservar.motivo, _transRehacer.firma, autor, autorEmail));
+    }
+  }
   repoEliminarFilas('TIMELINE', todos.filter(function (t) { return esDelTurnoAuto(t.obj); })
     .map(function (t) { return t.fila; }));
 

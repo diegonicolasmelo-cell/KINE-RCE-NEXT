@@ -44,6 +44,19 @@
 //       episodio del mismo día en la misma cama.
 //  18 · LA LISTA DE ARCHIVADOS conserva su orden (el más reciente primero) aunque el id del egreso ya no lleve el reloj.
 //
+// LO QUE SE SUMA EN EL PASO 10 (4-oct-2026) — LA RECUPERACIÓN EN guardarEvolucion, secciones 19 a 23:
+//  19 · LA MATRIZ DE MUERTE de GUARDAR_EVOLUCION (N = 0..total+1, mismo OP_ID): un INGRESO sobre cama libre con el PATIENT_ID
+//       acuñado, un turno nuevo, el re-guardado de un turno y una TRANSICIÓN de soporte y vía aérea; el estado final tras la
+//       muerte y el reintento es el de una corrida limpia y en ningún corte queda un turno, una medición, un procedimiento o un
+//       ingreso duplicado. SIN reordenar el flujo: el compromiso sigue siendo la escritura de la cama al final del guardado.
+//  20 · LA PRIMERA DIVERGENCIA: DIAS_VM, DIAS_VNI y DIAS_VA se calculan leyendo la CAMA, y tras el compromiso la cama ya absorbió
+//       el turno; el reintento daba OTRO número. Con muerte justo tras el compromiso y sin ella (re-guardar el mismo turno).
+//  21 · LA SEGUNDA: el hito «vía aérea cambió sin evento» (transicion_sin_evento) se calcula contra la vía aérea de la cama; en el
+//       reintento o en cualquier re-guardado la cama ya cambió, no se regenera y el barrido de los hitos del turno lo borraba.
+//  22 · LAS COLAS QUE TRAGABAN EL ERROR (mediciones a la serie, cultivo, hito de la medición, reintubación): ahora la respuesta es
+//       ok con data.advertencias[], NO se sella y el reintento con el mismo OP_ID las completa sin duplicar.
+//  23 · LA FORMA: el flujo no se reordena, la regla vive donde dice el diseño y ninguna cola vuelve a tragarse el error.
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -705,9 +718,13 @@ const hitosDe = (pid, tipo) => DB.TIMELINE.filter(h => h.PATIENT_ID === pid && h
  * contesta «la cama ya está libre», con el estado ya correcto.
  */
 function matriz(etq, accion, mk, viola, opts) {
+  // `opts.foto`: otras opciones de M.instantanea (por omisión SIN: la bitácora fuera). `opts.queSeVe`: qué dice el rojo cuando
+  // en un corte queda a la vista algo que la puerta prometía no dejar (el de las puertas de cama habla de pacientes borrados).
+  const foto_ = (opts && opts.foto) || SIN;
+  const queSeVe = (opts && opts.queSeVe) || 'un paciente borrado, duplicado o un egreso doble';
   volverAlMundo();
   const r0 = llama(accion, mk());
-  const total = M.total(), reg = M.registro(), limpio = M.instantanea(SIN);
+  const total = M.total(), reg = M.registro(), limpio = M.instantanea(foto_);
   si('★ ' + etq + ' · la corrida limpia sale ok', r0.ok);
   si('   …con varias escrituras (si no, no habría corte que probar): ' + total, total >= 2);
   eq('   …y cumple lo que la puerta promete', viola('final') || '(todo)', '(todo)');
@@ -720,14 +737,14 @@ function matriz(etq, accion, mk, viola, opts) {
     M.reiniciar();
     const r = llama(accion, mk());               // el reintento: el MISMO paquete (mismo OP_ID, mismos reclamos)
     if (!r.ok) noOk.push('N=' + n + ' (' + (r.codigo || '?') + ': ' + String(r.error || '').slice(0, 70) + ')');
-    const fin = M.instantanea(SIN);
+    const fin = M.instantanea(foto_);
     const fallaFinal = viola('final');
     const igual = fin === limpio;
     if (!igual) desiguales.push(n);
     eq('   N=' + n + ' · muerta y reintentada: el estado final es el de la corrida limpia' + (fallaFinal ? ' [' + fallaFinal + ']' : ''), igual && !fallaFinal, true);
     if (!igual) M.diferencias(limpio, fin).slice(0, 4).forEach(l => console.log('        ' + l.slice(0, 170)));
   }
-  eq('★★ ' + etq + ' · en NINGÚN corte queda a la vista un paciente borrado, duplicado o un egreso doble', cortes.join('; ') || '(ninguno)', '(ninguno)');
+  eq('★★ ' + etq + ' · en NINGÚN corte queda a la vista ' + queSeVe, cortes.join('; ') || '(ninguno)', '(ninguno)');
   if (opts && opts.sinExigirOk) info('   ' + etq + ' · cortes cuyo reintento NO contesta ok (el estado final es el correcto igual): ' + (noOk.join('; ') || '(ninguno)'));
   else eq('★★ ' + etq + ' · el reintento contesta ok en todos los cortes', noOk.join('; ') || '(todos)', '(todos)');
   eq('   ' + etq + ' · cortes tras cuyo reintento el estado difiere de la limpia', desiguales.join(',') || '(ninguno)', '(ninguno)');
@@ -904,5 +921,336 @@ tramo('orden de archivados', () => {
   eq('★ el alta de la cama 4 (después) sale ANTES que la de la 3, con el mismo día de egreso', (lista.data || []).map(x => x.cama).join(','), '4,3');
   si('   …y la lista no filtra campos internos de orden', (lista.data || []).every(x => Object.keys(x).every(k => k[0] !== '_')));
 });
+
+/* ══ 19 · LA MATRIZ DE MUERTE DE guardarEvolucion (paso 10) ═══════════════ */
+console.log('\n19 · GUARDAR_EVOLUCION: muerte tras la escritura N y reintento con el MISMO paquete → el estado final es el de una corrida limpia');
+// El guardado de la evolución NO se reordena (reordenar perdía los hitos de la caché del timeline): sigue siendo evolución →
+// procedimientos → hitos → la cama (el compromiso, UNA escritura) → las colas (mediciones, reintubación). Lo que se mide es que
+// cada paso previo es repetible y cada paso posterior lo repite el reintento sin daño.
+const PID_NUEVO = '44444444-dddd-4ddd-8ddd-000000000004';
+const OPG = 'op_evolucion_g10_01';
+// El reloj de la prueba: 10-ago a las 12:00. Los turnos de P: '2026-08-09-Dia' y '2026-08-10-Dia' (ya guardados en el mundo).
+const TKN = '2026-08-10-Noche';
+// Lo que el turno midió y un cultivo: lo que la cola de evaluaciones copia a la serie del episodio. Van como TEXTO (lo que escribe
+// un campo del formulario) porque el espejo de la serie escribe el total como texto en la cama; en la planilla real Sheets lee
+// los dos como número, pero el simulador guarda lo que se le da y compararía «48» con 48 como dos estados distintos.
+const MEDIDAS = { EVAL_T_MRC: '48', EVAL_T_FSS: '20' };
+const CULTIVO = { MUE_REALIZADAS: true, MUE_TIPOS_JSON: '["Traqueal"]', MUE_HORA_TOMA: '10:30', MUE_CON_ATB: false, RESP_CULT_OBJ: 'Dirigido' };
+// Un INGRESO como lo manda la pantalla de ahora: cama libre, EPISODIO_ABIERTO vacío y el PATIENT_ID que acuñó al abrir el formulario.
+const ingresoG10 = extra => evo('9', Object.assign({
+  ES_INGRESO: true, EPISODIO_ABIERTO: '', PATIENT_ID: PID_NUEVO, OP_ID: OPG,
+  PAC_NOMBRE: 'Paciente Charly', PAC_EDAD: 55, PAC_SEXO: 'F', PAC_TALLA: 160, PAC_DIAGNOSTICO: 'Dx de prueba',
+  PAC_FECHA_INGRESO: '2026-08-09', PAC_HORA_INGRESO: '09:30',
+  PROC_JSON: JSON.stringify(['INGRESO', 'IMAGENOLOGÍA']), PLAN_NOTA_TURNO: 'Nota de prueba del turno',
+}, MEDIDAS, extra || {}));
+// Un turno NUEVO de P (cama 3), con procedimientos, una nota, dos mediciones y un cultivo.
+const turnoG10 = extra => evo('3', Object.assign({
+  TURNO_KEY: TKN, EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPG, RESP_KTR_CANT: 2,
+  PROC_JSON: JSON.stringify(['IMAGENOLOGÍA', 'CULTIVO DE SECRECIONES']), PLAN_NOTA_TURNO: 'Nota de prueba del turno',
+}, MEDIDAS, CULTIVO, extra || {}));
+// Una TRANSICIÓN: de VM a VNI y de TOT a Natural, sin evento declarado y con su razón escrita (lo que produce el hito
+// transicion_sin_evento y mueve los tres contadores de días).
+const transicionG10 = extra => turnoG10(Object.assign({
+  VENT_VIA_AEREA: 'TOT', VENT_VIA_AEREA_FINAL: 'Natural', VENT_SOPORTE: 'VM', VENT_SOPORTE_FINAL: 'VNI',
+  TRANS_MOTIVO: 'Se retiró el tubo durante el traslado a pabellón',
+}, extra || {}));
+// El re-guardado de un turno que YA estaba guardado (el '2026-08-10-Dia' de P) con un dato cambiado.
+const reguardoG10 = extra => evo('3', Object.assign({ EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPG, RESP_KTR_CANT: 3 }, MEDIDAS, extra || {}));
+
+// La foto de ESTA matriz: sin la bitácora y con el orden físico de las hojas de «registros sueltos» fuera (un reintento que borra y
+// reinserta sus filas las deja en otro lugar de la hoja; nadie las lee por posición) y la caché TIMELINE_JSON de la cama como conjunto.
+// Lo que sigue contando EN ORDEN: CAMAS_ESTADO, EVOLUCIONES, los archivos y todo lo demás.
+const FOTO_G10 = { sinHojas: ['AUDIT_LOG'], sinOrden: ['TIMELINE', 'EVALUACIONES', 'PROCEDIMIENTOS', 'REINTUBACIONES'], jsonComoConjunto: ['TIMELINE_JSON'] };
+const evalsDe = pid => (DB.EVALUACIONES || []).filter(e => e.PATIENT_ID === pid);
+const filasDeTurno = (idCama, tk) => DB.EVOLUCIONES.filter(e => String(e.ID_CAMA) === String(idCama) && e.TURNO_KEY === tk);
+const hitosDe_ = pid => DB.TIMELINE.filter(h => h.PATIENT_ID === pid);
+const repetidos = (lista, clave) => { const m = {}; lista.forEach(x => { const k = clave(x); m[k] = (m[k] || 0) + 1; }); return Object.keys(m).filter(k => m[k] > 1); };
+const filaTurno = (idCama, tk) => filasDeTurno(idCama, tk)[0] || {};
+
+/**
+ * Lo que guardarEvolucion promete en CUALQUIER corte: el turno es UNA fila, ninguna medición, procedimiento, hito ni reintubación
+ * se repite. Y, ya terminado ('final'): las cuentas que corresponden (`esp`: mediciones y hitos de medición; el ingreso, UNO).
+ */
+const violaGE = (idCama, pid, tk, esp) => fase => {
+  const filas = filasDeTurno(idCama, tk);
+  if (filas.length > 1) return 'el turno quedó en ' + filas.length + ' filas';
+  const ev = repetidos(evalsDe(pid), e => e.ESCALA + '|' + e.ID_EVOLUCION);
+  if (ev.length) return 'una medición está repetida en EVALUACIONES (' + ev.join(', ') + ')';
+  const pr = repetidos(DB.PROCEDIMIENTOS.filter(x => x.PATIENT_ID === pid), x => x.ID_EVOLUCION + '|' + x.NOMBRE_PROC);
+  if (pr.length) return 'un procedimiento está repetido (' + pr.join(', ') + ')';
+  const hi = repetidos(hitosDe_(pid), h => [h.TIPO, h.TEXTO, h.FECHA, h.TURNO].join('|'));
+  if (hi.length) return 'un hito está repetido (' + hi.map(x => x.slice(0, 40)).join(', ') + ')';
+  const rb = repetidos((DB.REINTUBACIONES || []).filter(x => x.PATIENT_ID === pid), x => x.ID_REINTUB);
+  if (rb.length) return 'una reintubación está repetida';
+  if (fase !== 'final') return '';
+  if (filas.length !== 1) return 'el turno no quedó guardado (' + filas.length + ' filas)';
+  if (evalsDe(pid).length !== esp.evals) return 'hay ' + evalsDe(pid).length + ' mediciones y eran ' + esp.evals;
+  const he = hitosDe_(pid).filter(h => h.TIPO === 'evaluacion').length;
+  if (he !== esp.evals) return 'hay ' + he + ' hitos de medición y eran ' + esp.evals;
+  const ing = hitosDe_(pid).filter(h => h.TIPO === 'ingreso').length;
+  if (ing !== esp.ingreso) return 'hay ' + ing + ' hitos de ingreso y era(n) ' + esp.ingreso;
+  return (camaDe(idCama).ULTIMO_TURNO_KEY !== tk || camaDe(idCama).PATIENT_ID !== pid) ? 'la cama no quedó al día con el turno' : '';
+};
+const OPTS_GE = { foto: FOTO_G10, queSeVe: 'un turno, una medición, un procedimiento o un ingreso duplicado' };
+
+tramo('el mundo de guardarEvolucion', () => {
+  volverAlMundo();
+  const r = llama('GUARDAR_EVOLUCION', turnoG10());
+  si('(el montaje) un turno nuevo de P con procedimientos, nota, mediciones y cultivo entra', r.ok);
+  eq('   …y deja las dos mediciones y el cultivo en la serie, cada una con su hito', evalsDe(MUNDO.PID_P).length + '/' + hitosDe_(MUNDO.PID_P).filter(h => h.TIPO === 'evaluacion').length, '3/3');
+  volverAlMundo();
+  const i = llama('GUARDAR_EVOLUCION', ingresoG10());
+  si('(el montaje) el ingreso sobre la cama 9 (libre) con el PATIENT_ID acuñado entra', i.ok && camaDe('9').PATIENT_ID === PID_NUEVO);
+  eq('   …con UN hito de ingreso y dos mediciones', hitosDe_(PID_NUEVO).filter(h => h.TIPO === 'ingreso').length + '/' + evalsDe(PID_NUEVO).length, '1/2');
+});
+
+tramo('GUARDAR_EVOLUCION · ingreso', () => {
+  const esp = { evals: 2, ingreso: 1 };
+  console.log('   · el INGRESO con OP_ID');
+  const a = matriz('GUARDAR_EVOLUCION de un ingreso con OP_ID', 'GUARDAR_EVOLUCION', () => ingresoG10(), violaGE('9', PID_NUEVO, TK, esp), OPTS_GE);
+  // El compromiso es la escritura de la FILA de la cama (`repoEscribirFila`); las otras escrituras de CAMAS_ESTADO del camino son
+  // actualizaciones de una o dos columnas (el espejo ULT_* de cada medición y el caché del timeline) que vienen DESPUÉS.
+  const _filasCama = a.reg.map((x, i) => x === 'repoEscribirFila(CAMAS_ESTADO)' ? i : -1).filter(i => i >= 0);
+  eq('★ el compromiso es UNA sola escritura de la fila de la cama y NO es la primera (la evolución, los procedimientos y los hitos van antes)',
+    _filasCama.length + '/' + (_filasCama[0] > 0), '1/true');
+  console.log('   · el INGRESO sin OP_ID (solo el PATIENT_ID acuñado: lo que reconoce el «ya hecho» sin sello)');
+  matriz('GUARDAR_EVOLUCION de un ingreso sin OP_ID', 'GUARDAR_EVOLUCION', () => sinOpId(ingresoG10()), violaGE('9', PID_NUEVO, TK, esp), OPTS_GE);
+  console.log('   · el INGRESO de un paciente que llegó con la vía aérea de afuera (VA_EXTERNO: la vía parte antes del ingreso)');
+  matriz('GUARDAR_EVOLUCION de un ingreso con TQT de afuera', 'GUARDAR_EVOLUCION',
+    () => ingresoG10({ VENT_VIA_AEREA: 'TQT', VA_EXTERNO: true, VA_EXTERNO_DIAS: 5 }), violaGE('9', PID_NUEVO, TK, esp), OPTS_GE);
+});
+
+tramo('GUARDAR_EVOLUCION · turno nuevo', () => {
+  const esp = { evals: 3, ingreso: 1 };   // el ingreso de P (el de INGRESAR_PACIENTE del montaje) es UNO y no se toca
+  console.log('   · un TURNO NUEVO con OP_ID');
+  matriz('GUARDAR_EVOLUCION de un turno nuevo con OP_ID', 'GUARDAR_EVOLUCION', () => turnoG10(), violaGE('3', MUNDO.PID_P, TKN, esp), OPTS_GE);
+  console.log('   · un TURNO NUEVO sin OP_ID (el reclamo de episodio es lo único que lo ata)');
+  matriz('GUARDAR_EVOLUCION de un turno nuevo sin OP_ID', 'GUARDAR_EVOLUCION', () => sinOpId(turnoG10()), violaGE('3', MUNDO.PID_P, TKN, esp), OPTS_GE);
+  console.log('   · RE-GUARDAR un turno que ya estaba guardado');
+  matriz('GUARDAR_EVOLUCION re-guardando un turno con OP_ID', 'GUARDAR_EVOLUCION', () => reguardoG10(), violaGE('3', MUNDO.PID_P, TK, { evals: 2, ingreso: 1 }), OPTS_GE);
+  console.log('   · una TRANSICIÓN de soporte y vía aérea (VM a VNI, TOT a Natural) con su razón escrita');
+  matriz('GUARDAR_EVOLUCION con una transición de soporte y vía aérea', 'GUARDAR_EVOLUCION', () => transicionG10(), violaGE('3', MUNDO.PID_P, TKN, esp), OPTS_GE);
+});
+
+/* ══ 20 · LOS DÍAS DE VM, VNI Y VA TRAS LA MUERTE Y EL REINTENTO ══════════ */
+console.log('\n20 · DIAS_VM, DIAS_VNI y DIAS_VA: tras morir justo después del compromiso, el reintento da los de la corrida limpia');
+// 🔴 EL DEFECTO. Los tres se calculan leyendo la CAMA (`cama.SOPORTE`, `cama.VIA_AEREA`, `cama.FECHA_INICIO_*`), no el episodio
+// previo. La primera corrida los calcula con la cama como estaba; el compromiso (la escritura de la cama) la deja ya en el
+// soporte y la vía aérea del final del turno, con las fechas de inicio estampadas; el reintento lee ESA cama y puede dar otro
+// número. La regla: si la cama ya absorbió este turno (ULTIMO_TURNO_KEY === turnoKey) y el turno ya estaba en EVOLUCIONES
+// para el mismo paciente con el mismo soporte y la misma vía aérea, los días se conservan los de esa fila.
+const DIAS = ['DIAS_VM', 'DIAS_VNI', 'DIAS_VA'];
+const diasDe = (idCama, tk) => DIAS.map(k => k + '=' + filaTurno(idCama, tk)[k]).join(' ');
+const indiceDelCompromiso = reg => reg.findIndex(x => /^repo(EscribirFila|Actualizar)\(CAMAS_ESTADO\)$/.test(x)) + 1;   // la N que SÍ aterriza
+tramo('días tras la muerte', () => {
+  const casos = [
+    ['un ingreso con TQT de afuera (VA_EXTERNO 5 días): la vía parte 5 días antes', () => ingresoG10({ VENT_VIA_AEREA: 'TQT', VA_EXTERNO: true, VA_EXTERNO_DIAS: 5 }), '9', TK],
+    ['una transición VM a VNI y TOT a Natural', () => transicionG10(), '3', TKN],
+    ['un turno nuevo que sigue en VM con TOT (sin transición)', () => turnoG10(), '3', TKN],
+  ];
+  casos.forEach(([etq, mk, cama, tk]) => {
+    volverAlMundo();
+    const r0 = llama('GUARDAR_EVOLUCION', mk());
+    const limpio = diasDe(cama, tk), reg = M.registro(), N = indiceDelCompromiso(reg);
+    si('(el caso) ' + etq + ': la corrida limpia entra y el compromiso es la escritura ' + N, r0.ok && N > 0);
+    // 1 · muerte JUSTO tras el compromiso (la cama ya absorbió el turno; las colas no corrieron).
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(N); llama('GUARDAR_EVOLUCION', mk()); });
+    M.reiniciar();
+    llama('GUARDAR_EVOLUCION', mk());
+    eq('★ ' + etq + ' · muerte tras el compromiso y reintento: los días son los de la corrida limpia', diasDe(cama, tk), limpio);
+    // 2 · re-guardar el MISMO turno sin muerte (la cama ya está al día con él): los días no se mueven.
+    volverAlMundo();
+    llama('GUARDAR_EVOLUCION', mk());
+    const primero = diasDe(cama, tk);
+    llama('GUARDAR_EVOLUCION', mk());
+    eq('   …y re-guardar el mismo turno sin cambiar el soporte ni la vía aérea no mueve los días', diasDe(cama, tk), primero);
+  });
+  // La regla NO es «los días del turno no se vuelven a calcular nunca»: si el turno cambia de soporte o de vía aérea, se calcula
+  // como siempre. Un re-guardado que corrige la vía final (la transición se deshace: TOT sigue) no hereda los días de la fila.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10());
+  const conTransicion = diasDe('3', TKN);
+  const corregido = llama('GUARDAR_EVOLUCION', transicionG10({ VENT_VIA_AEREA: 'TOT', VENT_VIA_AEREA_FINAL: 'TOT', VENT_SOPORTE: 'VM', VENT_SOPORTE_FINAL: 'VM', TRANS_MOTIVO: 'Se reintubó de inmediato' }));
+  si('(el caso) corregir la vía final del turno es un guardado válido', corregido.ok);
+  eq('   …y entonces los días SÍ se vuelven a calcular (no se conservan los de la fila anterior)', diasDe('3', TKN) !== conTransicion, true);
+});
+
+/* ══ 21 · EL HITO «VÍA AÉREA CAMBIÓ SIN EVENTO» SOBREVIVE ═════════════════ */
+console.log('\n21 · transicion_sin_evento: el hito sobrevive al reintento y al re-guardado del turno');
+// 🔴 EL DEFECTO. El hito se calcula contra `cama.VIA_AEREA` («venía con TOT, queda con Natural»). Tras el compromiso la cama ya
+// dice Natural: en el reintento (y en CUALQUIER re-guardado del turno) no se regenera, y `_timelineDelGuardado` borra los hitos
+// automáticos del turno —este es de tipo via_aerea, automático— sin reponerlo: la razón escrita por el colega desaparecía en silencio.
+// La regla: si el turno ya tiene ese hito para este episodio con la misma razón y la misma vía final, se repone el MISMO.
+const transHitos = pid => DB.TIMELINE.filter(h => h.PATIENT_ID === pid && /transicion_sin_evento/.test(String(h.DATOS_JSON || '')));
+tramo('transicion_sin_evento', () => {
+  volverAlMundo();
+  const r0 = llama('GUARDAR_EVOLUCION', transicionG10());
+  const limpio = transHitos(MUNDO.PID_P).map(h => h.TEXTO);
+  eq('(el caso) la corrida limpia deja UN hito, con la razón escrita', limpio.length + '/' + /sin evento declarado: «Se retiró el tubo durante el traslado a pabellón»/.test(limpio[0] || ''), '1/true');
+  si('   …y la cama pasó a Natural', r0.ok && camaDe('3').VIA_AEREA === 'Natural');
+  const N = indiceDelCompromiso(M.registro());
+  // 1 · muerte tras el compromiso y reintento.
+  volverAlMundo();
+  callando(() => { M.muereTrasLaEscritura(N); llama('GUARDAR_EVOLUCION', transicionG10()); });
+  eq('(el corte) justo tras el compromiso la cama ya dice Natural', camaDe('3').VIA_AEREA, 'Natural');
+  M.reiniciar();
+  llama('GUARDAR_EVOLUCION', transicionG10());
+  eq('★ el hito SOBREVIVE al reintento (uno solo, el mismo texto)', transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), limpio.join('|'));
+  // 2 · re-guardar el turno sin muerte, cambiando otro dato.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10());
+  const r2 = llama('GUARDAR_EVOLUCION', transicionG10({ RESP_KTR_CANT: 4 }));
+  eq('★ re-guardar el turno (corrigiendo otro dato) NO borra el hito: hoy se perdía en cualquier re-guardado', r2.ok + '/' + transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), 'true/' + limpio.join('|'));
+  // 2b · la pantalla NO trae la razón al reabrir un turno (TRANS_MOTIVO no es una columna de EVOLUCIONES): ese re-guardado conserva el hito.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10());
+  const sinRazon = transicionG10(); delete sinRazon.TRANS_MOTIVO;
+  const r2b = llama('GUARDAR_EVOLUCION', Object.assign(sinRazon, { RESP_KTR_CANT: 5 }));
+  eq('★ re-guardar el turno SIN la razón en el payload (como lo reabre la pantalla) tampoco borra el hito', r2b.ok + '/' + transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), 'true/' + limpio.join('|'));
+  // 3 · si la razón CAMBIA, manda la nueva; si la vía final cambia, ya es otra transición (se calcula como siempre).
+  const r3 = llama('GUARDAR_EVOLUCION', transicionG10({ TRANS_MOTIVO: 'La razón quedó corregida por el colega' }));
+  eq('   …una razón corregida: manda la nueva y sigue habiendo UN solo hito', r3.ok + '/' + transHitos(MUNDO.PID_P).length + '/' + /La razón quedó corregida por el colega/.test((transHitos(MUNDO.PID_P)[0] || {}).TEXTO || ''), 'true/1/true');
+  // 4 · sin razón escrita no se inventa uno: el turno que no la trae no deja hito (y no lo reponía antes tampoco).
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', turnoG10());
+  eq('   …un turno sin transición no deja ningún hito de ese tipo', transHitos(MUNDO.PID_P).length, 0);
+  // 5 · el hito de OTRO turno del mismo episodio no se toca ni se repone en este.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10());
+  llama('GUARDAR_EVOLUCION', evo('3', { TURNO_KEY: '2026-08-11-Dia', EPISODIO_ABIERTO: MUNDO.PID_P, VENT_VIA_AEREA: 'Natural', VENT_SOPORTE: 'VNI' }));
+  eq('   …el turno siguiente (sin transición propia) no se lleva ni duplica el hito del anterior', transHitos(MUNDO.PID_P).length, 1);
+});
+
+/* ══ 22 · LAS COLAS QUE TRAGABAN EL ERROR ═════════════════════════════════ */
+console.log('\n22 · Las colas (mediciones a la serie, cultivo, hito de la medición, reintubación): si fallan, ok con advertencias, sin sello, y el reintento las completa');
+// 🔴 EL DEFECTO. Después del compromiso, guardarEvolucion copiaba las mediciones del turno a la serie, el cultivo y la reintubación
+// dentro de un `try { … } catch (e) { console.warn(…) }`: si fallaba una, la respuesta era un ok limpio y el sello recordaba «ya
+// hecho». El reintento con el mismo OP_ID devolvía la repetida y la medición no se copiaba NUNCA (hasta que alguien re-guardara el turno).
+// Ahora lo que no se pudo vuelve como `data.advertencias[]`: ok, con el aviso, SIN sellar; el reintento ejecuta y lo completa.
+// Se falla UNA escritura de la hoja (la cola «sin disco») y se deja pasar el resto.
+const fallarEscritura = (hoja, pred) => {
+  const orig = global.repoInsertar; let hecho = false;
+  global.repoInsertar = function (h, o) {
+    if (!hecho && h === hoja && (!pred || pred(o))) { hecho = true; throw new Error('sim: ' + hoja + ' no disponible'); }
+    return orig.apply(this, arguments);
+  };
+  return () => { global.repoInsertar = orig; return hecho; };
+};
+const fallarUpsert = (hoja) => {
+  const orig = global.repoUpsert; let hecho = false;
+  global.repoUpsert = function (h) {
+    if (!hecho && h === hoja) { hecho = true; throw new Error('sim: ' + hoja + ' no disponible'); }
+    return orig.apply(this, arguments);
+  };
+  return () => { global.repoUpsert = orig; return hecho; };
+};
+const reintubG10 = () => turnoG10({ EXT_REINTUB: true, EXT_REINTUB_RAZ: 'Estridor', REINTUB_HORA: '22:30', PROC_JSON: JSON.stringify(['REINTUBACIÓN', 'IMAGENOLOGÍA']) });
+tramo('colas', () => {
+  const sellos = () => opsDelCaché().length;
+  const casos = [
+    ['las mediciones del turno (EVALUACIONES de la primera medición)', () => turnoG10(), () => fallarEscritura('EVALUACIONES', o => o.ESCALA === 'MRC'), 1],
+    ['el cultivo a la serie (EVALUACIONES del cultivo)', () => turnoG10(), () => fallarEscritura('EVALUACIONES', o => o.ESCALA === 'CULTIVO'), 1],
+    ['el hito de la medición (TIMELINE del hito «evaluacion»)', () => turnoG10(), () => fallarEscritura('TIMELINE', o => o.TIPO === 'evaluacion'), 1],
+    ['la reintubación (REINTUBACIONES)', () => reintubG10(), () => fallarUpsert('REINTUBACIONES'), 1],
+  ];
+  casos.forEach(([etq, mk, fallar, nAdv]) => {
+    volverAlMundo();
+    const r0 = llama('GUARDAR_EVOLUCION', mk());
+    const limpio = M.instantanea(FOTO_G10);
+    si('(el caso) ' + etq + ': la corrida limpia entra y termina sin avisos', r0.ok && !(r0.data && r0.data.advertencias));
+
+    volverAlMundo();
+    const restaurar = fallar();
+    const r1 = llama('GUARDAR_EVOLUCION', mk());
+    const huboFalla = restaurar();
+    si('★ ' + etq + ': la falla se produjo', huboFalla);
+    eq('   …la respuesta es OK (el turno ya está guardado)…', r1.ok, true);
+    const adv = (r1.data && r1.data.advertencias) || [];
+    eq('★ …con data.advertencias: un aviso que dice qué quedó pendiente', Array.isArray(adv) ? adv.length : 'no es lista', nAdv);
+    si('   …en palabras de la unidad y sin datos del paciente ni mensajes técnicos',
+      adv.length > 0 && adv.every(a => typeof a === 'string' && a.length > 20 && a.length < 220 && !/sim:|Error|undefined|Paciente|Charly|\d{7,}/.test(a)));
+    eq('★★ …y NO se sella (el reintento tiene que poder completar lo que falló)', sellos(), 0);
+    eq('   …el servidor tampoco dice «repetida»', r1.data && r1.data.repetida, undefined);
+
+    const r2 = llama('GUARDAR_EVOLUCION', mk());
+    eq('★ el reintento con el MISMO OP_ID ejecuta (no es una repetida) y termina sin avisos', r2.ok + '/' + (r2.data && r2.data.repetida) + '/' + ((r2.data && r2.data.advertencias) ? 'con avisos' : 'sin avisos'), 'true/undefined/sin avisos');
+    eq('★★ …y deja el estado de la corrida limpia (la medición se copió, sin duplicar nada)', M.instantanea(FOTO_G10) === limpio, true);
+    if (M.instantanea(FOTO_G10) !== limpio) M.diferencias(limpio, M.instantanea(FOTO_G10)).slice(0, 4).forEach(l => console.log('        ' + l.slice(0, 170)));
+    eq('   …y ahora sí se sella', sellos(), 1);
+    M.reiniciar();   // el contador de escrituras parte de cero: lo que se mide es lo que escribe la repetida
+    const r3 = llama('GUARDAR_EVOLUCION', mk());
+    eq('   …y un tercer intento es la repetida, con cero escrituras', (r3.data && r3.data.repetida) + '/' + M.total(), 'true/0' ) || 0;
+  });
+
+  // Sin falla alguna la respuesta NO trae la clave (la respuesta de siempre queda idéntica).
+  volverAlMundo();
+  const ok1 = llama('GUARDAR_EVOLUCION', turnoG10());
+  si('★ sin ninguna falla la respuesta no trae la clave «advertencias» (no cambia la de siempre)', ok1.ok && !('advertencias' in (ok1.data || {})));
+
+  // Una medición con un valor FUERA DE RANGO no es una falla de la cola: es un dato inválido que el servidor siempre ignoró en
+  // la serie. No se vuelve un aviso eterno (el reintento lo repetiría igual) ni se sella distinto.
+  volverAlMundo();
+  const fuera = llama('GUARDAR_EVOLUCION', turnoG10({ EVAL_T_MRC: 99 }));
+  eq('   un MRC fuera de rango (99): la respuesta no cambia (ok, sin aviso: no es una falla de la cola)', fuera.ok + '/' + ('advertencias' in (fuera.data || {})), 'true/false');
+});
+
+// EL LÍMITE QUE SE DEJA ESCRITO. Una cama OCUPADA sin PATIENT_ID (un episodio cargado a mano, sin ingreso formal) no tiene identidad
+// para el reintento: el guardado acuña un uuid propio y, si moría ANTES del compromiso, el reintento acuña otro. La matriz lo mide y
+// lo DICE (no lo exige): arreglarlo pide acuñar el pid desde la pantalla o derivarlo del OP_ID, y eso es otra decisión. No afecta a
+// un ingreso hecho por la pantalla de ahora (trae su PATIENT_ID acuñado: matriz de arriba) ni a una cama con paciente ingresado.
+tramo('límite conocido: cama ocupada sin PATIENT_ID', () => {
+  volverAlMundo();
+  Object.assign(camaDe('3'), { PATIENT_ID: '' });
+  const F = M.foto();
+  const mk = () => turnoG10({ EPISODIO_ABIERTO: '' });
+  M.restaurar(F); llama('GUARDAR_EVOLUCION', mk());
+  const limpio = M.instantanea(FOTO_G10), total = M.total(), malos = [];
+  for (let n = 1; n <= total; n++) {
+    M.restaurar(F);
+    callando(() => { M.muereTrasLaEscritura(n); llama('GUARDAR_EVOLUCION', mk()); });
+    M.reiniciar(); llama('GUARDAR_EVOLUCION', mk());
+    if (M.instantanea(FOTO_G10) !== limpio) malos.push(n);
+  }
+  info('   GUARDAR_EVOLUCION sobre una cama ocupada SIN PATIENT_ID · cortes tras cuyo reintento el estado difiere de la limpia (límite conocido, no se exige): ' + (malos.join(',') || '(ninguno)'));
+});
+
+/* ══ 23 · LA FORMA DE LA RECUPERACIÓN DEL GUARDADO ════════════════════════ */
+console.log('\n23 · La forma: el flujo no se reordena, el compromiso sigue siendo la escritura de la cama y ninguna cola vuelve a tragarse el error');
+tramo('forma de guardarEvolucion', () => {
+  const sinComentarios = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  const ev = sinComentarios(leer('svc_evoluciones.gs')), evals = sinComentarios(leer('svc_evaluaciones.gs'));
+  const ini = ev.indexOf('function guardarEvolucion('), fin = ev.indexOf('\n}\n', ini);
+  const ge = ev.slice(ini, fin);
+  const pos = re => ge.search(re);
+  const orden = [/repoUpsertEnFila\('EVOLUCIONES'/, /_guardarProcedimientosInterno\(/, /_timelineDelGuardado\(/, /_syncCamaDesdeEvolucion\(/, /_evalDesdeEvolucion\(/, /_registrarReintubacion\(/, /SpreadsheetApp\.flush\(\)/];
+  const posiciones = orden.map(pos);
+  si('★ el flujo NO se reordenó: evolución, procedimientos, hitos, la cama, mediciones, reintubación y el flush, en ese orden',
+    posiciones.every(x => x > -1) && posiciones.every((x, i) => i === 0 || x > posiciones[i - 1]));
+  eq('   …y la cama se escribe UNA sola vez en el camino (el compromiso)', (ge.match(/_syncCamaDesdeEvolucion\(/g) || []).length, 1);
+  si('★ las colas ya no se tragan el error: el guardado junta data.advertencias y las devuelve', /advertencias/.test(ge) && /advertencias\.push\(/.test(ge));
+  // Entre la cola de mediciones y el flush no puede quedar un `catch` que no sume su aviso: cada uno dice qué quedó pendiente.
+  const colas = ge.slice(pos(/_evalDesdeEvolucion\(/), pos(/SpreadsheetApp\.flush\(\)/));
+  const catches = colas.split('catch (').slice(1);
+  si('★ ninguna cola termina solo en console.warn: hay un catch para las mediciones y otro para la reintubación, y los dos suman su aviso',
+    catches.length >= 2 && catches.every(c => /advertencias\.push\(/.test(c.slice(0, 400))));
+  const ede = (evals.match(/function _evalDesdeEvolucion\([\s\S]*?\n\}\n/) || [''])[0];
+  const cul = (evals.match(/function _cultivoALaSerie\([\s\S]*?\n\}\n/) || [''])[0];
+  no('★ _cultivoALaSerie no se traga nada: no hay un catch vacío ni uno que solo avise', /catch\s*\(\w+\)\s*\{\s*(console\.warn\([^)]*\);?\s*)?\}/.test(cul));
+  si('   …y _evalDesdeEvolucion devuelve los avisos (las mediciones que fallaron NO se pierden en un console.warn)', /advertencias/.test(ede) && !/console\.warn\('cultivo a la serie/.test(ede));
+  si('★ _evalRegistrarInterno sigue con la firma (datos, ctx) y no compara el episodio (lo hace quien la llama)', /function _evalRegistrarInterno\(datos, ctx\)/.test(evals) && !/validarEpisodioPuerta/.test((evals.match(/function _evalRegistrarInterno\([\s\S]*?\n\}\n/) || [''])[0]));
+  const tl = sinComentarios(leer('svc_timeline.gs'));
+  const tdg = (tl.match(/function _timelineDelGuardado\([\s\S]*?\n\}\n/) || [''])[0];
+  si('★ _timelineDelGuardado sigue borrando solo los hitos AUTOMÁTICOS del turno y del episodio, y los reinserta en un solo lote', /_TIPOS_HITO_AUTO\.indexOf/.test(tdg) && (tdg.match(/repoInsertarVarios\('TIMELINE'/g) || []).length === 1);
+  eq('   …y no cambió de lectura: sigue siendo UNA sola lectura de TIMELINE (los viajes a hojas no suben)', (tdg.match(/repoLeer\w*\(/g) || []).length + '/' + (tdg.match(/repoLeerTodosConFila\('TIMELINE'\)/g) || []).length, '1/1');
+  si('★ y recibe el hito a conservar (la vía con que queda el turno y la razón del payload) y lo busca en ESA misma lectura',
+    /function _timelineDelGuardado\([^)]*conservar\)/.test(tl) && /conservar\.a/.test(tdg) && /transicion_sin_evento/.test(tdg));
+  si('   …y guardarEvolucion se lo pasa y arma el hito con el helper compartido (un solo texto para la primera vez y la corrección)',
+    /_timelineDelGuardado\([^;]*\{ a: _vaFinalTurno, motivo: _transMotivo \}\)/.test(ge) && /_hitoTransicionSinEvento\(/.test(ge) && /function _hitoTransicionSinEvento\(/.test(tl));
+  no('   …el hito de ingreso ya no depende de «fila nueva» (el reintento tras morir antes de los hitos lo repone)', /ES_INGRESO\)\s*&&\s*esNuevo/.test(ge));
+  si('★ DIAS_VM, DIAS_VNI y DIAS_VA conservan los de la fila del turno cuando la cama ya absorbió el turno y el soporte y la vía no cambiaron',
+    /cama\.ULTIMO_TURNO_KEY[^;]*===\s*turnoKey/.test(ge) && /_prev\.PATIENT_ID[^;]*patientId/.test(ge) && /'DIAS_VM', 'DIAS_VNI', 'DIAS_VA'/.test(ge));
+});
+
 
 terminar();

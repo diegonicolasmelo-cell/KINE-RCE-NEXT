@@ -412,6 +412,27 @@ no('★ pero renombrar NO borra la estructura: un id repetido en dos filas no es
 const ordenAB = conFilas([fila({ ID_HITO: 'A' }), fila({ ID_HITO: 'B' })]), ordenBA = conFilas([fila({ ID_HITO: 'B' }), fila({ ID_HITO: 'A' })]);
 no('   …el orden de las filas cuenta', ordenAB === ordenBA);
 eq('   …y diferencias() lo dice con cero líneas (solo cambió el orden)', M.diferencias(ordenAB, ordenBA).length, 0);
+// `sinOrden` (paso 10): las hojas que se DECLAREN se comparan como conjunto. Es para las que nadie lee por posición (un reintento
+// que borra y reinserta sus filas las deja en otro lugar físico, y eso solo no es una diferencia de estado); por omisión ninguna.
+const sinOrdenDe = (filas, hojas) => { reset(); filas.forEach(f => DB.TIMELINE.push(f)); return M.instantanea({ sinOrden: hojas }); };
+const AB = [fila({ ID_HITO: 'A' }), fila({ ID_HITO: 'B' })], BA = [fila({ ID_HITO: 'B' }), fila({ ID_HITO: 'A' })];
+si('★ sinOrden: dos fotos que difieren SOLO en el orden de las filas de esa hoja son la misma', sinOrdenDe(AB, ['TIMELINE']) === sinOrdenDe(BA, ['TIMELINE']));
+no('   …y por omisión el orden sigue contando (no cambió para nadie)', sinOrdenDe(AB, undefined) === sinOrdenDe(BA, undefined));
+no('   …y declarar OTRA hoja no afloja ésta', sinOrdenDe(AB, ['EVALUACIONES']) === sinOrdenDe(BA, ['EVALUACIONES']));
+no('   …sobrar una fila sigue distinguiéndose', sinOrdenDe([fila({ ID_HITO: 'A' }), fila({ ID_HITO: 'A' })], ['TIMELINE']) === sinOrdenDe([fila({ ID_HITO: 'A' })], ['TIMELINE']));
+no('   …y cambiar un valor también', sinOrdenDe([fila({ TEXTO: 'uno' }), fila({ TEXTO: 'dos' })], ['TIMELINE']) === sinOrdenDe([fila({ TEXTO: 'uno' }), fila({ TEXTO: 'tres' })], ['TIMELINE']));
+// `jsonComoConjunto`: la caché TIMELINE_JSON de la cama (los 30 hitos más recientes, ordenados por un TIMESTAMP que en un mismo
+// guardado es el mismo segundo): su orden entre hitos del mismo segundo es el de la hoja, y no es un estado distinto.
+const cacheDe = (lista, opts) => { reset(); DB.CAMAS_ESTADO[0].TIMELINE_JSON = JSON.stringify(lista); return M.instantanea(opts); };
+const h1 = { ID_HITO: 'HITO_1790000000001_ABCDE', TEXTO: 'uno' }, h2 = { ID_HITO: 'HITO_1790000000001_ZZZZZ', TEXTO: 'dos' };
+const h1b = { ID_HITO: 'HITO_1790000000001_MMMMM', TEXTO: 'uno' }, h2b = { ID_HITO: 'HITO_1790000000001_AAAAA', TEXTO: 'dos' };
+si('★ jsonComoConjunto: una caché con los mismos hitos en otro orden (y otros ids generados) es la misma foto', cacheDe([h1, h2], { jsonComoConjunto: ['TIMELINE_JSON'] }) === cacheDe([h2b, h1b], { jsonComoConjunto: ['TIMELINE_JSON'] }));
+no('   …por omisión el orden de esa lista sigue contando', cacheDe([h1, h2]) === cacheDe([h2b, h1b]));
+no('   …un hito de más o de menos en la caché sigue distinguiéndose', cacheDe([h1, h2], { jsonComoConjunto: ['TIMELINE_JSON'] }) === cacheDe([h1], { jsonComoConjunto: ['TIMELINE_JSON'] }));
+no('   …y un texto distinto también', cacheDe([h1, h2], { jsonComoConjunto: ['TIMELINE_JSON'] }) === cacheDe([h1, { ID_HITO: 'HITO_1790000000001_ZZZZZ', TEXTO: 'otro' }], { jsonComoConjunto: ['TIMELINE_JSON'] }));
+si('★ con ids generados DISTINTOS y en otro orden físico la foto es la misma (se ordena por el contenido, no por el id crudo)',
+  sinOrdenDe([fila({ ID_HITO: 'HITO_1790000000001_ABCDE', TEXTO: 'primero' }), fila({ ID_HITO: 'HITO_1790000000001_ZZZZZ', TEXTO: 'segundo' })], ['TIMELINE']) ===
+  sinOrdenDe([fila({ ID_HITO: 'HITO_1790000000001_AAAAA', TEXTO: 'segundo' }), fila({ ID_HITO: 'HITO_1790000000001_MMMMM', TEXTO: 'primero' })], ['TIMELINE']));
 // La bitácora y la configuración.
 reset(); const sinBit0 = M.instantanea({ sinHojas: ['AUDIT_LOG'] }), conBit0 = M.instantanea();
 DB.AUDIT_LOG.push({ ID: 'a', ACCION: 'X' });

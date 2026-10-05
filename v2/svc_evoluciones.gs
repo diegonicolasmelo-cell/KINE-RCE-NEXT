@@ -528,6 +528,27 @@ function guardarEvolucion(datos, ctx, ep) {
           _esVA(datos.VENT_VIA_AEREA) || _esVA(_vaT),
           function (x) { return !_esVA(_finalVa(x)); },
           _esVA(cama.VIA_AEREA) ? cama.FECHA_INICIO_VA : fecha);
+
+        /* 🔐 LOS DÍAS NO CAMBIAN AL REPETIR EL GUARDADO (G16, paso 10, 5-oct-2026). Los tres contadores de arriba se
+           calculan leyendo la CAMA (`cama.SOPORTE`, `cama.VIA_AEREA`, `cama.FECHA_INICIO_*`), no la evolución previa. La
+           primera corrida los calcula con la cama como estaba; el compromiso (la escritura de la cama, más abajo) la deja ya
+           en el soporte y la vía aérea con que termina el turno y con sus fechas de inicio estampadas. Si el guardado murió
+           justo después —o si alguien re-guarda el turno— la segunda corrida lee ESA cama y da otro número: la guardia midió
+           un ingreso con VA de afuera que pasaba de 0 a 5 días de VA y una transición VM→VNI con TOT→Natural que pasaba de 3
+           a 1.
+           LA REGLA: si la cama YA absorbió este turno (`ULTIMO_TURNO_KEY === turnoKey`) y la fila del turno es del MISMO
+           paciente con el MISMO soporte y la MISMA vía aérea (inicial y final), el turno no cambió en nada que mueva los
+           contadores: se conservan los de esa fila. Con un soporte o una vía distintos se calcula como siempre. Una fila
+           sin días (anterior a las columnas) tampoco se «conserva»: se calcula. Es un CAMBIO DE CÁLCULO solo en el reintento y
+           en el re-guardado del turno, que antes daban un número que dependía de en qué estado hubiera quedado la cama. */
+        if (_prev && String(cama.ULTIMO_TURNO_KEY || '') === turnoKey && String(_prev.PATIENT_ID || '') === String(patientId) &&
+            ['VENT_SOPORTE', 'VENT_SOPORTE_FINAL', 'VENT_VIA_AEREA', 'VENT_VIA_AEREA_FINAL'].every(function (k) {
+              return String(datos[k] == null ? '' : datos[k]) === String(_prev[k] == null ? '' : _prev[k]);
+            })) {
+          ['DIAS_VM', 'DIAS_VNI', 'DIAS_VA'].forEach(function (k) {
+            if (_prev[k] !== '' && _prev[k] != null) datos[k] = _prev[k];
+          });
+        }
       }
 
       // BDT (test de azul) — repetible: cada resultado marcado en el turno se
@@ -688,10 +709,14 @@ function guardarEvolucion(datos, ctx, ep) {
       const accion = repoUpsertEnFila('EVOLUCIONES', filaEvo, evo);
       const esNuevo = (accion === 'crear');
 
-      // Hito de ingreso — solo en la primera escritura. Viaja en el MISMO lote
-      // que los hitos de procedimientos (una inserción, un solo cache).
+      // Hito de ingreso. Viaja en el MISMO lote que los hitos de procedimientos (una inserción, un solo cache).
+      // 🔐 G16 (paso 10): ya NO «solo en la primera escritura». Si el guardado moría tras escribir la evolución y antes de
+      // insertar los hitos, el reintento ya no veía una fila nueva, se quedaba sin el hito de ingreso con su diagnóstico y el
+      // procedimiento INGRESO dejaba en su lugar uno genérico («Ingreso a UCI»). El ingreso se anota UNA vez por episodio y eso
+      // ya lo garantiza `_timelineDelGuardado` (`hayIngreso`: si el paciente ya tiene su hito no escribe otro), así que
+      // proponerlo siempre que el turno es de ingreso es seguro: lo repone si falta y no duplica si está.
       const hitosExtra = [];
-      if (esVerdadero(evo.ES_INGRESO) && esNuevo) {
+      if (esVerdadero(evo.ES_INGRESO)) {
         hitosExtra.push({
           tipo: 'ingreso',
           texto: 'Ingreso UCI. Dx: ' + (evo.PAC_DIAGNOSTICO || evo.PAC_NOMBRE || 'Sin especificar'),
@@ -781,15 +806,16 @@ function guardarEvolucion(datos, ctx, ep) {
       }
       // La salida con RAZÓN ESCRITA: la vía aérea cambió sin evento y el colega
       // explicó por qué. No es una columna de EVOLUCIONES: vive en el hito.
+      // 🔐 G16 (paso 10): el hito se calcula contra la vía de la CAMA («venía con TOT»), y tras el compromiso la cama ya dice la
+      // nueva: en un reintento, o en cualquier re-guardado del turno, ya no se regeneraba y el barrido de `_timelineDelGuardado`
+      // (es de tipo `via_aerea`, automático) lo borraba. Por eso el barrido recibe la vía con que QUEDA el turno y la razón que
+      // trae el payload (`conservar`): el hito que el turno ya dejó se queda, o se rehace con la razón corregida.
       const _transMotivo = String(datos.TRANS_MOTIVO || '').trim();
+      const _vaFinalTurno = String(evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '');
       if (_transMotivo && cama && cama.VIA_AEREA) {
-        const _vaSale = String(evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '');
-        if (_vaSale && _vaSale !== String(cama.VIA_AEREA)) {
-          hitosExtra.push({ tipo: 'via_aerea',
-            texto: '⚠️ Vía aérea ' + cama.VIA_AEREA + ' → ' + _vaSale + ' sin evento declarado: «' +
-                   (_transMotivo.length > 160 ? _transMotivo.slice(0, 159) + '…' : _transMotivo) + '»',
-            autor: evo.PLAN_FIRMA_KINE, autorEmail: ctx.email || '',
-            datos: { evento: 'transicion_sin_evento', de: String(cama.VIA_AEREA), a: _vaSale, motivo: _transMotivo, firma: _vv('PLAN_FIRMA_KINE') } });
+        if (_vaFinalTurno && _vaFinalTurno !== String(cama.VIA_AEREA)) {
+          hitosExtra.push(_hitoTransicionSinEvento(String(cama.VIA_AEREA), _vaFinalTurno, _transMotivo, _vv('PLAN_FIRMA_KINE'),
+            evo.PLAN_FIRMA_KINE, ctx.email || ''));
         }
       }
 
@@ -817,31 +843,49 @@ function guardarEvolucion(datos, ctx, ep) {
       // narra maniobras, no cuenta eventos.
       const procsStats = procs.filter(function (p) { return !/^SUPINACI/i.test(String(p)); });
       _guardarProcedimientosInterno(idEvolucion, idCama, patientId, fecha, turno, procsStats, ctx.email);
-      const timelineJson = _timelineDelGuardado(idCama, fecha, turno, procs, evo.PLAN_FIRMA_KINE, ctx.email, patientId, hitosExtra, datosPorProc);
+      const timelineJson = _timelineDelGuardado(idCama, fecha, turno, procs, evo.PLAN_FIRMA_KINE, ctx.email, patientId, hitosExtra, datosPorProc,
+        { a: _vaFinalTurno, motivo: _transMotivo });
 
       // Sincronizar el snapshot de la cama: la ÚNICA escritura a CAMAS_ESTADO
       // del guardado (lleva también las fechas de ingreso corregidas arriba y
       // el cache de la línea de tiempo recién armado).
       _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, patientId, filaCama, timelineJson);
 
+      /* 🔐 LAS COLAS YA NO SE TRAGAN EL ERROR (G16, paso 10). Lo que sigue al compromiso —las mediciones a la serie, el
+         cultivo y la reintubación— terminaba en un `try { … } catch (e) { console.warn(…) }`: si fallaba una, la respuesta era
+         un OK limpio, el sello recordaba «ya hecho» y el reintento con el mismo OP_ID devolvía la repetida; la medición no se
+         copiaba NUNCA. Ahora lo que no se pudo vuelve en `data.advertencias[]`, en palabras de la unidad: la respuesta sigue
+         siendo OK (el turno YA está guardado: la fila, los procedimientos, los hitos y la cama), pero con el aviso, y SIN
+         sellar — el reintento ejecuta de nuevo y completa lo que faltó (`_evalCompletarCola`; la reintubación es un upsert
+         con id derivado). Sin ninguna falla la respuesta no trae la clave: es la de siempre. */
+      const advertencias = [];
+
       // 🗂️ Lo que este turno MIDIÓ pasa a la serie fechada del episodio con la
       // firma del turno (rama episodio/turno). No hereda nada: un valor
       // presente en el payload es una medición de HOY.
-      try { if (typeof _evalDesdeEvolucion === 'function') _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx); }
-      catch (e) { console.warn('_evalDesdeEvolucion:', e.message); }
+      try { if (typeof _evalDesdeEvolucion === 'function') _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx, advertencias); }
+      catch (e) {
+        console.warn('_evalDesdeEvolucion:', e.message);
+        advertencias.push('Las mediciones de este turno no quedaron completas en la serie. Vuelve a guardar el turno para completarlas.');
+      }
 
       // Reintubación desde el bloque EXT_* (le viaja el lector perezoso del
       // episodio: si el EXT_TS hay que buscarlo hacia atrás, no re-baja la hoja)
       if (esVerdadero(evo.EXT_REINTUB)) {
         try { _registrarReintubacion(evo, idCama, idEvolucion, fecha, turno, ctx, _evosCama); }
-        catch (e) { console.warn('_registrarReintubacion:', e.message); }
+        catch (e) {
+          console.warn('_registrarReintubacion:', e.message);
+          advertencias.push('La reintubación no quedó en el registro de reintubaciones. Vuelve a guardar el turno para completarla.');
+        }
       }
 
       SpreadsheetApp.flush();
       // El resumen del AUDIT_LOG dice si la fila nació aparte por una rotación
       // sin alta: es la huella que después busca auditoriaIntegridad().
       const _accion = esNuevo ? (_ubic.ajena ? 'crear (fila aparte: la cama rotó sin alta)' : 'crear') : 'actualizar';
-      return ok({ idEvolucion, idCama, patientId, turnoKey, accion: _accion, entidad: 'EVOLUCIONES', TEXTO_GENERADO: evo.TEXTO_GENERADO || '' });
+      const _resp = { idEvolucion, idCama, patientId, turnoKey, accion: _accion, entidad: 'EVOLUCIONES', TEXTO_GENERADO: evo.TEXTO_GENERADO || '' };
+      if (advertencias.length) _resp.advertencias = advertencias;
+      return ok(_resp);
     } catch (e) { return err('guardarEvolucion: ' + e.message, ERR.INTERNO, e); }
   });
 }

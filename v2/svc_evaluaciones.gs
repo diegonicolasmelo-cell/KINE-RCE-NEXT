@@ -152,19 +152,30 @@ function _evalRegistrarInterno(datos, ctx) {
   if (ult && ult.ID_EVAL === fila.ID_EVAL) _evalEspejoCama(idCama, escala, fila);
 
   // Hito legible, para la línea de tiempo y la tarjeta.
+  // 🔐 G16 (paso 10): si el hito o el caché no se pudieron escribir la medición YA está en la serie y se sigue; pero el
+  // resultado lo DICE (`sinHito`, solo cuando pasa) en vez de quedar en un console.warn que nadie lee: quien guardó un turno
+  // lo convierte en un aviso, y el reintento lo completa (`_evalCompletarCola`).
+  let sinHito = false;
   try {
-    _agregarHitoInternoSinSync({
-      idCama: idCama, patientId: pid, fecha: fecha, turno: turno, tipo: 'evaluacion',
-      texto: '📐 ' + _evalNombre(escala) + ' ' + total + (firma ? ' (' + firma + ')' : ''),
-      autor: firma, autorEmail: ctx.email || '',
-      // Sin el ID_EVAL (un uid): el hito debe ser DETERMINISTA para que dos
-      // guardados iguales dejen la misma línea de tiempo (guardia guardado_viajes).
-      datos: { escala: escala, total: total, firma: firma, fecha: fecha },
-    });
-    _sincronizarTimelineCama(idCama);
-  } catch (e) { console.warn('evalRegistrar hito:', e.message); }
+    _agregarHitoInternoSinSync(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx));
+    if (!_sincronizarTimelineCama(idCama)) sinHito = true;
+  } catch (e) { console.warn('evalRegistrar hito:', e.message); sinHito = true; }
 
-  return { entidad: 'EVALUACIONES', accion: 'medicion', escala: escala, total: total, idEval: fila.ID_EVAL, firma: firma, fecha: fecha };
+  const res = { entidad: 'EVALUACIONES', accion: 'medicion', escala: escala, total: total, idEval: fila.ID_EVAL, firma: firma, fecha: fecha };
+  if (sinHito) res.sinHito = true;
+  return res;
+}
+
+/** El hito legible de una medición. Lo arman por igual quien la escribe y quien, en un reintento, completa lo que le faltó. */
+function _evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx) {
+  return {
+    idCama: idCama, patientId: pid, fecha: fecha, turno: turno, tipo: 'evaluacion',
+    texto: '📐 ' + _evalNombre(escala) + ' ' + total + (firma ? ' (' + firma + ')' : ''),
+    autor: firma, autorEmail: (ctx && ctx.email) || '',
+    // Sin el ID_EVAL (un uid): el hito debe ser DETERMINISTA para que dos
+    // guardados iguales dejen la misma línea de tiempo (guardia guardado_viajes).
+    datos: { escala: escala, total: total, firma: firma, fecha: fecha },
+  };
 }
 
 function _evalNombre(escala) {
@@ -282,13 +293,30 @@ function episodioEscala(datos, ctx, ep) {
  * serie con la firma del turno. Solo lo que viene con valor: el turno no
  * hereda evaluaciones (se recargan solo si EVAL_FECHA es hoy), así que un
  * valor presente es una medición de este turno.
+ *
+ * 🔐 G16 (paso 10). Esta cola corre DESPUÉS del compromiso del guardado (la escritura de la cama) y antes se tragaba lo
+ * que fallara: un `catch` con console.warn y la respuesta salía limpia, con el sello de «ya hecho» puesto. El reintento
+ * con el mismo OP_ID devolvía la repetida y la medición no se copiaba NUNCA. Ahora, con `advertencias` (la lista que
+ * `guardarEvolucion` devuelve en `data.advertencias`), cada medición va en su propio intento: lo que falla suma un aviso
+ * en palabras de la unidad y las demás siguen — la respuesta es OK, SIN sello, y el reintento completa lo que faltó.
+ * Sin `advertencias` quien llama no tiene dónde recibir los avisos, así que el error sube como siempre: nadie lo traga.
+ *
+ * El reintento no duplica ni se queda corto: la medición que YA está en la serie no se escribe otra vez, pero se le
+ * COMPLETA lo que la muerte dejó a medias (el espejo de la cama y su hito): `_evalCompletarCola`.
  */
-function _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx) {
+function _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx, advertencias) {
   const firma = String(evo.PLAN_FIRMA_KINE || (ctx && ctx.firma) || '');
   const fecha = String(evo.FECHA || hoyISO());
   const turno = String(evo.TURNO || 'Dia');
   const hechas = [];
   const vale = function (x) { return x !== '' && x != null; };
+  // La cama y los hitos solo se leen si un reintento los necesita (la ruta de siempre no lee ni una hoja más).
+  const cola = { avisos: advertencias || null, memo: {} };
+  const falla = function (e, aviso) {
+    if (!advertencias) throw e;
+    console.warn('_evalDesdeEvolucion:', e.message);
+    advertencias.push(aviso);
+  };
   const pares = [
     ['MRC', evo.EVAL_T_MRC, { D: [evo.EVAL_MRC_D1, evo.EVAL_MRC_D2, evo.EVAL_MRC_D3, evo.EVAL_MRC_D4, evo.EVAL_MRC_D5, evo.EVAL_MRC_D6],
                               I: [evo.EVAL_MRC_I1, evo.EVAL_MRC_I2, evo.EVAL_MRC_I3, evo.EVAL_MRC_I4, evo.EVAL_MRC_I5, evo.EVAL_MRC_I6] }],
@@ -301,17 +329,71 @@ function _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx) {
   ];
   pares.forEach(function (p) {
     if (!vale(p[1])) return;
-    // ¿Ya está esta misma medición en la serie (re-guardado del mismo turno)?
-    const ya = repoLeerTodos('EVALUACIONES', 'ID_EVOLUCION', String(idEvolucion))
-      .some(function (e) { return e.ESCALA === p[0] && !esVerdadero(e.ANULADA) && String(e.TOTAL) === String(p[1]); });
-    if (ya) return;
-    const r = _evalRegistrarInterno({ idCama: idCama, escala: p[0], total: p[1], items: p[2], firma: firma,
-                                      fecha: fecha, turno: turno, origen: 'turno', idEvolucion: idEvolucion }, ctx);
-    if (r && !r.error) hechas.push(p[0]);
+    try {
+      // ¿Ya está esta misma medición en la serie (re-guardado del mismo turno, o reintento tras una muerte)?
+      const ya = repoLeerTodos('EVALUACIONES', 'ID_EVOLUCION', String(idEvolucion))
+        .filter(function (e) { return e.ESCALA === p[0] && !esVerdadero(e.ANULADA) && String(e.TOTAL) === String(p[1]); })[0];
+      if (ya) {
+        if (!_evalCompletarCola(ya, ctx, cola.memo)) _colaAviso(cola, _avisoHito('La medición de ' + _evalNombre(p[0])));
+        return;
+      }
+      const r = _evalRegistrarInterno({ idCama: idCama, escala: p[0], total: p[1], items: p[2], firma: firma,
+                                        fecha: fecha, turno: turno, origen: 'turno', idEvolucion: idEvolucion }, ctx);
+      if (r && !r.error) {
+        hechas.push(p[0]);
+        if (r.sinHito) _colaAviso(cola, _avisoHito('La medición de ' + _evalNombre(p[0])));
+      }
+    } catch (e) {
+      falla(e, 'La medición de ' + _evalNombre(p[0]) + ' de este turno no quedó completa en la serie. Vuelve a guardar el turno para completarla.');
+    }
   });
-  try { if (_cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx)) hechas.push('CULTIVO'); }
-  catch (e) { console.warn('cultivo a la serie:', e.message); }
+  try { if (_cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx, cola)) hechas.push('CULTIVO'); }
+  catch (e) { falla(e, 'El cultivo de este turno no quedó completo en la serie. Vuelve a guardar el turno para completarlo.'); }
   return hechas;
+}
+
+/** El aviso de una medición que quedó en la serie sin su hito (o sin el caché de la línea de tiempo). */
+function _avisoHito(que) {
+  return que + ' quedó en la serie, pero no su aviso en la línea de tiempo. Vuelve a guardar el turno para completarlo.';
+}
+function _colaAviso(cola, aviso) { if (cola && cola.avisos) cola.avisos.push(aviso); }
+
+/**
+ * 🔐 G16 (paso 10). Lo que le falta a una medición que YA está en la serie: el espejo ULT_* de la cama y su hito. Una muerte
+ * entre la fila de EVALUACIONES y esos dos pasos las dejaba sin ellos, y el reintento —que ve la fila y la salta— no se los
+ * ponía nunca. Solo escribe lo que falta, así que sobre una medición completa no escribe nada (y para saberlo lee la cama y los
+ * hitos de esa cama UNA vez por guardado: `memo`).
+ * Devuelve `false` si el hito quedó escrito pero el caché de la tarjeta no.
+ */
+function _evalCompletarCola(fila, ctx, memo) {
+  const m = memo || {};
+  const idCama = String(fila.ID_CAMA || ''), pid = String(fila.PATIENT_ID || ''), escala = String(fila.ESCALA || '');
+  if (!idCama || !pid) return true;
+  const def = EVAL_SERIE[escala] || {};
+  // El espejo: solo si la cama aún no refleja esta medición Y es la vigente del episodio (una anterior no pisa a una posterior).
+  if (def.ult) {
+    if (m.cama === undefined) m.cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama) || null;
+    const c = m.cama;
+    const dist = function (k, v) { return !!k && String(c[k] == null ? '' : c[k]) !== String(v == null ? '' : v); };
+    if (c && (dist(def.ult, fila.TOTAL) || dist(def.fecha, fila.FECHA) || dist(def.firma, fila.FIRMA || ''))) {
+      const ult = _evalUltima(pid, escala);
+      if (ult && ult.ID_EVAL === fila.ID_EVAL) { _evalEspejoCama(idCama, escala, fila); m.cama = undefined; }
+    }
+  }
+  // El hito: uno de esa escala en ese turno y ese episodio (no se compara el texto: un cultivo cuyo resultado llegó después
+  // cambió su total, y su hito sigue siendo el mismo).
+  if (m.hitos === undefined) m.hitos = repoLeerTodos('TIMELINE', 'ID_CAMA', idCama);
+  const marca = '"escala":"' + escala + '"';
+  const hay = m.hitos.some(function (h) {
+    return String(h.TIPO) === 'evaluacion' && String(h.PATIENT_ID || '') === pid && String(h.FECHA) === String(fila.FECHA) &&
+           String(h.TURNO) === String(fila.TURNO) && String(h.DATOS_JSON || '').indexOf(marca) !== -1;
+  });
+  if (hay) return true;
+  const hito = _evalHito(idCama, pid, String(fila.FECHA), String(fila.TURNO), escala, String(fila.TOTAL),
+                         String(fila.FIRMA || ''), ctx || {});
+  _agregarHitoInternoSinSync(hito);
+  m.hitos.push({ TIPO: 'evaluacion', PATIENT_ID: pid, FECHA: String(fila.FECHA), TURNO: String(fila.TURNO), DATOS_JSON: JSON.stringify(hito.datos) });
+  return _sincronizarTimelineCama(idCama);
 }
 
 /**
@@ -324,8 +406,10 @@ function _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx) {
  * el mismo cultivo. El evento es el hito 'CULTIVO DE SECRECIONES' que ya
  * deja el procedimiento; aquí solo se le agrega el detalle (DATOS_JSON).
  * Devuelve true si tocó la serie.
+ * 🔐 G16 (paso 10): `cola` (opcional, la arma `_evalDesdeEvolucion`) lleva la lista de avisos del guardado y la memoria de
+ * lecturas del reintento. Esta función no atrapa nada: un error sube hasta quien sabe convertirlo en un aviso.
  */
-function _cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx) {
+function _cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx, cola) {
   const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idCama));
   const pid = String((cama && cama.PATIENT_ID) || evo.PATIENT_ID || '');
   if (!pid) return false;
@@ -344,6 +428,7 @@ function _cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx) {
     if (!mia) {
       const r = _evalRegistrarInterno({ idCama: idCama, escala: 'CULTIVO', total: total, items: det, firma: firma,
                                         fecha: fecha, turno: turno, origen: 'turno', idEvolucion: idEvolucion }, ctx);
+      if (r && r.sinHito) _colaAviso(cola, _avisoHito('El cultivo'));
       return !(r && r.error);
     }
     // Re-guardado del mismo turno: se corrige encima, no se duplica.
@@ -351,6 +436,8 @@ function _cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx) {
       repoActualizar('EVALUACIONES', 'ID_EVAL', String(mia.ID_EVAL), { TOTAL: total, ITEMS_JSON: JSON.stringify(det) });
       return true;
     }
+    // Idéntico: nada que corregir, pero un reintento le completa el hito si la muerte lo dejó a medias.
+    if (!_evalCompletarCola(mia, ctx, cola && cola.memo)) _colaAviso(cola, _avisoHito('El cultivo'));
     return false;
   }
   if (!res) return false;
@@ -367,5 +454,6 @@ function _cultivoALaSerie(evo, idCama, idEvolucion, firma, fecha, turno, ctx) {
   if (ult && String(ult.TOTAL) === res) return false;
   const r = _evalRegistrarInterno({ idCama: idCama, escala: 'CULTIVO', total: res, items: { sinToma: true }, firma: firma,
                                     fecha: fecha, turno: turno, origen: 'turno', idEvolucion: idEvolucion }, ctx);
+  if (r && r.sinHito) _colaAviso(cola, _avisoHito('El cultivo'));
   return !(r && r.error);
 }
