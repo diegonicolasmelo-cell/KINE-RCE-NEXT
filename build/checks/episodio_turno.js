@@ -255,9 +255,13 @@ const si = (l, g) => eq(l, !!g, 'true');
   // (campo transitorio, como EPISODIO_ABIERTO: no es columna). Lo que esta línea fija es QUÉ se manda a la cama, y eso no
   // cambió: se compara el resto del paquete exacto y el OP_ID se mide aparte, en vez de dejar la guardia roja por un campo
   // que la propia convención nueva agrega.
+  // 🔐 Y desde el paso 14 (G14) la pantalla manda SIEMPRE `EPISODIO_ABIERTO`: el paciente de la tarjeta al abrir la calculadora
+  // (otro campo transitorio, tampoco es columna). Igual: el resto exacto y el reclamo aparte con su valor esperado.
   const dEsc = Object.assign({}, (llam[0] || {}).d); const opEsc = dEsc.OP_ID; delete dEsc.OP_ID;
+  const epEsc = dEsc.EPISODIO_ABIERTO; delete dEsc.EPISODIO_ABIERTO;
   eq('★ viaja EPISODIO_ESCALA a la cama 3 con ECF 4 y la firma', JSON.stringify(dEsc), JSON.stringify({ idCama: '3', escala: 'ECF', valor: '4', items: '', firma: 'MCC' }));
   si('…con el OP_ID de la intención que le puso el embudo (así un reintento que ya aterrizó no se repite)', /^op_[A-Za-z0-9_-]{5,61}$/.test(opEsc || ''));
+  eq('…y con el paciente de la tarjeta al abrir la calculadora (la cama 3 es de «p3»: el servidor lo compara con quien ocupa la cama)', epEsc, 'p3');
   si('…y el formulario NO se abrió', await p.evaluate(() => !document.getElementById('sp').classList.contains('on')));
   si('…ni se tocó el campo fEcf del formulario', await p.evaluate(() => (document.getElementById('fEcf') || {}).value === ''));
 

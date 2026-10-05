@@ -1249,6 +1249,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* TOAST */
 #tc{position:fixed;bottom:20px;right:20px;z-index:9998;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
 .toast{background:#1e293b;color:#fff;padding:9px 15px;border-radius:7px;font-size:.82rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.28);border-left:4px solid #3b82f6;animation:tin .28s ease;}
+/* 🔴 El servidor RECHAZÓ por cambio de paciente o por CONFLICTO (tanda 2, paso 14): no es un tropiezo cualquiera, es que la
+   pantalla iba a actuar sobre quien ya no estaba. Mismos tonos claros que «No se guardó» (`_EST_TONOS.error`). */
+.toast.toast-rojo{background:#fee2e2;color:#991b1b;border-left-color:#dc2626;}
 @keyframes tin{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
 
 /* TEXTO */
@@ -6140,7 +6143,7 @@ function gs(accion, datos, ok, fail) {
   api(accion, datos).then(d => { if (ok) ok(d); }).catch(e => {
     const msg = (e && e.message) || String(e);
     // Token GIS expirado a mitad de sesión → pedir re-login sin perder la vista
-    if (!_sesionCortadaALaEntrada(msg, msg) && msg !== 'offline') toast('❌ ' + msg);
+    if (!_sesionCortadaALaEntrada(msg, msg) && msg !== 'offline') toastError(e);
     if (fail) fail(msg);
   });
 }
@@ -6428,10 +6431,23 @@ function loading(on, msg='Cargando...') {
   $('lov').style.display = on ? 'flex' : 'none';
   if(msg) $('lmsg').textContent = msg;
 }
-function toast(msg, t=3200) {
+function toast(msg, t=3200, tono) {
   const c=$('tc'), el=document.createElement('div');
-  el.className='toast'; el.textContent=msg; c.appendChild(el);
+  el.className='toast'+(tono==='rojo'?' toast-rojo':''); el.textContent=msg; c.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
+}
+/* ❌ El aviso de un RECHAZO del servidor, en las puertas que actúan sobre «quien esté en la cama» (paso 14). Un error cualquiera
+   sigue siendo el aviso de siempre. Pero dos rechazos dicen algo más grave —«la cama cambió de paciente» y «otro se adelantó»
+   (CONFLICTO)—: son el candado de episodio haciendo su trabajo, y se quedan a la vista EN ROJO y más rato, porque quien los lee
+   estuvo a punto de dar el alta, anular o medir sobre otra persona. Se reconocen por `e.codigo` y, de respaldo, por la frase
+   que solo escribe el servidor (`_EP_CAMBIO_RE`: un servidor viejo, o un transporte que entregue el rechazo como falla). */
+function _esRechazoDeEpisodio(e){
+  return !!e && (e.codigo==='CONFLICTO' || _EP_CAMBIO_RE.test(String((e&&e.message)||e||'')));
+}
+function toastError(e, prefijo, t){
+  const m=(e&&e.message)?e.message:String(e);
+  if(_esRechazoDeEpisodio(e)) toast('❌ '+(prefijo||'')+m, Math.max(t||0, 8000), 'rojo');
+  else toast('❌ '+(prefijo||'')+m, t);
 }
 
 // ── TURNO LÓGICO: fecha y turno se calculan SIEMPRE como pareja ──
@@ -6619,6 +6635,16 @@ function _episodioDeTarjeta(idCama, fecha, tkey){
   if($('gDate').classList.contains('turno-hoy')) return String(viva.PATIENT_ID||'');
   const ev=_evoDeTarjetaRetro(idCama, tkey);
   return String((ev ? _camaDesdeEvo(viva, ev, fecha) : viva).PATIENT_ID||'');
+}
+/* 🔴 EL EPISODIO DE LA TARJETA VIVA, para los diálogos que se abren sobre la grilla de HOY (egreso, mover, escalas previas,
+   mediciones): el PATIENT_ID de quien ocupa la cama EN ESTE MOMENTO, o '' si la cama está LIBRE —una cama libre no tiene dueño
+   aunque su fila conserve un pid viejo, y es lo que el servidor entiende por «el destino estaba libre al elegir»—.
+   Se llama UNA vez, AL ABRIR el diálogo, y el resultado vive en la clausura de ese diálogo (tanda 2, paso 14). 🪤 NUNCA al
+   enviar: `DB` se vuelve a bajar solo (`recargarSilencioso`), y releerlo al enviar mandaría siempre al ocupante NUEVO, o sea
+   vaciaría el candado justo en el caso que existe para atrapar. Guardia: guardado_seguro_no_confirmado_g17.js (sección G). */
+function _epVivo(idCama){
+  const c=((typeof DB!=='undefined'&&DB)||[]).find(x=>String(x.ID_CAMA)===String(idCama));
+  return (c && (c.OCUPADA===true||c.OCUPADA==='TRUE')) ? String(c.PATIENT_ID||'') : '';
 }
 function _restarDiasISO(fecha, n){
   const [y,m,d]=String(fecha).split('-').map(Number);
@@ -7435,6 +7461,9 @@ function pasoPendSugerir(){
 function pasoPendDejar(texto){
   const t = String(texto || '').trim();
   const idCama = v('cBed');
+  /* 🔴 G14 · el episodio con que se abrió ESTE panel, tomado AHORA (al clic) y no después de la firma: `_pedirFirma` espera a una
+     persona y el panel puede haber cambiado de cama mientras tanto. Va siempre, también vacío. */
+  const ep = _episodioAbierto;
   if(!t || !idCama) return;
   // El mismo encargo no se deja dos veces: el servidor también lo rechaza, pero
   // avisarlo acá evita el viaje y el mensaje de error.
@@ -7445,7 +7474,7 @@ function pasoPendDejar(texto){
   }
   _pedirFirma().then(firma => {
     if(firma === null) return;
-    api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '' })
+    api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
         const i = $('pasoPendTxt'); if(i) i.value = '';
         if(_PEND_PUESTOS.indexOf(t) < 0) _PEND_PUESTOS.push(t);
@@ -7454,7 +7483,7 @@ function pasoPendDejar(texto){
         renderPend();
         toast('📌 Pendiente dejado para el turno que viene');
       })
-      .catch(e => toast('❌ No se pudo dejar el pendiente: ' + (e && e.message ? e.message : e)));
+      .catch(e => toastError(e, 'No se pudo dejar el pendiente: '));
   });
 }
 
@@ -7705,9 +7734,10 @@ function pendEpiPintar(){
 
 function pendEpiCerrar(id){
   const idCama = v('cBed'); if(!idCama || !id) return;
+  const ep = _episodioAbierto;   // 🔴 G14 · el episodio con que se abrió este panel, tomado al clic (ver pasoPendDejar)
   _pedirFirma().then(firma => {
     if(firma === null) return;
-    api('PEND_CERRAR', { idCama: String(idCama), id: String(id), firma: firma || '' })
+    api('PEND_CERRAR', { idCama: String(idCama), id: String(id), firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
         // La cama en memoria también: si no, vuelve a aparecer al repintar.
         const c = (typeof _camaPanel === 'function') ? _camaPanel() : null;
@@ -7721,7 +7751,7 @@ function pendEpiCerrar(id){
         pendEpiPintar();
         toast('✓ Pendiente cerrado');
       })
-      .catch(e => toast('❌ No se pudo cerrar: ' + (e && e.message ? e.message : e)));
+      .catch(e => toastError(e, 'No se pudo cerrar: '));
   });
 }
 
@@ -10782,6 +10812,10 @@ function egreso(id) {
   const c = DB.find(x => String(x.ID_CAMA) === String(id));
   if (!c || (c.OCUPADA !== true && c.OCUPADA !== 'TRUE')) { toast('La cama está libre.'); return; }
   EG_IDCAMA = id;
+  /* 🔴 G14 · el paciente que se vio AL ABRIR el diálogo (tanda 2, paso 14): es el que el servidor compara con quien ocupa la cama
+     al confirmar. Si mientras la ventana seguía abierta le dieron el alta a este y entró otro, el egreso se rechaza en vez de
+     archivarle el episodio al nuevo. Se toma de `c`, la cama que se está mostrando; NUNCA se relee de `DB` al confirmar. */
+  EG_EP = String(c.PATIENT_ID || '');
   $('egNombre').textContent = c.NOMBRE || '—';
   $('egCama').textContent = `Cama ${id} · ${c.COD_PACIENTE || '—'} · ${c.EDAD || '?'}a · ${c.SEXO || '—'} · ${c.DIAGNOSTICO || ''}`;
   $('egDestino').value = '';
@@ -10805,6 +10839,7 @@ function egreso(id) {
 }
 
 let EG_IDCAMA = null;
+let EG_EP = '';   // el episodio de la cama al abrir el diálogo de egreso (ver `egreso`)
 
 // Mapeo destino → motivo (para estadística REM y filtros)
 const DEST_TO_MOTIVO = {
@@ -10826,7 +10861,7 @@ const DEST_TO_MOTIVO = {
 function cerrarEgreso() {
   $('egMod').classList.remove('on');
   $('ovl').classList.remove('on');
-  EG_IDCAMA = null;
+  EG_IDCAMA = null; EG_EP = '';
 }
 
 function egDestinoChange() {
@@ -10861,20 +10896,24 @@ function confirmarEgreso() {
     $('egApache').focus(); return;
   }
   const motivo = DEST_TO_MOTIVO[destino] || destino;
-  const c = DB.find(x => String(x.ID_CAMA) === String(EG_IDCAMA));
+  // La cama y el episodio del diálogo, tomados AHORA y pasados por argumento: lo que sigue (una confirmación, un sondeo que
+  // refresca `DB`) no puede cambiarlos.
+  const idCama = EG_IDCAMA, ep = EG_EP;
+  const c = DB.find(x => String(x.ID_CAMA) === String(idCama));
   uiConfirm({
     icono:'🏠', titulo:'Confirmar egreso',
     mensaje:`<b>${escapeHtml(c?.NOMBRE || 'Paciente')}</b> egresa a <b>${escapeHtml(destino)}</b>.`,
-    detalle:`Motivo: ${motivo} · Se liberará la cama ${EG_IDCAMA} y el episodio pasará a Archivados.`,
+    detalle:`Motivo: ${motivo} · Se liberará la cama ${idCama} y el episodio pasará a Archivados.`,
     confirmar:'🏠 Confirmar egreso',
-  }).then(ok => { if (ok) _ejecutarEgreso(destino, motivo); });
+  }).then(ok => { if (ok) _ejecutarEgreso(destino, motivo, idCama, ep); });
 }
 
-function _ejecutarEgreso(destino, motivo) {
+function _ejecutarEgreso(destino, motivo, idCama, ep) {
   const btn = $('egConfBtn'); btn.disabled = true; btn.innerHTML = '⏳ Procesando...';
   loading(true, 'Procesando egreso...');
   gs('DAR_ALTA', {
-    idCama:         EG_IDCAMA,
+    idCama:         idCama,
+    EPISODIO_ABIERTO: ep,   // 🔴 G14 · el paciente que se vio al ABRIR el diálogo, siempre (también vacío): lo recibe por argumento
     motivoEgreso:   motivo,
     destinoEgreso:  destino,
     barthelEgreso:  v('egBarthel') || '',
@@ -10945,6 +10984,13 @@ function mover(id) {
     const destinoOcupada=!!(destino&&(destino.OCUPADA===true||destino.OCUPADA==='TRUE'));
     const accion=destinoOcupada?'INTERCAMBIAR_CAMAS':'MOVER_A_CAMA_VACIA';
     const datos=destinoOcupada?{idCamaA:MOVECAMA,idCamaB:id}:{idOrigen:MOVECAMA,idDestino:id};
+    /* 🔴 G14 · los dos pacientes que se vieron AL ELEGIR las camas (tanda 2, paso 14): `EPISODIO_ABIERTO` es el de la cama de
+       origen (A) y `EPISODIO_ABIERTO_B` el de la de destino (B) —vacío si estaba LIBRE: el servidor lo entiende como «el destino
+       estaba libre al elegir» y, si ahora lo ocupa otro, rechaza con CONFLICTO en vez de pisarlo—. Siempre, también vacíos. Se
+       toman acá, antes del diálogo de confirmar, y viven en `datos`: el sondeo que refresca `DB` mientras la persona decide no
+       puede cambiarlos. */
+    datos.EPISODIO_ABIERTO=_epVivo(MOVECAMA);
+    datos.EPISODIO_ABIERTO_B=_epVivo(id);
     // Equipos de la cama de ORIGEN que podrían viajar con el paciente (ago-2026,
     // reporte de Diego: María se trasladó con Airvo+V60+PB1 y nadie los movió a
     // mano). Traslado y movimiento de equipo son dos acciones separadas — se
@@ -15779,7 +15825,10 @@ function evGuardar(){
   // coordinación cuando el episodio está cerrado o la fecha no es de hoy.
   // El token viaja siempre que exista; si falta y hace falta, el toast del
   // rechazo dice el camino (entrar en 🔐 COORDINACIÓN).
-  const datos={ idCama:_evCama, patientId:_evPid, turnoKey:`${v('gDate')||hoy()}-${_evTurno}`, tipo:_evTipo,
+  /* 🔴 G14 · `EPISODIO_ABIERTO` = el paciente de la FILA con que se abrió el ➕ (`evAbrir` lo anotó en `_evPid`: en el Registro
+     Diario es el de la fila que se mira, no el de quien ocupa la cama hoy). Siempre, también vacío (un ➕ sin paciente en la
+     fila). `patientId`, el episodio declarado de siempre, sigue yendo igual: el servidor lo usa de respaldo. */
+  const datos={ idCama:_evCama, patientId:_evPid, EPISODIO_ABIERTO:_evPid, turnoKey:`${v('gDate')||hoy()}-${_evTurno}`, tipo:_evTipo,
     hora:v('evHora'), detalle:v('evDet'), proc:_evProcValor(),
     cultTipo:v('evCultTipo'), cultHallazgo:v('evCultHall'), firmaKine:firma,
     coordToken:(typeof COORD_TK!=='undefined'&&COORD_TK)||'' };
@@ -15842,7 +15891,8 @@ function anexoBorrar(btn){
     confirmar:'Borrar anexo'})
   .then(okC=>{ if(okC!==true) return;
     loading(true,'Borrando anexo...');
-    gs('ANULAR_ANEXO',{idProc:d.id, idCama:d.cama, coordToken:(typeof COORD_TK!=='undefined'&&COORD_TK)||''},
+    // 🔴 G14 · el episodio de la FILA donde se dibujó la × (`data-pid`): el del anexo que se borra, no el de quien ocupa la cama.
+    gs('ANULAR_ANEXO',{idProc:d.id, idCama:d.cama, EPISODIO_ABIERTO:String(d.pid||''), coordToken:(typeof COORD_TK!=='undefined'&&COORD_TK)||''},
       ()=>{ loading(false); toast('🗑️ Anexo borrado del registro'); recargarSilencioso(); },
       ()=>loading(false));
   });
@@ -19278,7 +19328,7 @@ function renderTabla(){
       const selloProc=(it,e)=>{
         const nom=_cEsc(it.n), corto=_cEsc(it.n.slice(0,14))+(it.n.length>14?'…':'');
         if(!it.ax) return `<span title="${nom}">${corto}</span>`;
-        return `<span class="sello-ax" title="${nom} · anotado con el ➕">${corto}<button type="button" class="sello-x" data-id="${_cEsc(it.ax.id)}" data-nombre="${nom}" data-cama="${_cEsc(String((e&&e.ID_CAMA)||''))}" onclick="anexoBorrar(this)" title="Borrar este anexo (${nom})">×</button></span>`;
+        return `<span class="sello-ax" title="${nom} · anotado con el ➕">${corto}<button type="button" class="sello-x" data-id="${_cEsc(it.ax.id)}" data-nombre="${nom}" data-cama="${_cEsc(String((e&&e.ID_CAMA)||''))}" data-pid="${_cEsc(String((e&&e.PATIENT_ID)||''))}" onclick="anexoBorrar(this)" title="Borrar este anexo (${nom})">×</button></span>`;
       };
       const cellsProc=(items,count,e)=>{const o=[];for(let i=0;i<count;i++){ if(i===count-1&&items.length>count) o.push(`<span title="${_cEsc(items.slice(count-1).map(x=>x.n).join(', '))}">+${items.length-(count-1)}</span>`); else o.push(items[i]?selloProc(items[i],e):dash);} return o;};
       const extub=e=>{ if(!e) return dash;
@@ -21050,12 +21100,14 @@ function escalaDesdeTarjeta(idCama, kind){
   const c=((typeof DB!=='undefined'&&DB)||[]).find(x=>String(x.ID_CAMA)===String(idCama))||{};
   if(_epRetro(c)){ toast('⚠️ La cama no tiene paciente ingresado'); return; }
   const esc=_EP_ESCALAS.find(e=>e.kind===kind); if(!esc) return;
+  // 🔴 G14 · el paciente de la tarjeta AL ABRIR la calculadora: vive en esta clausura, junto con la cama.
+  const ep=String(c.PATIENT_ID||'');
   _escalaOnApply=(valor,items)=>{
     _pedirFirma().then(firma=>{
       if(firma===null) return;
-      api('EPISODIO_ESCALA',{idCama:String(idCama), escala:esc.k, valor:valor, items:items||'', firma:firma})
+      api('EPISODIO_ESCALA',{idCama:String(idCama), escala:esc.k, valor:valor, items:items||'', firma:firma, EPISODIO_ABIERTO:ep})
         .then(r=>{ toast(`✅ ${esc.lbl} ${valor} guardado en el episodio${firma?' ('+firma+')':''}`); if(typeof recargarSilencioso==='function') recargarSilencioso(); })
-        .catch(e=>toast('❌ '+(e.message||e)));
+        .catch(e=>toastError(e));
     });
   };
   // La calculadora de siempre; el valor no va al formulario sino al callback.
@@ -21071,7 +21123,8 @@ function medirDesdeTarjeta(kind, idCama){
   const cfg=EVAL_MODALS[kind]; if(!cfg) return;
   // Si el panel de esa misma cama está abierto, se mide adentro como siempre.
   if(v('cBed')===String(idCama) && $('sp')?.classList.contains('on')){ abrirEvalModal(kind); return; }
-  _evalOnApply={kind:kind, idCama:String(idCama)};
+  // 🔴 G14 · el paciente de la tarjeta AL ABRIR la medición (`c`, la cama que se muestra): va con la cama en `_evalOnApply`.
+  _evalOnApply={kind:kind, idCama:String(idCama), ep:String(c.PATIENT_ID||'')};
   _evalLimpiarCampos(kind);
   abrirEvalModal(kind);
   _setEvalReadonly(kind,false);
@@ -21098,11 +21151,11 @@ function _evalAplicarTarjeta(kind){
   const escala={mrc:'MRC',fss:'FSS',cpax:'CPAX'}[kind];
   _pedirFirma().then(firma=>{
     if(firma===null) return;
-    api('EVAL_REGISTRAR',{idCama:st.idCama, escala:escala, total:total, items:_evalItemsDe(kind), firma:firma, origen:'tarjeta'})
+    api('EVAL_REGISTRAR',{idCama:st.idCama, escala:escala, total:total, items:_evalItemsDe(kind), firma:firma, origen:'tarjeta', EPISODIO_ABIERTO:st.ep})
       .then(r=>{ _evalOnApply=null; cerrarEvalModal(kind); _evalLimpiarCampos(kind);
         toast(`✅ ${escala==='CPAX'?'CPAx':escala} ${total} guardado en el episodio${firma?' ('+firma+')':''}`);
         if(typeof recargarSilencioso==='function') recargarSilencioso(); })
-      .catch(e=>toast('❌ '+(e.message||e)));
+      .catch(e=>toastError(e));
   });
 }
 /** Quién mide. Sin login, es la firma DECLARADA (la del formulario si está
@@ -21493,6 +21546,9 @@ function _renderEvStrip(s){
   el.classList.remove('hidden');
 }
 function anularEvento(tipo,lbl){
+  /* 🔴 G14 · la cama y el episodio con que se abrió ESTE panel, tomados al CLIC y no después de la confirmación (en la vista de
+     un día pasado, el que decide `_episodioAbierto`, F2). Es la puerta más grave: anular el evento de quien ya no está. */
+  const id=v('cBed'), ep=_episodioAbierto;
   uiConfirm({
     icono:'🗑️', titulo:'Anular evento del turno',
     mensaje:`Se anulará <b>${lbl}</b> de este turno.`,
@@ -21500,9 +21556,9 @@ function anularEvento(tipo,lbl){
     confirmar:'Anular evento', tono:'rojo',
   }).then(okC=>{
     if(!okC) return;
-    const id=v('cBed'), fecha=v('gDate')||hoy(), tkey=`${fecha}-${SHIFT}`;
+    const fecha=v('gDate')||hoy(), tkey=`${fecha}-${SHIFT}`;
     loading(true,'Anulando evento...');
-    gs('ANULAR_EVENTO',{idCama:id,turnoKey:tkey,tipo:tipo}, _=>{
+    gs('ANULAR_EVENTO',{idCama:id,turnoKey:tkey,tipo:tipo,EPISODIO_ABIERTO:ep}, _=>{
       loading(false); toast('🗑️ Evento anulado del turno');
       abrirPanel(id,false); recargar();
     }, ()=>loading(false));
@@ -22128,7 +22184,7 @@ function _gsaBandejaPintar(){
     '(por eso no aparecen en la hoja diaria). Dile de qué cama es cada uno y pasan al tiro.</div>'+
     _GSA_PEND.map((g,i)=>{
       const vals=Object.keys(g.valores||{}).map(k=>`${_GSA_ETIQ[k]||k} <b>${_escSt(String(g.valores[k]).replace('.',','))}</b>`).join(' · ');
-      const opts=camas.map(c=>`<option value="${_escSt(String(c.ID_CAMA))}"${String(c.ID_CAMA)===String(g.camaSugerida)?' selected':''}>Cama ${_escSt(String(c.ID_CAMA))} · ${_escSt(String(c.NOMBRE||''))}</option>`).join('');
+      const opts=camas.map(c=>`<option value="${_escSt(String(c.ID_CAMA))}" data-pid="${_escSt(String(c.PATIENT_ID||''))}"${String(c.ID_CAMA)===String(g.camaSugerida)?' selected':''}>Cama ${_escSt(String(c.ID_CAMA))} · ${_escSt(String(c.NOMBRE||''))}</option>`).join('');
       return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff;">
         <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
           <b style="font-size:.82rem;">📄 ${_escSt(g.ARCHIVO||'(sin nombre)')}</b>
@@ -22158,15 +22214,19 @@ function gsaBandejaAsignar(i){
   if(!idCama){ toast('Elige la cama.'); return; }
   if(!fecha||!hora){ toast('Falta la fecha o la hora de la toma.'); return; }
   const cama=(DB||[]).find(c=>String(c.ID_CAMA)===String(idCama));
+  /* 🔴 G14 · el paciente de la cama elegida TAL COMO se vio al pintar la bandeja (`data-pid` de la opción): lo que la persona
+     leyó en «Cama 7 · nombre» cuando decidió. Se toma AHORA, antes de confirmar, y no de `DB`, que el sondeo ya pudo refrescar. */
+  const _op=$('gsaCama'+i), _opSel=_op&&_op.selectedOptions&&_op.selectedOptions[0];
+  const ep=_opSel?String(_opSel.dataset.pid||''):'';
   uiConfirm({icono:'🧪', titulo:'Asignar el gas',
     mensaje:`Este examen quedará en la <b>cama ${_escSt(idCama)}</b>${cama&&cama.NOMBRE?' · '+_escSt(cama.NOMBRE):''}, con fecha ${_escSt(fecha.split('-').reverse().join('-'))} ${_escSt(hora)}.<br>Aparecerá en la hoja diaria y en la hoja impresa de ese paciente.`,
     confirmar:'Asignar'}).then(okk=>{
     if(!okk) return;
     loading(true,'Asignando…');
-    api('GSA_ASIGNAR',{idGsa:g.ID_GSA, idCama:idCama, fecha:fecha, hora:hora}).then(()=>{
+    api('GSA_ASIGNAR',{idGsa:g.ID_GSA, idCama:idCama, fecha:fecha, hora:hora, EPISODIO_ABIERTO:ep}).then(()=>{
       loading(false); toast('✅ Gas asignado a la cama '+idCama);
       _GSA_PEND.splice(i,1); _gsaBandejaPintar(); gsaBandejaContar();
-    }).catch(e=>{ loading(false); toast('❌ '+e.message, 6000); });
+    }).catch(e=>{ loading(false); toastError(e, '', 6000); });
   });
 }
 function gsaBandejaDescartar(i){

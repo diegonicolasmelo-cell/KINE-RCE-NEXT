@@ -8,7 +8,7 @@
 //
 // Esta guardia nace en el paso 12 con la parte del EMBUDO (el único `api()` por el que sale toda llamada); los pasos
 // 13 a 15 le suman las pantallas (guardar(), el episodio capturado en cada puerta, el ingreso con PATIENT_ID acuñado).
-// El paso 13 trae la sección F: guardar().
+// El paso 13 trae la sección F: guardar(). El paso 14 trae la G: el episodio capturado en cada puerta.
 //
 //   A · EL MISMO CONTRATO POR LOS DOS CAMINOS. `_apiGas` (google.script.run, dentro del iframe) y `_apiHttp` (fetch
 //       `text/plain`, la app instalada) entregan lo mismo: resuelven con los datos, o rechazan con un `Error` que lleva
@@ -28,6 +28,13 @@
 //       Los reintentos automáticos (3, 10 y 30 s) reenvían la MISMA foto con el MISMO OP_ID. Doble clic y Enter producen
 //       UNA llamada. Una respuesta repetida (`data.repetida`) luce igual que una limpia. Lo escrito mientras la llamada
 //       volaba no se da por guardado ni se pierde. Un guardado con `advertencias` dice «Guardado con aviso».
+//   G · EL EPISODIO SE CAPTURA AL ABRIR, EN CADA PUERTA (paso 14). El servidor ya compara EPISODIO_ABIERTO con quien ocupa
+//       la cama (pasos 4 a 8), pero solo si la pantalla lo MANDA. El valor es el PATIENT_ID de la tarjeta TAL COMO ESTABA
+//       al abrir el diálogo, y no se relee de `DB` al enviar: `DB` se refresca solo por sondeo (`recargarSilencioso`), y
+//       releerlo al enviar mandaría siempre al ocupante NUEVO, o sea vaciaría el candado. Cada puerta se prueba igual: se
+//       abre el diálogo para P, un sondeo REAL entrega la cama ya ocupada por Q (control: `DB` dice Q), y lo que sale al
+//       servidor tiene que seguir diciendo P. También con la cama de destino libre (viaja vacío, no se omite), y con el
+//       rechazo del servidor (CONFLICTO o «cambió de paciente») a la vista EN ROJO y no como un aviso cualquiera.
 //
 // 🪤 RELOJ CONGELADO. El vencimiento de 6 h depende de la hora: `Date` se congela en la página en un día inventado
 // (lunes 10-ago-2026, 11:00; ni Fiestas Patrias, ni cambio de turno, ni cierre de año) y se ADELANTA a mano con
@@ -827,6 +834,254 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     const texto = [gtxt, e.texto, e.titulo, e.modalTit, e.modalMsg, e.modalPrim, e.modalSec].join(' ');
     si('★ …y los textos nuevos no traen emojis posteriores a 2019 (solo texto y ✓ ⚠ ⏳ de siempre)',
       [...texto].every(c => c.codePointAt(0) < 0x2800), JSON.stringify([...texto].filter(c => c.codePointAt(0) >= 0x2800)));
+    await p.cerrar();
+  }
+
+  /* ══ G · EL EPISODIO SE CAPTURA AL ABRIR, EN CADA PUERTA ═══════════════ */
+  console.log('\nG · El episodio se captura AL ABRIR el diálogo y no se relee de la base al enviar');
+  const CAMA_G = (id, pid, extra) => Object.assign({ ID_CAMA: String(id), OCUPADA: true, PATIENT_ID: pid, NOMBRE: 'Paciente ' + id, EDAD: 61, SEXO: 'M',
+    DIAGNOSTICO: 'Dx', COD_PACIENTE: 'C' + id, VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'ACVC', FECHA_INGRESO: '2026-08-05', FECHA_INICIO_SOPORTE: '2026-08-05' }, extra || {});
+  // Una página con la cama 2 de P, la 3 de R y la 5 libre (con un PATIENT_ID viejo que la fila conserva: una cama libre no tiene dueño).
+  async function abrirG(camas) {
+    const p = await abrir({ modo: 'gas' });
+    await p.evaluate(c => {
+      window.__toasts = [];
+      $('gDate').value = '2026-08-10'; $('gDate').classList.add('turno-hoy'); SHIFT = 'Dia';
+      DB = c; renderGrid();
+      // La firma del formulario es lo primero que mira `_pedirFirma`: así no se abre el cuadro de «¿quién midió?».
+      const f = $('fFirma'); if (![...f.options].some(o => o.value === 'KIN')) f.insertAdjacentHTML('beforeend', '<option value="KIN">KIN</option>');
+      f.value = 'KIN';
+    }, camas || [CAMA_G(2, 'pP'), CAMA_G(3, 'pR'), CAMA_G(5, 'pViejo', { OCUPADA: false })]);
+    return p;
+  }
+  /* UN SONDEO DE VERDAD: el servidor entrega las camas cambiadas y corre `recargarSilencioso()`, que es lo que hace la pantalla
+     sola cada tanto. Devuelve cómo ve la pantalla cada cama DESPUÉS (el control: si no cambió, la prueba no prueba nada). */
+  async function sondear(p, cambios, evos) {
+    await p.evaluate(([cambios, evos]) => {
+      const nuevas = JSON.parse(JSON.stringify(DB)).map(c => Object.assign(c, cambios[c.ID_CAMA] || {}));
+      window.__srv.reglas['GET_TODAS_CAMAS'] = [{ tipo: 'ok', data: nuevas }];
+      if (evos) window.__srv.reglas['GET_EVOS_DEL_DIA'] = [{ tipo: 'ok', data: evos }];
+      recargarSilencioso();
+    }, [cambios, evos || null]);
+    await p.waitForTimeout(250);
+    return p.evaluate(() => Object.fromEntries(DB.map(c => [c.ID_CAMA, (c.OCUPADA === true || c.OCUPADA === 'TRUE') ? c.PATIENT_ID : ''])));
+  }
+  const fin = (p) => p.waitForTimeout(250);
+  const unaSalida = async (p, accion) => { const l = await salidas(p, accion); return l.length === 1 ? l[0].datos : null; };
+  const con = (d, k) => d !== null && Object.prototype.hasOwnProperty.call(d, k);
+  const ROJO = 'Esta cama cambió de paciente mientras tenías el diálogo abierto. No se hizo nada.';
+  const CONFLICTO = 'La cama 2 ya fue ocupada por otro paciente mientras llenabas este ingreso. No se guardó nada.';
+
+  /* ── G1 · el egreso: el pid se toma al ABRIR el diálogo y viaja por argumento ── */
+  {
+    const p = await abrirG();
+    await p.evaluate(() => { egreso('2'); });
+    const v1 = await sondear(p, { 2: { PATIENT_ID: 'pQ', NOMBRE: 'Otro paciente' } });
+    await p.evaluate(() => { $('egDestino').value = 'Domicilio'; const f = $('egFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN'; confirmarEgreso(); });
+    const v2 = await sondear(p, { 2: { PATIENT_ID: 'pS' } });
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'DAR_ALTA');
+    eq('G1 · (control) el sondeo SÍ cambió la cama 2 en la pantalla: ahora la ve de otro (dos veces)', [v1['2'], v2['2']], ['pQ', 'pS']);
+    eq('★★ G1 · DAR_ALTA manda EPISODIO_ABIERTO = el paciente que se vio AL ABRIR el diálogo (no el que ocupa la cama al enviar)', d && d.EPISODIO_ABIERTO, 'pP');
+    eq('   …sobre la cama que se abrió', d && d.idCama, '2');
+    await p.cerrar();
+  }
+
+  /* ── G2 · intercambio: epA y epB al elegir las dos camas ── */
+  {
+    const p = await abrirG();
+    await p.evaluate(() => { mover('2'); mover('3'); });          // elige el origen y el destino: abre el diálogo de confirmar
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' }, 3: { PATIENT_ID: 'pT' } });
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'INTERCAMBIAR_CAMAS');
+    eq('G2 · (control) tras el sondeo la pantalla ve a otros en las dos camas', [v['2'], v['3']], ['pQ', 'pT']);
+    eq('★★ G2 · INTERCAMBIAR_CAMAS manda el paciente de la cama A y el de la B tal como estaban al elegirlas', [d && d.EPISODIO_ABIERTO, d && d.EPISODIO_ABIERTO_B], ['pP', 'pR']);
+    eq('   …y las dos camas', [d && d.idCamaA, d && d.idCamaB], ['2', '3']);
+    await p.cerrar();
+  }
+
+  /* ── G3 · traslado a cama vacía: el destino libre viaja VACÍO (no se omite), aunque la fila conserve un pid viejo ── */
+  {
+    const p = await abrirG();
+    await p.evaluate(() => { mover('2'); mover('5'); });
+    const v = await sondear(p, { 5: { OCUPADA: true, PATIENT_ID: 'pZ' } });      // otra persona ingresó en el destino mientras se confirmaba
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'MOVER_A_CAMA_VACIA');
+    eq('G3 · (control) el destino, que estaba libre al elegirlo, ahora lo ocupa otro', v['5'], 'pZ');
+    eq('★★ G3 · MOVER_A_CAMA_VACIA manda el origen tal como estaba', d && d.EPISODIO_ABIERTO, 'pP');
+    si('★★ …y el destino VACÍO («estaba libre al elegir»): la clave viaja, con cadena vacía, y NO es el pid viejo de la fila ni el de quien llegó',
+      con(d, 'EPISODIO_ABIERTO_B') && d.EPISODIO_ABIERTO_B === '', JSON.stringify(d));
+    await p.cerrar();
+  }
+
+  /* ── G4 · anular un evento, desde el panel abierto: el pid con que se abrió el panel ── */
+  const abrirPanelG = async (p, cama) => {
+    await regla(p, 'GET_EVO_TURNO', { tipo: 'ok', data: { actual: null, previa: null, pronoAbierto: '' } });
+    await p.evaluate(id => { abrirPanel(id, false, false); }, cama);
+    await p.waitForTimeout(500);
+  };
+  {
+    const p = await abrirG();
+    await abrirPanelG(p, '2');
+    eq('G4 · (control) el panel abrió el episodio de la tarjeta', await p.evaluate(() => _episodioAbierto), 'pP');
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await p.evaluate(() => { anularEvento('pve_ext', 'PVE'); });
+    // Con el cuadro de confirmar abierto, la persona (o un aviso) abre OTRA cama: la cama y el episodio ya estaban tomados
+    await abrirPanelG(p, '3');
+    const ahora = await p.evaluate(() => [v('cBed'), _episodioAbierto]);
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'ANULAR_EVENTO');
+    eq('   …y el sondeo cambió la cama, y el panel de ahora es el de la 3', [v['2'], ahora], ['pQ', ['3', 'pR']]);
+    eq('★★ G4 · ANULAR_EVENTO manda la cama y el episodio con que se abrió el panel AL CLIC (no los del panel de ahora)', [d && d.EPISODIO_ABIERTO, d && d.idCama], ['pP', '2']);
+    await p.cerrar();
+  }
+
+  /* ── G5 · pendientes: el pid se toma al CLIC, antes de pedir la firma (que espera a una persona) ── */
+  {
+    const p = await abrirG();
+    await abrirPanelG(p, '2');
+    // La firma tarda: entre el clic y la firma pasa un sondeo (la cama ya es de otro)
+    await p.evaluate(() => { window.__firmas = []; window._pedirFirma = () => new Promise(r => { window.__firmas.push(() => r('KIN')); }); });
+    await p.evaluate(() => { pasoPendDejar('Medir PIM'); pendEpiCerrar('PEND_VIEJO'); });
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await abrirPanelG(p, '3');                                   // y entre tanto se abre OTRA cama
+    await p.evaluate(() => { window.__firmas.forEach(f => f()); });
+    await fin(p);
+    const a = await unaSalida(p, 'PEND_ABRIR'), c = await unaSalida(p, 'PEND_CERRAR');
+    eq('G5 · (control) mientras se esperaba la firma la cama pasó a otro y se abrió el panel de la 3', [v['2'], await p.evaluate(() => [v('cBed'), _episodioAbierto])], ['pQ', ['3', 'pR']]);
+    eq('★★ G5 · PEND_ABRIR manda el episodio con que se abrió el panel', [a && a.EPISODIO_ABIERTO, a && a.idCama], ['pP', '2']);
+    eq('★★ G5 · PEND_CERRAR manda el episodio con que se abrió el panel', [c && c.EPISODIO_ABIERTO, c && c.idCama], ['pP', '2']);
+    await p.cerrar();
+  }
+
+  /* ── G6 · el ➕: el pid de la fila que se mira; y vacío viaja vacío ── */
+  const anexarG = (p, pidFila) => p.evaluate(pid => {
+    evAbrir('2', null, pid); evTipo('otro');
+    $('evDet').value = 'nota de prueba';
+    const f = $('evFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN';
+  }, pidFila);
+  {
+    const p = await abrirG();
+    await anexarG(p, 'pP');
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await p.evaluate(() => { evGuardar(); });
+    await fin(p);
+    const d = await unaSalida(p, 'ANEXAR_EVENTO');
+    eq('G6 · (control) la cama ya es de otro', v['2'], 'pQ');
+    eq('★★ G6 · ANEXAR_EVENTO manda EPISODIO_ABIERTO = el paciente de la fila con que se abrió el ➕', d && d.EPISODIO_ABIERTO, 'pP');
+    eq('   …y el patientId declarado (el respaldo de siempre) sigue ahí, igual', d && d.patientId, 'pP');
+    await p.cerrar();
+  }
+  {
+    const p = await abrirG();
+    await anexarG(p, '');
+    await p.evaluate(() => { evGuardar(); });
+    await fin(p);
+    const d = await unaSalida(p, 'ANEXAR_EVENTO');
+    si('★ G6b · un ➕ sin paciente en la fila manda EPISODIO_ABIERTO VACÍO (la clave viaja, no se omite)', con(d, 'EPISODIO_ABIERTO') && d.EPISODIO_ABIERTO === '', JSON.stringify(d));
+    await p.cerrar();
+  }
+
+  /* ── G7 · la × de un anexo: el pid de la fila del Registro donde se dibujó ── */
+  {
+    const p = await abrirG();
+    const EVOS = [{ ID_CAMA: '2', TURNO_KEY: '2026-08-10-Dia', PATIENT_ID: 'pP', PAC_NOMBRE: 'Paciente 2', PAC_SEXO: 'M', PAC_EDAD: 61, PAC_DIAGNOSTICO: 'Dx',
+      VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC', DIA_ESTADIA: 5, DIAS_VM: 5, PROC_RESUMEN: 'KTM 1', PLAN_FIRMA_KINE: 'KIN',
+      ANEXOS: [{ id: 'PROC_A', nombre: 'KTM 1', ts: 't1' }] }];
+    await p.evaluate(e => { EVOS_DIA = e; EVO_SET = new Set(['2']); ATAB = 'P'; setTab('P'); renderTabla(); }, EVOS);
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } }, EVOS);
+    const hay = await p.evaluate(() => document.querySelectorAll('#notionTable .sello-x').length);
+    eq('G7 · (control) el Registro dibujó la × del anexo y la cama ya es de otro', [hay, v['2']], [1, 'pQ']);
+    await p.evaluate(() => { document.querySelector('#notionTable .sello-x').click(); });
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'ANULAR_ANEXO');
+    eq('★★ G7 · ANULAR_ANEXO manda el episodio de la fila del Registro (el del anexo), no el de quien ocupa la cama ahora', [d && d.EPISODIO_ABIERTO, d && d.idProc, d && d.idCama], ['pP', 'PROC_A', '2']);
+    await p.cerrar();
+  }
+
+  /* ── G8 · escala previa a la UCI y medición desde la tarjeta: el pid de la tarjeta al abrir ── */
+  {
+    const p = await abrirG();
+    await p.evaluate(() => { escalaDesdeTarjeta('2', 'barthel'); });
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await p.evaluate(() => { _escalaOnApply(70, 'items'); });
+    await fin(p);
+    const d = await unaSalida(p, 'EPISODIO_ESCALA');
+    eq('G8 · (control) la cama ya es de otro', v['2'], 'pQ');
+    eq('★★ G8 · EPISODIO_ESCALA manda el episodio de la tarjeta al abrir la escala', [d && d.EPISODIO_ABIERTO, d && d.idCama, d && d.escala], ['pP', '2', 'BARTHEL']);
+    await p.cerrar();
+  }
+  {
+    const p = await abrirG();
+    await p.evaluate(() => { medirDesdeTarjeta('mrc', '2'); });
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await p.evaluate(() => { for (let i = 1; i <= 6; i++) { $('fMrcD' + i).value = '4'; $('fMrcI' + i).value = '4'; } _evalAplicarTarjeta('mrc'); });
+    await fin(p);
+    const d = await unaSalida(p, 'EVAL_REGISTRAR');
+    eq('G8b · (control) la cama ya es de otro', v['2'], 'pQ');
+    eq('★★ G8b · EVAL_REGISTRAR manda el episodio de la tarjeta al abrir la medición', [d && d.EPISODIO_ABIERTO, d && d.idCama, d && d.escala], ['pP', '2', 'MRC']);
+    await p.cerrar();
+  }
+
+  /* ── G9 · asignar un gas: el pid de la cama elegida, tal como se pintó la bandeja ── */
+  {
+    const p = await abrirG();
+    await p.evaluate(() => {
+      _GSA_PEND = [{ ID_GSA: 'g1', ARCHIVO: 'gsa2.pdf', valores: { PH: 7.4 }, FECHA: '2026-08-10', HORA: '08:30', camaSugerida: '2' }];
+      $('gsaMod').classList.add('on'); _gsaBandejaPintar();
+    });
+    const v = await sondear(p, { 2: { PATIENT_ID: 'pQ' } });
+    await p.evaluate(() => { $('gsaCama0').value = '2'; gsaBandejaAsignar(0); });
+    await p.evaluate(() => { _ucFin(true); });
+    await fin(p);
+    const d = await unaSalida(p, 'GSA_ASIGNAR');
+    eq('G9 · (control) la cama ya es de otro (la bandeja no se repintó)', v['2'], 'pQ');
+    eq('★★ G9 · GSA_ASIGNAR manda el paciente de la cama elegida TAL COMO se vio al pintar la bandeja', [d && d.EPISODIO_ABIERTO, d && d.idCama], ['pP', '2']);
+    await p.cerrar();
+  }
+
+  /* ── G10 · el guardado de la evolución (el que ya lo hacía) sigue mandándolo tras un sondeo ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    await p.evaluate(() => { DB[0].PATIENT_ID = 'pQ'; });                  // el sondeo ya entregó otro paciente en la cama
+    await apretar(p);
+    await p.clock.runFor(30);
+    const d = await unaSalida(p, GUARDAR);
+    eq('★ G10 · GUARDAR_EVOLUCION sigue mandando el episodio con que se abrió el formulario, aunque la base ya diga otro', d && d.EPISODIO_ABIERTO, 'p2');
+    await p.cerrar();
+  }
+
+  /* ── G11 · el rechazo por cambio de paciente / CONFLICTO se ve EN ROJO; un error cualquiera, no ── */
+  const toastsDe = p => p.evaluate(() => [...document.querySelectorAll('#tc .toast')].map(t => ({
+    texto: t.textContent, rojo: t.classList.contains('toast-rojo'), fondo: getComputedStyle(t).backgroundColor, color: getComputedStyle(t).color })));
+  for (const caso of [
+    { n: 'por gs() · el egreso (VALIDACION con «cambió de paciente»)', accion: 'DAR_ALTA', e: { tipo: 'rechazo', error: ROJO, codigo: 'VALIDACION' }, msg: ROJO, rojo: true,
+      correr: () => { egreso('2'); $('egDestino').value = 'Domicilio'; const f = $('egFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN'; confirmarEgreso(); _ucFin(true); } },
+    { n: 'por gs() · el egreso (CONFLICTO)', accion: 'DAR_ALTA', e: { tipo: 'rechazo', error: CONFLICTO, codigo: 'CONFLICTO' }, msg: CONFLICTO, rojo: true,
+      correr: () => { egreso('2'); $('egDestino').value = 'Domicilio'; const f = $('egFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN'; confirmarEgreso(); _ucFin(true); } },
+    { n: 'por api().catch · un pendiente (CONFLICTO)', accion: 'PEND_ABRIR', e: { tipo: 'rechazo', error: CONFLICTO, codigo: 'CONFLICTO' }, msg: CONFLICTO, rojo: true,
+      correr: () => { $('cBed').value = '2'; pasoPendDejar('Medir PIM'); } },
+    { n: 'por api().catch · la escala (cambió de paciente)', accion: 'EPISODIO_ESCALA', e: { tipo: 'rechazo', error: ROJO, codigo: 'VALIDACION' }, msg: ROJO, rojo: true,
+      correr: () => { escalaDesdeTarjeta('2', 'barthel'); _escalaOnApply(70, 'x'); } },
+    { n: 'un error CUALQUIERA (VALIDACION sin la frase) NO se pinta de rojo: sigue siendo el aviso de siempre', accion: 'DAR_ALTA', e: { tipo: 'rechazo', error: 'Falta la firma (prueba).', codigo: 'VALIDACION' }, msg: 'Falta la firma (prueba).', rojo: false,
+      correr: () => { egreso('2'); $('egDestino').value = 'Domicilio'; const f = $('egFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN'; confirmarEgreso(); _ucFin(true); } },
+  ]) {
+    const p = await abrirG();
+    await regla(p, caso.accion, caso.e);
+    await p.evaluate(caso.correr);
+    await p.waitForTimeout(400);
+    const t = (await toastsDe(p)).filter(x => x.texto.indexOf(caso.msg) > -1);
+    eq('★ G11 · ' + caso.n + ': el aviso con el motivo sale', t.length, 1);
+    eq('   …' + (caso.rojo ? 'EN ROJO' : 'sin rojo'), t[0] && t[0].rojo, caso.rojo);
+    if (caso.rojo) {
+      si('   …y el rojo es de TEMA CLARO (fondo claro, texto oscuro)', !!t[0] && claro(t[0].fondo) && !claro(t[0].color), JSON.stringify(t[0]));
+      si('   …sin emojis posteriores a 2019 (el ❌ de siempre y texto)', !!t[0] && [...t[0].texto].every(c => c.codePointAt(0) < 0x2800), JSON.stringify(t[0] && t[0].texto));
+    }
     await p.cerrar();
   }
 
