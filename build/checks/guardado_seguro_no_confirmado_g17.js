@@ -8,6 +8,7 @@
 //
 // Esta guardia nace en el paso 12 con la parte del EMBUDO (el único `api()` por el que sale toda llamada); los pasos
 // 13 a 15 le suman las pantallas (guardar(), el episodio capturado en cada puerta, el ingreso con PATIENT_ID acuñado).
+// El paso 13 trae la sección F: guardar().
 //
 //   A · EL MISMO CONTRATO POR LOS DOS CAMINOS. `_apiGas` (google.script.run, dentro del iframe) y `_apiHttp` (fetch
 //       `text/plain`, la app instalada) entregan lo mismo: resuelven con los datos, o rechazan con un `Error` que lleva
@@ -21,9 +22,17 @@
 //       (vence a las 6 h), siempre en try/catch: con el almacenamiento caído la pantalla funciona igual.
 //       🔒 Lo que queda en localStorage es una huella y un id, nunca el contenido: el paquete lleva texto clínico.
 //
+//   F · guardar(): UNA INTENCIÓN, VARIOS INTENTOS, Y LA PANTALLA DICE LO QUE SABE (paso 13). A los 45 s sin respuesta la
+//       franja pasa a «No confirmado» (ÁMBAR) con el texto conservado, y NUNCA dice «Guardado» ni «No se guardó» (no lo
+//       sabe); la llamada original sigue viva: un éxito tardío corrige a «Guardado», un rechazo tardío a «No se guardó».
+//       Los reintentos automáticos (3, 10 y 30 s) reenvían la MISMA foto con el MISMO OP_ID. Doble clic y Enter producen
+//       UNA llamada. Una respuesta repetida (`data.repetida`) luce igual que una limpia. Lo escrito mientras la llamada
+//       volaba no se da por guardado ni se pierde. Un guardado con `advertencias` dice «Guardado con aviso».
+//
 // 🪤 RELOJ CONGELADO. El vencimiento de 6 h depende de la hora: `Date` se congela en la página en un día inventado
 // (lunes 10-ago-2026, 11:00; ni Fiestas Patrias, ni cambio de turno, ni cierre de año) y se ADELANTA a mano con
-// `window.__t`. No se espera nada.
+// `window.__t`. No se espera nada. La sección F necesita además temporizadores falsos (45 s no se esperan): usa
+// `page.clock` de Playwright, que dobla Date y setTimeout juntos, y avanza el reloj a mano.
 //
 // Uso: node build/checks/guardado_seguro_no_confirmado_g17.js (requiere playwright-core)
 'use strict';
@@ -61,12 +70,15 @@ const BOOT = { ahora: '2026-08-10 11:00:00', yo: { email: '', firma: 'DMV', dev:
    viajó: lo que de verdad llega al servidor es una copia, no el objeto de quien llamó) y la respuesta sale de la cola
    `window.__srv.reglas[ACCION]` (una por llamada) o, si no hay, del defecto: los datos de arranque o un ok vacío.
    Tipos de respuesta: ok · rechazo · falla (el servidor no contestó) · nulo (contestó vacío) · html (solo HTTP) · colgado. */
-const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID }) => {
-  const Real = Date;
-  function Falso(...a) { return a.length ? new Real(...a) : new Real(window.__t); }
-  Falso.now = () => window.__t; Falso.parse = Real.parse; Falso.UTC = Real.UTC; Falso.prototype = Real.prototype;
-  if (window.__t === undefined) window.__t = t0;
-  window.Date = Falso;
+const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
+  // relojPW: el reloj lo maneja Playwright (page.clock: Date Y temporizadores falsos). Sin él (secciones A a E) solo se dobla Date.
+  if (!relojPW) {
+    const Real = Date;
+    function Falso(...a) { return a.length ? new Real(...a) : new Real(window.__t); }
+    Falso.now = () => window.__t; Falso.parse = Real.parse; Falso.UTC = Real.UTC; Falso.prototype = Real.prototype;
+    if (window.__t === undefined) window.__t = t0;
+    window.Date = Falso;
+  }
 
   if (almacen === 'metodos') {            // el almacenamiento «existe» pero cada uso lanza (cuota llena, sitio bloqueado)
     const boom = function () { throw new Error('SecurityError: almacenamiento no disponible'); };
@@ -79,24 +91,36 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID }) => {
   if (sinUUID) { try { crypto.randomUUID = undefined; } catch (e) {} }
 
   const DEFECTO = { GET_BOOT: boot, GET_ARCHIVADOS: [], ACCESO_ESTADO: { activo: false, dentro: false } };
-  window.__srv = { llamadas: [], cuerpos: [], reglas: {} };
+  window.__srv = { llamadas: [], cuerpos: [], reglas: {}, pendientes: [] };
   function decidir(accion, datos, token) {
     window.__srv.llamadas.push({ accion: accion, datos: JSON.parse(JSON.stringify(datos === undefined ? null : datos)), token: token || null });
     const cola = window.__srv.reglas[accion];
     if (cola && cola.length) return cola.shift();
     return { tipo: 'ok', data: DEFECTO[accion] !== undefined ? DEFECTO[accion] : null };
   }
+  window.__srv.contestar = (accion, n, x) => {
+    const q = window.__srv.pendientes.find(y => y.accion === accion && y.n === n);
+    if (!q) return false;
+    q.responder(x); return true;
+  };
   if (modo === 'gas') {
     window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler(fail) { return {
       api(accion, datos, token) {
         const r = decidir(accion, datos, token);
-        setTimeout(() => {
-          if (r.tipo === 'ok') ok({ ok: true, data: r.data });
-          else if (r.tipo === 'rechazo') ok(r.sinCodigo ? { ok: false, error: r.error } : { ok: false, error: r.error, codigo: r.codigo });
-          else if (r.tipo === 'falla') fail({ message: r.mensaje || 'boom' });
-          else if (r.tipo === 'nulo') ok(null);
-          /* colgado: nadie contesta */
-        }, r.retraso || 0);
+        const responder = x => {
+          if (x.tipo === 'ok') ok({ ok: true, data: x.data });
+          else if (x.tipo === 'rechazo') ok(x.sinCodigo ? { ok: false, error: x.error } : { ok: false, error: x.error, codigo: x.codigo });
+          else if (x.tipo === 'falla') fail({ message: x.mensaje || 'boom' });
+          else if (x.tipo === 'nulo') ok(null);
+        };
+        /* colgado: nadie contesta… hasta que la guardia lo decida (`contestar`): así se prueba la respuesta TARDÍA de una
+           llamada que parecía perdida. `n` = el orden de esa llamada entre las de su misma acción. */
+        if (r.tipo === 'colgado') {
+          const n = window.__srv.llamadas.filter(q => q.accion === accion).length - 1;
+          window.__srv.pendientes.push({ accion, n, responder });
+          return;
+        }
+        setTimeout(() => responder(r), r.retraso || 0);
       }
     }; } }; } } } };
   } else {
@@ -121,13 +145,14 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID }) => {
 
   // Una página nueva por escenario, en un contexto propio: su localStorage no se mezcla con el de otro.
   async function abrir(opc) {
-    const o = Object.assign({ modo: 'gas', almacen: null, sinUUID: false }, opc || {});
+    const o = Object.assign({ modo: 'gas', almacen: null, sinUUID: false, relojPW: false }, opc || {});
     const ctx = await navegador.newContext({ viewport: { width: 1100, height: 900 } });
     const p = await ctx.newPage();
     p.on('pageerror', e => errores.push('[' + o.modo + (o.almacen ? '/' + o.almacen : '') + '] ' + e.message));
-    await p.addInitScript(PRELUDIO, { modo: o.modo, t0: T0, boot: BOOT, exec: EXEC_FALSO, almacen: o.almacen, sinUUID: o.sinUUID });
+    if (o.relojPW) await p.clock.install({ time: T0 });     // Date y temporizadores falsos desde ANTES de cargar la página
+    await p.addInitScript(PRELUDIO, { modo: o.modo, t0: T0, boot: BOOT, exec: EXEC_FALSO, almacen: o.almacen, sinUUID: o.sinUUID, relojPW: o.relojPW });
     await p.goto('file://' + IDX);
-    await p.waitForTimeout(700);
+    if (o.relojPW) await p.clock.runFor(1500); else await p.waitForTimeout(700);
     await p.evaluate(() => { window.__srv.llamadas = []; window.__srv.cuerpos = []; });
     p.cerrar = () => ctx.close();
     return p;
@@ -442,8 +467,371 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID }) => {
     await p.cerrar();
   }
 
+  /* ══ F · guardar(): UNA INTENCIÓN, VARIOS INTENTOS, Y LA PANTALLA DICE LO QUE SABE ═ */
+  console.log('\nF · guardar(): 45 s sin respuesta, reintentos 3/10/30 s, una sola llamada y estados honestos');
+  const GUARDAR = 'GUARDAR_EVOLUCION';
+  const FORM_TXT = 'bipedestación asistida';
+  // El formulario lleno como lo llenaría un colega (la hemodinamia y la vía aérea son obligatorias y NO se rellenan solas:
+  // una guardia que las pusiera sola taparía el caso «nadie la miró»).
+  const llenar = (p, texto) => p.evaluate(t => {
+    const f = $('fFirma'); if (![...f.options].some(o => o.value === 'KIN')) f.innerHTML = '<option value="KIN">KIN</option>';
+    f.value = 'KIN';
+    $('fHEst').value = 'Estable'; $('fDVA').value = 'Sin requerimientos'; $('fVA').value = 'Natural';
+    $('fPlanes').value = t; _transAvisoOk = true; _formDirty = true;
+  }, texto || FORM_TXT);
+  const abrirCama = async (p, cama, pid) => {
+    await p.evaluate(([id, pid]) => {
+      $('gDate').value = '2026-08-10'; SHIFT = 'Dia';
+      DB = [{ ID_CAMA: id, OCUPADA: true, PATIENT_ID: pid, NOMBRE: 'Paciente ' + id, VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' }];
+      renderGrid(); abrirPanel(id, false, false);
+    }, [cama, pid]);
+    await p.clock.runFor(600);
+    await llenar(p);
+  };
+  // Una página nueva con el reloj de Playwright, el panel de la cama abierto y lleno. `p.t` = ms desde que se aprieta guardar.
+  async function abrirGuardar(cama, pid) {
+    const p = await abrir({ modo: 'gas', relojPW: true });
+    await p.evaluate(() => {
+      localStorage.clear();
+      window.__toasts = []; window.toast = m => window.__toasts.push(String(m));
+      window.__recargas = 0; window.recargarSilencioso = () => { window.__recargas++; };
+      window.gs = (a, d, okf) => { if (okf) okf(a === 'GET_EVO_TURNO' ? { actual: null, previa: null, pronoAbierto: '' } : null); };
+    });
+    await abrirCama(p, cama || '2', pid || 'p2');
+    p.t = 0;
+    return p;
+  }
+  const irA = async (p, seg) => { const ms = Math.round(seg * 1000) - p.t; if (ms > 0) { await p.clock.runFor(ms); p.t += ms; } };
+  const apretar = p => p.evaluate(() => { guardar(); });
+  const contestar = (p, n, x) => p.evaluate(([n, x]) => window.__srv.contestar('GUARDAR_EVOLUCION', n, x), [n, x]);
+  const llamadasG = p => salidas(p, GUARDAR);
+  const pantalla = p => p.evaluate(() => {
+    const e = $('gEstadoGuardado'), m = $('avErrOvl');
+    return {
+      estado: e.dataset.estado, visible: !e.classList.contains('hidden'),
+      texto: e.textContent.replace(/\s+/g, ' ').trim(), titulo: e.title || '',
+      botones: [...e.querySelectorAll('button')].map(b => b.textContent.trim()),
+      modal: m.classList.contains('on'), modalTit: $('avErrTit').textContent.trim(), modalMsg: $('avErrMsg').textContent.trim(),
+      modalPrim: $('avErrReint').textContent.trim(), modalSec: $('avErrSec').textContent.trim(),
+      btn: $('btnGuardar').textContent.trim(), btnOff: $('btnGuardar').disabled, avanzaOff: $('pasoAvanza').disabled,
+      dirty: _formDirty, planes: $('fPlanes').value, paso: PASO_ACTUAL,
+      borrador: Object.keys(localStorage).filter(k => /^CAMA_\d+_/.test(k)).length,
+      toasts: window.__toasts.slice(), recargas: window.__recargas, reintento: typeof _reintentoGuardado === 'function',
+    };
+  });
+  const OK_DATA = { TEXTO_GENERADO: 'texto del servidor', patientId: 'p2' };
+  const mismaFoto = ll => ll.length > 0 && ll.every(x => JSON.stringify(x.datos) === JSON.stringify(ll[0].datos)) && valido(ll[0].datos.OP_ID);
+  const exitos = e => e.toasts.filter(t => /Evolución guardada correctamente/.test(t)).length;
+  // «Guardado» / «No se guardó» son AFIRMACIONES: en ámbar la pantalla no puede hacer ninguna de las dos.
+  const afirma = t => /Guardado|No se guard[oó]|NO se guard[oó]/.test(t);
+  // Tema claro = el fondo es claro (luminancia relativa alta). El ámbar #fef3c7 es claro aunque su canal azul sea 199.
+  const claro = c => { const n = String(c).match(/\d+/g).map(Number); return (0.2126 * n[0] + 0.7152 * n[1] + 0.0722 * n[2]) / 255 > 0.8; };
+
+  /* ── F0 · las constantes de tiempo viven en UN lugar ── */
+  {
+    const p = await abrirGuardar();
+    const k = await p.evaluate(() => ({ r: typeof GUARDADO_REINTENTOS_MS === 'undefined' ? null : [...GUARDADO_REINTENTOS_MS], e: typeof GUARDADO_ESPERA_MS === 'undefined' ? null : GUARDADO_ESPERA_MS }));
+    eq('★ F0 · los reintentos (3, 10 y 30 s) y la espera (45 s) viven en UN lugar, ajustable', k, { r: [3000, 10000, 30000], e: 45000 });
+    await p.cerrar();
+  }
+
+  /* ── F1 · el servidor no contesta: reintentos 3/10/30 s con la misma foto, y a los 45 s ÁMBAR ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    let ll = await llamadasG(p), e = await pantalla(p);
+    eq('★ F1 · al guardar sale UNA llamada y la franja dice «Guardando…» (neutra) con el botón apagado',
+      [ll.length, e.estado, /Guardando/.test(e.texto), e.btnOff], [1, 'guardando', true, true]);
+    await irA(p, 2.9); ll = await llamadasG(p);
+    eq('   …a los 2,9 s todavía una sola llamada', ll.length, 1);
+    await irA(p, 3.1); ll = await llamadasG(p);
+    eq('★ a los 3 s sale el primer reintento (2 llamadas)', ll.length, 2);
+    await irA(p, 9.9); ll = await llamadasG(p);
+    eq('   …a los 9,9 s siguen siendo 2', ll.length, 2);
+    await irA(p, 10.1); ll = await llamadasG(p);
+    eq('★ a los 10 s sale el segundo (3 llamadas)', ll.length, 3);
+    await irA(p, 29.9); ll = await llamadasG(p);
+    eq('   …a los 29,9 s siguen siendo 3', ll.length, 3);
+    await irA(p, 30.1); ll = await llamadasG(p);
+    eq('★ a los 30 s sale el tercero (4 llamadas) y no hay más', ll.length, 4);
+    si('★ los cuatro envíos son EXACTAMENTE la misma foto del payload, con el MISMO OP_ID válido', mismaFoto(ll), JSON.stringify(opIds(ll)));
+    await irA(p, 44.9); e = await pantalla(p);
+    eq('   …a los 44,9 s todavía «Guardando» (nada que afirmar aún), sin cuadro', [e.estado, e.modal], ['guardando', false]);
+    await irA(p, 45.1); e = await pantalla(p);
+    eq('★★ a los 45 s sin respuesta la franja pasa a «No confirmado» en ÁMBAR', [e.estado, /No confirmado/.test(e.texto), e.visible], ['noconfirmado', true, true]);
+    si('★★ …y NUNCA dice «Guardado» ni «No se guardó» (no lo sabe)', !afirma(e.texto) && !afirma(e.modalTit), e.texto + ' | ' + e.modalTit);
+    si('   …con su botón «Reintentar ahora»', e.botones.join('|') === 'Reintentar ahora', e.botones.join('|'));
+    si('   …y sin «Reintentando…» (ya no queda ningún reintento automático)', !/Reintentando/.test(e.texto), e.texto);
+    si('★ el cuadro del centro dice «No confirmado» y explica: no sabemos si se guardó, el texto sigue aquí',
+      e.modal && e.modalTit === 'No confirmado' && /No sabemos si se guardó/.test(e.modalMsg) && /Tu texto sigue aquí/.test(e.modalMsg), JSON.stringify([e.modal, e.modalTit, e.modalMsg]));
+    eq('   …con «Reintentar ahora» y «Seguir editando»', [e.modalPrim, e.modalSec], ['Reintentar ahora', 'Seguir editando']);
+    eq('★ el texto escrito se CONSERVA: el formulario intacto, sin guardar, con borrador local', [e.planes, e.dirty, e.borrador], [FORM_TXT, true, 1]);
+    eq('   …y el botón de guardar queda disponible (se puede volver a apretar)', [e.btnOff, e.avanzaOff], [false, false]);
+    si('   …y hay un reintento armado', e.reintento);
+    si('★ las llamadas siguen vivas: nadie se descartó (los 4 envíos quedaron pendientes de respuesta)', await p.evaluate(() => window.__srv.pendientes.filter(q => q.accion === 'GUARDAR_EVOLUCION').length === 4));
+    await irA(p, 120); ll = await llamadasG(p);
+    eq('   …y pasado el tiempo NO salen más reintentos solos («después, solo manual»)', ll.length, 4);
+
+    // F2 · un éxito TARDÍO corrige el estado
+    await contestar(p, 1, { tipo: 'ok', data: OK_DATA });
+    await p.clock.runFor(20);
+    e = await pantalla(p);
+    eq('★★ F2 · el éxito TARDÍO corrige la franja a «Guardado hh:mm» (verde)', [e.estado, /^✓ Guardado \d{2}:\d{2}$/.test(e.texto)], ['ok', true]);
+    eq('   …cierra el cuadro de «No confirmado»', e.modal, false);
+    eq('   …y recién ahí el formulario deja de estar sin guardar y el borrador muere', [e.dirty, e.borrador, e.reintento], [false, 0, false]);
+    eq('   …con UN solo «Evolución guardada» y UN solo refresco del censo', [exitos(e), e.recargas], [1, 1]);
+    // las otras tres llamadas contestan después (repetidas): no se vuelve a aplicar nada
+    await contestar(p, 0, { tipo: 'ok', data: Object.assign({ repetida: true }, OK_DATA) });
+    await contestar(p, 2, { tipo: 'ok', data: Object.assign({ repetida: true }, OK_DATA) });
+    await contestar(p, 3, { tipo: 'ok', data: Object.assign({ repetida: true }, OK_DATA) });
+    await p.clock.runFor(20);
+    e = await pantalla(p);
+    eq('   …y las otras tres respuestas (repetidas) no lo aplican otra vez', [e.estado, exitos(e), e.recargas], ['ok', 1, 1]);
+    await p.cerrar();
+  }
+
+  /* ── F3 · un RECHAZO tardío pasa a «No se guardó» ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await irA(p, 46);
+    let e = await pantalla(p);
+    eq('F3 · (control) a los 46 s está en ámbar', e.estado, 'noconfirmado');
+    await contestar(p, 0, { tipo: 'rechazo', error: 'Falta la firma del kinesiólogo (prueba).', codigo: 'VALIDACION' });
+    await p.clock.runFor(20);
+    e = await pantalla(p);
+    eq('★★ el rechazo TARDÍO pasa la franja a «No se guardó» (rojo): ahora sí lo sabe', [e.estado, /NO se guardó/.test(e.texto)], ['error', true]);
+    eq('   …y el cuadro del centro dice «No se guardó» con el motivo del servidor', [e.modal, e.modalTit, e.modalMsg], [true, 'No se guardó', 'Falta la firma del kinesiólogo (prueba).']);
+    eq('   …el formulario y el borrador se conservan', [e.planes, e.dirty, e.borrador], [FORM_TXT, true, 1]);
+    // y si la llamada de más atrás contestara ok, el éxito corrige también el rojo (el dato SÍ quedó)
+    await p.cerrar();
+  }
+
+  /* ── F4 · la respuesta REPETIDA del reintento luce igual que una limpia, y corta los reintentos ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await irA(p, 3.1);
+    let ll = await llamadasG(p);
+    eq('F4 · (control) el primer intento no contestó y salió el reintento', ll.length, 2);
+    await contestar(p, 1, { tipo: 'ok', data: Object.assign({ repetida: true }, OK_DATA) });
+    await p.clock.runFor(20);
+    let e = await pantalla(p);
+    eq('★ F4 · la respuesta REPETIDA (`data.repetida`) muestra «Guardado hh:mm» igual que una limpia', [e.estado, /^✓ Guardado \d{2}:\d{2}$/.test(e.texto)], ['ok', true]);
+    await irA(p, 120); ll = await llamadasG(p);
+    eq('   …y con la respuesta en mano ya no salen los reintentos de 10 y 30 s (se cancelan)', ll.length, 2);
+    eq('   …sin duplicar nada: un solo «Evolución guardada»', exitos(await pantalla(p)), 1);
+    await p.cerrar();
+  }
+
+  /* ── F5 · doble clic y Enter producen UNA llamada ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await p.evaluate(() => { pasoIr(5); });
+    const misma = await p.evaluate(() => { window.__a = guardar(); window.__b = guardar(); return { igual: window.__a === window.__b, esPromesa: !!window.__a && typeof window.__a.then === 'function' }; });
+    eq('★ F5 · un segundo guardar() devuelve LA MISMA promesa (no abre otra llamada)', misma, { igual: true, esPromesa: true });
+    await p.evaluate(() => { $('btnGuardar').click(); $('btnGuardar').click(); const a = $('pasoAvanza'); a.click(); a.click(); });
+    await p.evaluate(() => { $('pasoAvanza').focus(); });
+    await p.keyboard.press('Enter'); await p.keyboard.press('Enter');
+    await p.clock.runFor(100);
+    const ll = await llamadasG(p), e = await pantalla(p);
+    eq('★ F5 · doble clic en los dos botones y Enter: UNA sola llamada al servidor', ll.length, 1);
+    eq('   …y el botón del camino queda apagado mientras vuela', [e.avanzaOff, e.btnOff], [true, true]);
+    await p.cerrar();
+  }
+
+  /* ── F6 · los reintentos reenvían la FOTO; lo escrito mientras vuela no se da por guardado ni se pierde ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await p.evaluate(() => { pasoIr(5); });     // en el paso 5 el guardado bueno SALTA al relato (paso 6): con cambios en vuelo no debe
+    await apretar(p);
+    await p.evaluate(() => { const t = $('fPlanes'); t.value = 'agregué esto con la llamada en vuelo'; t.dispatchEvent(new Event('input', { bubbles: true })); });
+    await irA(p, 31);
+    const ll = await llamadasG(p);
+    eq('F6 · (control) salieron los 4 envíos', ll.length, 4);
+    si('★ los reintentos reenvían la FOTO de lo que se apretó (no lo que se escribió después), con el mismo OP_ID',
+      mismaFoto(ll) && ll.every(x => x.datos.PLAN_PLANES === FORM_TXT), JSON.stringify(ll.map(x => x.datos.PLAN_PLANES)));
+    await contestar(p, 0, { tipo: 'ok', data: OK_DATA });
+    await p.clock.runFor(20);
+    const e = await pantalla(p);
+    eq('★★ F6 · el guardado confirma la foto, pero lo escrito DESPUÉS sigue sin guardar (el formulario no se da por guardado)', [e.estado, e.dirty], ['ok', true]);
+    eq('   …el texto nuevo sigue en pantalla', e.planes, 'agregué esto con la llamada en vuelo');
+    const bor = await p.evaluate(() => { const k = Object.keys(localStorage).filter(x => /^CAMA_2_/.test(x))[0]; return k ? (JSON.parse(localStorage.getItem(k)).campos || {}).fPlanes : null; });
+    eq('★★ …y el borrador local NO se borra: queda con lo último que se escribió', bor, 'agregué esto con la llamada en vuelo');
+    eq('   …y la pantalla no salta de paso por un guardado que ya no es el formulario (sigue en el mismo paso)', e.paso, 5);
+    await p.cerrar();
+  }
+
+  /* ── F7 · el servidor no contestó rápido (la red cayó): ámbar de inmediato, reintentando 3/10/30 s, y al agotarse sigue en ámbar ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' });
+    await apretar(p);
+    await p.clock.runFor(10); p.t += 10;
+    let e = await pantalla(p), ll = await llamadasG(p);
+    eq('★ F7 · apenas falla la primera (sin respuesta): «No confirmado» ámbar y dice que sigue reintentando', [ll.length, e.estado, /Reintentando/.test(e.texto)], [1, 'noconfirmado', true]);
+    eq('   …todavía sin el cuadro del centro (quedan reintentos)', e.modal, false);
+    si('   …y todavía no dice «Guardado» ni «No se guardó»', !afirma(e.texto), e.texto);
+    await irA(p, 3.1); await irA(p, 10.1); await irA(p, 31);
+    ll = await llamadasG(p); e = await pantalla(p);
+    eq('★ a los 31 s salieron los 4 envíos con la misma foto y el mismo OP_ID', [ll.length, mismaFoto(ll)], [4, true]);
+    eq('★★ agotados, se queda en ÁMBAR (nunca «No se guardó»): sin «Reintentando…», con el cuadro y «Reintentar ahora»',
+      [e.estado, /Reintentando/.test(e.texto), e.modal, e.modalTit, e.botones.join('|')], ['noconfirmado', false, true, 'No confirmado', 'Reintentar ahora']);
+    si('   …ni «Guardado» ni «No se guardó» en ninguna parte', !afirma(e.texto) && !afirma(e.modalTit) && !afirma(e.btn), e.texto + ' | ' + e.modalTit + ' | ' + e.btn);
+    // «Reintentar ahora»: el mismo paquete, el mismo OP_ID, y si el servidor contesta ok pasa a «Guardado»
+    await p.evaluate(() => { $('avErrReint').click(); });
+    await p.clock.runFor(50);
+    ll = await llamadasG(p); e = await pantalla(p);
+    eq('★ «Reintentar ahora» manda UN envío más, con la misma foto y el mismo OP_ID', [ll.length, mismaFoto(ll)], [5, true]);
+    eq('   …y al contestar ok la franja pasa a «Guardado» y el cuadro se va', [e.estado, /^✓ Guardado \d{2}:\d{2}$/.test(e.texto), e.modal, e.dirty, e.borrador], ['ok', true, false, false, 0]);
+    await p.cerrar();
+  }
+
+  /* ── F8 · el servidor CONTESTÓ que no: rojo de una vez, sin reintentar solo ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'rechazo', error: 'APACHE II fuera de rango (prueba).', codigo: 'VALIDACION' });
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    let e = await pantalla(p);
+    eq('★ F8 · un rechazo del servidor (VALIDACION) es «No se guardó» (rojo) al tiro', [e.estado, /NO se guardó/.test(e.texto), e.modal, e.modalTit], ['error', true, true, 'No se guardó']);
+    eq('   …con el formulario, el borrador y el botón de volver a guardar intactos', [e.planes, e.dirty, e.borrador, e.btnOff], [FORM_TXT, true, 1, false]);
+    await irA(p, 120);
+    eq('★ …y NO se reintenta solo (reenviar lo mismo recibiría lo mismo): una sola llamada', (await llamadasG(p)).length, 1);
+    // Reintentar a mano manda los MISMOS datos
+    await p.evaluate(() => { $('avErrReint').click(); });
+    await p.clock.runFor(50);
+    const ll = await llamadasG(p); e = await pantalla(p);
+    eq('   …«Reintentar» a mano remanda lo mismo y, si sale bien, pasa a «Guardado»', [ll.length, ll[1] && ll[1].datos.PLAN_PLANES, e.estado], [2, FORM_TXT, 'ok']);
+    await p.cerrar();
+  }
+  {
+    // CONFLICTO también es el servidor contestando que no: rojo, y tampoco se reintenta solo
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'rechazo', error: 'La cama 2 ya fue ocupada por otro paciente mientras llenabas este ingreso. No se guardó nada. Tu formulario sigue abierto con lo que escribiste.', codigo: 'CONFLICTO' });
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    await irA(p, 120);
+    const e = await pantalla(p);
+    eq('★ F8b · un CONFLICTO del servidor es «No se guardó» (rojo), con una sola llamada', [e.estado, (await llamadasG(p)).length], ['error', 1]);
+    eq('   …y conserva el formulario y el borrador', [e.planes, e.borrador], [FORM_TXT, 1]);
+    await p.cerrar();
+  }
+
+  /* ── F9 · LOCK_TIMEOUT es «no se ejecutó»: se reintenta con el mismo OP_ID ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'rechazo', error: 'Sistema ocupado (otra escritura en curso). Reintenta.', codigo: 'LOCK_TIMEOUT' });
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    let e = await pantalla(p);
+    si('★ F9 · LOCK_TIMEOUT no es un «No se guardó» todavía: se reintenta solo', e.estado !== 'error' && !e.modal, e.estado);
+    await irA(p, 3.1);
+    await p.clock.runFor(20);
+    const ll = await llamadasG(p); e = await pantalla(p);
+    eq('★ …a los 3 s sale el reintento con el MISMO OP_ID y la misma foto', [ll.length, mismaFoto(ll)], [2, true]);
+    eq('   …y al salir bien pasa a «Guardado»', [e.estado, /^✓ Guardado \d{2}:\d{2}$/.test(e.texto)], ['ok', true]);
+    await p.cerrar();
+  }
+  {
+    // dos veces «sistema ocupado»: el servidor contestó dos veces que no se ejecutó → ahora sí «No se guardó»
+    const p = await abrirGuardar();
+    const LT = { tipo: 'rechazo', error: 'Sistema ocupado (otra escritura en curso). Reintenta.', codigo: 'LOCK_TIMEOUT' };
+    await regla(p, GUARDAR, LT, LT);
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    await irA(p, 3.1); await p.clock.runFor(20);
+    const e = await pantalla(p);
+    eq('F9b · el servidor contestó dos veces «sistema ocupado»: «No se guardó» (rojo), con su Reintentar', [e.estado, e.modal, e.reintento], ['error', true, true]);
+    await p.cerrar();
+  }
+
+  /* ── F10 · «Guardado con aviso» y las advertencias a la vista ── */
+  {
+    const p = await abrirGuardar();
+    const AV = ['Las mediciones de este turno no quedaron completas en la serie. Vuelve a guardar el turno para completarlas.'];
+    await regla(p, GUARDAR, { tipo: 'ok', data: Object.assign({ advertencias: AV }, OK_DATA) });
+    await apretar(p);
+    await p.clock.runFor(20);
+    const e = await pantalla(p);
+    eq('★ F10 · un guardado con advertencias dice «Guardado con aviso hh:mm»', [e.estado, /^✓ Guardado con aviso \d{2}:\d{2}$/.test(e.texto)], ['aviso', true]);
+    si('   …y las LISTA (en el aviso y en la franja)', e.toasts.some(t => t.indexOf(AV[0]) > -1) && e.titulo.indexOf(AV[0]) > -1, JSON.stringify([e.toasts, e.titulo]));
+    eq('   …y el formulario ya está guardado', [e.dirty, e.borrador], [false, 0]);
+    await p.cerrar();
+  }
+
+  /* ── F11 · la respuesta de OTRO panel no toca el que está abierto, y no lo bloquea ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p);
+    await p.clock.runFor(100); p.t += 100;
+    await p.evaluate(() => { _borradorGuardar(); _formDirty = false; cerrarPanel(true); });
+    await abrirCama(p, '3', 'p3');
+    await p.evaluate(() => { window.__toasts = []; });
+    await contestar(p, 0, { tipo: 'ok', data: OK_DATA });
+    await p.clock.runFor(20);
+    let e = await pantalla(p);
+    eq('★ F11 · la respuesta tardía del guardado de la cama 2 NO toca la franja ni el formulario de la cama 3',
+      [e.estado, e.dirty, e.planes], ['', true, FORM_TXT]);
+    eq('   …pero sí refresca el censo y limpia el borrador de la cama 2', [e.recargas, e.borrador], [1, 0]);
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p);
+    const ll = await llamadasG(p);
+    eq('★ …y el guardado en vuelo de la cama 2 NO impide guardar la cama 3', [ll.length, ll[1] && ll[1].datos.ID_CAMA], [2, '3']);
+    await p.cerrar();
+  }
+
+  /* ── F12 · apretar guardar de nuevo con la franja en ámbar: mismo contenido = misma intención; otro contenido = intención nueva ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await irA(p, 46);
+    await p.evaluate(() => { avErrCerrar(); });
+    await apretar(p);
+    let ll = await llamadasG(p);
+    eq('★ F12 · con la franja en ámbar se puede apretar guardar otra vez, y el mismo contenido lleva el MISMO OP_ID', [ll.length, ll[4] && ll[4].datos.OP_ID === ll[0].datos.OP_ID], [5, true]);
+    await p.evaluate(() => { const t = $('fPlanes'); t.value = 'cambié lo escrito'; t.dispatchEvent(new Event('input', { bubbles: true })); });
+    await p.evaluate(() => { guardar(); });
+    ll = await llamadasG(p);
+    const nuevo = ll[ll.length - 1];
+    eq('★ …y otro contenido es otra intención: otro paquete, OP_ID NUEVO', [ll.length, nuevo.datos.PLAN_PLANES, valido(nuevo.datos.OP_ID) && nuevo.datos.OP_ID !== ll[0].datos.OP_ID], [6, 'cambié lo escrito', true]);
+    await p.clock.runFor(50);
+    const e = await pantalla(p);
+    eq('   …y al contestar el servidor (ok por defecto) la franja dice «Guardado»', [e.estado, e.dirty], ['ok', false]);
+    // la respuesta tardía de la intención VIEJA no pisa lo que ya se confirmó
+    await contestar(p, 0, { tipo: 'rechazo', error: 'respuesta vieja y tardía (prueba)', codigo: 'VALIDACION' });
+    await p.clock.runFor(20);
+    eq('   …y un rechazo tardío de la intención vieja no ensucia lo ya confirmado', (await pantalla(p)).estado, 'ok');
+    await p.cerrar();
+  }
+
+  /* ── F13 · tema claro y sin emojis posteriores a 2019 ── */
+  {
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, { tipo: 'colgado' });
+    await apretar(p);
+    const colores = { guardando: await p.evaluate(() => getComputedStyle($('gEstadoGuardado')).backgroundColor) };
+    const gtxt = (await pantalla(p)).texto;
+    await irA(p, 46);
+    const e = await pantalla(p);
+    colores.noconfirmado = await p.evaluate(() => getComputedStyle($('gEstadoGuardado')).backgroundColor);
+    colores.modal = await p.evaluate(() => getComputedStyle($('avErrCard')).backgroundColor);
+    si('★ F13 · «Guardando…» y «No confirmado» y el cuadro van en TEMA CLARO', claro(colores.guardando) && claro(colores.noconfirmado) && claro(colores.modal), JSON.stringify(colores));
+    const texto = [gtxt, e.texto, e.titulo, e.modalTit, e.modalMsg, e.modalPrim, e.modalSec].join(' ');
+    si('★ …y los textos nuevos no traen emojis posteriores a 2019 (solo texto y ✓ ⚠ ⏳ de siempre)',
+      [...texto].every(c => c.codePointAt(0) < 0x2800), JSON.stringify([...texto].filter(c => c.codePointAt(0) >= 0x2800)));
+    await p.cerrar();
+  }
+
   eq('sin errores de JavaScript en ningún escenario', errores.filter(e => !/favicon/.test(e)), []);
   await navegador.close();
-  console.log(fails.length ? `\n❌ ${fails.length} FALLOS:\n  - ${fails.join('\n  - ')}` : '\n✅ guardado_seguro_no_confirmado_g17 (embudo y OP_ID): la pantalla distingue lo que el servidor contestó de lo que no.');
+  console.log(fails.length ? `\n❌ ${fails.length} FALLOS:\n  - ${fails.join('\n  - ')}` : '\n✅ guardado_seguro_no_confirmado_g17 (embudo, OP_ID y guardar()): la pantalla distingue lo que el servidor contestó de lo que no y no afirma lo que no sabe.');
   process.exit(fails.length ? 1 : 0);
 })().catch(e => { console.error('❌ la guardia reventó: ' + (e && e.stack || e)); process.exit(1); });

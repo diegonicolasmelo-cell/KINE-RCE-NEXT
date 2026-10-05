@@ -1733,6 +1733,11 @@ table.hj{border-collapse:separate;border-spacing:0;font-size:.7rem;width:100%;}
 /* Encima de cualquier modal de la app (400). Debajo del login (#loginOvl,
    9999), que es una toma de pantalla completa con su propio Reintentar. */
 #avErrOvl{z-index:800;}
+/* G17 · «No confirmado»: el mismo cuadro en ámbar (#b45309 / #92400e, los de la franja). El rojo queda para lo que SE SABE. */
+.av-err-card.av-err-ambar{border-color:#b45309;}
+.av-err-ambar .av-err-tit{color:#92400e;}
+.av-err-ambar .av-err-reint{background:#b45309;}
+.av-err-ambar .av-err-reint:hover,.av-err-ambar .av-err-reint:focus{background:#92400e;}
 
 /* ── v2: barra dev, fase clínica, chip COD ── */
 .devbar{background:#fef3c7;color:#92400e;font-size:.75rem;text-align:center;padding:4px;border-bottom:1px solid #fde68a;}
@@ -7749,6 +7754,7 @@ function abrirPanel(id, esIng, verFicha) {
   _relatoListo=false;         // turno recién abierto: todavía no hay relato guardado
   { const _pg=$('pasoGuardado'); if(_pg) _pg.innerHTML=''; }   // el «✓ Guardado» del panel anterior no se queda pegado
   _formDirty=false;           // panel recién abierto: sin cambios que perder
+  _panelSeq++;                // otro panel: lo que conteste un guardado del anterior ya no le toca a éste (G17)
   _limpiarHeredados();
   _marcarTextoGenerado('');   // editor de texto: parte sin edición manual
   $('kf').reset(); PROCS=[]; renderChips();
@@ -7953,6 +7959,7 @@ function cerrarPanel(force) {
   hide('btnCerrarPost');
   hide('rarea');
   _estadoGuardado(null); _reintentoGuardado=null; _cerrarTrasGuardar=false;
+  if(_sesionGuardado) _sesionGuardado.cerrado=true;   // lo que conteste un guardado en vuelo ya no toca esta pantalla (G17)
   actualizarTituloPanel('');
 }
 // H2: cerrar la pestaña con el panel abierto y cambios sin guardar dispara el
@@ -8001,6 +8008,18 @@ setInterval(_tickSinGuardar, 2000);
 // Guardado que quedó pendiente de reintentar a mano (lo arma guardar()).
 let _reintentoGuardado = null;
 
+/* 🔴 G17 · LOS TIEMPOS DEL GUARDADO, en UN solo lugar (decisión 8: ajustables sin buscar por el código).
+   · Si el servidor no contesta, el MISMO paquete con el MISMO OP_ID sale de nuevo a los 3, 10 y 30 s: si el primero había
+     aterrizado, el servidor reconoce el OP_ID y contesta lo ya hecho (`data.repetida`) sin repetir nada.
+   · A los 45 s sin respuesta la pantalla deja de decir «Guardando» y dice lo que sabe: «No confirmado». La llamada original
+     NO se descarta: si la respuesta llega tarde, corrige el estado. */
+const GUARDADO_REINTENTOS_MS = [3000, 10000, 30000];
+const GUARDADO_ESPERA_MS = 45000;
+/* La intención de guardado del panel abierto (`_guardadoIniciar`) y la promesa que mantiene UNA sola llamada en vuelo:
+   `guardar()` la devuelve en vez de abrir otra. Cada una lleva el `_panelSeq` del panel que la pidió. */
+let _sesionGuardado = null;
+let _guardadoVuelo = null;
+
 /* 🔴 EL EPISODIO QUE ABRIÓ ESTE FORMULARIO (G14, 4-oct-2026). `abrirPanel` anota aquí el PATIENT_ID que tenía la
    tarjeta de la cama en el MOMENTO DE ABRIR —lo que la persona estaba viendo cuando empezó a escribir; en la vista
    de un día pasado, la tarjeta de ESE día (`_episodioDeTarjeta`, F2) y no la cama en vivo—, y
@@ -8026,11 +8045,19 @@ const _EST_TONOS = {
   ok:       { fondo:'#dcfce7', borde:'#86efac', color:'#166534' },
   error:    { fondo:'#fee2e2', borde:'#fca5a5', color:'#991b1b' },
   borrador: { fondo:'#fef3c7', borde:'#fcd34d', color:'#92400e' },
+  /* 🔴 G17 · tres estados que dicen LO QUE SE SABE, ni más ni menos (tema claro, como todo):
+       guardando     neutro: salió la llamada y todavía no hay nada que afirmar
+       noconfirmado  ÁMBAR: el servidor no contestó; el primer intento pudo haber aterrizado. Ni «Guardado» ni «No se guardó»
+       aviso         el turno quedó guardado, pero una cola secundaria quedó a medias: el servidor lo dice en `advertencias` */
+  guardando:    { fondo:'#f1f5f9', borde:'#cbd5e1', color:'#334155' },
+  noconfirmado: { fondo:'#fef3c7', borde:'#f59e0b', color:'#92400e' },
+  aviso:        { fondo:'#fef9c3', borde:'#fde047', color:'#854d0e' },
 };
 
 function _estadoGuardado(modo, html){
   const e = $('gEstadoGuardado');
   if(!e) return;
+  e.title='';   // el rótulo largo de un estado (ámbar, aviso) no se queda pegado al siguiente
   if(!modo){ e.classList.add('hidden'); e.dataset.estado=''; e.innerHTML=''; return; }
   const t = _EST_TONOS[modo] || _EST_TONOS.ok;
   e.style.background=t.fondo; e.style.border='1px solid '+t.borde; e.style.color=t.color;
@@ -8038,7 +8065,33 @@ function _estadoGuardado(modo, html){
 }
 
 // O3 · queda a la vista mientras el panel esté abierto, sin tapar ningún campo.
-function _marcaGuardadoOK(d){ _reintentoGuardado=null; _estadoGuardado('ok','✓ Guardado '+_hhmm(d)); }
+/* G17 · `_marcaGuardadoAviso`: `avisos` = `data.advertencias` del servidor. El turno SÍ quedó guardado, pero algo secundario
+   (la serie de mediciones, el registro de reintubaciones) quedó a medias y la respuesta no se selló para que volver a
+   guardar lo complete. Se dice con todas sus letras: «Guardado con aviso» y la lista, que se lee en el aviso y en la franja.
+   Y un éxito que llega TARDE cierra el cuadro de «No confirmado» / «No se guardó» que hubiera quedado abierto. */
+function _marcaGuardadoOK(d){
+  _guardadoConfirmado();
+  _estadoGuardado('ok','✓ Guardado '+_hhmm(d));
+}
+function _marcaGuardadoAviso(avisos, d){
+  _guardadoConfirmado();
+  _estadoGuardado('aviso','✓ Guardado con aviso '+_hhmm(d));
+  const e=$('gEstadoGuardado'); if(e) e.title=avisos.join('\n');
+  toast('⚠ Guardado, pero: '+avisos.join(' · '), 9000);
+}
+// Lo que tienen en común: ya no hay nada que reintentar, y un cuadro de «No confirmado» / «No se guardó» abierto se cierra.
+function _guardadoConfirmado(){
+  _reintentoGuardado=null;
+  if(_avErrModo==='guardado') avErrCerrar();
+}
+
+/* G17 · ÁMBAR: el servidor NO contestó, y no se sabe si lo guardó. La franja no afirma nada («Guardado» sería mentir si
+   no llegó; «No se guardó» sería mentir si llegó y solo se perdió la respuesta). `quedan` = todavía hay reintentos
+   automáticos programados. El texto escrito sigue en pantalla, y el botón manda EL MISMO paquete con el MISMO OP_ID. */
+function _marcaNoConfirmado(quedan){
+  _estadoGuardado('noconfirmado','⚠ No confirmado'+(quedan?' · Reintentando…':'')+' <button type="button" data-nodirty onclick="reintentarGuardado()" style="font:inherit;border:1px solid #92400e;background:#fff;color:#92400e;border-radius:14px;padding:1px 9px;cursor:pointer;">Reintentar ahora</button>');
+  const e=$('gEstadoGuardado'); if(e) e.title='No sabemos si se guardó. Tu texto sigue aquí.';
+}
 
 // O3b · estado de ERROR persistente: se queda hasta que un guardado termine bien.
 // 🔴 La píldora NO se toca ni se reemplaza — es el estado PERSISTENTE del PRD y
@@ -8077,9 +8130,12 @@ function cerrarCamaTrasRechazo(){
 let _avErrModo = null;      // 'guardado' | 'carga' | null
 let _avErrAccion = null;    // lo que corre el botón «Reintentar»
 
-function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim){
+function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim, tono){
   const o=$('avErrOvl'); if(!o) return;
   _avErrModo=modo; _avErrAccion=(typeof accion==='function')?accion:null;
+  // G17 · 'ambar' = «No confirmado» (no sabemos): mismo cuadro, otro color y otro símbolo. El rojo es solo de lo que SE SABE que falló.
+  const _c=$('avErrCard'); if(_c) _c.classList.toggle('av-err-ambar', tono==='ambar');
+  const _i=document.querySelector('#avErrCard .av-err-ico'); if(_i) _i.textContent=(tono==='ambar')?'⚠':'❌';
   $('avErrTit').textContent=titulo;
   // textContent, no innerHTML: el detalle viene del servidor y no se interpreta.
   const m=$('avErrMsg'); m.textContent=detalle||''; m.style.display=detalle?'':'none';
@@ -8112,6 +8168,11 @@ function avisoErrorGuardado(detalle){
   _avErrAbrir('guardado', 'No se guardó', detalle||'', reintentarGuardado, 'Seguir editando');
 }
 
+// G17 · el guardado NO CONFIRMADO: mismo cuadro bloqueante que «No se guardó», pero en ámbar y sin afirmar nada.
+function avisoNoConfirmado(){
+  _avErrAbrir('guardado', 'No confirmado', 'No sabemos si se guardó. Tu texto sigue aquí.', reintentarGuardado, 'Seguir editando', 'Reintentar ahora', 'ambar');
+}
+
 // CARGA · mismo cuadro, otro título y su propia acción de reintento.
 function avisoErrorCarga(detalle, accion){
   _avErrAbrir('carga', 'No se pudo cargar', detalle||'', accion, 'Cerrar');
@@ -8129,7 +8190,7 @@ function reintentarGuardado(){
   avErrCerrar();   // venga del cuadro al centro o de la píldora, el cuadro se va
   if(typeof _reintentoGuardado!=='function') return;
   const f=_reintentoGuardado; _reintentoGuardado=null;
-  _estadoGuardado('error','⏳ Reintentando…');
+  _estadoGuardado('guardando','⏳ Reintentando…');
   f();
 }
 
@@ -8176,8 +8237,10 @@ function _borradorGuardar(){
   }catch(e){ console.warn('borrador no guardado', e && e.name); return false; }
 }
 
-function _borradorDescartar(idCama){
-  try{ localStorage.removeItem(_borradorLlave(idCama||$('cBed')?.value||'')); }catch(e){}
+/* `tkey` es opcional: un guardado que confirma cuando ya se abrió otra cama o cambió el turno borra SU borrador (la llave
+   del turno en que se apretó guardar), no el de lo que esté abierto ahora (G17). */
+function _borradorDescartar(idCama, tkey){
+  try{ localStorage.removeItem(_borradorLlave(idCama||$('cBed')?.value||'', tkey)); }catch(e){}
 }
 
 /* 🔴 ¿ESTE BORRADOR ES DE ESTE PACIENTE? (G14 + F2). UNA sola regla para las dos preguntas que se hacen sobre un
@@ -9562,7 +9625,7 @@ function transOfRegistrar(ev, ahora){
   const h=$(cf.hora);
   if(h){ h.value=inp.value; h.dispatchEvent(new Event('change',{bubbles:true})); }
   if(typeof cf.espejo==='function') cf.espejo();
-  _formDirty=true;
+  _formDirty=true; _formRev++;
   if(typeof _rtxtLive==='function') _rtxtLive();
   toast('📝 '+cf.label.charAt(0).toUpperCase()+cf.label.slice(1)+' anotada a las '+inp.value+' — revisa el bloque antes de guardar');
   _mostrarTransAviso(_avisosPreGuardado());   // el aviso resuelto desaparece solo
@@ -9861,6 +9924,10 @@ function _irAlCampo(id){
 }
 
 function guardar() {
+  /* 🔴 G17 · UNA sola llamada en vuelo por panel: un segundo toque (doble clic, Enter con el foco en el botón) devuelve la MISMA
+     promesa y no vuelve a validar ni a abrir otra llamada. Va ANTES de las validaciones a propósito. Con la franja en «No
+     confirmado» (sin reintentos por venir) la intención ya soltó el vuelo: apretar guardar otra vez es una intención nueva. */
+  if(_guardadoVuelo && _guardadoVuelo.seq===_panelSeq) return _guardadoVuelo.promesa;
   const id=v('cBed'), fecha=v('gDate')||hoy(), tkey=`${fecha}-${SHIFT}`;
   /* 🔴 EL CERO SE CONSERVA (G06, 4-oct-2026). Antes era `parseFloat(x)||null`, y como 0 es falso, un PEEP, un
      AutoPEEP, una PIC o un exceso de base de 0 salían como `null` y se guardaban VACÍOS (y al reabrir el turno
@@ -10456,98 +10523,258 @@ function guardar() {
   const _plantEnUso = (typeof _plantActiva==='function') && !!_plantActiva() && !!_rtV;
   datos.TEXTO_GENERADO = (datos.TEXTO_MANUAL || _plantEnUso) ? $('rtxt').value : datos.TEXTO_AUTO;
   _podarEventosPayload(datos);
-  const btn=$('btnGuardar'); btn.disabled=true; btn.textContent='⏳ Guardando...';
-  toast('💾 Guardando en servidor...');
-  const _exito=r=>{
-    btn.disabled=false; btn.textContent='✅ Guardado';
+  /* 🔴 G17 · Lo que viaja es una FOTO: una copia de lo que había en pantalla al apretar. Los reintentos reenvían ESA foto, no lo
+     que se escriba mientras tanto (eso queda en el formulario, sin guardar). Todos los valores son texto, números o
+     booleanos, así que una copia superficial es una copia entera. */
+  return _guardadoIniciar(Object.assign({}, datos), id, tkey);
+}
+
+/* ══ GUARDAR: UNA INTENCIÓN, VARIOS INTENTOS, Y LA PANTALLA DICE LO QUE SABE ══════════
+   (tanda 2 del guardado seguro, G16/G17, 5-oct-2026). Hasta hoy el guardado hacía UN intento, esperaba 3 s y hacía UNO
+   más; si fallaban los dos, la franja decía «NO se guardó». Eso afirmaba una certeza que no tenía: «fallar» era no
+   haber recibido respuesta, y el primer intento pudo haber aterrizado. De ahí salen la evolución dada por perdida
+   cuando sí estaba y la que se vuelve a escribir encima de la ya guardada. Además un solo intento sin respuesta dejaba
+   al botón en «Guardando…» para siempre (Apps Script puede tardar minutos en soltar una llamada).
+
+   La INTENCIÓN es esta pulsación de guardar con su foto del paquete; los INTENTOS son cada vez que la foto sale. Todos
+   los intentos llevan el mismo OP_ID (el embudo `api()` lo acuña por contenido), así que si uno aterrizó el servidor
+   reconoce a los demás y contesta lo ya hecho. La pantalla distingue tres cosas, por `e.codigo` / `e.sinRespuesta`
+   del embudo y no por el texto (el texto queda como respaldo de los servidores viejos):
+
+     · el servidor CONTESTÓ que no (VALIDACION, CONFLICTO, sesión cortada…): «No se guardó», rojo, y no se reintenta solo;
+     · el servidor NO contestó (red caída, tiempo agotado): ÁMBAR «No confirmado». Reintenta solo a los 3, 10 y 30 s y a los 45 s
+       sin respuesta lo dice; la llamada original sigue VIVA, y si su respuesta llega tarde corrige el estado (un éxito
+       tardío pasa a «Guardado», un rechazo tardío a «No se guardó»). Agotados los reintentos se queda en ámbar: nunca pasa a
+       «No se guardó» ni a «Guardado» por su cuenta;
+     · el servidor contestó «ahora no» (LOCK_TIMEOUT, un fallo interno, «No se pudo comprobar tu sesión») o el error no
+       salió del embudo: lo de siempre, un reintento a los 3 s y, si vuelve a pasar, «No se guardó».
+
+   🪤 Una sola llamada en vuelo por panel: un segundo toque o un Enter devuelven la MISMA promesa. Es comodidad, no defensa:
+   el servidor valida igual con el sello y el OP_ID. Y lo escrito mientras la llamada volaba NO se da por guardado: al
+   confirmarse solo se limpia «sin guardar» y se borra el borrador si el formulario no cambió desde la foto (`_formRev`).
+   Guardia: guardado_seguro_no_confirmado_g17.js (sección F). */
+
+/* ¿Qué le pasó a UN intento? 'ambiguo' = no hubo respuesta; 'rechazo' = el servidor contestó que no y reenviar lo mismo
+   recibe lo mismo; 'reintentable' = el servidor contestó «ahora no» (LOCK_TIMEOUT es «no se ejecutó»; INTERNO es un
+   tropiezo de Sheets, la causa más común) o es un Error SIN bandera —no sale del embudo: un fallo de la propia pantalla o un
+   banco de pruebas—, que conserva lo que siempre se hizo con él: un reintento a los 3 s. */
+function _guardadoClase(e){
+  const m=(e&&e.message)||String(e||'');
+  /* El TEXTO que solo el servidor escribe prueba que contestó, llegue como llegue (respaldo de los servidores viejos y de un
+     transporte que entregue un rechazo por el camino de las fallas): «cambió de paciente» es un rechazo, y «No se pudo
+     comprobar tu sesión» —la identidad se mira ANTES de ejecutar nada— dice que no se ejecutó y que se puede reintentar. */
+  if(_EP_CAMBIO_RE.test(m)) return 'rechazo';
+  if(_SES_SIN_COMPROBAR_RE.test(m)) return 'reintentable';
+  if(e && e.sinRespuesta) return 'ambiguo';
+  if(e && e.codigo && e.codigo!=='LOCK_TIMEOUT' && e.codigo!=='INTERNO') return 'rechazo';
+  return 'reintentable';
+}
+
+/* Los dos botones que guardan: el de siempre (oculto, el que usan las guardias) y el del camino (`pasoAvanza`, que en el
+   paso 5 es el que guarda). Mientras hay una llamada en vuelo los dos quedan apagados. */
+function _guardadoBotones(enVuelo, rotulo){
+  const b=$('btnGuardar'); if(b){ b.disabled=enVuelo; b.textContent=rotulo; }
+  const a=$('pasoAvanza'); if(!a) return;
+  if(enVuelo){ a.disabled=true; return; }
+  // En el paso 1 «Siguiente» tiene su propia regla (prevAvanceUI): no se enciende a ciegas.
+  if(PASO_ACTUAL===1 && typeof prevAvanceUI==='function') prevAvanceUI(); else a.disabled=false;
+}
+
+function _guardadoIniciar(foto, id, tkey){
+  // Otra intención en este MISMO panel releva a la anterior (el formulario es uno). Las de OTROS paneles siguen su curso:
+  // lo que escribió esa cama sigue sin guardar y sus reintentos no tienen por qué morir porque se abrió otra.
+  if(_sesionGuardado && _sesionGuardado.seq===_panelSeq) _sesionGuardado.cancelar();
+  const ctx={ id:String(id), tkey:tkey, seq:_panelSeq, rev:_formRev, ep:foto.EPISODIO_ABIERTO };
+  const S={ seq:_panelSeq, cancelada:false, cerrado:false, cancelar:null };
+  _sesionGuardado=S;
+
+  let hecho=false;                 // ya se aplicó un éxito: las respuestas repetidas de los demás intentos no se aplican otra vez
+  let rechazada=false;             // el servidor contestó que no (un éxito tardío todavía lo corrige)
+  let avisadoModal=false;          // el cuadro de «No confirmado» ya se mostró en esta ronda
+  let avisadoReint=false;          // el aviso de «reintentando» ya salió en esta ronda
+  let esperaVencida=false;         // pasaron los 45 s de esta ronda
+  let abiertas=0;                  // intentos sin respuesta todavía
+  let ambiguos=0, reintentables=0; // cuántos terminaron sin respuesta / con «ahora no»
+  let quedan=0;                    // reintentos automáticos aún programados
+  let ultimo={ m:'', tipo:'red' };
+  const timers=[]; let esperaT=null;
+  const nuevoVuelo=()=>{ const v={ seq:ctx.seq, soltar:null }; v.promesa=new Promise(r=>{ v.soltar=r; }); return v; };
+  let vuelo=nuevoVuelo();
+  _guardadoVuelo=vuelo;
+
+  const liberar=como=>{ if(_guardadoVuelo===vuelo) _guardadoVuelo=null; vuelo.soltar(como); };
+  const apagar=()=>{ timers.forEach(clearTimeout); timers.length=0; quedan=0; if(esperaT){ clearTimeout(esperaT); esperaT=null; } };
+  S.cancelar=()=>{ S.cancelada=true; apagar(); liberar('relevada'); };
+  /* ¿La pantalla sigue siendo la de esta intención? Si se cerró el panel, se abrió otro o se cambió de cama, la respuesta
+     NO toca el formulario, la franja ni los botones de lo que haya delante: solo avisa y refresca el censo. */
+  const vigente=()=>!S.cerrado && ctx.seq===_panelSeq && String(v('cBed'))===ctx.id;
+
+  const exito=r=>{
+    hecho=true; apagar(); liberar('ok');
+    const vig=vigente();
+    const cambio=_formRev!==ctx.rev;     // se escribió algo mientras la llamada volaba
+    const avisos=(r && Array.isArray(r.advertencias)) ? r.advertencias.filter(Boolean).map(String) : [];
+    if(vig) _guardadoBotones(false,'✅ Guardado');
     toast('✅ Evolución guardada correctamente');
     /* 🔴 G14 · El formulario ya es del paciente al que se guardó: un ingreso nace sin episodio, y desde este
        primer guardado el siguiente ya viaja con el suyo (y queda protegido si la cama cambia de dueño).
        Solo si el panel SIGUE siendo este: la respuesta de un guardado lento puede llegar cuando ya se abrió otra
        cama, y entonces el episodio de aquella no le corresponde a esta. */
-    if(r && r.patientId && _episodioAbierto===datos.EPISODIO_ABIERTO && String(v('cBed'))===String(id)) _episodioAbierto=String(r.patientId);
-    /* Texto DEFINITIVO. Si hubo edición manual, lo de pantalla ES lo guardado y
-       no se toca. Si no, se refleja el que confirmó el servidor — y desde aquí
-       queda CONGELADO (30-ago-2026): el turno ya está guardado, así que tocar
-       una casilla después no puede reescribir lo que quedó archivado. Antes se
-       marcaba como «generado» y seguía en vivo: ésa era la puerta por la que el
-       texto «se reiniciaba» al volver a hacer clic. */
-    if(!_textoManual){
-      $('rtxt').value = (r && r.TEXTO_GENERADO) || genTexto();
-      _rtxtGen = $('rtxt').value;
-      _rtxtGenBloq = (window._TXB_ULT||[]).slice();
-      _congelarTexto(true);
+    if(r && r.patientId && _episodioAbierto===ctx.ep && String(v('cBed'))===ctx.id) _episodioAbierto=String(r.patientId);
+    if(vig){
+      /* Texto DEFINITIVO. Si hubo edición manual, lo de pantalla ES lo guardado y
+         no se toca. Si no, se refleja el que confirmó el servidor — y desde aquí
+         queda CONGELADO (30-ago-2026): el turno ya está guardado, así que tocar
+         una casilla después no puede reescribir lo que quedó archivado. Antes se
+         marcaba como «generado» y seguía en vivo: ésa era la puerta por la que el
+         texto «se reiniciaba» al volver a hacer clic.
+         G17 · Con cambios hechos MIENTRAS la llamada volaba, el texto en pantalla ya es el del formulario nuevo: ponerle
+         el que confirmó el servidor (el de la foto) y congelarlo lo dejaría narrando lo viejo. */
+      if(!_textoManual && !cambio){
+        $('rtxt').value = (r && r.TEXTO_GENERADO) || genTexto();
+        _rtxtGen = $('rtxt').value;
+        _rtxtGenBloq = (window._TXB_ULT||[]).slice();
+        _congelarTexto(true);
+      }
+      show('rarea');
+      // SIN desplazarse al texto (Diego, 15-ago-2026: «que solo guarde antes de progresar»): guardar es para seguir
+      // con el próximo paciente. El texto queda disponible arriba de la barra por si hay que copiarlo, y ✖ Cerrar
+      // aparece en la misma barra pegada abajo, a mano. Con cambios en vuelo tampoco se salta de paso: se sigue editando.
+      if(!cambio){ pasoTrasGuardar(); _formDirty=false; }   // el relato ya existe: paso 6 · guardado: ya no hay cambios que perder
+      // O3 · confirmación PERSISTENTE con hora en la franja del botón 💾 (el toast de arriba sigue saliendo igual: se SUMA).
+      if(avisos.length) _marcaGuardadoAviso(avisos); else _marcaGuardadoOK();
+      show('btnCerrarPost');
     }
-    show('rarea');
-    pasoTrasGuardar();   // el relato ya existe: paso 6
-    // SIN desplazarse al texto (Diego, 15-ago-2026: «que solo guarde antes
-    // de progresar»): guardar es para seguir con el próximo paciente. El
-    // texto queda disponible arriba de la barra por si hay que copiarlo, y
-    // ✖ Cerrar aparece en la misma barra pegada abajo, a mano.
-    _formDirty=false;   // guardado: ya no hay cambios que perder
-    // O3 · confirmación PERSISTENTE con hora en la franja del botón 💾 (el
-    // toast de arriba sigue saliendo igual: se SUMA, no reemplaza).
-    _marcaGuardadoOK();
-    // O7 · ya está en el servidor: el borrador local de esta cama y turno muere.
-    _borradorDescartar($('cBed')?.value||'');
-    // Mostrar botón cerrar y actualizar grid en background (sin overlay)
-    show('btnCerrarPost');
+    // O7 · ya está en el servidor: el borrador local de esta cama y turno muere… salvo que se haya escrito algo desde la foto:
+    // eso NO está guardado, y el borrador pasa a ser lo último que se escribió (no se borra sin confirmación).
+    if(!cambio) _borradorDescartar(ctx.id, ctx.tkey);
+    else if(vig) _borradorGuardar();
     recargarSilencioso();
-    // «Guardar y cerrar» del modal de cierre: solo cierra si terminó bien.
-    if(_cerrarTrasGuardar){ _cerrarTrasGuardar=false; cerrarPanel(true); }
+    // «Guardar y cerrar» del modal de cierre: solo cierra si terminó bien… y si no se escribió nada después (se perdería).
+    if(vig){ const cerrar=_cerrarTrasGuardar && !cambio; _cerrarTrasGuardar=false; if(cerrar) cerrarPanel(true); }
   };
-  /* `sesionCortada` (F3B): el servidor rechazó el guardado porque la sesión está cortada y la pantalla ya fue a la puerta
-     (`_sesionCortadaALaEntrada`). No es una red caída: el aviso dice qué pasó y qué hacer, sin «revisa la red». El formulario
-     NO se toca y `_reintentoGuardado` queda armado: al entrar con la clave, Reintentar manda estos mismos datos con la sesión nueva. */
-  const _falloFinal=(m,sesionCortada)=>{
-    btn.disabled=false; btn.textContent='💾 Guardar Evolución';
+
+  /* `tipo`: 'sesion' (F3B: el servidor rechazó porque la sesión está cortada y la pantalla ya fue a la puerta; no es una red
+     caída: el aviso dice qué pasó y qué hacer, sin «revisa la red»; el formulario NO se toca y `_reintentoGuardado` queda armado: al
+     entrar con la clave, Reintentar manda estos mismos datos con la sesión nueva) · 'servidor' (el servidor contestó y
+     dijo que no) · 'red' (un Error que no salió del embudo). */
+  const falloFinal=(m,tipo)=>{
+    apagar(); rechazada=true; liberar('rojo');
+    if(!vigente()){ toast('❌ La evolución de la cama '+ctx.id+' no se guardó: '+(m||'sin conexión')); return; }
+    _guardadoBotones(false,'💾 Guardar Evolución');
     // 🔴 G14 · «La cama cambió de paciente» ya dice qué pasó y qué hacer; mandar a «revisar la red» sería mentir.
-    toast(_EP_CAMBIO_RE.test(m||'')
+    const cambioPac=_EP_CAMBIO_RE.test(m||'');
+    toast(cambioPac
       ? '❌ '+m
-      : sesionCortada
+      : tipo==='sesion'
         ? '🔐 Se cerró tu sesión: entra con tu clave y aprieta Reintentar — tu evolución sigue en pantalla'
-        : '❌ No se pudo guardar: '+(m||'sin conexión')+' — tu evolución sigue en pantalla, revisa la red y aprieta 💾 de nuevo');
-    // O3b · el toast se apaga a los 3,2 s; esto NO. La franja del botón 💾
-    // queda en error hasta que un guardado termine bien, con su Reintentar
-    // que remanda los MISMOS datos. _formDirty sigue en true y el formulario
-    // no se toca. Y se deja borrador local por si el equipo se apaga ahora.
+        : tipo==='servidor'
+          ? '❌ No se guardó: '+(m||'sin respuesta')+' — tu evolución sigue en pantalla'
+          : '❌ No se pudo guardar: '+(m||'sin conexión')+' — tu evolución sigue en pantalla, revisa la red y aprieta 💾 de nuevo');
+    // O3b · el toast se apaga a los 3,2 s; esto NO. La franja del botón 💾 queda en error hasta que un guardado termine
+    // bien, con su Reintentar que remanda los MISMOS datos. _formDirty sigue en true y el formulario no se toca. Y se deja
+    // borrador local por si el equipo se apaga ahora.
     _cerrarTrasGuardar=false;
     // F2 · el rechazo por cambio de paciente no deja nada que reintentar: reenviaría lo mismo y recibiría lo mismo.
-    _reintentoGuardado=_EP_CAMBIO_RE.test(m||'')?null:_enviar;
-    _marcaGuardadoError(sesionCortada ? 'Tu sesión se cerró. Entra con tu clave y aprieta Reintentar: lo que escribiste sigue aquí.' : (m||'sin conexión'));
+    _reintentoGuardado=cambioPac?null:reintentarAhora;
+    _marcaGuardadoError(tipo==='sesion' ? 'Tu sesión se cerró. Entra con tu clave y aprieta Reintentar: lo que escribiste sigue aquí.' : (m||'sin conexión'));
     _borradorGuardar();
   };
-  // Reintento automático (v5.25): si la red parpadea justo al guardar, se
-  // reintenta UNA vez a los 3 s antes de molestar. Es inocuo aunque el primer
-  // intento sí hubiera llegado: re-guardar el mismo turno actualiza, no duplica.
-  // _enviar = un viaje completo (intento + su reintento automático). Es lo que
-  // vuelve a correr el botón «Reintentar» de la franja: los MISMOS datos, sin
-  // sumarse al reintento de 3 s (éste solo existe cuando aquél ya se agotó).
-  const _enviar=()=>{
-    btn.disabled=true; btn.textContent='⏳ Guardando...';
-    api('GUARDAR_EVOLUCION', datos).then(_exito).catch(e1=>{
-      const m1=(e1&&e1.message)||String(e1);
-      // 🔴 F3B · Sesión cortada: a la puerta y SIN reintento automático (mandaría lo mismo y recibiría lo mismo; mientras tanto el
-      // aviso diría «sin respuesta»). El formulario queda como está. «No se pudo comprobar tu sesión» NO entra acá: es la planilla
-      // que no respondió, y sigue el camino de los errores reintentables (un reintento a los 3 s y «Reintentar» a mano).
-      if(_sesionCortadaALaEntrada(m1, m1)){ _falloFinal(m1, true); return; }
-      // 🔴 G14 · Un rechazo DELIBERADO del servidor (la cama cambió de paciente) no es una red que parpadeó:
-      // reintentar a los 3 s manda lo mismo y recibe lo mismo, y mientras tanto el aviso diría «sin respuesta».
-      if(_EP_CAMBIO_RE.test(m1)){ _falloFinal(m1); return; }
-      btn.textContent='⏳ Reintentando…';
-      toast('⚠️ Sin respuesta del servidor — reintentando en 3 s…');
-      setTimeout(()=>{
-        api('GUARDAR_EVOLUCION', datos)
-          .then(r=>{ toast('✅ Guardado al segundo intento'); _exito(r); })
-          .catch(e2=>{
-            const m2=(e2&&e2.message)||String(e2);
-            // La sesión también puede cortarse ENTRE el primer intento y este (o el primero ser un parpadeo de red): mismo reconocimiento.
-            _falloFinal(m2, _sesionCortadaALaEntrada(m2, m2));
-          });
-      }, 3000);
-    });
+
+  /* ÁMBAR. Con reintentos por venir es solo la franja («Reintentando…»); sin ellos (o a los 45 s) se suma el cuadro del
+     centro, el botón de guardar vuelve a quedar disponible y se guarda un borrador: el texto sigue aquí, de verdad. */
+  const noConfirmado=()=>{
+    const hayMas=quedan>0;
+    if(!vigente()){
+      if(!hayMas && !avisadoModal){ avisadoModal=true; liberar('espera'); toast('⚠ No sabemos si se guardó la evolución de la cama '+ctx.id+': ábrela y revísala.'); }
+      return;
+    }
+    _cerrarTrasGuardar=false;
+    _reintentoGuardado=reintentarAhora;
+    _marcaNoConfirmado(hayMas);
+    if(hayMas){
+      _guardadoBotones(true,'⏳ Reintentando…');
+      if(!avisadoReint){ avisadoReint=true; toast('⚠️ Sin respuesta del servidor — reintentando…'); }
+      return;
+    }
+    _guardadoBotones(false,'💾 Guardar Evolución');
+    liberar('espera');
+    _borradorGuardar();
+    if(!avisadoModal){ avisadoModal=true; avisoNoConfirmado(); }
   };
-  _enviar();
+
+  const evaluar=()=>{
+    if(hecho || rechazada || S.cancelada) return;
+    const agotado = quedan===0 && (abiertas===0 || esperaVencida);
+    if(agotado){
+      // Nada más por mandar ni por esperar. Si algún intento quedó sin respuesta (o sigue colgado), no se sabe: ámbar. Si
+      // TODO lo que contestó el servidor fue «ahora no», se sabe que no se ejecutó: rojo.
+      if(ambiguos>0 || abiertas>0) noConfirmado(); else falloFinal(ultimo.m, ultimo.tipo);
+      return;
+    }
+    if(ambiguos>0){ if(quedan>0) noConfirmado(); return; }   // sin reintentos programados espera a los 45 s o a lo que contesten
+    // Solo «ahora no» del servidor: todavía no hay nada que afirmar, pero sí que se reintenta.
+    _guardadoBotones(true,'⏳ Reintentando…');
+    _estadoGuardado('guardando','⏳ Reintentando…');
+    if(!avisadoReint){ avisadoReint=true; toast('⚠️ Sin respuesta del servidor — reintentando…'); }
+  };
+
+  const alExito=r=>{ if(S.cancelada || hecho) return; exito(r); };
+  const alFallo=e=>{
+    if(S.cancelada || hecho || rechazada) return;
+    const m=(e&&e.message)||String(e);
+    // 🔴 F3B · Sesión cortada: a la puerta y SIN reintento automático (mandaría lo mismo y recibiría lo mismo; mientras tanto el
+    // aviso diría «sin respuesta»). El formulario queda como está. «No se pudo comprobar tu sesión» NO entra acá: es la planilla
+    // que no respondió, y sigue el camino de los errores reintentables (un reintento a los 3 s y «Reintentar» a mano).
+    if(_sesionCortadaALaEntrada(m, m)){ falloFinal(m, 'sesion'); return; }
+    const clase=_guardadoClase(e);
+    // 🔴 G14 · Un rechazo DELIBERADO del servidor (la cama cambió de paciente) no es una red que parpadeó: reintentar a los 3 s
+    // manda lo mismo y recibe lo mismo, y mientras tanto el aviso diría «sin respuesta».
+    if(clase==='rechazo'){ falloFinal(m, 'servidor'); return; }
+    ultimo={ m:m, tipo:(e&&e.codigo)?'servidor':'red' };
+    if(clase==='ambiguo') ambiguos++;
+    else {
+      reintentables++;
+      // Dos veces «ahora no» y nada más en vuelo ni sin respuesta: el servidor ya dijo dos veces que no se ejecutó.
+      // Con algo todavía en el aire (un intento colgado, o uno sin respuesta) no se afirma: ese pudo haber aterrizado.
+      if(reintentables>=2 && ambiguos===0 && abiertas===0){ falloFinal(m, ultimo.tipo); return; }
+    }
+    evaluar();
+  };
+
+  const enviar=()=>{
+    abiertas++;
+    let v1; try{ v1=api('GUARDAR_EVOLUCION', foto); }catch(x){ v1=Promise.reject(x); }
+    Promise.resolve(v1).then(r=>{ abiertas--; alExito(r); }, e=>{ abiertas--; alFallo(e); });
+  };
+  const vencioEspera=()=>{ esperaT=null; esperaVencida=true; if(hecho || rechazada || S.cancelada) return; noConfirmado(); };
+
+  /* «Reintentar ahora» (la franja y el cuadro) y el «Reintentar» tras un rechazo: UN envío más con la MISMA foto y el MISMO OP_ID
+     (el embudo lo conserva mientras el servidor no haya respondido). No se suma a los automáticos: esos solo existen
+     al principio. Y vuelve a correr la espera de 45 s. */
+  const reintentarAhora=()=>{
+    if(S.cancelada || hecho) return;
+    rechazada=false; esperaVencida=false; avisadoModal=false;
+    if(esperaT) clearTimeout(esperaT);
+    esperaT=setTimeout(vencioEspera, GUARDADO_ESPERA_MS);
+    vuelo=nuevoVuelo(); _guardadoVuelo=vuelo;
+    _guardadoBotones(true,'⏳ Reintentando…');
+    _estadoGuardado('guardando','⏳ Reintentando…');
+    enviar();
+  };
+
+  // ── la primera salida ──
+  _reintentoGuardado=null;
+  _guardadoBotones(true,'⏳ Guardando...');
+  _estadoGuardado('guardando','⏳ Guardando…');
+  toast('💾 Guardando en servidor...');
+  GUARDADO_REINTENTOS_MS.forEach(ms=>{
+    quedan++;
+    timers.push(setTimeout(()=>{ quedan--; if(hecho || rechazada || S.cancelada) return; enviar(); }, ms));
+  });
+  esperaT=setTimeout(vencioEspera, GUARDADO_ESPERA_MS);
+  enviar();
+  return vuelo.promesa;
 }
 
 //  EGRESO
@@ -12576,11 +12803,11 @@ function _bindPanelListeners(){
   $('kf')?.addEventListener('click', ev=>{
     const b=ev.target.closest('button');
     if(!b || b.hasAttribute('data-nodirty')) return;
-    _formDirty=true; _rtxtLive(ev);
+    _formDirty=true; _formRev++; _rtxtLive(ev);
   });
   // Cualquier interacción del usuario marca el formulario como "con cambios"
-  $('kf')?.addEventListener('input', ()=>{ _formDirty=true; });
-  $('kf')?.addEventListener('change', ()=>{ _formDirty=true; });
+  $('kf')?.addEventListener('input', ()=>{ _formDirty=true; _formRev++; });
+  $('kf')?.addEventListener('change', ()=>{ _formDirty=true; _formRev++; });
 }
 _bindPanelListeners();
 /* El deshacer va enganchado al FORMULARIO y no dentro de cada manejador: al
@@ -14809,7 +15036,7 @@ function hSed(){
   aplicarGatesNeuro();
 }
 /** Chips de sedantes: cuáles están puestos, no cuánto. */
-function sedFarmToggle(b){ b.classList.toggle('on'); _formDirty=true; if(typeof _rtxtLive==='function') _rtxtLive(); }
+function sedFarmToggle(b){ b.classList.toggle('on'); _formDirty=true; _formRev++; if(typeof _rtxtLive==='function') _rtxtLive(); }
 function _sedFarmLista(){
   return Array.from(document.querySelectorAll('#sedFarmacos .sedf-btn.on')).map(b=>b.dataset.f);
 }
@@ -16051,6 +16278,12 @@ const _VA_VALIDAS=['Natural','TOT','TQT'];   // 16-sep-2026: la vía aérea son 
 let _iniVA='', _iniSop='';    // estado (VA/soporte) con que ABRIÓ el turno — base del aviso de transición
 let _transAvisoOk=false;      // el kine ya vio el aviso de transición y eligió guardar igual
 let _formDirty=false;         // hay cambios sin guardar en el panel (confirmación al cerrar)
+/* 🔴 G17 · DOS CONTADORES para que una respuesta tardía no se equivoque de formulario. `_formRev` sube con cada edición:
+   `guardar()` anota cuál era al apretar y, al confirmarse el guardado, sabe si se escribió algo MIENTRAS la llamada volaba
+   (entonces eso no se da por guardado). `_panelSeq` sube con cada apertura del panel: la respuesta de un guardado solo toca
+   la pantalla del panel que lo pidió. Nunca se reinician: un número repetido sería justo la confusión que evitan. */
+let _formRev=0;
+let _panelSeq=0;
 let _transIntubEsteTurno=false; // hubo transición no-invasiva → invasiva en esta sesión de panel
 function actualizarDiasVA(){ actualizarContadores(); } // alias legacy
 function actualizarContadores(){
