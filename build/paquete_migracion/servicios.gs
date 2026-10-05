@@ -4515,7 +4515,8 @@ function evalRegistrar(datos, ctx, ep) {
           if (_msgEp) return err(_msgEp, ERR.VALIDACION);
         }
       }
-      const r = _evalRegistrarInterno(datos, ctx);
+      // 🔐 G16 (paso 11): con OP_ID, el id de la medición y el de su hito se DERIVAN de la operación (`derivar` = true).
+      const r = _evalRegistrarInterno(datos, ctx, true);
       if (r && r.error) return r;
       SpreadsheetApp.flush();
       return ok(r);
@@ -4523,8 +4524,21 @@ function evalRegistrar(datos, ctx, ep) {
   });
 }
 
-/** Sin lock: para llamar desde guardarEvolucion, que ya lo tiene. */
-function _evalRegistrarInterno(datos, ctx) {
+/**
+ * Sin lock: para llamar desde guardarEvolucion, que ya lo tiene.
+ *
+ * 🔐 G16 (paso 11, 5-oct-2026) — `derivar` (solo lo pide `evalRegistrar`, la puerta de la tarjeta; la cola de `guardarEvolucion`
+ * llama con dos argumentos y sigue con su regla de «¿ya está?» de siempre, que no suma lecturas al guardado).
+ * 🔴 EL DEFECTO. La medición se escribía con un id de reloj y azar: si la corrida moría después de insertarla (o de anular la
+ * que corregía) y antes de sellar, el reintento con el mismo OP_ID insertaba OTRA, y la serie del episodio quedaba con la
+ * misma medición dos veces (la tarjeta la dibuja dos veces y el «último valor» lo decide el desempate). Con operación en curso
+ * y `derivar`, el id sale del OP_ID y del contenido de la medición (`EVAL_<op>_<huella>`), se busca antes de insertar
+ * (`repoBuscarFila`) y la medición que ya estaba no se escribe otra vez. Lo demás (anular la corregida, el espejo de la cama, el
+ * hito y la tarjeta) es idempotente o se completa solo si falta, así que el reintento llega siempre al mismo final.
+ * 🪤 La clave NO lleva la fecha ni el turno que la puerta pone por omisión (el reloj): un reintento a las 19:59 de lo enviado a
+ * las 19:58 es el MISMO registro. Sí lleva la fecha y el turno que el usuario declaró, y la medición que corrige.
+ */
+function _evalRegistrarInterno(datos, ctx, derivar) {
   datos = datos || {};
   const idCama = String(datos.idCama || datos.ID_CAMA || '').trim();
   const escala = _evalEscala(datos.escala || datos.ESCALA);
@@ -4552,15 +4566,19 @@ function _evalRegistrarInterno(datos, ctx) {
   let items = datos.items != null ? datos.items : (datos.ITEMS_JSON != null ? datos.ITEMS_JSON : '');
   if (items && typeof items !== 'string') { try { items = JSON.stringify(items); } catch (e) { items = ''; } }
 
+  const derivada = !!derivar && !!_opIdDeLaPeticion();
+  const claveEval = derivada ? [escala, total, idCama, pid, String(datos.fecha || datos.FECHA || ''), String(datos.turno || datos.TURNO || ''),
+    String(datos.anulaId || '')].join('|') : '';
   const fila = {
-    ID_EVAL: uid('EVAL'), PATIENT_ID: pid, ID_CAMA: idCama,
+    ID_EVAL: derivada ? uid('EVAL', claveEval) : uid('EVAL'), PATIENT_ID: pid, ID_CAMA: idCama,
     FECHA: fecha, TURNO: turno, ESCALA: escala, TOTAL: total,
     ITEMS_JSON: items || '', FIRMA: firma,
     ORIGEN: String(datos.origen || datos.ORIGEN || 'tarjeta'),
     ID_EVOLUCION: String(datos.idEvolucion || datos.ID_EVOLUCION || ''),
     ANULADA: false, TIMESTAMP: ahoraTS(),
   };
-  repoInsertar('EVALUACIONES', fila);
+  // Con id derivado, la medición que ya está (el primer intento llegó hasta acá) no se inserta otra vez.
+  if (!derivada || repoBuscarFila('EVALUACIONES', 'ID_EVAL', fila.ID_EVAL) === -1) repoInsertar('EVALUACIONES', fila);
 
   // Corregir = nueva fila + anular la vieja. Nunca se borra.
   if (datos.anulaId) {
@@ -4578,8 +4596,13 @@ function _evalRegistrarInterno(datos, ctx) {
   // lo convierte en un aviso, y el reintento lo completa (`_evalCompletarCola`).
   let sinHito = false;
   try {
-    _agregarHitoInternoSinSync(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx));
-    if (!_sincronizarTimelineCama(idCama)) sinHito = true;
+    if (derivada) {
+      // El hito también lleva id derivado y se escribe solo si no está; la tarjeta se vuelve a sincronizar si no lo muestra.
+      if (!_hitoDeOperacion(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx), true, claveEval).sincronizado) sinHito = true;
+    } else {
+      _agregarHitoInternoSinSync(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx));
+      if (!_sincronizarTimelineCama(idCama)) sinHito = true;
+    }
   } catch (e) { console.warn('evalRegistrar hito:', e.message); sinHito = true; }
 
   const res = { entidad: 'EVALUACIONES', accion: 'medicion', escala: escala, total: total, idEval: fila.ID_EVAL, firma: firma, fecha: fecha };
@@ -4692,16 +4715,22 @@ function episodioEscala(datos, ctx, ep) {
       // Los ítems de la calculadora también viven en la cama cuando existen
       // (BARTHEL_JSON/CHARLSON_JSON son de EVOLUCIONES; aquí se guardan en el
       // hito para no abrir columnas nuevas por esto).
-      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
       let items = datos.items != null ? datos.items : '';
       if (items && typeof items !== 'string') { try { items = JSON.stringify(items); } catch (e) { items = ''; } }
-      _agregarHitoInternoSinSync({
+      /* 🔐 G16 (paso 11, 5-oct-2026) — EL HITO VA PRIMERO. Se escribía el valor en la cama y después el hito, que cuenta lo que
+         CORRIGE: «Barthel 60 (corrige 40)» sale de leer la cama ANTES de escribirla. La corrida que moría entre ambas dejaba el
+         valor nuevo y, al reintentar, la cama ya decía 60: el hito salía sin su «corrige 40» y el dato de qué valor se pisó se
+         perdía para siempre. Con el hito primero el «antes» verdadero queda escrito en cuanto se lee; y con OP_ID el hito lleva id
+         derivado y se escribe solo si no está, así que el reintento no lo repite ni lo reescribe con un «antes» ya pisado. La
+         clave del hito NO lleva el «antes» (cambia entre un intento y su reintento): es la escala y el valor. */
+      _hitoDeOperacion({
         idCama: idCama, patientId: cama.PATIENT_ID, tipo: 'evaluacion',
         texto: '📐 ' + ({ ECF: 'ECF', BARTHEL: 'Barthel', CHARLSON: 'Charlson' })[escala] + ' ' + valor +
                (antes !== '' && antes !== valor ? ' (corrige ' + antes + ')' : '') + (firma ? ' (' + firma + ')' : ''),
         autor: firma, autorEmail: ctx.email || '',
         datos: { escala: escala, valor: valor, antes: antes, firma: firma, items: items || '' },
-      });
+      }, false, ['evaluacion', idCama, cama.PATIENT_ID, escala, valor].join('|'));
+      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
       _sincronizarTimelineCama(idCama);
       SpreadsheetApp.flush();
       return ok({ entidad: 'CAMAS_ESTADO', accion: 'escala ' + escala, idCama: idCama, valor: valor, antes: antes, firma: firma });
@@ -5155,6 +5184,19 @@ function anexarEventoRapido(datos, ctx, ep) {
       // auditoría de firmas en mantenimiento.gs.
       const firma = String(ctx.firma || datos.firma || '').slice(0, 60);
       const hrTxt = hora ? ' ' + hora + ' hrs' : '';
+      /* El hito se fecha SIEMPRE en su turno. Se arma acá, antes de las ramas, porque con OP_ID su id derivado decide si este
+         intento es el REINTENTO de uno que ya empezó (`yaMia`, más abajo) y eso cambia qué se rechaza y qué se escribe. */
+      const armarHito = function (txt, tipoH) {
+        return {
+          idCama: String((ubic && ubic.obj && ubic.obj.ID_CAMA) || idCama),
+          patientId: pid, fecha: fecha, turno: turno, tipo: tipoH,
+          texto: txt + (firma ? ' · ' + firma : ''),
+          autor: firma, autorEmail: String(ctx.email || ''),
+        };
+      };
+      let relojCampos = null;   // el reloj del dispositivo, si el anexo es un cambio de HME/HEPA/sonda
+      let plan = null;          // lo que escribe un procedimiento (evolución y fila de la estadística), si lo es
+      let yaMia = false;        // con OP_ID: el hito derivado de ESTE contenido ya está, o sea este intento es un reintento
 
       /* 🔐 EL CANDADO DEL ➕ (decisión de Manuel, 20-ago-2026): corregir el
          PASADO exige clave de coordinación, aunque el botón viva en el
@@ -5196,10 +5238,8 @@ function anexarEventoRapido(datos, ctx, ep) {
           return err('El cambio de ' + disp.nombre + ' no se puede anotar hacia atrás: el reloj del ' +
             'filtro es de la cama ' + idCama + ', que hoy tiene a otro paciente.', ERR.VALIDACION);
         }
-        // Cambio de dispositivo → reinicia el reloj con la fecha efectiva.
-        repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, (function () {
-          const c = {}; c[disp.campo] = fechaEf; c.DISP_CONFIRMADO = true; return c;
-        })());
+        // Cambio de dispositivo → reinicia el reloj con la fecha efectiva (se escribe más abajo, antes del hito).
+        relojCampos = (function () { const c = {}; c[disp.campo] = fechaEf; c.DISP_CONFIRMADO = true; return c; })();
         texto = disp.icono + ' Cambio de ' + disp.nombre + hrTxt + (detalle ? ' — ' + detalle : '');
         tipoHito = 'dispositivo';
       } else if (tipo === 'procedimiento') {
@@ -5239,23 +5279,38 @@ function anexarEventoRapido(datos, ctx, ep) {
         const clavePos = _procClaveHito(nombreProc);
         const esPos = (clavePos === 'PRONO' || clavePos === 'SUPINO');
         const cicloCampos = {};
+        // El nombre pasa a la forma canónica del formulario: así el `Set` del
+        // próximo guardado lo reconoce como el mismo y no lo cuenta dos veces.
+        if (esPos) nombreProc = _procNombreCiclo(clavePos, hora);
+
+        /* 🔐 G16 (paso 11, 5-oct-2026) — EL REINTENTO DE SU PROPIO ANEXO.
+           🔴 EL DEFECTO. El ➕ escribía la evolución (el nombre al final de PROC_JSON), la fila de PROCEDIMIENTOS y el hito, cada
+           uno con id de reloj y azar y sin preguntar «¿ya estoy?». Una muerte entre ellos y el reintento con el mismo OP_ID
+           (el sello solo se escribe cuando TODO terminó limpio) dejaba el anexo repetido en una cara: dos instancias en la
+           evolución, dos filas en la estadística (el REM las cuenta) o dos hitos en la línea de tiempo. Y el reintento de un
+           anexo de PRONO o de SUPINO que ya había declarado su ciclo se rechazaba con «este turno ya tiene registrada la
+           pronación», aunque la que estaba registrada era la suya.
+           EL HITO ES EL MARCADOR. Con OP_ID su id se deriva de la operación y del contenido (`_idHitoDeOperacion`) y se escribe
+           PRIMERO (más abajo): que ya esté dice «este intento ya empezó». Otro OP_ID, u otro contenido con el mismo (el
+           usuario editó la hora), da otro id: es un anexo nuevo y se rechaza y se escribe como siempre. Sin OP_ID `yaMia` es
+           siempre false y nada de esto cambia. */
+        const textoProc = _hitoAnexoPrefijo(nombreProc) + (esPos ? '' : hrTxt) + (detalle ? ' — ' + detalle : '') + ' (anexo)';
+        const idHitoProc = _idHitoDeOperacion(armarHito(textoProc, 'anexo'));
+        yaMia = !!idHitoProc && repoBuscarFila('TIMELINE', 'ID_HITO', idHitoProc) !== -1;
         if (esPos) {
           /* No se pisa lo ya registrado: si el turno ya declaró su pronación,
              cambiarle la hora por esta puerta movería un reloj que ya está
              corriendo, en silencio. Se corrige donde se declaró. */
-          if (clavePos === 'PRONO' && esVerdadero(evo.RESP_PRONO_EVENTO)) {
+          if (!yaMia && clavePos === 'PRONO' && esVerdadero(evo.RESP_PRONO_EVENTO)) {
             return err('Este turno ya tiene registrada la pronación' +
               (evo.RESP_PRONO_HORA ? ' de las ' + evo.RESP_PRONO_HORA + ' hrs' : '') +
               '. Si la hora no es esa, corrígela en la evolución del turno.', ERR.VALIDACION);
           }
-          if (clavePos === 'SUPINO' && esVerdadero(evo.RESP_SUPINO_EVENTO)) {
+          if (!yaMia && clavePos === 'SUPINO' && esVerdadero(evo.RESP_SUPINO_EVENTO)) {
             return err('Este turno ya tiene registrada la supinación' +
               (evo.RESP_SUPINO_HORA ? ' de las ' + evo.RESP_SUPINO_HORA + ' hrs' : '') +
               '. Si la hora no es esa, corrígela en la evolución del turno.', ERR.VALIDACION);
           }
-          // El nombre pasa a la forma canónica del formulario: así el `Set` del
-          // próximo guardado lo reconoce como el mismo y no lo cuenta dos veces.
-          nombreProc = _procNombreCiclo(clavePos, hora);
           if (clavePos === 'PRONO') {
             cicloCampos.RESP_POS_PRONO = true; cicloCampos.RESP_POS_SUPINO = false;
             cicloCampos.RESP_PRONO_EVENTO = true; cicloCampos.RESP_PRONO_HORA = hora;
@@ -5274,29 +5329,16 @@ function anexarEventoRapido(datos, ctx, ep) {
           _pronoSellarCiclo(String(evo.ID_CAMA || idCama), turnoKey, fecha, turno, cicloCampos, evosCiclo);
         }
 
-        let procs = [];
-        try { procs = JSON.parse(evo.PROC_JSON || '[]') || []; } catch (e) { procs = []; }
-        procs.push(nombreProc);
-        /* Se escribe POR NÚMERO DE FILA y en la hoja donde está la evolución
-           —viva o archivo—, no por clave: `repoActualizar` escribe en la primera
-           coincidencia, que en una cama rotada es la del otro paciente. La fila
-           viaja COMPLETA porque `repoEscribirFila` reescribe el renglón entero. */
-        repoEscribirFila(ubic.hoja, ubic.fila, Object.assign({}, evo, cicloCampos, {
-          PROC_JSON: JSON.stringify(procs), PROC_CANTIDAD: procs.length,
-          PROC_RESUMEN: procs.join(', '),
-        }));
-        if (clavePos !== 'SUPINO') repoInsertar('PROCEDIMIENTOS', {
-          // La clave y la cama salen de la EVOLUCIÓN, no del payload: tras un
-          // traslado la cama del turno no es la cama de hoy. Y el pid es el del
-          // EPISODIO — tomarlo de la cama era lo que fabricaba filas mixtas.
-          ID_PROC: uid('PROC'), ID_EVOLUCION: String(evo.ID_EVOLUCION || ''),
-          ID_CAMA: String(evo.ID_CAMA || idCama), PATIENT_ID: pidEvo,
-          FECHA: fecha, TURNO: turno, TIPO_PROC: 'anexo', NOMBRE_PROC: nombreProc,
-          DESCRIPCION: detalle, AUTOR_EMAIL: String(ctx.email || ''), TIMESTAMP: ahoraTS(),
-        });
+        /* Lo que se escribe (la evolución y la fila de PROCEDIMIENTOS) lo hace `_anexoEscribirProcedimiento`, más abajo y
+           DESPUÉS del hito: este bloque solo valida y arma. */
+        plan = {
+          ubic: ubic, evo: evo, cicloCampos: cicloCampos, nombreProc: nombreProc, esSupino: clavePos === 'SUPINO',
+          hora: hora, detalle: detalle, turnoKey: turnoKey, fecha: fecha, turno: turno,
+          idCama: idCama, pidEvo: pidEvo, email: String(ctx.email || ''), yaMia: yaMia,
+        };
         // En el prono y el supino la hora ya viaja DENTRO del nombre canónico
         // («PRONO 20:03 HRS»): repetirla daría «🔧 PRONO 20:03 HRS 20:03 hrs».
-        texto = _hitoAnexoPrefijo(nombreProc) + (esPos ? '' : hrTxt) + (detalle ? ' — ' + detalle : '') + ' (anexo)';
+        texto = textoProc;
         // 🔴 Hasta ago-2026 este hito nacía con TIPO 'procedimiento', que está
         // en `_TIPOS_HITO_AUTO`: el siguiente guardado de la evolución lo
         // borraba y lo regeneraba como la etiqueta pelada del procedimiento,
@@ -5322,14 +5364,17 @@ function anexarEventoRapido(datos, ctx, ep) {
          sincronizar la tarjeta: la tarjeta es del ocupante de HOY y el hito es de
          otro. Desde que `_sincronizarTimelineCama` filtra por paciente, esto ya
          no es un retardo de minutos — el hito ajeno no puede entrar ni cuando la
-         sincronización corra después. */
-      const hito = {
-        idCama: String((ubic && ubic.obj && ubic.obj.ID_CAMA) || idCama),
-        patientId: pid, fecha: fecha, turno: turno, tipo: tipoHito,
-        texto: texto + (firma ? ' · ' + firma : ''),
-        autor: firma, autorEmail: String(ctx.email || ''),
-      };
-      if (enCama) _agregarHitoInterno(hito); else _agregarHitoInternoSinSync(hito);
+         sincronización corra después.
+
+         🔐 G16 (paso 11). EL ORDEN DE LAS ESCRITURAS: el reloj del dispositivo (una escritura idempotente: la misma fecha otra
+         vez), el HITO —con OP_ID, escrito solo si no está— y, si es un procedimiento, la evolución y la fila de la estadística
+         AL FINAL: esa fila es lo que cuenta el REM, o sea el punto de compromiso, y un reintento que llega hasta ahí sabe
+         exactamente qué le falta. Antes iba al revés (evolución, fila, hito) y un hito de reloj y azar: no había forma de
+         saber qué ya estaba. */
+      const hito = armarHito(texto, tipoHito);
+      if (relojCampos) repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, relojCampos);
+      _hitoDeOperacion(hito, enCama, undefined, plan ? yaMia : undefined);
+      if (plan) _anexoEscribirProcedimiento(plan);
       SpreadsheetApp.flush();
 
       const salida = {
@@ -5350,6 +5395,63 @@ function anexarEventoRapido(datos, ctx, ep) {
       }
       return ok(salida);
     } catch (e) { return err('anexarEventoRapido: ' + e.message, ERR.INTERNO, e); }
+  });
+}
+
+/**
+ * Las dos caras de un procedimiento anexado que NO son el hito: el nombre en la evolución (PROC_JSON) y la fila de la estadística
+ * (PROCEDIMIENTOS). Va DESPUÉS del hito (G16, paso 11) y la fila es lo último que se escribe.
+ *
+ * SIN reintento (`p.yaMia` false, o sin OP_ID) escribe las dos como siempre. En un REINTENTO (el hito derivado de este contenido
+ * ya estaba: el primer intento llegó al menos hasta ahí) cada una se escribe solo si falta:
+ *  · LA FILA tiene id derivado de la operación (`uid('PROC', clave de contenido)`): si ya existe, no se inserta otra.
+ *  · LA EVOLUCIÓN no se puede repetir a ciegas: es un «agregar al final». Se compara lo que hay con lo que habría: las instancias
+ *    del nombre en PROC_JSON contra las filas de PROCEDIMIENTOS del mismo turno y nombre SIN contar la de este anexo. Si el nombre
+ *    ya sobra respecto de las otras filas, el primer intento ya lo escribió; si no, falta. (La supinación no tiene fila: su
+ *    nombre canónico lleva la hora, y basta con ver si ya está.)
+ *    🪤 Esa comparación supone la invariante «instancias en PROC_JSON == filas», que el guardado y el ➕ mantienen. En un turno
+ *    antiguo donde ya no se cumple, un reintento puede decidir mal; es un riesgo residual de un caso que ya era raro (un
+ *    reintento) sobre datos que ya estaban desparejos.
+ */
+function _anexoEscribirProcedimiento(p) {
+  const evo = p.evo;
+  const idProc = uid('PROC', [p.nombreProc, p.hora, p.detalle, p.turnoKey].join('|'));
+  let procs = [];
+  try { procs = JSON.parse(evo.PROC_JSON || '[]') || []; } catch (e) { procs = []; }
+  let rehacerEvo = true;
+  if (p.yaMia) {
+    const enJson = procs.filter(function (x) { return x === p.nombreProc; }).length;
+    if (p.esSupino) {
+      rehacerEvo = enJson === 0;
+    } else {
+      const otras = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(evo.ID_EVOLUCION || '')).filter(function (r) {
+        return String(r.NOMBRE_PROC) === p.nombreProc && String(r.ID_PROC) !== idProc &&
+               (!r.PATIENT_ID || !p.pidEvo || String(r.PATIENT_ID) === p.pidEvo);
+      }).length;
+      rehacerEvo = enJson <= otras;
+    }
+  }
+  if (rehacerEvo) {
+    procs.push(p.nombreProc);
+    /* Se escribe POR NÚMERO DE FILA y en la hoja donde está la evolución
+       —viva o archivo—, no por clave: `repoActualizar` escribe en la primera
+       coincidencia, que en una cama rotada es la del otro paciente. La fila
+       viaja COMPLETA porque `repoEscribirFila` reescribe el renglón entero. */
+    repoEscribirFila(p.ubic.hoja, p.ubic.fila, Object.assign({}, evo, p.cicloCampos, {
+      PROC_JSON: JSON.stringify(procs), PROC_CANTIDAD: procs.length,
+      PROC_RESUMEN: procs.join(', '),
+    }));
+  }
+  if (p.esSupino) return;
+  if (p.yaMia && repoBuscarFila('PROCEDIMIENTOS', 'ID_PROC', idProc) !== -1) return;
+  repoInsertar('PROCEDIMIENTOS', {
+    // La clave y la cama salen de la EVOLUCIÓN, no del payload: tras un
+    // traslado la cama del turno no es la cama de hoy. Y el pid es el del
+    // EPISODIO — tomarlo de la cama era lo que fabricaba filas mixtas.
+    ID_PROC: idProc, ID_EVOLUCION: String(evo.ID_EVOLUCION || ''),
+    ID_CAMA: String(evo.ID_CAMA || p.idCama), PATIENT_ID: p.pidEvo,
+    FECHA: p.fecha, TURNO: p.turno, TIPO_PROC: 'anexo', NOMBRE_PROC: p.nombreProc,
+    DESCRIPCION: p.detalle, AUTOR_EMAIL: p.email, TIMESTAMP: ahoraTS(),
   });
 }
 
@@ -5382,8 +5484,22 @@ function anularAnexo(datos, ctx, ep) {
       const idProc = String((datos && datos.idProc) || '');
       if (!idProc) return err('Falta el identificador del anexo.', ERR.VALIDACION);
 
+      /* 🔐 G16 (paso 11, 5-oct-2026). La fila de PROCEDIMIENTOS es lo ÚLTIMO que esta función borra (más abajo): si ya no está,
+         las demás caras ya se resolvieron. Con OP_ID —la pantalla acuña uno por intención— un anexo que ya no está es el éxito
+         de una anulación anterior (el doble toque, el reintento de una respuesta perdida, un colega que se adelantó): el
+         efecto pedido ya es verdad, así que se contesta ok `yaEstaba`, sin escribir nada y sin pedir clave de coordinación
+         (no hay nada que borrar). SIN OP_ID rige la regla de siempre: un id que no está es un rechazo (anexo_anular.js §4). */
+      const op = _opIdDeLaPeticion();
       const filaProc = repoBuscarPorId('PROCEDIMIENTOS', 'ID_PROC', idProc);
-      if (!filaProc) return err('Ese anexo ya no está en el registro (otro colega pudo haberlo borrado). Actualiza con 🔄.', ERR.VALIDACION);
+      if (!filaProc) {
+        if (op) {
+          return ok({
+            entidad: 'PROCEDIMIENTOS', idCama: String((datos && datos.idCama) || ''), patientId: '', idEvolucion: '',
+            accion: 'anexo anulado (ya estaba)', nombre: '', yaEstaba: true,
+          });
+        }
+        return err('Ese anexo ya no está en el registro (otro colega pudo haberlo borrado). Actualiza con 🔄.', ERR.VALIDACION);
+      }
       if (String(filaProc.TIPO_PROC) !== 'anexo') {
         return err('Solo se pueden borrar procedimientos anexados con el ➕. Los del guardado se corrigen re-guardando la evolución del turno.', ERR.VALIDACION);
       }
@@ -5449,30 +5565,61 @@ function anularAnexo(datos, ctx, ep) {
         if (pidProc && hp && hp !== pidProc) return false;
         return String(h.TEXTO || '').indexOf(pref) === 0;
       });
-      if (!cand.length) {
+      /* Sin hito emparejable: SIN OP_ID no se borra nada (borrar solo la fila dejaría el registro y la línea de tiempo diciendo
+         cosas distintas). CON OP_ID el hito faltante es lo que dejó una anulación que murió justo después de borrarlo: la fila
+         de la estadística seguía ahí, sin forma de borrarse, y cada reintento volvía a chocar con este rechazo. Con la
+         identidad de la intención se puede distinguir ese caso del de un registro que ya estaba inconsistente, y se CONTINÚA
+         con lo que falta. */
+      if (!cand.length && !op) {
         return err('No se encontró el hito de ese anexo en la línea de tiempo, así que NO se borró nada: ' +
           'borrar solo la fila dejaría el registro y la línea de tiempo diciendo cosas distintas. Repórtalo.', ERR.VALIDACION);
       }
-      const tsRef = Date.parse(String(filaProc.TIMESTAMP || '')) || 0;
-      cand.sort(function (a, b) {
-        const da = Math.abs((Date.parse(String(a.obj.TIMESTAMP || '')) || 0) - tsRef);
-        const db = Math.abs((Date.parse(String(b.obj.TIMESTAMP || '')) || 0) - tsRef);
-        return da - db;
-      });
-      const hito = cand[0];
+      let hito = null;
+      if (cand.length) {
+        const tsRef = Date.parse(String(filaProc.TIMESTAMP || '')) || 0;
+        cand.sort(function (a, b) {
+          const da = Math.abs((Date.parse(String(a.obj.TIMESTAMP || '')) || 0) - tsRef);
+          const db = Math.abs((Date.parse(String(b.obj.TIMESTAMP || '')) || 0) - tsRef);
+          return da - db;
+        });
+        hito = cand[0];
+      }
 
-      // 1/3 — el hito de la línea de tiempo
-      repoEliminarFilas('TIMELINE', [hito.fila]);
-      // 2/3 — la fila de la estadística (por identidad, jamás «el más parecido»)
-      repoEliminarDonde('PROCEDIMIENTOS', function (r) { return String(r.ID_PROC) === idProc; });
-      // 3/3 — una instancia del nombre en la evolución (si un re-guardado ya la
+      /* EL ORDEN DE LAS ESCRITURAS (G16, paso 11): el hito, la tarjeta de la cama, la evolución y —AL FINAL, el compromiso— la
+         fila de PROCEDIMIENTOS, que es lo que la estadística y el REM cuentan. Antes la fila se borraba segunda: una muerte
+         después de borrar el hito la dejaba sin forma de borrarse, para siempre. Ahora «la fila sigue» significa «la anulación
+         no terminó» y el reintento rehace lo que falte; «la fila ya no está» significa que terminó. */
+
+      // 1/4 — el hito de la línea de tiempo (si no está, ya se borró)
+      if (hito) repoEliminarFilas('TIMELINE', [hito.fila]);
+
+      /* 2/4 — el JSON de la tarjeta se reescribe SIEMPRE que un flujo borra hitos (y en un reintento sin hito, porque no se
+         puede saber si la anulación murió antes o después de reescribirlo). Y si la cama quedó sin ninguno, se vacía
+         explícito: la sincronización normal no escribe con lista vacía porque siempre corre tras INSERTAR. */
+      _sincronizarTimelineCama(idCama);
+      if (!repoLeerTodos('TIMELINE', 'ID_CAMA', idCama).length) {
+        repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, { TIMELINE_JSON: '[]' });
+      }
+
+      // 3/4 — una instancia del nombre en la evolución (si un re-guardado ya la
       // depuró con su Set, no hay nada que quitar y no es un error)
       if (ubic && ubic.obj) {
         const evo = ubic.obj;
         let procs = [];
         try { procs = JSON.parse(evo.PROC_JSON || '[]') || []; } catch (e) { procs = []; }
         const i = procs.indexOf(nombre);
-        if (i !== -1) procs.splice(i, 1);
+        let quitado = i !== -1;
+        if (!hito && quitado) {
+          /* Un reintento SIN hito: la instancia pudo ya haberse quitado en el intento que murió. Mientras la fila de este
+             anexo siga ahí, las instancias del nombre en PROC_JSON son tantas como las filas si NO se quitó y una menos
+             si ya se quitó: solo se quita si no sobran respecto de las filas (misma invariante que `_anexoEscribirProcedimiento`). */
+          const enJson = procs.filter(function (x) { return x === nombre; }).length;
+          const filasIguales = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(filaProc.ID_EVOLUCION || '')).filter(function (r) {
+            return String(r.NOMBRE_PROC) === nombre && (!r.PATIENT_ID || !pidProc || String(r.PATIENT_ID) === pidProc);
+          }).length;
+          quitado = enJson >= filasIguales;
+        }
+        if (quitado) procs.splice(i, 1);
 
         /* 🔃 Y SI LO QUE SE ANULA ES UNA PRONACIÓN, SE APAGA SU RELOJ. Desde
            que el ➕ sella el ciclo (arriba), borrar solo la fila y el hito
@@ -5486,7 +5633,7 @@ function anularAnexo(datos, ctx, ep) {
           cicloCampos.RESP_POS_PRONO = false;  cicloCampos.RESP_PRONO_EVENTO = false;
           cicloCampos.RESP_PRONO_HORA = '';    cicloCampos.PRONO_INICIO_TS = '';
         }
-        if (i !== -1 || Object.keys(cicloCampos).length) {
+        if (quitado || Object.keys(cicloCampos).length) {
           repoEscribirFila(ubic.hoja, ubic.fila, Object.assign({}, evo, cicloCampos, {
             PROC_JSON: JSON.stringify(procs), PROC_CANTIDAD: procs.length,
             PROC_RESUMEN: procs.join(', '),
@@ -5494,13 +5641,8 @@ function anularAnexo(datos, ctx, ep) {
         }
       }
 
-      /* El JSON de la tarjeta se reescribe SIEMPRE que un flujo borra hitos. Y
-         si la cama quedó sin ninguno, se vacía explícito: la sincronización
-         normal no escribe con lista vacía porque siempre corre tras INSERTAR. */
-      _sincronizarTimelineCama(idCama);
-      if (!repoLeerTodos('TIMELINE', 'ID_CAMA', idCama).length) {
-        repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, { TIMELINE_JSON: '[]' });
-      }
+      // 4/4 — la fila de la estadística (por identidad, jamás «el más parecido»): el compromiso, lo último
+      repoEliminarDonde('PROCEDIMIENTOS', function (r) { return String(r.ID_PROC) === idProc; });
       SpreadsheetApp.flush();
 
       return ok({
@@ -7478,7 +7620,14 @@ function anularEvento(datos, ctx, ep) {
     }
 
     evo.TEXTO_GENERADO = generarTextoEvolucion(evo);
-    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
+
+    /* 🔐 G16 (paso 11, 5-oct-2026) — LA FILA DE LA EVOLUCIÓN SE ESCRIBE AL FINAL. Era lo primero que se escribía, y a la cama le
+       faltaba el resto: la corrida que moría entre ambas dejaba el evento YA borrado de la evolución y a la cama con la vía
+       aérea y el soporte del evento anulado. El reintento miraba la evolución, veía el evento ausente y contestaba «ya estaba»
+       (para no restar los días de VM dos veces): la cama se quedaba mal para siempre. Con la evolución al FINAL, «el evento
+       sigue en la fila» significa «la anulación no terminó», y el reintento lo rehace todo: re-sincroniza la cama, restaura las
+       fechas de inicio y escribe la fila. La resta de DIAS_VM_PREVIOS parte de la fila vieja, así que sigue pasando UNA sola vez.
+       🪤 Todo lo de abajo trabaja con `evo` en memoria (ya con el evento borrado), no con lo que hay en la hoja. */
 
     // Re-sincronizar la cama y restaurar las fechas de inicio (para que los
     // contadores de días de VM/VA no se reinicien tras la anulación)
@@ -7505,6 +7654,9 @@ function anularEvento(datos, ctx, ep) {
       if (evo.VENT_VIA_AEREA && evo.VENT_VIA_AEREA !== 'Natural' && fecha && !coordCampoCorregido(_camaAct, 'FECHA_INICIO_VA')) campos.FECHA_INICIO_VA = rest(fecha, dva);
       if (Object.keys(campos).length) repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
     }
+
+    // El compromiso: la fila de la evolución, lo ÚLTIMO que se escribe.
+    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
 
     return ok({
       idEvolucion: evo.ID_EVOLUCION, idCama: idCama, patientId: evo.PATIENT_ID || '',
@@ -8805,6 +8957,20 @@ function pendAbrir(datos, ctx, ep) {
          🪤 Solo cuenta lo ABIERTO: pabellón el lunes y otra vez el jueves son
          dos encargos distintos, no un duplicado. */
       const _norm = function (t) { return String(t || '').trim().toLowerCase().replace(/\s+/g, ' '); };
+      /* 🔐 G16 (paso 11, 5-oct-2026) — EL REINTENTO DE SU PROPIO ÉXITO. El pendiente se escribe en UNA sola escritura (la lista
+         JSON de la cama), así que no hay muerte «a medias»: o aterrizó o no. Pero si aterrizó y la respuesta se perdió, el
+         reintento con el mismo OP_ID (el sello no llegó a escribirse, o el caché falló) chocaba con la regla de abajo y la
+         pantalla decía «ese pendiente ya está abierto» del pendiente que ella misma acababa de abrir.
+         Con OP_ID el id del pendiente se DERIVA de la operación y del texto normalizado (`PEND_<op>_<huella>`): si la lista ya
+         tiene ESE id, es el suyo, y se contesta OK con el mismo pendiente. Va ANTES de la regla de «ya está abierto» y no la
+         toca: el mismo texto con OTRO OP_ID (dos teléfonos tocando el mismo chip) sigue siendo un duplicado, y el mismo OP_ID
+         con otro texto es otro encargo. Sin OP_ID el id es el de siempre (12 caracteres de un uuid). */
+      const _conOp = (typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id);   // (compatibilidad: ver `uid`, infra_util.gs)
+      const _id = _conOp ? uid('PEND', _norm(texto)) : Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+      const _suyo = lista.filter(function (p) { return p && String(p.id) === _id; })[0];
+      if (_suyo) {
+        return ok({ entidad: 'CAMAS_ESTADO', accion: 'pendiente abierto', idCama: idCama, pendiente: _suyo });
+      }
       const _yaEsta = lista.some(function (p) { return p && !p.ci && _norm(p.tx) === _norm(texto); });
       if (_yaEsta) {
         return err('Ese pendiente ya está abierto en este paciente.', ERR.VALIDACION);
@@ -8814,7 +8980,7 @@ function pendAbrir(datos, ctx, ep) {
       }
       const firma = _pendFirma(datos, ctx);
       const nuevo = {
-        id: Utilities.getUuid().replace(/-/g, '').slice(0, 12),
+        id: _id,
         tx: texto, ab: firma, abTs: ahoraTS(), ci: '', ciTs: '',
       };
       lista.push(nuevo);
@@ -10465,6 +10631,78 @@ function _agregarHitoInterno(hito) {
 }
 
 /**
+ * El OP_ID de la petición en curso ('' si no hay), el mismo que arma `_auditar` en OP_ACTUAL (infra_lock.gs).
+ * 🪤 `typeof OP_ACTUAL` es compatibilidad y no una comprobación de seguridad: la variable se declara en infra_lock.gs y los
+ * bancos antiguos, que cargan una lista fija de archivos, ni la tienen declarada. Es la misma regla de `_opIdCamas()`
+ * (svc_camas.gs); vive también acá porque los bancos que cargan esta pieza no siempre cargan la de camas.
+ */
+function _opIdDeLaPeticion() {
+  return (typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id) ? String(OP_ACTUAL.id) : '';
+}
+
+/** La clave de CONTENIDO de un hito de operación: lo que lo identifica en lógica (tipo, cama, paciente, momento y texto). */
+function _claveHitoDeOperacion(hito) {
+  return [hito.tipo, hito.idCama, hito.patientId, hito.fecha || '', hito.turno || '', hito.texto].join('|');
+}
+
+/**
+ * El id que le toca a un hito dentro de la operación en curso ('' si no hay operación): `HITO_<op>_<huella de la clave>`.
+ * La clave es de CONTENIDO, no un contador (ver `uid` en infra_util.gs): el mismo OP_ID con otro contenido (el usuario
+ * editó la hora, el texto) da OTRO id y por lo tanto otro hito, y el reintento de lo mismo da EL MISMO.
+ */
+function _idHitoDeOperacion(hito, clave) {
+  if (!_opIdDeLaPeticion()) return '';
+  return uid('HITO', clave != null ? String(clave) : _claveHitoDeOperacion(hito));
+}
+
+/**
+ * Escribe un hito SOLO SI NO ESTÁ cuando hay una operación en curso (G16, paso 11), y devuelve `{ id, existia, sincronizado }`.
+ *
+ * 🔴 DE DÓNDE SALE. Un hito nacía con un id de reloj y azar y nadie preguntaba «¿ya estoy?»: si la corrida murió después de
+ * escribirlo y antes de sellar, el reintento con el mismo OP_ID (el sello solo se escribe cuando TODO terminó limpio) escribía
+ * otro, y la línea de tiempo mostraba el mismo cultivo, la misma nota o el mismo anexo dos veces. Con operación en curso el id
+ * se DERIVA del OP_ID y del contenido (`_idHitoDeOperacion`), se busca antes de insertar (`repoBuscarFila`) y el hito que ya
+ * estaba no se escribe otra vez. Es el mismo modelo de `_hitoTraslado` (svc_camas.gs), para el resto de las puertas.
+ *
+ * El hito sirve además de MARCADOR de «este intento ya empezó»: quien escribe varias caras (el anexo: evolución, fila de la
+ * estadística y hito) lo escribe PRIMERO y, si ya estaba, sabe que está reintentando y que lo que sigue puede estar hecho.
+ *
+ * @param hito              el hito de siempre ({idCama, patientId, fecha, turno, tipo, texto, autor, autorEmail, datos}).
+ * @param sincronizar       si además deja la tarjeta de la cama mostrándolo. Con el hito recién escrito se sincroniza; si ya
+ *                          estaba solo se vuelve a sincronizar cuando la tarjeta NO lo muestra (la muerte cayó entre las dos
+ *                          escrituras): si ya lo muestra no se escribe nada. Quien lo pide en `false` sincroniza él, al final.
+ * @param clave             la clave de contenido si la puerta necesita una propia (por omisión tipo, cama, paciente, fecha,
+ *                          turno y texto). Una clave propia sirve para dejar FUERA lo que cambia entre un intento y su reintento.
+ * @param existiaConocida   si quien llama ya buscó el hito (para no leer dos veces), el resultado de esa búsqueda.
+ *
+ * SIN operación en curso (los bancos antiguos y las llamadas internas) escribe como siempre, con id de reloj y azar, y no
+ * lee nada de más: `existia` es siempre false.
+ */
+function _hitoDeOperacion(hito, sincronizar, clave, existiaConocida) {
+  const op = _opIdDeLaPeticion();
+  if (!op) {
+    if (sincronizar) _agregarHitoInterno(hito); else _agregarHitoInternoSinSync(hito);
+    return { id: '', existia: false, sincronizado: true };
+  }
+  const id = _idHitoDeOperacion(hito, clave);
+  const existia = (existiaConocida !== undefined && existiaConocida !== null)
+    ? !!existiaConocida
+    : (repoBuscarFila('TIMELINE', 'ID_HITO', id) !== -1);
+  if (!existia) _agregarHitoInternoSinSync(Object.assign({}, hito, { id: id }));
+  let sincronizado = true;
+  if (sincronizar) {
+    const idCama = String(hito.idCama);
+    if (!existia) {
+      sincronizado = _sincronizarTimelineCama(idCama);
+    } else {
+      const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
+      if (c && String(c.TIMELINE_JSON || '').indexOf(id) === -1) sincronizado = _sincronizarTimelineCama(idCama);
+    }
+  }
+  return { id: id, existia: existia, sincronizado: sincronizado };
+}
+
+/**
  * Guarda en CAMAS_ESTADO.TIMELINE_JSON los últimos 30 hitos de la cama (cache).
  *
  * 🔴 DEL EPISODIO VIGENTE, no de la cama entera (20-ago-2026). Leía solo por
@@ -10527,7 +10765,12 @@ function agregarHito(hito, ep) {
         const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
-      const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r);
+      /* 🔐 G16 (paso 11). Con OP_ID el id del hito se deriva de la operación y del contenido y se escribe SOLO SI NO ESTÁ: el reintento de
+         su propio éxito (la respuesta se perdió, el sello no llegó a escribirse) no repite el hito en la línea de tiempo. Sin OP_ID,
+         como siempre. La respuesta es la de siempre. */
+      _hitoDeOperacion(hito, true);
+      SpreadsheetApp.flush();
+      return ok({ accion: 'hito_agregado' });
     } catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
   });
 }

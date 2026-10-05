@@ -94,7 +94,8 @@ function evalRegistrar(datos, ctx, ep) {
           if (_msgEp) return err(_msgEp, ERR.VALIDACION);
         }
       }
-      const r = _evalRegistrarInterno(datos, ctx);
+      // 🔐 G16 (paso 11): con OP_ID, el id de la medición y el de su hito se DERIVAN de la operación (`derivar` = true).
+      const r = _evalRegistrarInterno(datos, ctx, true);
       if (r && r.error) return r;
       SpreadsheetApp.flush();
       return ok(r);
@@ -102,8 +103,21 @@ function evalRegistrar(datos, ctx, ep) {
   });
 }
 
-/** Sin lock: para llamar desde guardarEvolucion, que ya lo tiene. */
-function _evalRegistrarInterno(datos, ctx) {
+/**
+ * Sin lock: para llamar desde guardarEvolucion, que ya lo tiene.
+ *
+ * 🔐 G16 (paso 11, 5-oct-2026) — `derivar` (solo lo pide `evalRegistrar`, la puerta de la tarjeta; la cola de `guardarEvolucion`
+ * llama con dos argumentos y sigue con su regla de «¿ya está?» de siempre, que no suma lecturas al guardado).
+ * 🔴 EL DEFECTO. La medición se escribía con un id de reloj y azar: si la corrida moría después de insertarla (o de anular la
+ * que corregía) y antes de sellar, el reintento con el mismo OP_ID insertaba OTRA, y la serie del episodio quedaba con la
+ * misma medición dos veces (la tarjeta la dibuja dos veces y el «último valor» lo decide el desempate). Con operación en curso
+ * y `derivar`, el id sale del OP_ID y del contenido de la medición (`EVAL_<op>_<huella>`), se busca antes de insertar
+ * (`repoBuscarFila`) y la medición que ya estaba no se escribe otra vez. Lo demás (anular la corregida, el espejo de la cama, el
+ * hito y la tarjeta) es idempotente o se completa solo si falta, así que el reintento llega siempre al mismo final.
+ * 🪤 La clave NO lleva la fecha ni el turno que la puerta pone por omisión (el reloj): un reintento a las 19:59 de lo enviado a
+ * las 19:58 es el MISMO registro. Sí lleva la fecha y el turno que el usuario declaró, y la medición que corrige.
+ */
+function _evalRegistrarInterno(datos, ctx, derivar) {
   datos = datos || {};
   const idCama = String(datos.idCama || datos.ID_CAMA || '').trim();
   const escala = _evalEscala(datos.escala || datos.ESCALA);
@@ -131,15 +145,19 @@ function _evalRegistrarInterno(datos, ctx) {
   let items = datos.items != null ? datos.items : (datos.ITEMS_JSON != null ? datos.ITEMS_JSON : '');
   if (items && typeof items !== 'string') { try { items = JSON.stringify(items); } catch (e) { items = ''; } }
 
+  const derivada = !!derivar && !!_opIdDeLaPeticion();
+  const claveEval = derivada ? [escala, total, idCama, pid, String(datos.fecha || datos.FECHA || ''), String(datos.turno || datos.TURNO || ''),
+    String(datos.anulaId || '')].join('|') : '';
   const fila = {
-    ID_EVAL: uid('EVAL'), PATIENT_ID: pid, ID_CAMA: idCama,
+    ID_EVAL: derivada ? uid('EVAL', claveEval) : uid('EVAL'), PATIENT_ID: pid, ID_CAMA: idCama,
     FECHA: fecha, TURNO: turno, ESCALA: escala, TOTAL: total,
     ITEMS_JSON: items || '', FIRMA: firma,
     ORIGEN: String(datos.origen || datos.ORIGEN || 'tarjeta'),
     ID_EVOLUCION: String(datos.idEvolucion || datos.ID_EVOLUCION || ''),
     ANULADA: false, TIMESTAMP: ahoraTS(),
   };
-  repoInsertar('EVALUACIONES', fila);
+  // Con id derivado, la medición que ya está (el primer intento llegó hasta acá) no se inserta otra vez.
+  if (!derivada || repoBuscarFila('EVALUACIONES', 'ID_EVAL', fila.ID_EVAL) === -1) repoInsertar('EVALUACIONES', fila);
 
   // Corregir = nueva fila + anular la vieja. Nunca se borra.
   if (datos.anulaId) {
@@ -157,8 +175,13 @@ function _evalRegistrarInterno(datos, ctx) {
   // lo convierte en un aviso, y el reintento lo completa (`_evalCompletarCola`).
   let sinHito = false;
   try {
-    _agregarHitoInternoSinSync(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx));
-    if (!_sincronizarTimelineCama(idCama)) sinHito = true;
+    if (derivada) {
+      // El hito también lleva id derivado y se escribe solo si no está; la tarjeta se vuelve a sincronizar si no lo muestra.
+      if (!_hitoDeOperacion(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx), true, claveEval).sincronizado) sinHito = true;
+    } else {
+      _agregarHitoInternoSinSync(_evalHito(idCama, pid, fecha, turno, escala, total, firma, ctx));
+      if (!_sincronizarTimelineCama(idCama)) sinHito = true;
+    }
   } catch (e) { console.warn('evalRegistrar hito:', e.message); sinHito = true; }
 
   const res = { entidad: 'EVALUACIONES', accion: 'medicion', escala: escala, total: total, idEval: fila.ID_EVAL, firma: firma, fecha: fecha };
@@ -271,16 +294,22 @@ function episodioEscala(datos, ctx, ep) {
       // Los ítems de la calculadora también viven en la cama cuando existen
       // (BARTHEL_JSON/CHARLSON_JSON son de EVOLUCIONES; aquí se guardan en el
       // hito para no abrir columnas nuevas por esto).
-      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
       let items = datos.items != null ? datos.items : '';
       if (items && typeof items !== 'string') { try { items = JSON.stringify(items); } catch (e) { items = ''; } }
-      _agregarHitoInternoSinSync({
+      /* 🔐 G16 (paso 11, 5-oct-2026) — EL HITO VA PRIMERO. Se escribía el valor en la cama y después el hito, que cuenta lo que
+         CORRIGE: «Barthel 60 (corrige 40)» sale de leer la cama ANTES de escribirla. La corrida que moría entre ambas dejaba el
+         valor nuevo y, al reintentar, la cama ya decía 60: el hito salía sin su «corrige 40» y el dato de qué valor se pisó se
+         perdía para siempre. Con el hito primero el «antes» verdadero queda escrito en cuanto se lee; y con OP_ID el hito lleva id
+         derivado y se escribe solo si no está, así que el reintento no lo repite ni lo reescribe con un «antes» ya pisado. La
+         clave del hito NO lleva el «antes» (cambia entre un intento y su reintento): es la escala y el valor. */
+      _hitoDeOperacion({
         idCama: idCama, patientId: cama.PATIENT_ID, tipo: 'evaluacion',
         texto: '📐 ' + ({ ECF: 'ECF', BARTHEL: 'Barthel', CHARLSON: 'Charlson' })[escala] + ' ' + valor +
                (antes !== '' && antes !== valor ? ' (corrige ' + antes + ')' : '') + (firma ? ' (' + firma + ')' : ''),
         autor: firma, autorEmail: ctx.email || '',
         datos: { escala: escala, valor: valor, antes: antes, firma: firma, items: items || '' },
-      });
+      }, false, ['evaluacion', idCama, cama.PATIENT_ID, escala, valor].join('|'));
+      repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
       _sincronizarTimelineCama(idCama);
       SpreadsheetApp.flush();
       return ok({ entidad: 'CAMAS_ESTADO', accion: 'escala ' + escala, idCama: idCama, valor: valor, antes: antes, firma: firma });

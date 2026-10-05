@@ -1920,7 +1920,14 @@ function anularEvento(datos, ctx, ep) {
     }
 
     evo.TEXTO_GENERADO = generarTextoEvolucion(evo);
-    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
+
+    /* 🔐 G16 (paso 11, 5-oct-2026) — LA FILA DE LA EVOLUCIÓN SE ESCRIBE AL FINAL. Era lo primero que se escribía, y a la cama le
+       faltaba el resto: la corrida que moría entre ambas dejaba el evento YA borrado de la evolución y a la cama con la vía
+       aérea y el soporte del evento anulado. El reintento miraba la evolución, veía el evento ausente y contestaba «ya estaba»
+       (para no restar los días de VM dos veces): la cama se quedaba mal para siempre. Con la evolución al FINAL, «el evento
+       sigue en la fila» significa «la anulación no terminó», y el reintento lo rehace todo: re-sincroniza la cama, restaura las
+       fechas de inicio y escribe la fila. La resta de DIAS_VM_PREVIOS parte de la fila vieja, así que sigue pasando UNA sola vez.
+       🪤 Todo lo de abajo trabaja con `evo` en memoria (ya con el evento borrado), no con lo que hay en la hoja. */
 
     // Re-sincronizar la cama y restaurar las fechas de inicio (para que los
     // contadores de días de VM/VA no se reinicien tras la anulación)
@@ -1947,6 +1954,9 @@ function anularEvento(datos, ctx, ep) {
       if (evo.VENT_VIA_AEREA && evo.VENT_VIA_AEREA !== 'Natural' && fecha && !coordCampoCorregido(_camaAct, 'FECHA_INICIO_VA')) campos.FECHA_INICIO_VA = rest(fecha, dva);
       if (Object.keys(campos).length) repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
     }
+
+    // El compromiso: la fila de la evolución, lo ÚLTIMO que se escribe.
+    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
 
     return ok({
       idEvolucion: evo.ID_EVOLUCION, idCama: idCama, patientId: evo.PATIENT_ID || '',

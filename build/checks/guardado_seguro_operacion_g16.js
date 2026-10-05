@@ -57,6 +57,19 @@
 //       ok con data.advertencias[], NO se sella y el reintento con el mismo OP_ID las completa sin duplicar.
 //  23 · LA FORMA: el flujo no se reordena, la regla vive donde dice el diseño y ninguna cola vuelve a tragarse el error.
 //
+// LO QUE SE SUMA EN EL PASO 11 (5-oct-2026) — LA RECUPERACIÓN EN LOS ANEXOS Y LAS PUERTAS DE DATO, secciones 24 a 28:
+//  24 · LA MATRIZ DE MUERTE de ANEXAR_EVENTO (procedimiento, prono, supino, dispositivo, cultivo y «otro»): el ➕ escribía la
+//       evolución, la fila de PROCEDIMIENTOS y el hito con ids de reloj y azar y sin preguntar «¿ya estoy?»; una muerte entre
+//       ellos y el reintento dejaba el anexo repetido en una cara (el REM cuenta la fila). Ahora el hito, con id derivado del
+//       OP_ID, es el marcador de «este intento ya empezó» y la fila de la estadística se escribe al final.
+//  25 · ANULAR_ANEXO: una muerte tras borrar el hito dejaba la fila de PROCEDIMIENTOS sin forma de borrarse (rechazaba «no se
+//       encontró el hito» para siempre). Ahora la fila se borra al FINAL; con OP_ID el reintento continúa y un anexo que ya no
+//       está es «ya estaba». SIN OP_ID rige la regla de siempre (anexo_anular.js).
+//  26 · ANULAR_EVENTO: la evolución (el compromiso) se reescribe al final, y el reintento re-sincroniza la cama.
+//  27 · EVAL_REGISTRAR, EPISODIO_ESCALA, PEND_ABRIR y AGREGAR_HITO: ids derivados e insertar-si-no-existe; el reintento de su
+//       propio éxito contesta lo mismo que la corrida limpia (el pendiente ya no dice «ya está abierto» de su propio éxito).
+//  28 · LA FORMA: el orden de cada puerta, los ids derivados y que nadie parsea ni ordena por ellos.
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -1238,7 +1251,9 @@ tramo('forma de guardarEvolucion', () => {
   const cul = (evals.match(/function _cultivoALaSerie\([\s\S]*?\n\}\n/) || [''])[0];
   no('★ _cultivoALaSerie no se traga nada: no hay un catch vacío ni uno que solo avise', /catch\s*\(\w+\)\s*\{\s*(console\.warn\([^)]*\);?\s*)?\}/.test(cul));
   si('   …y _evalDesdeEvolucion devuelve los avisos (las mediciones que fallaron NO se pierden en un console.warn)', /advertencias/.test(ede) && !/console\.warn\('cultivo a la serie/.test(ede));
-  si('★ _evalRegistrarInterno sigue con la firma (datos, ctx) y no compara el episodio (lo hace quien la llama)', /function _evalRegistrarInterno\(datos, ctx\)/.test(evals) && !/validarEpisodioPuerta/.test((evals.match(/function _evalRegistrarInterno\([\s\S]*?\n\}\n/) || [''])[0]));
+  // Paso 11: la firma ganó un tercer parámetro OPCIONAL (`derivar`: solo lo pide evalRegistrar, para derivar el id del OP_ID). La cola de
+  // guardarEvolucion sigue llamando con (datos, ctx) —lo exige la línea siguiente de la sección 28—, así que para ella nada cambia.
+  si('★ _evalRegistrarInterno sigue con (datos, ctx) —más el `derivar` opcional del paso 11— y no compara el episodio (lo hace quien la llama)', /function _evalRegistrarInterno\(datos, ctx(, derivar)?\)/.test(evals) && !/validarEpisodioPuerta/.test((evals.match(/function _evalRegistrarInterno\([\s\S]*?\n\}\n/) || [''])[0]));
   const tl = sinComentarios(leer('svc_timeline.gs'));
   const tdg = (tl.match(/function _timelineDelGuardado\([\s\S]*?\n\}\n/) || [''])[0];
   si('★ _timelineDelGuardado sigue borrando solo los hitos AUTOMÁTICOS del turno y del episodio, y los reinserta en un solo lote', /_TIPOS_HITO_AUTO\.indexOf/.test(tdg) && (tdg.match(/repoInsertarVarios\('TIMELINE'/g) || []).length === 1);
@@ -1250,6 +1265,392 @@ tramo('forma de guardarEvolucion', () => {
   no('   …el hito de ingreso ya no depende de «fila nueva» (el reintento tras morir antes de los hitos lo repone)', /ES_INGRESO\)\s*&&\s*esNuevo/.test(ge));
   si('★ DIAS_VM, DIAS_VNI y DIAS_VA conservan los de la fila del turno cuando la cama ya absorbió el turno y el soporte y la vía no cambiaron',
     /cama\.ULTIMO_TURNO_KEY[^;]*===\s*turnoKey/.test(ge) && /_prev\.PATIENT_ID[^;]*patientId/.test(ge) && /'DIAS_VM', 'DIAS_VNI', 'DIAS_VA'/.test(ge));
+});
+
+/* ══ 24 · LA MATRIZ DE MUERTE DE ANEXAR_EVENTO (paso 11) ══════════════════ */
+console.log('\n24 · ANEXAR_EVENTO: muerte tras la escritura N y reintento con el MISMO paquete → el estado final es el de una corrida limpia');
+// 🔴 EL DEFECTO. El ➕ escribía la evolución (el nombre al final de PROC_JSON), la fila de PROCEDIMIENTOS y el hito, cada uno con un
+// id de reloj y azar y sin preguntar «¿ya estoy?». Una muerte entre ellos y el reintento (el sello solo se escribe cuando TODO terminó
+// limpio) dejaba el anexo repetido en una de las tres caras: dos instancias en la evolución, dos filas en la estadística (el REM las
+// cuenta) o dos hitos en la línea de tiempo. Ahora el hito lleva un id derivado del OP_ID y es el MARCADOR de «este intento ya empezó»;
+// la fila de PROCEDIMIENTOS (el punto de compromiso: lo que cuenta el REM) se escribe al FINAL con su id derivado; y la evolución, que
+// es un «agregar al final» y por eso no se puede repetir a ciegas, se rehace solo si el reintento comprueba que no quedó escrita.
+const OPA = 'op_anexo_g11_0001';
+const OPN = 'op_anular_g11_0001';
+const enMundo = (armar, fn) => {
+  const guardada = MUNDO.FOTO;
+  try { volverAlMundo(); armar(); MUNDO.FOTO = M.foto(); fn(); } finally { MUNDO.FOTO = guardada; }
+};
+const procsDe = (pid, nombre) => DB.PROCEDIMIENTOS.filter(p => p.PATIENT_ID === pid && p.TIPO_PROC === 'anexo' && p.NOMBRE_PROC === nombre);
+const hitosAnexoDe = (pid, nombre) => DB.TIMELINE.filter(h => h.PATIENT_ID === pid && h.TIPO === 'anexo' && String(h.TEXTO).indexOf('🔧 ' + nombre) === 0);
+const jsonDeTurno = (idCama, tk) => { try { return JSON.parse(filaTurno(idCama, tk).PROC_JSON || '[]') || []; } catch (e) { return []; } };
+const cuantas = (lista, x) => lista.filter(y => y === x).length;
+const enCache = (idCama, texto) => String(camaDe(idCama).TIMELINE_JSON || '').indexOf(texto) !== -1;
+const mkAnexo = extra => Object.assign({ idCama: '3', turnoKey: TK, tipo: 'procedimiento', proc: 'ECOGRAFÍA', hora: '11:30',
+  detalle: 'control de rutina', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPA }, extra || {});
+const QUEANEXO = 'un anexo, un hito o una instancia del procedimiento repetidos';
+
+// Lo que un anexo de procedimiento promete en CUALQUIER corte (nada repetido) y, ya terminado, que las tres caras están: el nombre en
+// la evolución, la fila de la estadística (salvo la supinación, que no entra: un ciclo prono-supino es UN evento) y el hito, visible en la tarjeta.
+const violaProc = (nombre, conFila, extra) => fase => {
+  const enJson = cuantas(jsonDeTurno('3', TK), nombre), filas = procsDe(MUNDO.PID_P, nombre).length, hitos = hitosAnexoDe(MUNDO.PID_P, nombre).length;
+  if (enJson > 1) return 'el procedimiento está ' + enJson + ' veces en la evolución (PROC_JSON)';
+  if (filas > 1) return 'PROCEDIMIENTOS tiene ' + filas + ' filas del anexo (el REM las cuenta)';
+  if (hitos > 1) return 'la línea de tiempo tiene ' + hitos + ' hitos del anexo';
+  if (fase !== 'final') return '';
+  if (enJson !== 1 || filas !== (conFila ? 1 : 0) || hitos !== 1) return 'quedó a medias: ' + enJson + ' en la evolución, ' + filas + ' fila(s) y ' + hitos + ' hito(s)';
+  if (String(filaTurno('3', TK).PROC_CANTIDAD) !== '1') return 'PROC_CANTIDAD (' + filaTurno('3', TK).PROC_CANTIDAD + ') no cuenta el anexo';
+  if (!enCache('3', nombre)) return 'la tarjeta de la cama no muestra el hito';
+  return (extra && extra()) || '';
+};
+const violaHitoTipo = (tipo, marca, extra) => fase => {
+  const n = DB.TIMELINE.filter(h => h.PATIENT_ID === MUNDO.PID_P && h.TIPO === tipo && String(h.TEXTO).indexOf(marca) !== -1).length;
+  if (n > 1) return 'hay ' + n + ' hitos «' + marca + '»';
+  if (fase !== 'final') return '';
+  if (n !== 1) return 'no quedó el hito «' + marca + '»';
+  if (!enCache('3', marca)) return 'la tarjeta de la cama no muestra el hito';
+  return (extra && extra()) || '';
+};
+
+tramo('ANEXAR_EVENTO · procedimiento', () => {
+  volverAlMundo();
+  console.log('   · procedimiento (ECOGRAFÍA 11:30)');
+  const a = matriz('ANEXAR_EVENTO de un procedimiento con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo(), violaProc('ECOGRAFÍA', true), { queSeVe: QUEANEXO });
+  const iHito = a.reg.findIndex(x => /^repoInsertar\(TIMELINE\)/.test(x));
+  const iEvo = a.reg.findIndex(x => /^repoEscribirFila\(EVOLUCIONES\)/.test(x));
+  const iProc = a.reg.findIndex(x => /^repoInsertar\(PROCEDIMIENTOS\)/.test(x));
+  eq('★ el orden de escrituras: el HITO primero (es el marcador de que este intento ya empezó), la evolución y la fila de la estadística AL FINAL (el compromiso)',
+    [iHito, iEvo, iProc].join(',') + '|' + (iHito > -1 && iHito < iEvo && iEvo < iProc), [iHito, iEvo, iProc].join(',') + '|true');
+  volverAlMundo();
+  llama('ANEXAR_EVENTO', mkAnexo());
+  const idProc = (procsDe(MUNDO.PID_P, 'ECOGRAFÍA')[0] || {}).ID_PROC || '';
+  const idHito = (hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA')[0] || {}).ID_HITO || '';
+  si('★ el id de la fila de PROCEDIMIENTOS se DERIVA del OP_ID (PROC_<op>_…): el reintento lo reconoce', idProc.indexOf('PROC_' + OPA + '_') === 0);
+  si('★ el id del hito se DERIVA del OP_ID (HITO_<op>_…)', idHito.indexOf('HITO_' + OPA + '_') === 0);
+  si('   …y son seguros para una celda y para un atributo HTML (letras, números, guion y guion bajo)', /^[A-Za-z0-9_-]+$/.test(idProc) && /^[A-Za-z0-9_-]+$/.test(idHito));
+
+  // Dos anexos LEGÍTIMAMENTE iguales (otra intención: otro OP_ID) NO se confunden con un reintento.
+  volverAlMundo();
+  llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: 'op_anexo_g11_dos_a' })); llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: 'op_anexo_g11_dos_b' }));
+  eq('★ dos anexos iguales con OTRO OP_ID son dos (el id derivado no los une: uno es una intención nueva)',
+    cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA') + '/' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '/' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length, '2/2/2');
+  // El mismo OP_ID con OTRO contenido (el usuario editó la hora): se ejecuta de nuevo y NO se pierde lo editado.
+  volverAlMundo();
+  llama('ANEXAR_EVENTO', mkAnexo({ hora: '11:30' })); const ed = llama('ANEXAR_EVENTO', mkAnexo({ hora: '12:15' }));
+  eq('★ el mismo OP_ID con otro contenido ejecuta y deja LO EDITADO (la hora nueva no se pierde por «ya existía»)',
+    ed.ok + '/' + ed.data.repetida + '/' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').filter(h => /12:15/.test(h.TEXTO)).length, 'true/undefined/1');
+  // Sin OP_ID: ids de siempre (reloj y azar), sin leer de más.
+  volverAlMundo();
+  llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: undefined }));
+  si('   sin OP_ID los ids son los de siempre: PREFIJO_<ms>_<azar> (los registros y bancos antiguos no cambian)',
+    /^PROC_\d{13}_[A-Z0-9]{1,5}$/.test((procsDe(MUNDO.PID_P, 'ECOGRAFÍA')[0] || {}).ID_PROC || '') && /^HITO_\d{13}_[A-Z0-9]{1,5}$/.test((hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA')[0] || {}).ID_HITO || ''));
+});
+
+tramo('ANEXAR_EVENTO · prono y supino', () => {
+  volverAlMundo();
+  console.log('   · PRONO 09:00 (el ciclo vive en la evolución: el reintento de un anexo que ya lo declaró NO es «ya tiene registrada la pronación»)');
+  const extraP = () => (esVerdadero(filaTurno('3', TK).RESP_PRONO_EVENTO) && filaTurno('3', TK).RESP_PRONO_HORA === '09:00') ? '' : 'el ciclo de prono no quedó declarado en la evolución';
+  matriz('ANEXAR_EVENTO de un PRONO con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo({ proc: 'PRONO', hora: '09:00', detalle: '' }), violaProc('PRONO 09:00 HRS', true, extraP), { queSeVe: QUEANEXO });
+  console.log('   · SUPINO 10:00 (no entra a PROCEDIMIENTOS: UN ciclo es UN evento)');
+  const extraS = () => (esVerdadero(filaTurno('3', TK).RESP_SUPINO_EVENTO) && filaTurno('3', TK).RESP_SUPINO_HORA === '10:00') ? '' : 'el supino no quedó declarado en la evolución';
+  matriz('ANEXAR_EVENTO de un SUPINO con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo({ proc: 'SUPINO', hora: '10:00', detalle: '' }), violaProc('SUPINACIÓN 10:00 HRS', false, extraS), { queSeVe: QUEANEXO });
+  // La regla de siempre no se afloja: OTRO anexo de prono en un turno que ya lo declaró se rechaza (solo el reintento del MISMO pasa).
+  volverAlMundo();
+  llama('ANEXAR_EVENTO', mkAnexo({ proc: 'PRONO', hora: '09:00', detalle: '' }));
+  const otro = llama('ANEXAR_EVENTO', mkAnexo({ proc: 'PRONO', hora: '09:30', detalle: '', OP_ID: 'op_anexo_g11_otro' }));
+  eq('★ otro PRONO de OTRA intención en un turno que ya declaró su pronación: se rechaza como siempre', otro.ok + '/' + otro.codigo + '/' + /ya tiene registrada la pronaci/.test(otro.error || ''), 'false/VALIDACION/true');
+});
+
+tramo('ANEXAR_EVENTO · dispositivo, cultivo y «otro»', () => {
+  volverAlMundo();
+  console.log('   · cambio de HME (reinicia el reloj de la cama: una escritura idempotente) + su hito');
+  const violaD = violaHitoTipo('dispositivo', 'Cambio de HME', () => (camaDe('3').DISP_HME_FECHA === '2026-08-10' && camaDe('3').DISP_CONFIRMADO === true) ? '' : 'el reloj del HME no quedó reiniciado');
+  matriz('ANEXAR_EVENTO de un cambio de HME con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo({ tipo: 'hme', proc: undefined, detalle: '' }), violaD, { queSeVe: QUEANEXO });
+  console.log('   · resultado de cultivo');
+  matriz('ANEXAR_EVENTO de un cultivo con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo({ tipo: 'cultivo', proc: undefined, cultTipo: 'Traqueal', cultHallazgo: 'pendiente', hora: '10:00' }),
+    violaHitoTipo('cultivo', 'Cultivo Traqueal'), { queSeVe: QUEANEXO });
+  console.log('   · «otro» (una nota)');
+  matriz('ANEXAR_EVENTO de «otro» con OP_ID', 'ANEXAR_EVENTO', () => mkAnexo({ tipo: 'otro', proc: undefined, detalle: 'Paciente rechazó la sesión de la mañana', hora: '10:15' }),
+    violaHitoTipo('evento', 'Paciente rechazó la sesión'), { queSeVe: QUEANEXO });
+});
+
+/* ══ 25 · ANULAR_ANEXO: NI ATASCADA NI A MEDIAS ═══════════════════════════ */
+console.log('\n25 · ANULAR_ANEXO: una muerte tras borrar el hito ya no la deja atascada, y un anexo que ya no está es «ya estaba»');
+// 🔴 EL DEFECTO. Borraba el hito, la fila de PROCEDIMIENTOS y una instancia de la evolución, y RECHAZABA si el hito no aparecía: una muerte
+// justo después de borrar el hito dejaba la fila de la estadística (que el REM cuenta) sin forma de borrarse, para siempre. Y el reintento de
+// una anulación que SÍ terminó contestaba «ese anexo ya no está en el registro». Ahora: el hito, la tarjeta, la evolución y, AL FINAL (el
+// compromiso), la fila de PROCEDIMIENTOS; con OP_ID, sin hito el reintento continúa y sin fila es «ya estaba». SIN OP_ID rige la regla de
+// siempre (anexo_anular.js: sin hito emparejable no se borra nada), porque sin la identidad de la intención no se puede distinguir un
+// reintento de un registro que YA estaba inconsistente.
+tramo('ANULAR_ANEXO', () => {
+  enMundo(() => { const r = llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: 'op_anexo_previo_01' })); si('(el montaje) el anexo entra', r.ok); }, () => {
+    const idProc = (procsDe(MUNDO.PID_P, 'ECOGRAFÍA')[0] || {}).ID_PROC || '';
+    si('(el montaje) el anexo quedó con su fila, su hito y su instancia en la evolución', idProc && hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length === 1 && cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA') === 1);
+    const mk = () => ({ idProc, idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPN });
+    const viola = fase => {
+      const enJson = cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA'), filas = procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, hitos = hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length;
+      if (enJson > 1 || filas > 1 || hitos > 1) return 'quedó algo repetido';
+      if (fase !== 'final') return '';
+      if (enJson || filas || hitos) return 'no se borró entero: ' + enJson + ' en la evolución, ' + filas + ' fila(s) y ' + hitos + ' hito(s)';
+      if (String(filaTurno('3', TK).PROC_CANTIDAD) !== '0') return 'PROC_CANTIDAD no bajó (' + filaTurno('3', TK).PROC_CANTIDAD + ')';
+      return enCache('3', 'ECOGRAFÍA') ? 'la tarjeta de la cama sigue mostrando el hito (un sello fantasma)' : '';
+    };
+    const a = matriz('ANULAR_ANEXO con OP_ID', 'ANULAR_ANEXO', mk, viola, { queSeVe: 'un anexo repetido' });
+    const iHito = a.reg.findIndex(x => /^repoEliminarFilas\(TIMELINE\)/.test(x));
+    const iEvo = a.reg.findIndex(x => /^repoEscribirFila\(EVOLUCIONES\)/.test(x));
+    const iProc = a.reg.findIndex(x => /^repoEliminarDonde\(PROCEDIMIENTOS\)/.test(x));
+    eq('★ el orden de escrituras: el hito primero, la evolución después y la fila de PROCEDIMIENTOS AL FINAL (el compromiso: lo que el REM cuenta)',
+      [iHito, iEvo, iProc].join(',') + '|' + (iHito > -1 && iHito < iEvo && iEvo < iProc), [iHito, iEvo, iProc].join(',') + '|true');
+
+    // El caso del defecto, a la vista: muere tras borrar el hito (la primera escritura).
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(1); llama('ANULAR_ANEXO', mk()); });
+    eq('(el corte N=1) el hito ya se borró y la fila de la estadística sigue', hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '/' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, '0/1');
+    M.reiniciar();
+    const r = llama('ANULAR_ANEXO', mk());
+    eq('★★ el reintento con el mismo OP_ID CONTINÚA (hoy: «no se encontró el hito» para siempre) y borra lo que faltaba', r.ok + '/' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '/' + cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA'), 'true/0/0');
+    // …y SIN OP_ID la regla de siempre: un hito que no está NO se completa a ciegas.
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(1); llama('ANULAR_ANEXO', mk()); });
+    M.reiniciar();
+    const sinOp = llama('ANULAR_ANEXO', sinOpId(mk()));
+    eq('★ sin OP_ID, sin hito emparejable se rechaza completo como siempre (anexo_anular.js §6) y la fila sigue', sinOp.ok + '/' + sinOp.codigo + '/' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, 'false/VALIDACION/1');
+
+    // El anexo que ya no está: «ya estaba», sin escribir nada.
+    volverAlMundo();
+    llama('ANULAR_ANEXO', mk());
+    global.__simCacheReset();                       // el sello se evaporó (o el caché falló): el reintento no tiene quien lo reconozca
+    const foto = M.instantanea(SIN);
+    M.reiniciar();
+    const ya = llama('ANULAR_ANEXO', mk());
+    eq('★ con OP_ID, un anexo que ya no está es OK «ya estaba» (hoy: «ese anexo ya no está en el registro»)', ya.ok + '/' + (ya.data && ya.data.yaEstaba), 'true/true');
+    // (Lo único que puede aterrizar es el sello de la respuesta y la fila de la bitácora: ninguna hoja de datos.)
+    const hojasEscritas = M.registro().filter(x => !/^CacheService\.put|\(AUDIT_LOG\)/.test(x));
+    eq('   …sin escribir en ninguna hoja de datos y con la base idéntica', hojasEscritas.length + '/' + (M.instantanea(SIN) === foto), '0/true');
+    const otroOp = llama('ANULAR_ANEXO', Object.assign(mk(), { OP_ID: 'op_anular_g11_otro' }));
+    eq('   …y con OTRO OP_ID (un colega ya lo había borrado) también: el efecto pedido ya es verdad', otroOp.ok + '/' + (otroOp.data && otroOp.data.yaEstaba), 'true/true');
+    const sinOp2 = llama('ANULAR_ANEXO', sinOpId(mk()));
+    eq('★ sin OP_ID un id que ya no está se rechaza como siempre (anexo_anular.js §4)', sinOp2.ok + '/' + sinOp2.codigo, 'false/VALIDACION');
+  });
+});
+
+/* ══ 26 · ANULAR_EVENTO: LA EVOLUCIÓN SE ESCRIBE AL FINAL ═════════════════ */
+console.log('\n26 · ANULAR_EVENTO: la evolución (el compromiso) se reescribe al final, y el reintento re-sincroniza la cama');
+// 🔴 EL DEFECTO. Reescribía la fila de la evolución PRIMERO y después sincronizaba la cama y le restauraba las fechas de inicio. Una muerte entre
+// ambas dejaba el evento ya borrado: el reintento lo veía ausente, contestaba «ya estaba» (para no restar los días de VM dos veces) y la cama se
+// quedaba con la vía aérea y el soporte del evento anulado para siempre. Con la evolución al FINAL, «el evento sigue en la fila» significa «la
+// anulación no terminó», y el reintento rehace todo: la resta de DIAS_VM_PREVIOS parte de la fila vieja, así que se hace UNA sola vez.
+tramo('ANULAR_EVENTO', () => {
+  const EXT = { EXT_OCURRIO: true, EXT_TIPO: 'protocolo', EXT_HORA: '10:00', VENT_VIA_AEREA_FINAL: 'Natural', VENT_SOPORTE_FINAL: 'Ambiente' };
+  let DVM = 0;
+  enMundo(() => {
+    const r = llama('GUARDAR_EVOLUCION', evo('3', Object.assign({ EPISODIO_ABIERTO: MUNDO.PID_P, DIAS_VM_PREVIOS: 9 }, EXT)));
+    si('(el montaje) el turno de P se guarda con su extubación', r.ok && camaDe('3').VIA_AEREA === 'Natural' && camaDe('3').SOPORTE === 'Ambiente');
+  }, () => {
+    DVM = parseInt(filaTurno('3', TK).DIAS_VM) || 0;
+    si('(el montaje) el turno del evento tiene DIAS_VM > 0 (si no, restar dos veces no se vería)', DVM > 0);
+    const mk = () => ({ idCama: '3', turnoKey: TK, tipo: 'pve_ext', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: 'op_anularev_g11_01' });
+    const viola = fase => {
+      const e = filaTurno('3', TK), prev = parseInt(e.DIAS_VM_PREVIOS);
+      if (prev !== 9 && prev !== 9 - DVM) return 'DIAS_VM_PREVIOS quedó en ' + prev + ' (era 9 y se resta ' + DVM + ' UNA vez)';
+      if (fase !== 'final') return '';
+      if (String(e.EXT_OCURRIO || '') !== '') return 'el evento sigue en el turno';
+      if (prev !== 9 - DVM) return 'no se restaron los días de VM del turno';
+      if (camaDe('3').VIA_AEREA !== 'TOT' || camaDe('3').SOPORTE !== 'VM') return 'la cama no volvió a TOT en VM (' + camaDe('3').VIA_AEREA + ' / ' + camaDe('3').SOPORTE + ')';
+      return '';
+    };
+    const a = matriz('ANULAR_EVENTO con OP_ID', 'ANULAR_EVENTO', mk, viola, { queSeVe: 'los días de VM restados dos veces' });
+    const iSync = a.reg.findIndex(x => /^repoActualizar\(CAMAS_ESTADO\)/.test(x));
+    const iEvo = a.reg.findIndex(x => /^repoUpsert\(EVOLUCIONES\)/.test(x));
+    eq('★ el orden de escrituras: la cama primero y la fila de la evolución AL FINAL (el compromiso)', [iSync, iEvo].join(',') + '|' + (iSync > -1 && iSync < iEvo), [iSync, iEvo].join(',') + '|true');
+    // Sin OP_ID (el reclamo de episodio es lo único) la recuperación es la misma: no depende del sello ni de un id derivado.
+    matriz('ANULAR_EVENTO sin OP_ID', 'ANULAR_EVENTO', () => sinOpId(mk()), viola, { queSeVe: 'los días de VM restados dos veces' });
+  });
+});
+
+/* ══ 27 · EVAL_REGISTRAR, EPISODIO_ESCALA, PEND_ABRIR Y AGREGAR_HITO ══════ */
+console.log('\n27 · EVAL_REGISTRAR, EPISODIO_ESCALA, PEND_ABRIR y AGREGAR_HITO: el reintento de su propio éxito da lo mismo que la corrida limpia');
+const OPE = 'op_eval_g11_0001', OPS = 'op_escala_g11_0001', OPP = 'op_pend_g11_0001', OPH = 'op_hito_g11_0001';
+const evalsMrc = () => evalsDe(MUNDO.PID_P).filter(e => e.ESCALA === 'MRC');
+const mkEval = extra => Object.assign({ idCama: '3', escala: 'MRC', total: '48', firma: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPE }, extra || {});
+
+tramo('EVAL_REGISTRAR', () => {
+  volverAlMundo();
+  console.log('   · una medición nueva (MRC 48)');
+  const viola = fase => {
+    const v = evalsMrc().filter(e => String(e.TOTAL) === '48').length, h = hitosDe(MUNDO.PID_P, 'evaluacion').filter(x => /MRC-ss 48/.test(x.TEXTO)).length;
+    if (v > 1) return 'la medición está ' + v + ' veces en la serie';
+    if (h > 1) return 'el hito de la medición está ' + h + ' veces';
+    if (fase !== 'final') return '';
+    if (v !== 1 || h !== 1) return 'quedó a medias: ' + v + ' medición(es) y ' + h + ' hito(s)';
+    if (String(camaDe('3').ULT_MRC) !== '48' || camaDe('3').ULT_MRC_FIRMA !== 'DMV') return 'el espejo ULT_MRC de la cama no quedó al día';
+    return enCache('3', 'MRC-ss 48') ? '' : 'la tarjeta de la cama no muestra el hito';
+  };
+  matriz('EVAL_REGISTRAR con OP_ID', 'EVAL_REGISTRAR', () => mkEval(), viola, { queSeVe: 'una medición o un hito repetidos' });
+  volverAlMundo();
+  llama('EVAL_REGISTRAR', mkEval());
+  si('★ el id de la medición se DERIVA del OP_ID (EVAL_<op>_…)', ((evalsMrc()[0] || {}).ID_EVAL || '').indexOf('EVAL_' + OPE + '_') === 0);
+  volverAlMundo();
+  llama('EVAL_REGISTRAR', mkEval({ OP_ID: undefined }));
+  si('   …y sin OP_ID es el de siempre (reloj y azar)', /^EVAL_\d{13}_[A-Z0-9]{1,5}$/.test((evalsMrc()[0] || {}).ID_EVAL || ''));
+  // Dos mediciones iguales de OTRA intención son dos; el mismo OP_ID con otro valor es lo que se editó.
+  volverAlMundo();
+  llama('EVAL_REGISTRAR', mkEval({ OP_ID: 'op_eval_g11_dos_a' })); llama('EVAL_REGISTRAR', mkEval({ OP_ID: 'op_eval_g11_dos_b' }));
+  eq('★ dos mediciones iguales con OTRO OP_ID son dos (cada una su intención)', evalsMrc().length, 2);
+  volverAlMundo();
+  llama('EVAL_REGISTRAR', mkEval()); llama('EVAL_REGISTRAR', mkEval({ total: '50' }));
+  eq('★ el mismo OP_ID con otro valor (el usuario editó) deja LO EDITADO: las dos filas, con ids distintos', evalsMrc().map(e => e.TOTAL).join(',') + '|' + new Set(evalsMrc().map(e => e.ID_EVAL)).size, '48,50|2');
+
+  console.log('   · corregir una medición (anulaId): la nueva más la vieja anulada');
+  enMundo(() => { const r = llama('EVAL_REGISTRAR', mkEval({ OP_ID: 'op_eval_previo_01', total: '40' })); si('(el montaje) la medición previa entra', r.ok && evalsMrc().length === 1); }, () => {
+    const previa = evalsMrc()[0].ID_EVAL;
+    const violaC = fase => {
+      const v = evalsMrc().filter(e => String(e.TOTAL) === '48').length;
+      if (v > 1) return 'la corrección está ' + v + ' veces en la serie';
+      if (fase !== 'final') return '';
+      const vieja = evalsMrc().find(e => e.ID_EVAL === previa);
+      if (v !== 1 || !vieja || !esVerdadero(vieja.ANULADA)) return 'no quedó la corrección con la previa anulada';
+      return String(camaDe('3').ULT_MRC) === '48' ? '' : 'el espejo ULT_MRC no quedó en la corrección';
+    };
+    matriz('EVAL_REGISTRAR corrigiendo con anulaId', 'EVAL_REGISTRAR', () => mkEval({ anulaId: previa }), violaC, { queSeVe: 'una corrección repetida' });
+  });
+});
+
+tramo('EPISODIO_ESCALA', () => {
+  enMundo(() => { camaDe('3').BARTHEL = '40'; }, () => {
+    console.log('   · Barthel 60 sobre uno ya escrito (40): el hito dice «corrige 40»');
+    const mk = () => ({ idCama: '3', escala: 'BARTHEL', valor: '60', firma: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPS });
+    const hitosB = () => hitosDe(MUNDO.PID_P, 'evaluacion').filter(h => /Barthel 60/.test(h.TEXTO));
+    const viola = fase => {
+      const h = hitosB();
+      if (h.length > 1) return 'hay ' + h.length + ' hitos de Barthel 60';
+      if (fase !== 'final') return '';
+      if (h.length !== 1) return 'no quedó el hito';
+      if (!/corrige 40/.test(h[0].TEXTO)) return 'el hito perdió el «corrige 40» (decía: «' + h[0].TEXTO + '»)';
+      if (String(camaDe('3').BARTHEL) !== '60') return 'la cama no quedó con Barthel 60';
+      return enCache('3', 'Barthel 60') ? '' : 'la tarjeta de la cama no muestra el hito';
+    };
+    const a = matriz('EPISODIO_ESCALA con OP_ID', 'EPISODIO_ESCALA', mk, viola, { queSeVe: 'un hito repetido o sin su «corrige»' });
+    const iHito = a.reg.findIndex(x => /^repoInsertar\(TIMELINE\)/.test(x));
+    const iCol = a.reg.findIndex(x => /^repoActualizar\(CAMAS_ESTADO\)/.test(x));
+    eq('★ el orden de escrituras: el HITO primero (guarda el «antes» verdadero: tras escribir la cama ya no se puede saber) y el valor en la cama después',
+      [iHito, iCol].join(',') + '|' + (iHito > -1 && iHito < iCol), [iHito, iCol].join(',') + '|true');
+  });
+});
+
+tramo('PEND_ABRIR', () => {
+  volverAlMundo();
+  const TXT = 'Control de gases a las 18:00';
+  const mk = () => ({ idCama: '3', texto: TXT, firma: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPP });
+  const lista = () => { try { return JSON.parse(camaDe('3').PENDIENTES_JSON || '[]') || []; } catch (e) { return []; } };
+  const viola = fase => {
+    const n = lista().filter(p => p.tx === TXT).length;
+    if (n > 1) return 'el pendiente está ' + n + ' veces';
+    return (fase === 'final' && n !== 1) ? 'no quedó el pendiente' : '';
+  };
+  console.log('   · abrir un pendiente (una sola escritura: el reintento de su propio éxito no puede ser «ya está abierto»)');
+  matriz('PEND_ABRIR con OP_ID', 'PEND_ABRIR', mk, viola, { queSeVe: 'un pendiente repetido' });
+
+  // El síntoma, a la vista y sin la ayuda del sello: el caché cae (o se evaporó) y la respuesta se perdió.
+  volverAlMundo();
+  ctl.cache.fallar(true);
+  const p1 = llama('PEND_ABRIR', mk()), p2 = llama('PEND_ABRIR', mk());
+  ctl.cache.fallar(false);
+  eq('★★ el reintento de su propio éxito (sin sello) contesta OK y no «ese pendiente ya está abierto»', p1.ok + '/' + p2.ok + '/' + (p2.error || ''), 'true/true/');
+  const idDe = r => (r && r.data && r.data.pendiente && r.data.pendiente.id) || '';
+  eq('   …devuelve el MISMO pendiente (el id derivado del OP_ID) y la lista sigue con UNO', (idDe(p2) !== '' && idDe(p2) === idDe(p1)) + '/' + lista().length, 'true/1');
+  si('★ el id del pendiente se DERIVA del OP_ID (PEND_<op>_…) y es seguro para un atributo HTML', /^PEND_op_pend_g11_0001_[A-Za-z0-9]+$/.test((p1.data && p1.data.pendiente && p1.data.pendiente.id) || ''));
+  // La regla de siempre sigue: OTRA intención con el mismo texto es un duplicado.
+  const dup = llama('PEND_ABRIR', Object.assign(mk(), { OP_ID: 'op_pend_g11_otra' }));
+  eq('★ el MISMO texto con OTRO OP_ID sigue siendo «ya está abierto» (dos teléfonos tocando el mismo chip)', dup.ok + '/' + dup.codigo + '/' + /ya est[aá] abierto/.test(dup.error || ''), 'false/VALIDACION/true');
+  // El mismo OP_ID con otro texto (el usuario editó): es OTRO encargo, y se abre.
+  const ed = llama('PEND_ABRIR', Object.assign(mk(), { texto: 'Control de gases a las 21:00' }));
+  eq('★ el mismo OP_ID con otro texto abre el pendiente EDITADO (no devuelve el viejo)', ed.ok + '/' + lista().length + '/' + lista().filter(p => p.tx === 'Control de gases a las 21:00').length, 'true/2/1');
+  volverAlMundo();
+  const sinOp = llama('PEND_ABRIR', sinOpId(mk()));
+  si('   sin OP_ID el id es el de siempre (12 caracteres del uuid, sin prefijo)', sinOp.ok && !/^PEND_/.test((sinOp.data.pendiente || {}).id || 'PEND_'));
+});
+
+tramo('AGREGAR_HITO', () => {
+  volverAlMundo();
+  console.log('   · un hito escrito a mano (nota)');
+  const mk = () => ({ idCama: '3', tipo: 'nota', texto: 'Hito de prueba del turno', fecha: '2026-08-10', turno: 'Dia', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPH });
+  const a = matriz('AGREGAR_HITO con OP_ID', 'AGREGAR_HITO', mk, violaHitoTipo('nota', 'Hito de prueba del turno'), { queSeVe: 'un hito repetido' });
+  eq('★ el hito se escribe y DESPUÉS se sincroniza la tarjeta (dos escrituras: la muerte entre ambas deja el hito sin sello en la tarjeta, y el reintento la completa)',
+    a.reg.slice(0, 2).join(' | '), 'repoInsertar(TIMELINE) | repoActualizar(CAMAS_ESTADO)');
+  volverAlMundo();
+  llama('AGREGAR_HITO', mk());
+  si('★ el id del hito se DERIVA del OP_ID (HITO_<op>_…)', ((hitosDe(MUNDO.PID_P, 'nota')[0] || {}).ID_HITO || '').indexOf('HITO_' + OPH + '_') === 0);
+  volverAlMundo();
+  llama('AGREGAR_HITO', mk()); llama('AGREGAR_HITO', Object.assign(mk(), { OP_ID: 'op_hito_g11_otro_1' }));
+  eq('★ el mismo texto con OTRO OP_ID es otro hito (el id derivado no une intenciones distintas)', hitosDe(MUNDO.PID_P, 'nota').length, 2);
+});
+
+/* ══ 28 · LA FORMA DE LA RECUPERACIÓN EN LOS ANEXOS Y LAS PUERTAS DE DATO ═ */
+console.log('\n28 · La forma: el orden de cada puerta, los ids derivados y que nadie parsea ni ordena por ellos');
+tramo('forma de los anexos', () => {
+  const sinComentarios = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  const cuerpo = (texto, nombre) => {
+    const ini = texto.indexOf('function ' + nombre + '(');
+    const fin = ini === -1 ? -1 : texto.indexOf('\n}\n', ini);
+    return (ini === -1 || fin === -1) ? '' : sinComentarios(texto.slice(ini, fin));
+  };
+  const orden = (txt, res) => { const p = res.map(re => txt.search(re)); return p.every(x => x > -1) && p.every((x, i) => i === 0 || x > p[i - 1]); };
+  const eventos = leer('svc_eventos.gs'), tl = leer('svc_timeline.gs'), evals = leer('svc_evaluaciones.gs'), pend = leer('svc_pendientes.gs'), evol = leer('svc_evoluciones.gs');
+
+  si('★ svc_timeline.gs define el helper del hito de operación (insertar solo si no existe) y la operación en curso', /function _hitoDeOperacion\(/.test(tl) && /function _opIdDeLaPeticion\(/.test(tl));
+  const hdo = cuerpo(tl, '_hitoDeOperacion'), idh = cuerpo(tl, '_idHitoDeOperacion');
+  si('   …que deriva el id con uid(\'HITO\', clave) de CONTENIDO y pregunta por él ANTES de escribir (repoBuscarFila)', /uid\('HITO'/.test(idh) && /_idHitoDeOperacion\(/.test(hdo) && hdo.search(/repoBuscarFila\('TIMELINE'/) > -1 && hdo.search(/repoBuscarFila\('TIMELINE'/) < hdo.search(/_agregarHitoInternoSinSync\(Object\.assign/));
+  si('   …y SIN operación escribe como siempre (con o sin sincronizar la tarjeta) y vuelve ANTES de leer nada', /!op/.test(hdo) && hdo.search(/_agregarHitoInternoSinSync\(hito\)/) > -1 && hdo.search(/_agregarHitoInternoSinSync\(hito\)/) < hdo.search(/repoBuscarFila\(/));
+  si('★ agregarHito usa el helper (el reintento de su propio éxito no duplica el hito)', /_hitoDeOperacion\(/.test(cuerpo(tl, 'agregarHito')));
+
+  const anex = cuerpo(eventos, 'anexarEventoRapido'), anexP = cuerpo(eventos, '_anexoEscribirProcedimiento');
+  si('★ la fila de PROCEDIMIENTOS deriva su id del OP_ID con una clave de CONTENIDO (uid(\'PROC\', clave), no el uid() de reloj y azar)', /uid\('PROC',\s*[^)]/.test(anexP) && !/uid\('PROC'\)/.test(anex + anexP));
+  si('   …el hito se escribe con el helper de operación y el resto de las caras con el suyo', /_hitoDeOperacion\(/.test(anex) && /_anexoEscribirProcedimiento\(/.test(anex));
+  si('★ …en este orden: el reloj del dispositivo, el hito y DESPUÉS las caras del procedimiento (la fila de la estadística, AL FINAL)', orden(anex, [/repoActualizar\('CAMAS_ESTADO', 'ID_CAMA', idCama, relojCampos\)/, /_hitoDeOperacion\(/, /_anexoEscribirProcedimiento\(plan\)/]));
+  si('   …y dentro de ellas la evolución antes que la fila, que es lo último', orden(anexP, [/repoEscribirFila\(/, /repoInsertar\('PROCEDIMIENTOS'/]));
+  si('   …y en un reintento cada cara se escribe solo si falta (repoBuscarFila por el id derivado; la evolución, por conteo)', /repoBuscarFila\('PROCEDIMIENTOS'/.test(anexP) && /rehacerEvo/.test(anexP) && /p\.yaMia/.test(anexP));
+  si('   …y el rechazo «ya tiene registrada la pronación» no se aplica al reintento de la propia operación (yaMia)', /!yaMia && clavePos === 'PRONO'/.test(anex) && /!yaMia && clavePos === 'SUPINO'/.test(anex));
+
+  const anul = cuerpo(eventos, 'anularAnexo');
+  si('★ anularAnexo: el hito primero, la evolución después y la fila de PROCEDIMIENTOS AL FINAL (el compromiso)', orden(anul, [/repoEliminarFilas\('TIMELINE'/, /repoEscribirFila\(ubic\.hoja/, /repoEliminarDonde\('PROCEDIMIENTOS'/]));
+  si('   …el «ya estaba» y el «continúa sin hito» están atados al OP_ID (sin él, la regla de siempre)', /_opIdDeLaPeticion\(\)/.test(anul) && /yaEstaba: true/.test(anul));
+
+  const anuEv = cuerpo(evol, 'anularEvento');
+  si('★ anularEvento: la cama primero y la fila de la evolución AL FINAL (el compromiso)', orden(anuEv, [/_syncCamaDesdeEvolucion\(/, /repoActualizar\('CAMAS_ESTADO'/, /repoUpsert\('EVOLUCIONES'/]));
+
+  const ei = cuerpo(evals, '_evalRegistrarInterno'), er = cuerpo(evals, 'evalRegistrar'), ee = cuerpo(evals, 'episodioEscala');
+  si('★ _evalRegistrarInterno deriva el id de la medición del OP_ID SOLO cuando se lo piden (la cola de guardarEvolucion sigue con su propia regla «ya está»)',
+    /function _evalRegistrarInterno\(datos, ctx, derivar\)/.test(evals) && /uid\('EVAL',\s*[^)]/.test(ei) && /repoBuscarFila\('EVALUACIONES'/.test(ei) && /_evalRegistrarInterno\(datos, ctx, true\)/.test(er));
+  no('   …y la cola de guardarEvolucion NO deriva (no suma lecturas al guardado)', /_evalRegistrarInterno\([^)]*true\)/.test(cuerpo(evals, '_evalDesdeEvolucion') + cuerpo(evals, '_cultivoALaSerie')));
+  si('★ episodioEscala: el hito va ANTES de escribir el valor en la cama (guarda el «antes» verdadero) y con id derivado', orden(ee, [/_hitoDeOperacion\(/, /repoActualizar\('CAMAS_ESTADO'/]));
+
+  const pa = cuerpo(pend, 'pendAbrir');
+  si('★ pendAbrir deriva el id del pendiente del OP_ID (uid(\'PEND\', clave)) y reconoce el suyo ANTES de la regla «ya está abierto»',
+    /uid\('PEND',\s*[^)]/.test(pa) && pa.search(/uid\('PEND'/) > -1 && pa.search(/_yaEsta\s*=/) > pa.search(/uid\('PEND'/));
+
+  // Lo que permite derivar los ids: NADIE los parsea ni ordena por ellos (el prerrequisito del paso 11, ahora permanente).
+  const fuentes = fs.readdirSync(V2).filter(f => /\.(gs|html)$/.test(f));
+  const malos = [];
+  fuentes.forEach(f => {
+    sinComentarios(leer(f)).split('\n').forEach((l, i) => {
+      if (!/\b(ID_PROC|ID_HITO|ID_EVAL)\b/.test(l)) return;
+      if (/\.(sort|split|slice|substring|substr|match|replace|indexOf|startsWith|endsWith|localeCompare|parseInt|search)\(|parseInt\(|\bsort\(/.test(l.replace(/\.indexOf\(\w*['"]?[A-Za-z_]*['"]?\)\s*===\s*-1/g, ''))) {
+        // La única lectura legítima de un id derivado es compararlo ENTERO o buscarlo por igualdad.
+        if (!/String\([^)]*(ID_PROC|ID_HITO|ID_EVAL)[^)]*\)\s*(===|!==)/.test(l)) malos.push(f + ':' + (i + 1) + ' ' + l.trim().slice(0, 90));
+      }
+    });
+  });
+  eq('★★ NADIE parsea ni ordena por ID_PROC, ID_HITO ni ID_EVAL (solo se comparan enteros): por eso se pueden derivar del OP_ID', malos.join(' || ') || '(nadie)', '(nadie)');
+  const pendMalos = [];
+  [['svc_pendientes.gs', pend]].forEach(([f, t]) => sinComentarios(t).split('\n').forEach((l, i) => {
+    if (/\.id\b/.test(l) && /\.(sort|split|slice|substring|match|replace|startsWith|localeCompare)\(|parseInt\(/.test(l)) pendMalos.push(f + ':' + (i + 1) + ' ' + l.trim().slice(0, 90));
+  }));
+  eq('   …ni por el id de un pendiente (svc_pendientes.gs)', pendMalos.join(' || ') || '(nadie)', '(nadie)');
+  // La pantalla lo usa solo como valor de un atributo y para comparar (escapeHtml/escapeJs): un id derivado es seguro ahí.
+  const idx = leer('index.html');
+  const usoFront = idx.split('\n').filter(l => /pendEpiCerrar\(|data-pend=/.test(l));
+  si('   …y la pantalla solo lo escapa y lo devuelve (escapeHtml/escapeJs), no lo parte', usoFront.length > 0 && usoFront.every(l => /escape(Html|Js)\(p\.id/.test(l) || /function pendEpiCerrar/.test(l) || /pendEpiCerrar\(id\)/.test(l)));
 });
 
 

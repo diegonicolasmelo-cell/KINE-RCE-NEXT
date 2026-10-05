@@ -38,6 +38,78 @@ function _agregarHitoInterno(hito) {
 }
 
 /**
+ * El OP_ID de la petición en curso ('' si no hay), el mismo que arma `_auditar` en OP_ACTUAL (infra_lock.gs).
+ * 🪤 `typeof OP_ACTUAL` es compatibilidad y no una comprobación de seguridad: la variable se declara en infra_lock.gs y los
+ * bancos antiguos, que cargan una lista fija de archivos, ni la tienen declarada. Es la misma regla de `_opIdCamas()`
+ * (svc_camas.gs); vive también acá porque los bancos que cargan esta pieza no siempre cargan la de camas.
+ */
+function _opIdDeLaPeticion() {
+  return (typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id) ? String(OP_ACTUAL.id) : '';
+}
+
+/** La clave de CONTENIDO de un hito de operación: lo que lo identifica en lógica (tipo, cama, paciente, momento y texto). */
+function _claveHitoDeOperacion(hito) {
+  return [hito.tipo, hito.idCama, hito.patientId, hito.fecha || '', hito.turno || '', hito.texto].join('|');
+}
+
+/**
+ * El id que le toca a un hito dentro de la operación en curso ('' si no hay operación): `HITO_<op>_<huella de la clave>`.
+ * La clave es de CONTENIDO, no un contador (ver `uid` en infra_util.gs): el mismo OP_ID con otro contenido (el usuario
+ * editó la hora, el texto) da OTRO id y por lo tanto otro hito, y el reintento de lo mismo da EL MISMO.
+ */
+function _idHitoDeOperacion(hito, clave) {
+  if (!_opIdDeLaPeticion()) return '';
+  return uid('HITO', clave != null ? String(clave) : _claveHitoDeOperacion(hito));
+}
+
+/**
+ * Escribe un hito SOLO SI NO ESTÁ cuando hay una operación en curso (G16, paso 11), y devuelve `{ id, existia, sincronizado }`.
+ *
+ * 🔴 DE DÓNDE SALE. Un hito nacía con un id de reloj y azar y nadie preguntaba «¿ya estoy?»: si la corrida murió después de
+ * escribirlo y antes de sellar, el reintento con el mismo OP_ID (el sello solo se escribe cuando TODO terminó limpio) escribía
+ * otro, y la línea de tiempo mostraba el mismo cultivo, la misma nota o el mismo anexo dos veces. Con operación en curso el id
+ * se DERIVA del OP_ID y del contenido (`_idHitoDeOperacion`), se busca antes de insertar (`repoBuscarFila`) y el hito que ya
+ * estaba no se escribe otra vez. Es el mismo modelo de `_hitoTraslado` (svc_camas.gs), para el resto de las puertas.
+ *
+ * El hito sirve además de MARCADOR de «este intento ya empezó»: quien escribe varias caras (el anexo: evolución, fila de la
+ * estadística y hito) lo escribe PRIMERO y, si ya estaba, sabe que está reintentando y que lo que sigue puede estar hecho.
+ *
+ * @param hito              el hito de siempre ({idCama, patientId, fecha, turno, tipo, texto, autor, autorEmail, datos}).
+ * @param sincronizar       si además deja la tarjeta de la cama mostrándolo. Con el hito recién escrito se sincroniza; si ya
+ *                          estaba solo se vuelve a sincronizar cuando la tarjeta NO lo muestra (la muerte cayó entre las dos
+ *                          escrituras): si ya lo muestra no se escribe nada. Quien lo pide en `false` sincroniza él, al final.
+ * @param clave             la clave de contenido si la puerta necesita una propia (por omisión tipo, cama, paciente, fecha,
+ *                          turno y texto). Una clave propia sirve para dejar FUERA lo que cambia entre un intento y su reintento.
+ * @param existiaConocida   si quien llama ya buscó el hito (para no leer dos veces), el resultado de esa búsqueda.
+ *
+ * SIN operación en curso (los bancos antiguos y las llamadas internas) escribe como siempre, con id de reloj y azar, y no
+ * lee nada de más: `existia` es siempre false.
+ */
+function _hitoDeOperacion(hito, sincronizar, clave, existiaConocida) {
+  const op = _opIdDeLaPeticion();
+  if (!op) {
+    if (sincronizar) _agregarHitoInterno(hito); else _agregarHitoInternoSinSync(hito);
+    return { id: '', existia: false, sincronizado: true };
+  }
+  const id = _idHitoDeOperacion(hito, clave);
+  const existia = (existiaConocida !== undefined && existiaConocida !== null)
+    ? !!existiaConocida
+    : (repoBuscarFila('TIMELINE', 'ID_HITO', id) !== -1);
+  if (!existia) _agregarHitoInternoSinSync(Object.assign({}, hito, { id: id }));
+  let sincronizado = true;
+  if (sincronizar) {
+    const idCama = String(hito.idCama);
+    if (!existia) {
+      sincronizado = _sincronizarTimelineCama(idCama);
+    } else {
+      const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
+      if (c && String(c.TIMELINE_JSON || '').indexOf(id) === -1) sincronizado = _sincronizarTimelineCama(idCama);
+    }
+  }
+  return { id: id, existia: existia, sincronizado: sincronizado };
+}
+
+/**
  * Guarda en CAMAS_ESTADO.TIMELINE_JSON los últimos 30 hitos de la cama (cache).
  *
  * 🔴 DEL EPISODIO VIGENTE, no de la cama entera (20-ago-2026). Leía solo por
@@ -100,7 +172,12 @@ function agregarHito(hito, ep) {
         const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
-      const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r);
+      /* 🔐 G16 (paso 11). Con OP_ID el id del hito se deriva de la operación y del contenido y se escribe SOLO SI NO ESTÁ: el reintento de
+         su propio éxito (la respuesta se perdió, el sello no llegó a escribirse) no repite el hito en la línea de tiempo. Sin OP_ID,
+         como siempre. La respuesta es la de siempre. */
+      _hitoDeOperacion(hito, true);
+      SpreadsheetApp.flush();
+      return ok({ accion: 'hito_agregado' });
     } catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
   });
 }

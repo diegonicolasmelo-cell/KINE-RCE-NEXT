@@ -1395,7 +1395,9 @@ tramo('D', () => {
     si('★ ' + fn + ' recibe el reclamo de episodio como ÚLTIMO parámetro', firma.test(c));
     const iLock = c.indexOf('conLock(');
     const iVal = c.indexOf('validarEpisodioPuerta(');
-    const escritura = c.search(/\b(repoInsertar|repoActualizar|repoEscribirFila|repoEliminarFilas|repoEliminarDonde|repoUpsert|_agregarHitoInterno|_agregarHitoInternoSinSync)\(/);
+    // G16 (paso 11): el hito y las caras del anexo se escriben ahora por `_hitoDeOperacion` y `_anexoEscribirProcedimiento` (escriben
+    // ellas, no la función de la lista): se suman a los escritores para que la guardia siga midiendo contra la primera escritura REAL.
+    const escritura = c.search(/\b(repoInsertar|repoActualizar|repoEscribirFila|repoEliminarFilas|repoEliminarDonde|repoUpsert|_agregarHitoInterno|_agregarHitoInternoSinSync|_hitoDeOperacion|_anexoEscribirProcedimiento)\(/);
     si('   …toma el lock y DENTRO compara con validarEpisodioPuerta', iLock > -1 && iVal > iLock);
     si('★★ …y la comparación va ANTES de la primera escritura', iVal > -1 && escritura > iVal);
     eq('   …y ANTES del conLock no se lee ninguna hoja', (c.slice(0, iLock).match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+)\(/g) || []).join(',') || '(nada)', '(nada)');
@@ -1796,8 +1798,10 @@ tramo('E', () => {
     eq('   …y ANTES del conLock no se lee ninguna hoja', (c.slice(0, iLock).match(/\b(repo[A-Za-z]+|obtener[A-Za-z]+|_ubicar[A-Za-z]+|_pendCama)\(/g) || []).join(',') || '(nada)', '(nada)');
     si('   …solo se invoca si el reclamo viene (o está el modo estricto): los bancos antiguos no cargan la regla', /estricto === true/.test(c) && /\.a !== undefined/.test(c));
   });
+  // G16 (paso 11): la firma ganó un tercer parámetro OPCIONAL, `derivar` (solo lo pasa evalRegistrar para derivar el id de la medición
+  // del OP_ID; la cola de guardarEvolucion llama con dos y no cambia). Lo que esta guardia protege —que NO compare el episodio— sigue.
   si('★ _evalRegistrarInterno queda INTACTA: guardarEvolucion ya comparó el episodio y no lo vuelve a comparar',
-    /^function _evalRegistrarInterno\(datos, ctx\)/.test(cuerpoDeEn('svc_evaluaciones.gs', '_evalRegistrarInterno')) &&
+    /^function _evalRegistrarInterno\(datos, ctx(, derivar)?\)/.test(cuerpoDeEn('svc_evaluaciones.gs', '_evalRegistrarInterno')) &&
     !/validarEpisodioPuerta/.test(cuerpoDeEn('svc_evaluaciones.gs', '_evalRegistrarInterno')));
   {
     const cf = cuerpoDeEn('svc_coordinacion.gs', 'coordCorregirFicha'), ci = cuerpoDeEn('svc_coordinacion.gs', '_coordCorregirFichaInterno');
