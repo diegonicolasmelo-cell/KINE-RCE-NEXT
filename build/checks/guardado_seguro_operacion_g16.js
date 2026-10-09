@@ -85,6 +85,17 @@
 //  H17 · 29 · GUARDAR_SUGERENCIA toma el candado y deriva su id del OP_ID: un reenvío no duplica. Esta guardia ya NO la sustituye por un doble.
 //  H8  · 29 · AGREGAR_HITO: la firma de la sesión gana sobre el autor que mande la pantalla y el id del hito no lo elige quien llama.
 //
+// LO QUE SE SUMA EN LA REVISIÓN DE LA TANDA 2 (paso E «timeline y DIAS», 9-oct-2026):
+//  H11 y H16 · 21b · EL EVENTO DECLARADO DESPUÉS APAGA LA ADVERTENCIA: la regla de conservar el hito `transicion_sin_evento` (sección 21)
+//       lo dejaba junto al evento cuando el re-guardado ya declaraba la extubación, la intubación, la reintubación, la traqueostomía o
+//       la decanulación. Conservar vale solo si el turno no declara ninguno de esos cinco eventos. Una vez por evento, con la misma
+//       razón y con otra en el payload, lo que la regla SIGUE conservando, una matriz de muerte de dos pasos y la forma (la lista de
+//       eventos es la de `validarTransicionVA`).
+//  H19 · 20b · LOS DÍAS AL VOLVER A GUARDAR EL MISMO TURNO: la regla de la sección 20 NO se puede reemplazar por el sello (se escribe solo
+//       cuando el guardado terminó limpio). Fija los valores del re-guardado con otra OP_ID: la transición queda en 3, 0 y 3 (con el
+//       cálculo de antes bajaba a 1, 0 y 1 y arrastraba el error al turno siguiente), el turno corriente no se mueve y el ingreso con
+//       vía aérea de afuera conserva el primer valor (EFECTO CONOCIDO, decisión 5 de Diego pendiente).
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -1260,6 +1271,66 @@ tramo('días tras la muerte', () => {
   eq('   …y entonces los días SÍ se vuelven a calcular (no se conservan los de la fila anterior)', diasDe('3', TKN) !== conTransicion, true);
 });
 
+/* ══ 20b · H19 · LOS DÍAS AL VOLVER A GUARDAR EL MISMO TURNO ══════════════ */
+console.log('\n20b · H19 · volver a guardar el MISMO turno (con otra OP_ID, a propósito) deja los días como el primer guardado');
+// 🔴 DE DÓNDE SALE (revisión de la tanda 2, paso E, 9-oct-2026). La regla de la sección 20 conserva DIAS_VM/VNI/VA de la fila del turno
+// cuando la cama ya absorbió ese turno. El revisor la marcó porque cambia el valor frente al cálculo de antes de la tanda 2 (aa842ec) y no
+// está en ACUERDOS_REDISENO.md. Se averiguó POR QUÉ existe y la respuesta no es «el sello»: el sello se escribe SOLO cuando el guardado
+// terminó limpio, así que una corrida que murió DESPUÉS de escribir la cama no deja sello y su reintento (o el guardado sin OP_ID, o
+// el que llega con otra OP_ID) vuelve a calcular leyendo la cama YA ingresada como si fuera la de ANTES del turno. Lo que da ese
+// cálculo, medido contra aa842ec con la transición VM→VNI y TOT→Natural de esta guardia:
+//     primer guardado    DIAS_VM=3  DIAS_VNI=0  DIAS_VA=3   (el día de la transición es del soporte que sale)
+//     volver a guardar   DIAS_VM=1  DIAS_VNI=0  DIAS_VA=1   (leyó la cama ya en VNI y Natural: «el tramo parte hoy»)
+//     el turno siguiente DIAS_VM=1  DIAS_VNI=1  DIAS_VA=1   (el 1 queda CONGELADO como base de todo lo que sigue)
+// o sea que con el cálculo de antes cada «volver a guardar» una transición BAJABA los días de VM y de vía aérea del episodio, y el REM
+// cuenta el último valor. La regla los deja en 3, 0, 3 y 3, 1, 3.
+// ESTA SECCIÓN FIJA ESOS VALORES. Si Diego decide NO conservar (decisión 5 del diseño, aún sin respuesta suya), esta guardia es la que
+// se da vuelta a propósito; mientras tanto nadie puede mover los días del re-guardado sin ver un rojo.
+let _opH19 = 0;
+const opH19 = () => 'op_h19_reguardo_' + String(++_opH19).padStart(3, '0');
+tramo('H19 · los días al volver a guardar el turno', () => {
+  // 1 · LA TRANSICIÓN (el caso que bajaba): VM→VNI y TOT→Natural en el turno de noche del 10.
+  volverAlMundo();
+  const a = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH19() }));
+  eq('(el caso) el primer guardado de la transición cuenta 3 de VM, 0 de VNI y 3 de vía aérea', a.ok + '/' + diasDe('3', TKN), 'true/DIAS_VM=3 DIAS_VNI=0 DIAS_VA=3');
+  const b = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH19(), RESP_KTR_CANT: 4 }));
+  eq('★ volver a guardar el turno (otra OP_ID, otro dato cambiado) deja 3, 0 y 3: antes de la tanda 2 los bajaba a 1, 0 y 1', b.ok + '/' + diasDe('3', TKN), 'true/DIAS_VM=3 DIAS_VNI=0 DIAS_VA=3');
+  const c = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH19(), RESP_KTR_CANT: 5 }));
+  eq('   …y una tercera vez, lo mismo (no se va desgastando)', c.ok + '/' + diasDe('3', TKN), 'true/DIAS_VM=3 DIAS_VNI=0 DIAS_VA=3');
+  SIM.fecha = '2026-08-11';
+  const sig = llama('GUARDAR_EVOLUCION', evo('3', { TURNO_KEY: '2026-08-11-Dia', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: opH19(),
+    VENT_VIA_AEREA: 'Natural', VENT_VIA_AEREA_FINAL: 'Natural', VENT_SOPORTE: 'VNI', VENT_SOPORTE_FINAL: 'VNI' }));
+  eq('★★ …y el turno SIGUIENTE parte de los 3 días de VM y de vía aérea (con el cálculo de antes partía de 1: el error se arrastraba)',
+    sig.ok + '/' + diasDe('3', '2026-08-11-Dia'), 'true/DIAS_VM=3 DIAS_VNI=1 DIAS_VA=3');
+
+  // 2 · UN TURNO CORRIENTE (sin transición): volver a guardarlo no mueve nada. Aquí la regla y el cálculo de antes dan lo mismo.
+  volverAlMundo();
+  const antes = diasDe('3', TK);
+  const r1 = llama('GUARDAR_EVOLUCION', reguardoG10({ OP_ID: opH19() }));
+  const r2 = llama('GUARDAR_EVOLUCION', reguardoG10({ OP_ID: opH19(), RESP_KTR_CANT: 4 }));
+  eq('   un turno corriente (VM con TOT, sin transición): volver a guardarlo dos veces no mueve los días', r1.ok + '/' + r2.ok + '/' + diasDe('3', TK), 'true/true/' + antes);
+
+  // 3 · EL INGRESO CON VÍA AÉREA DE AFUERA. EFECTO CONOCIDO, que se fija a la vista: el primer guardado del turno de ingreso cuenta 0
+  // días de vía aérea (la cama todavía no existe cuando se calcula) y la regla conserva ese 0 al volver a guardar; con el cálculo de antes,
+  // volver a guardar «corregía» a 5 por accidente (leía la cama ya ingresada, con la vía parada 5 días antes). El turno SIGUIENTE lo calcula
+  // bien en los dos casos. Es la otra cara de la decisión 5 y va a Diego con su ejemplo.
+  volverAlMundo();
+  const ing = () => ingresoG10({ VENT_VIA_AEREA: 'TQT', VA_EXTERNO: true, VA_EXTERNO_DIAS: 5, OP_ID: opH19() });
+  const i1 = llama('GUARDAR_EVOLUCION', ing());
+  const dIng = diasDe('9', TK);
+  const i2 = llama('GUARDAR_EVOLUCION', Object.assign(ing(), { PAC_DIAGNOSTICO: 'Dx corregido' }));
+  eq('   el ingreso con TQT de afuera (5 días): el primer guardado cuenta 0 de vía aérea…', i1.ok + '/' + dIng, 'true/DIAS_VM=0 DIAS_VNI=0 DIAS_VA=0');
+  eq('★ …y volver a guardar el ingreso conserva ese valor (EFECTO CONOCIDO de la regla: antes de la tanda 2 «corregía» a 5)', i2.ok + '/' + diasDe('9', TK), 'true/' + dIng);
+
+  // 4 · LA REGLA NO CONGELA LO QUE CAMBIÓ: si el re-guardado cambia el soporte o la vía aérea, se calcula de nuevo (sección 20, repetida
+  // aquí con otra OP_ID para que no la tape el sello).
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH19() }));
+  const conTrans = diasDe('3', TKN);
+  const cor = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH19(), VENT_VIA_AEREA: 'TOT', VENT_VIA_AEREA_FINAL: 'TOT', VENT_SOPORTE: 'VM', VENT_SOPORTE_FINAL: 'VM', TRANS_MOTIVO: 'Se reintubó de inmediato' }));
+  eq('   corregir la vía final y el soporte final del turno SÍ recalcula los días (no hereda los de la fila anterior)', cor.ok + '/' + (diasDe('3', TKN) !== conTrans), 'true/true');
+});
+
 /* ══ 21 · EL HITO «VÍA AÉREA CAMBIÓ SIN EVENTO» SOBREVIVE ═════════════════ */
 console.log('\n21 · transicion_sin_evento: el hito sobrevive al reintento y al re-guardado del turno');
 // 🔴 EL DEFECTO. El hito se calcula contra `cama.VIA_AEREA` («venía con TOT, queda con Natural»). Tras el compromiso la cama ya
@@ -1304,6 +1375,99 @@ tramo('transicion_sin_evento', () => {
   llama('GUARDAR_EVOLUCION', transicionG10());
   llama('GUARDAR_EVOLUCION', evo('3', { TURNO_KEY: '2026-08-11-Dia', EPISODIO_ABIERTO: MUNDO.PID_P, VENT_VIA_AEREA: 'Natural', VENT_SOPORTE: 'VNI' }));
   eq('   …el turno siguiente (sin transición propia) no se lleva ni duplica el hito del anterior', transHitos(MUNDO.PID_P).length, 1);
+});
+
+/* ══ 21b · H11 Y H16 · EL EVENTO DECLARADO DESPUÉS APAGA LA ADVERTENCIA ═════ */
+console.log('\n21b · H11 y H16 · si el turno declara DESPUÉS el evento de vía aérea, el hito «sin evento declarado» desaparece');
+// 🔴 EL DEFECTO (revisión de la tanda 2, paso E). La sección 21 hizo que el hito `transicion_sin_evento` sobreviva a los re-guardados,
+// y lo hizo sin mirar si el payload nuevo YA declara el evento que explica la transición. El caso real: la kinesióloga guarda el
+// turno con la vía aérea cambiada y la razón escrita (la salida que cuesta una razón), después se da cuenta, reabre el turno y declara
+// la extubación (o la intubación, la reintubación, la traqueostomía, la decanulación). La pantalla ya no manda TRANS_MOTIVO (al reabrir,
+// la cama dice la vía nueva y no hay transición que explicar). Con el defecto el hito se QUEDABA y en la línea de tiempo y en la entrega
+// de turno convivían «extubación» y «cambió la vía aérea SIN evento declarado»: una alerta falsa que justo el registro del evento
+// debía apagar. Antes de la tanda 2 (aa842ec) el re-guardado barría ese hito. La regla de conservar vale solo cuando el turno NO declara
+// ninguno de los cinco eventos que usa `validarTransicionVA` para dar por explicado un cambio de vía.
+const EVENTOS_VA = [
+  ['EXT_OCURRIO', 'EXTUBACIÓN C/PROTOCOLO', 'extubacion', { EXT_OCURRIO: true, EXT_HORA: '10:00', EXT_TIPO: 'Electiva' }],
+  ['INTUB_OCURRIO', 'INTUBACIÓN', 'intubacion', { INTUB_OCURRIO: true, INTUB_HORA: '09:00' }],
+  ['EXT_REINTUB', 'REINTUBACIÓN', 'reintubacion', { EXT_REINTUB: true, REINTUB_HORA: '11:00', EXT_REINTUB_RAZ: 'Falla ventilatoria' }],
+  ['TQT_OCURRIO', 'TQT', 'tqt', { TQT_OCURRIO: true, TQT_HORA: '10:30' }],
+  ['DECAN_OCURRIO', 'DECANULACIÓN', 'decanulacion', { DECAN_OCURRIO: true, DECAN_HORA: '10:30', DECAN_TIPO: 'Electiva' }],
+];
+const hitosDeEvento = (pid, evento) => DB.TIMELINE.filter(h => h.PATIENT_ID === pid && new RegExp('"evento":"' + evento + '"').test(String(h.DATOS_JSON || '')));
+// El re-guardado que declara el evento. Como lo manda la pantalla al reabrir el turno: sin TRANS_MOTIVO (salvo que se pida).
+const conEvento = (flag, proc, extra, ajuste) => {
+  const p = transicionG10(Object.assign({ PROC_JSON: JSON.stringify([proc, 'IMAGENOLOGÍA', 'CULTIVO DE SECRECIONES']) }, extra, ajuste || {}));
+  if (!(ajuste && 'TRANS_MOTIVO' in ajuste)) delete p.TRANS_MOTIVO;
+  return p;
+};
+let _opH11 = 0;
+const opH11 = () => 'op_h11_evento_' + String(++_opH11).padStart(3, '0');
+tramo('H11 y H16 · cada uno de los cinco eventos', () => {
+  EVENTOS_VA.forEach(([flag, proc, evento, extra]) => {
+    volverAlMundo();
+    const a = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+    eq('(el caso ' + flag + ') el primer guardado deja el hito de transición sin evento', a.ok + '/' + transHitos(MUNDO.PID_P).length + '/' + hitosDeEvento(MUNDO.PID_P, evento).length, 'true/1/0');
+    const b = llama('GUARDAR_EVOLUCION', Object.assign(conEvento(flag, proc, extra), { OP_ID: opH11() }));
+    eq('★ ' + flag + ': al re-guardar declarando el evento, el hito «sin evento declarado» DESAPARECE y queda el hito del evento',
+      b.ok + '/' + transHitos(MUNDO.PID_P).length + '/' + hitosDeEvento(MUNDO.PID_P, evento).length, 'true/0/1');
+  });
+  // Aunque el payload VUELVA a traer la misma razón (una pantalla vieja, o el reintento del primer guardado con el evento ya agregado):
+  // declarar el evento manda sobre conservar. Es el camino `m === d.motivo` del barrido.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+  const rr = llama('GUARDAR_EVOLUCION', Object.assign(conEvento('EXT_OCURRIO', 'EXTUBACIÓN C/PROTOCOLO', EVENTOS_VA[0][3], { TRANS_MOTIVO: 'Se retiró el tubo durante el traslado a pabellón' }), { OP_ID: opH11() }));
+  eq('★ …aunque el payload traiga otra vez la MISMA razón escrita, el evento declarado manda: el hito falso no se queda', rr.ok + '/' + transHitos(MUNDO.PID_P).length + '/' + hitosDeEvento(MUNDO.PID_P, 'extubacion').length, 'true/0/1');
+  // Y con una razón DISTINTA (el camino de «rehacer»): tampoco se rehace una advertencia que el evento ya apagó.
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+  const rd = llama('GUARDAR_EVOLUCION', Object.assign(conEvento('EXT_OCURRIO', 'EXTUBACIÓN C/PROTOCOLO', EVENTOS_VA[0][3], { TRANS_MOTIVO: 'Una razón escrita de nuevo y distinta' }), { OP_ID: opH11() }));
+  eq('   …y con una razón DISTINTA tampoco se rehace el hito: el evento declarado ya explica el cambio', rd.ok + '/' + transHitos(MUNDO.PID_P).length + '/' + hitosDeEvento(MUNDO.PID_P, 'extubacion').length, 'true/0/1');
+});
+
+tramo('H11 y H16 · lo que la regla de conservar SIGUE haciendo', () => {
+  // Para lo que se creó: el re-guardado de un turno que NO declara evento conserva el hito (con y sin la razón en el payload, e idéntico).
+  volverAlMundo();
+  llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+  const limpio = transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|');
+  const ident = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+  eq('★ re-guardar el turno IDÉNTICO (otra OP_ID) sigue conservando el hito', ident.ok + '/' + transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), 'true/' + limpio);
+  const sinRazon = transicionG10({ OP_ID: opH11(), RESP_KTR_CANT: 6 }); delete sinRazon.TRANS_MOTIVO;
+  const sr = llama('GUARDAR_EVOLUCION', sinRazon);
+  eq('★ re-guardar SIN la razón en el payload y sin evento (como reabre la pantalla) sigue conservando el hito', sr.ok + '/' + transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), 'true/' + limpio);
+  // Un evento que NO es de vía aérea (cultivo, nota) no apaga la advertencia: la regla es de los cinco eventos de vía aérea.
+  const cult = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11(), PLAN_NOTA_TURNO: 'Otra nota del turno', MUE_REALIZADAS: true, MUE_TIPOS_JSON: '["Traqueal"]', MUE_HORA_TOMA: '10:30' }));
+  eq('   …un cultivo o una nota declarados NO apagan la advertencia (no son eventos de vía aérea)', cult.ok + '/' + transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), 'true/' + limpio);
+  // Un evento declarado en OTRO turno no toca el hito de este (el barrido es del turno).
+  llama('GUARDAR_EVOLUCION', evo('3', Object.assign({ TURNO_KEY: '2026-08-11-Dia', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: opH11(), PROC_JSON: JSON.stringify(['INTUBACIÓN']) },
+    { INTUB_OCURRIO: true, INTUB_HORA: '09:00', VENT_VIA_AEREA: 'Natural', VENT_VIA_AEREA_FINAL: 'TOT', VENT_SOPORTE: 'VNI', VENT_SOPORTE_FINAL: 'VM' })));
+  eq('   …y un evento declarado en el turno SIGUIENTE no apaga la advertencia de este turno', transHitos(MUNDO.PID_P).map(h => h.TEXTO).join('|'), limpio);
+});
+
+tramo('H11 y H16 · matriz de muerte: transición sin evento y luego con evento', () => {
+  // La matriz de la sección 19 con DOS pasos: el estado de partida es el de DESPUÉS del primer guardado (la transición con su razón);
+  // lo que se corta y se reintenta es el SEGUNDO, el que declara la extubación. En ningún corte y tras el reintento queda el hito falso.
+  const fotoDelMundo = MUNDO.FOTO;
+  try {
+    volverAlMundo();
+    const base = llama('GUARDAR_EVOLUCION', transicionG10({ OP_ID: opH11() }));
+    si('(el montaje) el primer guardado, con su razón y sin evento, entra y deja el hito', base.ok && transHitos(MUNDO.PID_P).length === 1);
+    MUNDO.FOTO = M.foto();
+    const esp = { evals: 3, ingreso: 1 };
+    const OPE = 'op_h11_matriz_0001';
+    const violaBase = violaGE('3', MUNDO.PID_P, TKN, esp);
+    const viola = fase => {
+      const v = violaBase(fase);
+      if (v) return v;
+      if (fase !== 'final') return '';
+      if (transHitos(MUNDO.PID_P).length) return 'quedó el hito «sin evento declarado» junto al evento';
+      const n = hitosDeEvento(MUNDO.PID_P, 'extubacion').length;
+      return n === 1 ? '' : 'hay ' + n + ' hitos de extubación y era 1';
+    };
+    matriz('GUARDAR_EVOLUCION que declara la extubación sobre una transición sin evento', 'GUARDAR_EVOLUCION',
+      () => Object.assign(conEvento('EXT_OCURRIO', 'EXTUBACIÓN C/PROTOCOLO', EVENTOS_VA[0][3]), { OP_ID: OPE }), viola,
+      Object.assign({}, OPTS_GE, { queSeVe: 'un turno, una medición, un procedimiento o un hito duplicado, o la advertencia falsa junto al evento' }));
+  } finally { MUNDO.FOTO = fotoDelMundo; }
 });
 
 /* ══ 22 · LAS COLAS QUE TRAGABAN EL ERROR ═════════════════════════════════ */
@@ -1433,6 +1597,18 @@ tramo('forma de guardarEvolucion', () => {
     /function _timelineDelGuardado\([^)]*conservar\)/.test(tl) && /conservar\.a/.test(tdg) && /transicion_sin_evento/.test(tdg));
   si('   …y guardarEvolucion se lo pasa y arma el hito con el helper compartido (un solo texto para la primera vez y la corrección)',
     /_timelineDelGuardado\([^;]*\{ a: _vaFinalTurno, motivo: _transMotivo \}\)/.test(ge) && /_hitoTransicionSinEvento\(/.test(ge) && /function _hitoTransicionSinEvento\(/.test(tl));
+  // H11 y H16: conservar el hito vale solo sin evento de vía aérea declarado, y la lista de eventos es la MISMA que usa el servidor para
+  // dar por explicado un cambio de vía (`validarTransicionVA`): dos listas que se separan son el siguiente defecto.
+  const dominioVA = sinComentarios(leer('dominio_validacion.gs'));
+  const vtva = (dominioVA.match(/function validarTransicionVA\([\s\S]*?\n\}\n/) || [''])[0];
+  const flagsDominio = ((vtva.match(/if \(((?:vv\(d\.\w+\) \|\| )+vv\(d\.\w+\))\) return errs;/) || [])[1] || '').match(/d\.(\w+)/g) || [];
+  const flagsServicio = (((ge.match(/const _declaraEventoVA = \[([^\]]*)\]/) || [])[1]) || '').match(/\w+_\w+/g) || [];
+  const normalizar = l => l.map(x => x.replace(/^d\./, '')).sort().join(',');
+  eq('★ guardarEvolucion mira los MISMOS cinco eventos de vía aérea que validarTransicionVA para decidir si conserva el hito',
+    normalizar(flagsServicio) + '/' + flagsDominio.length, 'DECAN_OCURRIO,EXT_OCURRIO,EXT_REINTUB,INTUB_OCURRIO,TQT_OCURRIO/5');
+  eq('   …y son los mismos que declara el dominio', normalizar(flagsServicio), normalizar(flagsDominio));
+  si('   …y con evento declarado el barrido corre SIN `conservar` (nulo), no con una razón vacía',
+    /_timelineDelGuardado\([^;]*_declaraEventoVA \? null : \{ a: _vaFinalTurno, motivo: _transMotivo \}\)/.test(ge));
   no('   …el hito de ingreso ya no depende de «fila nueva» (el reintento tras morir antes de los hitos lo repone)', /ES_INGRESO\)\s*&&\s*esNuevo/.test(ge));
   si('★ DIAS_VM, DIAS_VNI y DIAS_VA conservan los de la fila del turno cuando la cama ya absorbió el turno y el soporte y la vía no cambiaron',
     /cama\.ULTIMO_TURNO_KEY[^;]*===\s*turnoKey/.test(ge) && /_prev\.PATIENT_ID[^;]*patientId/.test(ge) && /'DIAS_VM', 'DIAS_VNI', 'DIAS_VA'/.test(ge));

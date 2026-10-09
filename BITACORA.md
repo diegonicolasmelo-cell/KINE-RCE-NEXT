@@ -3666,3 +3666,54 @@ el paquete pisando la firma, dejar pasar `id` o `ID_HITO`, el respaldo `||0` del
   la pantalla solo lo devuelve en SET_SUGERENCIA_ESTADO, y es seguro para un atributo HTML.
 - 🪤 **La sugerencia con el sello evaporado se reconoce por la fila** (mismo id derivado), no por el caché: cuesta una lectura de la
   columna de ids, y solo cuando hay OP_ID.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el evento declarado después apaga la advertencia y los días del re-guardado quedan fijados
+
+**De dónde sale.** Paso «E timeline y DIAS» de la revisión de la tanda 2: H11 y H16 (el mismo defecto visto por dos revisores) y H19.
+Los tres reproducidos antes de tocar nada.
+
+**Los defectos, en palabras.**
+- **H11 y H16 · la advertencia falsa «cambió la vía aérea sin evento declarado» se quedaba junto al evento.** La tanda 2 hizo que ese hito
+  (`transicion_sin_evento`) sobreviviera a un reintento o a un re-guardado del turno, y lo hizo sin mirar si el guardado nuevo YA declara el
+  evento que explica el cambio. El caso real: la kinesióloga guarda el turno con la vía cambiada y su razón escrita (la salida que cuesta
+  una razón), se da cuenta, reabre el turno y declara la extubación. La pantalla ya no manda razón (la cama dice la vía nueva), y en la
+  línea de tiempo y en la entrega de turno convivían «extubación» y «sin evento declarado»: la alerta que ese registro debía apagar.
+  Antes de la tanda 2 el re-guardado barría el hito.
+  · **Arreglo.** `guardarEvolucion` le pasa `conservar` al barrido de hitos solo si el turno NO declara ninguno de los cinco eventos de vía
+  aérea (`EXT_OCURRIO`, `INTUB_OCURRIO`, `EXT_REINTUB`, `TQT_OCURRIO`, `DECAN_OCURRIO`: los mismos con que `validarTransicionVA` da por
+  explicado un cambio de vía). Con evento, el barrido corre como en aa842ec. Lo que la regla se creó para hacer sigue igual: el reintento
+  tras morir, el re-guardado idéntico y el que no trae la razón (la pantalla no la manda al reabrir) conservan el hito.
+  · **La guardia (21b).** Una vez por cada uno de los cinco eventos, con la misma razón y con otra en el payload (los dos caminos del barrido:
+  «conservar» y «rehacer»), lo que la regla SIGUE conservando (idéntico, sin razón, un cultivo o una nota que no son eventos de vía aérea, un
+  evento de otro turno), una matriz de muerte de dos pasos (transición sin evento y luego el evento, muerta tras cada escritura) y la forma
+  (la lista de eventos del servicio es la del dominio). Rojo visto antes de arreglar: 21 fallos; verde después; 8 mutantes mueren.
+- **H19 · la regla que conserva los días (`DIAS_VM`, `DIAS_VNI`, `DIAS_VA`) al volver a guardar el mismo turno cambia el valor frente a
+  antes de la tanda 2 y no está en `ACUERDOS_REDISENO.md`.** Se averiguó por qué existe: el sello NO la puede reemplazar. El sello se
+  escribe solo cuando el guardado terminó limpio; una corrida que murió después de escribir la cama no deja sello, y el reintento (o el
+  guardado sin OP_ID, o el que llega con otra OP_ID) calcula de nuevo leyendo la cama YA ingresada como si fuera la de antes del turno.
+  Quitar la regla pone en rojo 67 comprobaciones de las matrices de muerte (el ingreso con y sin OP_ID, el ingreso con vía aérea de afuera y
+  la transición): se quedó. No se puede acotar más por el estado (desde fuera un reintento y un re-guardado legítimo son idénticos), y ya
+  pide cama al día con el turno, mismo paciente, mismo soporte y misma vía inicial y final.
+  · **Lo que mide la guardia 20b, contra el cálculo de antes.** Transición VM→VNI y TOT→Natural: primer guardado 3, 0 y 3 días (VM, VNI, VA).
+  Con el cálculo de antes, al volver a guardar daba 1, 0 y 1, y el turno siguiente partía de ese 1: el error se arrastraba al resto del
+  episodio y el REM cuenta el último valor. Con la regla se queda en 3, 0 y 3 y el turno siguiente da 3, 1 y 3. Un turno corriente no se
+  mueve en ninguno de los dos casos. **Contra-efecto, a la vista:** el turno de INGRESO de un paciente con vía aérea de afuera cuenta 0 días
+  de vía aérea en el primer guardado (la cama aún no existe al calcular) y la regla conserva ese 0; con el cálculo de antes el segundo
+  guardado lo «corregía» a los días de afuera por accidente (5 en el caso de prueba). El turno siguiente lo calcula bien en los dos casos.
+  · **Decisión para Diego (la 5 del diseño, sin responder).** No se escribe en `ACUERDOS_REDISENO.md` hasta que él la responda con sus
+  palabras. La guardia 20b es la que se da vuelta a propósito si decide otra cosa.
+  · **Código.** Solo comentario en `v2/svc_evoluciones.gs`: la razón por la que no se reemplaza por el sello, el ejemplo con números y los
+  tres cambios frente a antes. Ninguna línea de cálculo se tocó.
+
+**Qué se cambió.**
+- `v2/svc_evoluciones.gs`: `_declaraEventoVA` y la llamada a `_timelineDelGuardado`; el comentario de la regla de los días (H19).
+- `build/checks/guardado_seguro_operacion_g16.js`: secciones 20b y 21b nuevas y la forma de la 23.
+- `build/paquete_migracion/servicios.gs`: lo regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre
+  (`paridad_entrega` y `pwa_paquete` están rojas hasta regenerarlos).
+
+### Para no olvidar
+
+- 🪤 **Conservar el hito de transición y declarar el evento son dos cosas que se pisan.** Cualquier regla nueva que haga sobrevivir un hito
+  automático a un re-guardado tiene que preguntarse si el payload nuevo ya trae lo que lo apaga.
+- 🪤 **Quitar la regla de los días no es «volver a como estaba»:** el cálculo de antes bajaba los días al volver a guardar una transición y
+  la tanda 2 vive de que un reintento dé lo mismo que la corrida limpia. Si algún día se quita, caen las matrices de muerte de la sección 19.

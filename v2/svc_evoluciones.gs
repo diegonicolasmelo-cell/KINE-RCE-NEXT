@@ -581,7 +581,23 @@ function guardarEvolucion(datos, ctx, ep) {
            paciente con el MISMO soporte y la MISMA vía aérea (inicial y final), el turno no cambió en nada que mueva los
            contadores: se conservan los de esa fila. Con un soporte o una vía distintos se calcula como siempre. Una fila
            sin días (anterior a las columnas) tampoco se «conserva»: se calcula. Es un CAMBIO DE CÁLCULO solo en el reintento y
-           en el re-guardado del turno, que antes daban un número que dependía de en qué estado hubiera quedado la cama. */
+           en el re-guardado del turno, que antes daban un número que dependía de en qué estado hubiera quedado la cama.
+
+           🔴 H19 (revisión de la tanda 2): ESTA REGLA NO SE PUEDE REEMPLAZAR POR EL SELLO. El sello de operación se escribe
+           solo cuando el guardado terminó limpio: una corrida que murió después de escribir la cama no deja sello, y su
+           reintento (o el guardado sin OP_ID, o el que llega con otra OP_ID) calcula de nuevo leyendo la cama ya ingresada
+           como si fuera la de antes del turno. Con el cálculo de antes de la tanda 2, la transición VM→VNI y TOT→Natural
+           daba 3, 0 y 3 días al guardarla y 1, 0 y 1 al volver a guardarla; el turno siguiente partía de ese 1 y el error
+           se arrastraba al resto del episodio. Sin la regla caen las matrices de muerte de la sección 19 de
+           `guardado_seguro_operacion_g16.js` (el ingreso con y sin OP_ID, el ingreso con vía aérea de afuera y la
+           transición). Desde fuera no se distingue un reintento de un re-guardado legítimo (la fila y la cama quedan
+           iguales), así que la regla es tan estricta como lo permite el estado: misma cama ya al día con el turno, mismo
+           paciente, mismo soporte y misma vía inicial y final. LO QUE CAMBIA FRENTE A ANTES, y la guardia 20b fija: (1)
+           volver a guardar una transición ya no baja los días; (2) el turno de ingreso de un paciente con vía aérea de
+           afuera conserva el 0 del primer guardado (antes, el segundo guardado lo «corregía» a los días de afuera por
+           accidente); (3) por construcción, si se corrige un turno anterior y luego se vuelve a guardar este, los días de
+           ESTE turno no se recalculan hasta el siguiente. Es la decisión 5 del diseño: Diego aún no la responde, así que no
+           figura en ACUERDOS_REDISENO.md. */
         if (_prev && String(cama.ULTIMO_TURNO_KEY || '') === turnoKey && String(_prev.PATIENT_ID || '') === String(patientId) &&
             ['VENT_SOPORTE', 'VENT_SOPORTE_FINAL', 'VENT_VIA_AEREA', 'VENT_VIA_AEREA_FINAL'].every(function (k) {
               return String(datos[k] == null ? '' : datos[k]) === String(_prev[k] == null ? '' : _prev[k]);
@@ -853,6 +869,15 @@ function guardarEvolucion(datos, ctx, ep) {
       // trae el payload (`conservar`): el hito que el turno ya dejó se queda, o se rehace con la razón corregida.
       const _transMotivo = String(datos.TRANS_MOTIVO || '').trim();
       const _vaFinalTurno = String(evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '');
+      // 🔴 H11 y H16 (revisión de la tanda 2): conservar el hito vale SOLO si el turno no declara un evento de vía aérea. La
+      // kinesióloga que guardó el cambio con su razón y después reabre el turno a declarar la extubación (o la intubación, la
+      // reintubación, la traqueostomía, la decanulación) no manda razón —la cama ya dice la vía nueva—, y conservar dejaba en la
+      // línea de tiempo y en la entrega de turno «cambió sin evento declarado» JUNTO al evento: la alerta que ese registro debía
+      // apagar. Antes de la tanda 2 el re-guardado barría el hito. Son los mismos cinco eventos con que `validarTransicionVA`
+      // (dominio_validacion.gs) da por explicado un cambio de vía; se miran en `evo`, la fila ya fusionada y normalizada
+      // (la PVE superada sin extubar ya apagó EXT_OCURRIO). Con evento declarado el barrido corre como siempre: sin `conservar`.
+      const _declaraEventoVA = ['EXT_OCURRIO', 'INTUB_OCURRIO', 'EXT_REINTUB', 'TQT_OCURRIO', 'DECAN_OCURRIO']
+        .some(function (k) { return esVerdadero(evo[k]); });
       if (_transMotivo && cama && cama.VIA_AEREA) {
         if (_vaFinalTurno && _vaFinalTurno !== String(cama.VIA_AEREA)) {
           hitosExtra.push(_hitoTransicionSinEvento(String(cama.VIA_AEREA), _vaFinalTurno, _transMotivo, _vv('PLAN_FIRMA_KINE'),
@@ -885,7 +910,7 @@ function guardarEvolucion(datos, ctx, ep) {
       const procsStats = procs.filter(function (p) { return !/^SUPINACI/i.test(String(p)); });
       _guardarProcedimientosInterno(idEvolucion, idCama, patientId, fecha, turno, procsStats, ctx.email);
       const timelineJson = _timelineDelGuardado(idCama, fecha, turno, procs, evo.PLAN_FIRMA_KINE, ctx.email, patientId, hitosExtra, datosPorProc,
-        { a: _vaFinalTurno, motivo: _transMotivo });
+        _declaraEventoVA ? null : { a: _vaFinalTurno, motivo: _transMotivo });
 
       // Sincronizar el snapshot de la cama: la ÚNICA escritura a CAMAS_ESTADO
       // del guardado (lleva también las fechas de ingreso corregidas arriba y
