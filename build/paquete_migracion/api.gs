@@ -119,7 +119,7 @@ function api(accion, datos, token) {
       case 'GUARDAR_EVOLUCION':
         return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx, _epDeDatos(datos)), datos);
       case 'AGREGAR_HITO':
-        return _auditar(ctx, accion, () => agregarHito(Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos), _epDeDatos(datos)), datos);
+        return _auditar(ctx, accion, () => agregarHito(_hitoDeLaPuerta(datos, ctx), _epDeDatos(datos)), datos);
       case 'SET_ASIGNACION_TURNO':
         return _auditar(ctx, accion, () => guardarAsignacionTurno(datos), datos);
       case 'AGREGAR_FASE':
@@ -400,6 +400,24 @@ function _opDe(accion, datos) {
   const id = d.OP_ID;
   if (typeof id !== 'string' || !_OP_ID_RE.test(id)) return null;
   return { id: id, accion: accion, h: _huellaPayload(d), texto: String(d.TEXTO_GENERADO || '').trim(), tomado: false, repetida: false };
+}
+
+/**
+ * El hito que la puerta AGREGAR_HITO le entrega a `agregarHito`: lo que mandó la pantalla, con la IDENTIDAD DE LA SESIÓN puesta encima y sin
+ * id propio (revisión de la tanda 2, H8).
+ *
+ * 🔴 EL DEFECTO. Se armaba `Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos)`: lo que traía el paquete iba DESPUÉS y
+ * pisaba la firma, así que un hito podía quedar «de» otra persona. Y desde el paso 9 `hito.id` es el ID_HITO de la fila (para que el reintento
+ * de una operación reconozca el suyo): si lo elegía quien llama, dos hitos con el mismo id dejaban la línea de tiempo con una clave repetida,
+ * y el sello y el «insertar si falta» dan por hecho que es única. La firma se toma de `ctx` (lo que `autorizar` verificó) y los ids los
+ * deriva el servidor (`uid('HITO', clave)`) o los pone un llamador interno; esta puerta no acepta `id` ni `ID_HITO`.
+ * `patientId` sí se respeta: es el episodio al que el hito dice pertenecer, y el candado de episodio lo compara.
+ */
+function _hitoDeLaPuerta(datos, ctx) {
+  const h = Object.assign({}, datos, { autor: ctx.firma, autorEmail: ctx.email });
+  delete h.id;
+  delete h.ID_HITO;
+  return h;
 }
 
 /** Ejecuta fn y, si resultó ok, deja registro en AUDIT_LOG. */

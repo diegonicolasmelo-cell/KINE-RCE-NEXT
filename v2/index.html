@@ -20517,7 +20517,9 @@ async function vmFallaRegistrar(){
   const datos={ idVm:idVm, descripcion:desc };
   if(foto){ datos.fotoB64=foto.b64; datos.fotoMime=foto.mime; }
   gs('REGISTRAR_FALLA_VM', datos, r=>{
-    fin(); toast('⚠️ Falla registrada'+(r&&r.fotoUrl?' con foto':'')+'. El equipo queda «Con falla».');
+    // La respuesta REPETIDA (el reintento de una falla que sí se registró) no trae la dirección de la foto —es una URL y el sello no la guarda—:
+    // la foto viaja en este mismo paquete, así que si esta llamada la mandó, esa falla quedó con foto.
+    fin(); toast('⚠️ Falla registrada'+((r&&r.fotoUrl)||(r&&r.repetida&&foto)?' con foto':'')+'. El equipo queda «Con falla».');
     $('vmFallaDesc').value=''; $('vmFallaFoto').value=''; $('vmFallaFotoNom').textContent='sin foto';
     $('vmfEstado').value='Con falla';
     vmFallasCargar(idVm); vmCargar&&vmCargar();
@@ -20649,9 +20651,13 @@ function vmColaAplicar(){
     confirmar:'✅ Aplicar todos' }).then(okC=>{
     if(!okC) return;
     loading(true,'Aplicando movimientos…');
+    /* El lote es TODO O NADA: si el servidor contesta ok se aplicaron todos los que esta pantalla mandó. Esa cuenta (`enviados`) es el
+       respaldo del aviso: la respuesta REPETIDA (el reintento de un lote que sí se aplicó) trae el `total` que el sello guarda, pero la
+       pantalla no depende de eso para no decir «0 ventiladores movidos» de un lote que se movió. */
+    const enviados=VM_COLA.length;
     gs('MOVER_VENTILADORES_LOTE',{movimientos:VM_COLA}, r=>{
       loading(false); VM_COLA=[]; vmColaRender();
-      toast('✅ '+((r&&r.total)||0)+' ventiladores movidos');
+      toast('✅ '+((r&&r.total)||enviados)+' ventiladores movidos');
       vmCargar();
     }, ()=>{ loading(false); });
   });

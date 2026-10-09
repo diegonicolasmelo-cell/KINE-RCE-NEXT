@@ -11383,24 +11383,39 @@ function _asigPodarViejas(props) {
    Estadísticas y les pone estado. El colega ve las SUYAS con su estado
    (sabe que no cayeron al vacío); el listado completo es de coordinación. */
 
+/**
+ * Guarda una sugerencia del equipo.
+ *
+ * 🔐 G16, revisión de la tanda 2 (H17). Antes no tomaba el candado —así que no pasaba por el sello de operación— y su id era
+ * `'SUG_' + Date.now()`: el reintento tras un corte de red (mismo OP_ID) insertaba una SEGUNDA fila, y la coordinación leía la misma
+ * idea dos veces. Ahora hace lo que las demás puertas que crean un registro: toma el candado (el sello vive ahí dentro), deriva el id del
+ * OP_ID y de lo que se escribe (`uid('SUG', clave)`, infra_util.gs) y NO inserta si esa fila ya está (el reintento de una corrida a la que
+ * se le evaporó el sello). La clave es de CONTENIDO: el mismo OP_ID con el texto editado es otra sugerencia y se guarda; no se pierde lo
+ * editado por «ya estaba». Sin OP_ID, como siempre (reloj y azar; cada envío es una fila y no se lee nada de más).
+ * 🪤 `typeof OP_ACTUAL` es compatibilidad con los bancos antiguos, que cargan este archivo sin infra_lock.gs: ahí cae a «sin operación».
+ */
 function guardarSugerencia(datos, ctx) {
-  try {
-    const texto = String((datos && datos.texto) || '').trim().slice(0, 1000);
-    const firma = String((datos && datos.firma) || '').trim();
-    if (!texto) return err('Escribe la sugerencia antes de enviar.', ERR.VALIDACION);
-    if (!firma) return err('Falta la firma de quien sugiere.', ERR.VALIDACION);
-    const fila = {
-      ID: 'SUG_' + Date.now(),
-      TIMESTAMP: ahoraTS(),
-      FIRMA: firma,
-      AUTOR_EMAIL: (ctx && ctx.email) || '',
-      TEXTO: texto,
-      ESTADO: 'nueva',
-      NOTA_COORD: '',
-    };
-    repoInsertar('SUGERENCIAS', fila);
-    return ok({ id: fila.ID, entidad: 'SUGERENCIAS', accion: 'sugerencia' });
-  } catch (e) { return err('guardarSugerencia: ' + e.message, ERR.INTERNO, e); }
+  return conLock(function () {
+    try {
+      const texto = String((datos && datos.texto) || '').trim().slice(0, 1000);
+      const firma = String((datos && datos.firma) || '').trim();
+      if (!texto) return err('Escribe la sugerencia antes de enviar.', ERR.VALIDACION);
+      if (!firma) return err('Falta la firma de quien sugiere.', ERR.VALIDACION);
+      const conOperacion = (typeof OP_ACTUAL !== 'undefined') && !!(OP_ACTUAL && OP_ACTUAL.id);
+      const fila = {
+        ID: uid('SUG', firma + '|' + texto),
+        TIMESTAMP: ahoraTS(),
+        FIRMA: firma,
+        AUTOR_EMAIL: (ctx && ctx.email) || '',
+        TEXTO: texto,
+        ESTADO: 'nueva',
+        NOTA_COORD: '',
+      };
+      // Con operación en curso el id es el mismo en cada intento: la fila que ya está (el primer intento llegó hasta acá) no se repite.
+      if (!conOperacion || repoBuscarFila('SUGERENCIAS', 'ID', fila.ID) === -1) repoInsertar('SUGERENCIAS', fila);
+      return ok({ id: fila.ID, entidad: 'SUGERENCIAS', accion: 'sugerencia' });
+    } catch (e) { return err('guardarSugerencia: ' + e.message, ERR.INTERNO, e); }
+  });
 }
 
 function obtenerSugerencias() {

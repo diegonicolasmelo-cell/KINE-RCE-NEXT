@@ -76,6 +76,15 @@
 //  H9 · DAR_ALTA de un pid que ya figura en el archivo cuando la cama volvió a ocuparse con él (otra estadía): ya no contesta ok sin
 //       escribir su egreso; el reintento del MISMO episodio sigue convergiendo.
 //
+// LO QUE SE SUMA EN LA REVISIÓN DE LA TANDA 2 (paso D «sello y sugerencia», 9-oct-2026):
+//  H10 y H15 · 11 y 11b · EL SELLO NO LLEVA TEXTO LIBRE: `accion` y `entidad` salen de lo que se guarda en el caché. En ANEXAR_EVENTO la
+//       acción es el texto clínico de quien anota y en ANULAR_ANEXO el nombre del anexo; la sección 11 original solo miraba el ingreso y el
+//       guardado de la evolución. La 11b llama a las dos puertas de verdad con un texto CENTINELA y exige que no esté en ninguna clave ni valor.
+//  H13 · 29 · LA RESPUESTA REPETIDA NO DEBE DECIR «0 ventiladores movidos»: `total` (un conteo, solo del lote) se sella y la pantalla no
+//       depende de lo que el sello no guarda (resumen, fotoUrl).
+//  H17 · 29 · GUARDAR_SUGERENCIA toma el candado y deriva su id del OP_ID: un reenvío no duplica. Esta guardia ya NO la sustituye por un doble.
+//  H8  · 29 · AGREGAR_HITO: la firma de la sesión gana sobre el autor que mande la pantalla y el id del hito no lo elige quien llama.
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -157,13 +166,18 @@ const reset = () => {
 // Las acciones son las de verdad (api.gs las audita y les arma el sello); el cuerpo es el de la prueba: escribe UNA fila
 // (para contar) y NO llama a flush por su cuenta, así que un flush antes del sello solo puede venir de conLock.
 let EJEC = 0, CUERPO = null;
-global.guardarSugerencia = (datos, ctx) => conLock(() => { EJEC++; return CUERPO(datos, ctx); });
-global.setSugerenciaEstado = (datos) => conLock(() => { EJEC++; return CUERPO(datos); });
+// 🔴 H17 (revisión de la tanda 2, paso D). El anfitrión del juguete NO puede ser una acción cuyo servicio real se quiere probar: este
+// banco sustituía `guardarSugerencia` por un doble que SÍ tomaba el candado, y por eso no veía que la real no lo tomaba (un reenvío
+// con el mismo OP_ID insertaba una segunda fila). Los anfitriones son dos acciones de plantillas, cuyo servicio real esta guardia
+// no prueba; GUARDAR_SUGERENCIA se prueba con su función de verdad en la sección 29.
+global.plantillaGuardar = (datos, ctx) => conLock(() => { EJEC++; return CUERPO(datos, ctx); });
+global.plantillaDesactivar = (datos) => conLock(() => { EJEC++; return CUERPO(datos); });
 const escribeUna = extra => () => {
   repoInsertar('TIMELINE', { ID_HITO: 'H' + EJEC, ID_CAMA: '3', TEXTO: 'fila de prueba ' + EJEC });
-  return ok(Object.assign({ idCama: '3', id: 'S1', accion: 'sugerencia', entidad: 'SUGERENCIAS' }, extra || {}));
+  return ok(Object.assign({ idCama: '3', id: 'S1', accion: 'plantilla de prueba', entidad: 'PLANTILLAS_EVOLUCION' }, extra || {}));
 };
-const ACC = 'GUARDAR_SUGERENCIA';
+const ACC = 'PLANTILLA_GUARDAR';
+const ACC2 = 'PLANTILLA_RETIRAR';
 const OPID = 'op_prueba_0001';
 const llama = (accion, datos) => callando(() => api(accion, datos, null));
 const clonar = o => JSON.parse(JSON.stringify(o));
@@ -255,7 +269,11 @@ tramo('misma OP_ID', () => {
   eq('★★ …y escribe CERO (ni hojas ni el caché)', M.total(), 0);
   eq('   …contesta ok y marca repetida', r2.ok + '/' + (r2.data && r2.data.repetida), 'true/true');
   const sinRep = d => { const o = Object.assign({}, d); delete o.repetida; return o; };
-  eq('★ …y es la MISMA respuesta (los ids y las banderas de la primera)', JSON.stringify(sinRep(r2.data)), JSON.stringify(r1.data));
+  // `accion` y `entidad` NO se sellan (H10 y H15, revisión de la tanda 2): en ANEXAR_EVENTO la acción lleva el texto clínico libre.
+  // La repetida es la de la primera menos esas dos; lo que la pantalla necesita —los ids y las banderas— viaja entero.
+  const sinTexto = d => { const o = Object.assign({}, d); delete o.accion; delete o.entidad; return o; };
+  eq('★ …y es la MISMA respuesta (los ids y las banderas de la primera, sin la acción ni la entidad: son texto libre)', JSON.stringify(sinRep(r2.data)), JSON.stringify(sinTexto(r1.data)));
+  eq('   …y la repetida no trae `accion` ni `entidad`', ('accion' in r2.data) + '/' + ('entidad' in r2.data), 'false/false');
   eq('   …la base queda exactamente igual', M.instantanea() === snap, true);
   eq('★ la bitácora no repite la fila de la acción (ya quedó anotada la primera vez)', DB.AUDIT_LOG.length, filas1);
   const r3 = llama(ACC, payload());
@@ -443,9 +461,9 @@ tramo('fail-open', () => {
 console.log('\n7 · Solo el primer conLock de la petición participa; el mismo OP_ID en otra acción no choca');
 tramo('primer conLock', () => {
   reset();
-  global.guardarSugerencia = () => {
-    const a = conLock(() => { EJEC++; repoInsertar('TIMELINE', { ID_HITO: 'PRIMERO' }); return ok({ idCama: '3', accion: 'primera' }); });
-    const b = conLock(() => { EJEC++; repoInsertar('TIMELINE', { ID_HITO: 'SEGUNDO' + EJEC }); return ok({ idCama: '3', accion: 'segunda' }); });
+  global.plantillaGuardar = () => {
+    const a = conLock(() => { EJEC++; repoInsertar('TIMELINE', { ID_HITO: 'PRIMERO' }); return ok({ idCama: '3', id: 'primera' }); });
+    const b = conLock(() => { EJEC++; repoInsertar('TIMELINE', { ID_HITO: 'SEGUNDO' + EJEC }); return ok({ idCama: '3', id: 'segunda' }); });
     return b;
   };
   const r1 = llama(ACC, payload());
@@ -453,15 +471,15 @@ tramo('primer conLock', () => {
   eq('★ …y solo el primero sella (UN put)', opsDelCaché().length, 1);
   const r2 = llama(ACC, payload());
   eq('★ …y el segundo conLock NO consulta el sello: devuelve lo suyo y no la respuesta guardada del primero',
-    (r2.data && r2.data.accion) + '/' + (r2.data && r2.data.repetida), 'segunda/undefined');
-  global.guardarSugerencia = (datos, ctx) => conLock(() => { EJEC++; return CUERPO(datos, ctx); });
+    (r2.data && r2.data.id) + '/' + (r2.data && r2.data.repetida), 'segunda/undefined');
+  global.plantillaGuardar = (datos, ctx) => conLock(() => { EJEC++; return CUERPO(datos, ctx); });
 
   reset(); CUERPO = escribeUna();
-  llama('GUARDAR_SUGERENCIA', payload());
-  llama('SET_SUGERENCIA_ESTADO', payload());
+  llama(ACC, payload());
+  llama(ACC2, payload());
   eq('★ el MISMO OP_ID en otra acción es otra operación: ejecuta', EJEC, 2);
-  eq('   …cada una con su propia clave en el caché', opsDelCaché().map(p => p.k).sort().join(','), [claveSello('GUARDAR_SUGERENCIA', OPID), claveSello('SET_SUGERENCIA_ESTADO', OPID)].sort().join(','));
-  const re = llama('SET_SUGERENCIA_ESTADO', payload());
+  eq('   …cada una con su propia clave en el caché', opsDelCaché().map(p => p.k).sort().join(','), [claveSello(ACC, OPID), claveSello(ACC2, OPID)].sort().join(','));
+  const re = llama(ACC2, payload());
   eq('   …y la repetida de la segunda se reconoce en la suya', EJEC + '/' + (re.data && re.data.repetida), '2/true');
 
   // Una petición que NO es una escritura auditada (una lectura) no se sella aunque traiga OP_ID.
@@ -581,7 +599,9 @@ tramo('privacidad', () => {
   const sensible = [NOMBRE, 'Alfa', RUT, '11111111', DX, 'Dx secreto', TEXTO, 'Texto clinico', 'AP-61', 'dato clinico'];
   const filtrado = todos.filter(p => sensible.some(s => p.v.indexOf(s) > -1)).map(p => p.k);
   eq('★★ NINGÚN put al caché contiene el nombre, el RUT, el diagnóstico, el texto ni el código del paciente', filtrado.join(',') || '(ninguno)', '(ninguno)');
-  const PERMITIDAS = ['idCama', 'idEvolucion', 'id', 'patientId', 'turnoKey', 'accion', 'entidad', 'TEXTO_GENERADO'];
+  // `accion` y `entidad` YA NO están (H10 y H15, revisión de la tanda 2): en ANEXAR_EVENTO y ANULAR_ANEXO la acción lleva el texto libre
+  // de quien anota. Ningún servicio las lee de una respuesta repetida (la bitácora ya las anotó en la primera y la pantalla no las mira).
+  const PERMITIDAS = ['idCama', 'idEvolucion', 'id', 'patientId', 'turnoKey', 'TEXTO_GENERADO'];
   todos.forEach(p => {
     const d = (JSON.parse(p.v) || {}).d || {};
     const sobra = Object.keys(d).filter(k => PERMITIDAS.indexOf(k) === -1);
@@ -597,12 +617,13 @@ tramo('privacidad', () => {
     const o = dep({ idCama: '6', idEvolucion: 'E1', id: 'S1', patientId: 'pid-1', turnoKey: TK, accion: 'ingreso', entidad: 'CAMAS_ESTADO',
       nombre: NOMBRE, rut: RUT, pendiente: { texto: TEXTO }, lista: [1, 2], cod: 'AP-61', valor: 42, TEXTO_GENERADO: TEXTO,
       yaEstaba: true, hayAviso: false });
-    eq('★ _selloDepurar deja ids y banderas y nada más', Object.keys(o).sort().join(','),
-      'TEXTO_GENERADO,accion,entidad,hayAviso,id,idCama,idEvolucion,patientId,turnoKey,yaEstaba'.split(',').sort().join(','));
+    eq('★ _selloDepurar deja ids y banderas y nada más (ni la acción ni la entidad: son texto libre)', Object.keys(o).sort().join(','),
+      'TEXTO_GENERADO,hayAviso,id,idCama,idEvolucion,patientId,turnoKey,yaEstaba'.split(',').sort().join(','));
     eq('   …el texto queda como marca vacía', o.TEXTO_GENERADO, '');
     eq('   …y las banderas (verdadero o falso) pasan tal cual: no pueden llevar un nombre', o.yaEstaba + '/' + o.hayAviso, 'true/false');
     eq('   …y no deja pasar objetos ni listas aunque se llamen como un id permitido', JSON.stringify(dep({ idCama: { x: 1 }, id: ['a'], accion: { t: 'y' } })), '{}');
-    eq('   …una acción larguísima se acota (no es un lugar para pegar texto)', String(dep({ accion: 'x'.repeat(500) }).accion || '').length <= 80, true);
+    eq('★ la acción y la entidad no pasan NUNCA: ni cortas, ni larguísimas, ni con el texto de un anexo (H10 y H15)',
+      JSON.stringify([dep({ accion: 'ingreso', entidad: 'CAMAS_ESTADO' }), dep({ accion: 'x'.repeat(500) }), dep({ accion: 'evento rápido: 📌 texto libre de la kinesióloga' })]), '[{},{},{}]');
     eq('   …algo que no es un objeto da vacío', JSON.stringify([dep(null), dep(undefined), dep('texto'), dep(5)]), '[{},{},{},{}]');
   } else fails.push('_selloDepurar no existe');
 
@@ -611,6 +632,61 @@ tramo('privacidad', () => {
   CUERPO = () => { repoInsertar('TIMELINE', { ID_HITO: 'GRANDE' }); return ok({ idCama: '9'.repeat(95000), accion: 'grande' }); };
   const gr = llama(ACC, payload());
   eq('★ un sello de más de 90 KB se descarta sin error: la operación contesta ok y no se intentó el put', gr.ok + '/' + opsDelCaché().length, 'true/0');
+});
+
+/* ══ 11b · PRIVACIDAD EN LOS ANEXOS: EL TEXTO LIBRE DEL ➕ NO LLEGA AL CACHÉ (H10 y H15) ═══════════════ */
+console.log('\n11b · ANEXAR_EVENTO y ANULAR_ANEXO: el texto que escribe la kinesióloga no está en NINGÚN valor del caché');
+// 🔴 EL DEFECTO (revisión adversarial de la tanda 2, H10 y H15). El sello guardaba `accion` (cortada a 80 caracteres) y `entidad`, y en el ➕ la
+// acción ES el texto clínico libre: `'evento rápido: ' + texto` (una nota, el hallazgo de un cultivo, el detalle de un procedimiento) y, al
+// borrar un anexo, `'anexo anulado: ' + nombre + ' (' + turno + ')'`. Seis horas de texto clínico en la memoria temporal del script, y la sección 11
+// original solo miraba el ingreso y el guardado de la evolución, con un servicio de juguete: nunca llamó a estas dos puertas de verdad.
+// Aquí SÍ: las puertas reales con un texto CENTINELA ficticio en cada campo libre, y se mira cada clave y cada valor que se puso en el caché
+// (y lo que el caché guarda de verdad, no solo lo que se intentó).
+tramo('privacidad · anexos', () => {
+  reset();
+  const OPI = 'op_ingreso_priv_0001', OPG = 'op_evolucion_priv_0001';
+  llama('INGRESAR_PACIENTE', ingreso('6', { OP_ID: OPI }));
+  const PID = camaDe('6').PATIENT_ID;
+  llama('GUARDAR_EVOLUCION', evo('6', { EPISODIO_ABIERTO: PID, OP_ID: OPG }));
+  const C_OTRO = 'CENTINELA-OTRO hematoma en flanco derecho', C_CULT = 'CENTINELA-CULT hallazgo de klebsiella', C_DET = 'CENTINELA-DETALLE drenaje con trocar',
+    C_NOMBRE = 'CENTINELA-NOMBRE-PROCEDIMIENTO';
+  const anexo = extra => Object.assign({ idCama: '6', turnoKey: TK, patientId: PID, EPISODIO_ABIERTO: PID, hora: '10:00' }, extra);
+  const aOtro = anexo({ tipo: 'otro', detalle: C_OTRO, OP_ID: 'op_anexo_priv_otro_1' });
+  const aCult = anexo({ tipo: 'cultivo', cultTipo: 'Traqueal', cultHallazgo: C_CULT, OP_ID: 'op_anexo_priv_cult_1' });
+  const aProc = anexo({ tipo: 'procedimiento', proc: C_NOMBRE, detalle: C_DET, OP_ID: 'op_anexo_priv_proc_1' });
+  const rOtro = llama('ANEXAR_EVENTO', aOtro), rCult = llama('ANEXAR_EVENTO', aCult), rProc = llama('ANEXAR_EVENTO', aProc);
+  si('(el montaje) los tres anexos entran', rOtro.ok && rCult.ok && rProc.ok);
+  const idProc = ((DB.PROCEDIMIENTOS.find(p => p.PATIENT_ID === PID && p.TIPO_PROC === 'anexo' && p.NOMBRE_PROC === C_NOMBRE)) || {}).ID_PROC || '';
+  si('(el montaje) el procedimiento anexado tiene su fila de estadística', !!idProc);
+  const anular = () => ({ idProc, idCama: '6', EPISODIO_ABIERTO: PID, OP_ID: 'op_anular_priv_0001' });
+  const rAnu = llama('ANULAR_ANEXO', anular());
+  si('(el montaje) el anexo se anula', rAnu.ok);
+  // La prueba no es vacía: la respuesta SÍ lleva el texto (la bitácora lo anota), y los sellos de las dos puertas SÍ se escribieron.
+  si('(el montaje) la acción de la primera respuesta lleva el texto, como siempre (es lo que audita la bitácora, en la hoja)', /CENTINELA-OTRO/.test((rOtro.data && rOtro.data.accion) || ''));
+  si('(el montaje) la de ANULAR_ANEXO lleva el nombre del anexo', /CENTINELA-NOMBRE/.test((rAnu.data && rAnu.data.accion) || ''));
+  eq('★ se sellaron las cuatro operaciones (3 de ANEXAR_EVENTO y 1 de ANULAR_ANEXO)',
+    ['ANEXAR_EVENTO', 'ANULAR_ANEXO'].map(a => opsDelCaché().filter(p => p.k.indexOf('op|' + a + '|') === 0).length).join(','), '3,1');
+
+  const piezas = [];   // cada clave, cada valor puesto y lo que el caché devuelve de verdad por esa clave
+  PUTS.forEach(p => { piezas.push(['clave ' + p.k, p.k], ['valor de ' + p.k, p.v], ['guardado en ' + p.k, String(global.CacheService.getScriptCache().get(p.k) || '')]); });
+  const donde = re => piezas.filter(([, t]) => re.test(t)).map(([q]) => q);
+  eq('★★ NINGÚN valor ni clave del caché contiene el texto centinela', donde(/centinela/i).join(' | ') || '(ninguno)', '(ninguno)');
+  // …ni siquiera las palabras clínicas sueltas (la acción se cortaba a 80 caracteres, pero el principio del texto pasaba entero).
+  [['la nota libre', 'hematoma|flanco'], ['el hallazgo del cultivo', 'klebsiella'], ['el detalle del procedimiento', 'drenaje|trocar'], ['el nombre del anexo', 'NOMBRE-PROCEDIMIENTO']].forEach(([etq, re]) =>
+    eq('   …ni ' + etq + ' ni sus palabras clínicas', donde(new RegExp(re, 'i')).join(' | ') || '(ninguno)', '(ninguno)'));
+  piezas.filter(([q]) => /^valor de op\|(ANEXAR_EVENTO|ANULAR_ANEXO)\|/.test(q)).forEach(([q, t]) => {
+    const d = (JSON.parse(t) || {}).d || {};
+    eq('   ' + q + ': solo ids y banderas', Object.keys(d).filter(k => ['idCama', 'idEvolucion', 'id', 'patientId', 'turnoKey'].indexOf(k) === -1 && typeof d[k] !== 'boolean').join(',') || '(ninguna)', '(ninguna)');
+  });
+
+  // Lo que la pantalla necesita de una respuesta REPETIDA sigue funcionando: es ok, repetida, con los ids del paciente y de la cama.
+  M.reiniciar();
+  const rep = llama('ANEXAR_EVENTO', clonar(aOtro));
+  eq('★ la repetida del ➕ sigue siendo ok y marcada «repetida», sin escribir nada', rep.ok + '/' + (rep.data && rep.data.repetida) + '/' + M.total(), 'true/true/0');
+  eq('   …con los ids de la cama, del paciente y de la evolución que la pantalla toma para refrescarse',
+    [rep.data && rep.data.idCama, rep.data && rep.data.patientId === PID, !!(rep.data && rep.data.idEvolucion && rep.data.idEvolucion === rOtro.data.idEvolucion)].join('/'), '6/true/true');
+  const repA = llama('ANULAR_ANEXO', anular());
+  eq('   …y la de ANULAR_ANEXO también (ok, repetida, la cama y el paciente)', repA.ok + '/' + (repA.data && repA.data.repetida) + '/' + (repA.data && repA.data.idCama) + '/' + (repA.data && repA.data.patientId === PID), 'true/true/6/true');
 });
 
 /* ══ 12 · LA APP INSTALADA: doPost ════════════════════════════════════════ */
@@ -1825,6 +1901,155 @@ tramo('forma de los anexos', () => {
   const idx = leer('index.html');
   const usoFront = idx.split('\n').filter(l => /pendEpiCerrar\(|data-pend=/.test(l));
   si('   …y la pantalla solo lo escapa y lo devuelve (escapeHtml/escapeJs), no lo parte', usoFront.length > 0 && usoFront.every(l => /escape(Html|Js)\(p\.id/.test(l) || /function pendEpiCerrar/.test(l) || /pendEpiCerrar\(id\)/.test(l)));
+});
+
+
+/* ══ 29 · REVISIÓN DE LA TANDA 2, PASO D: H13, H17 Y H8 ═══════════════════ */
+console.log('\n29 · La repetida del lote conserva su total, la sugerencia no duplica y el hito lleva la firma de la sesión');
+
+// ── H13 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// 🔴 EL DEFECTO. La respuesta REPETIDA de un lote de ventiladores perdía `total`, y la pantalla arma su aviso con
+// `((r&&r.total)||0)+' ventiladores movidos'`: tras un corte de red, justo el caso para el que existe el sello, decía «0 ventiladores movidos»
+// de un lote que sí se aplicó. Lo mismo, sin el drama, con `resumen` (mover uno) y `fotoUrl` (registrar una falla): son texto y una dirección, y
+// el sello no los guarda. Arreglo: `total` (un CONTEO, solo de esta acción) se sella, y la pantalla no depende de lo que no se sella.
+tramo('H13 · el total del lote', () => {
+  const lote = extra => Object.assign({ movimientos: [{ idVm: 'vm1', tipo: 'PASILLO', fecha: '2026-08-10' }, { idVm: 'vm2', tipo: 'PASILLO', fecha: '2026-08-10' }], OP_ID: 'op_lote_h13_0001' }, extra || {});
+  reset();
+  const a = llama('MOVER_VENTILADORES_LOTE', lote());
+  si('(el montaje) el lote de dos equipos entra', a.ok && a.data.total === 2);
+  M.reiniciar();
+  const b = llama('MOVER_VENTILADORES_LOTE', lote());
+  eq('★ el reintento es la repetida, sin escribir nada', b.ok + '/' + (b.data && b.data.repetida) + '/' + M.total(), 'true/true/0');
+  eq('★★ …y conserva el TOTAL (un número): la pantalla no puede decir «0 ventiladores movidos»', b.data && b.data.total, 2);
+  eq('   …pero no el detalle ni la acción (texto: nombres de equipos y ubicaciones)', ('detalle' in b.data) + '/' + ('accion' in b.data), 'false/false');
+
+  // `total` es un conteo SOLO en esta acción. En EVAL_REGISTRAR es el puntaje de una escala del paciente (un dato clínico): no se sella.
+  volverAlMundo();
+  const e = llama('EVAL_REGISTRAR', mkEval({ OP_ID: 'op_eval_h13_0001' }));
+  si('(el montaje) la medición entra con su total', e.ok && String(e.data.total) === '48');
+  const selloE = JSON.parse((opsDelCaché().find(p => p.k.indexOf('op|EVAL_REGISTRAR|') === 0) || { v: '{}' }).v).d || {};
+  eq('★ el puntaje de una escala (EVAL_REGISTRAR) NO se sella: es un dato clínico', ('total' in selloE) + '/' + Object.keys(selloE).join(','), 'false/' + Object.keys(selloE).join(','));
+  const dep = global._selloDepurar;
+  eq('★ _selloDepurar guarda `total` solo si es un número y solo en la acción del lote',
+    JSON.stringify([dep({ total: 2, valor: 7 }, 'MOVER_VENTILADORES_LOTE'), dep({ total: 48 }, 'EVAL_REGISTRAR'), dep({ total: 2 }), dep({ total: 'texto libre' }, 'MOVER_VENTILADORES_LOTE')]),
+    JSON.stringify([{ total: 2 }, {}, {}, {}]));
+
+  // Mover uno y registrar una falla: la repetida es ok y trae el id; lo que la pantalla dice no depende de lo que el sello no guarda.
+  volverAlMundo();
+  const mov = () => ({ idVm: 'vm1', tipo: 'PASILLO', fecha: '2026-08-10', OP_ID: 'op_mover_h13_0001' });
+  const m1 = llama('MOVER_VENTILADOR', mov()), m2 = llama('MOVER_VENTILADOR', mov());
+  eq('MOVER_VENTILADOR: la repetida es ok, con el id del equipo y sin el resumen (texto)', m2.ok + '/' + (m2.data && m2.data.repetida) + '/' + (m2.data && m2.data.id) + '/' + ('resumen' in (m2.data || {})), 'true/true/vm1/false');
+  const falla = () => ({ idVm: 'vm2', descripcion: 'No enciende la pantalla', fotoB64: 'AAAA', fotoMime: 'image/jpeg', OP_ID: 'op_falla_h13_0001' });
+  const f1 = llama('REGISTRAR_FALLA_VM', falla()), f2 = llama('REGISTRAR_FALLA_VM', falla());
+  si('(el montaje) la falla con foto entra y devuelve la dirección de la foto', f1.ok && !!f1.data.fotoUrl);
+  eq('REGISTRAR_FALLA_VM: la repetida es ok, con el id de la falla y sin la dirección de la foto', f2.ok + '/' + (f2.data && f2.data.repetida) + '/' + (f2.data && f2.data.id === f1.data.id) + '/' + ('fotoUrl' in (f2.data || {})), 'true/true/true/false');
+  eq('   …y no duplicó la falla', DB.FALLAS_VM.filter(x => x.ID_VM === 'vm2').length, 1);
+});
+
+tramo('H13 · la pantalla', () => {
+  const idx = leer('index.html');
+  // El aviso del lote, EJECUTADO: la función de verdad, con la respuesta del servidor puesta a mano.
+  const src = (idx.match(/function vmColaAplicar\(\)\{[\s\S]*?\n\}\n/) || [''])[0];
+  si('(el montaje) vmColaAplicar existe en la pantalla', src.length > 200 && /MOVER_VENTILADORES_LOTE/.test(src));
+  const correr = resp => {
+    const toasts = [];
+    const ctxP = vm.createContext({
+      VM_COLA: [{ idVm: 'vm1', tipo: 'PASILLO', detalle: '', fecha: '2026-08-10' }, { idVm: 'vm2', tipo: 'PASILLO', detalle: '', fecha: '2026-08-10' }],
+      uiConfirm: () => ({ then: f => { f(true); } }),                  // el diálogo se confirma al instante: sin esperar microtareas
+      loading() {}, vmColaRender() {}, vmCargar() {}, _tutDemoMover() {}, _docsEsc: x => x, _vmNombre: x => x, _vmDestinoTxt: () => 'Pasillo',
+      toast: m => toasts.push(String(m)), gs: (a, d, okF) => { okF(resp); },
+    });
+    vm.runInContext(src, ctxP); vm.runInContext('vmColaAplicar()', ctxP);
+    return toasts.join(' | ');
+  };
+  eq('★ con el total del servidor, la pantalla dice cuántos', correr({ total: 2 }), '✅ 2 ventiladores movidos');
+  eq('★★ con la repetida (lleva el total sellado) dice lo mismo', correr({ total: 2, repetida: true }), '✅ 2 ventiladores movidos');
+  eq('★★ y si una respuesta no trae el total, dice los que ELLA mandó y nunca «0» (el lote es todo o nada: se aplicaron todos)', correr({ repetida: true }), '✅ 2 ventiladores movidos');
+  const sinCom = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  const code = sinCom(idx);
+  si('mover UN ventilador: el aviso cae a «Ventilador movido» si la respuesta no trae el resumen (la repetida no lo trae)', /toast\('🔁 '\+\(\(r&&r\.resumen\)\|\|'Ventilador movido'\)\)/.test(code));
+  si('★ registrar una falla: «con foto» también si la respuesta es la repetida y esta llamada mandó la foto (la dirección no se sella)', /\(r&&r\.fotoUrl\)\|\|\(r&&r\.repetida&&foto\)/.test(code));
+  // Lo que justifica no sellar la acción ni la entidad: ningún sitio de la pantalla las lee de una respuesta.
+  eq('★ la pantalla no lee `.accion` ni `.entidad` de ninguna respuesta (por eso el sello no las guarda)', (code.match(/\.(accion|entidad)\b/g) || []).length, 0);
+});
+
+// ── H17 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// 🔴 EL DEFECTO. GUARDAR_SUGERENCIA no tomaba el candado (así que no pasaba por el sello) y su id era `'SUG_' + Date.now()`: un reenvío con el
+// mismo OP_ID insertaba una segunda fila. La guardia de arriba usaba esta acción de anfitrión con un doble que SÍ tomaba el candado, y por eso no
+// lo veía. Ahora el servicio real: conLock, id derivado del OP_ID y de lo que se escribe, e insertar solo si falta.
+tramo('H17 · GUARDAR_SUGERENCIA', () => {
+  const sug = () => (DB.SUGERENCIAS || []);
+  const mk = extra => Object.assign({ texto: 'Que el tablero muestre la hora del ultimo cambio', firma: 'DMV', OP_ID: 'op_sug_h17_0001' }, extra || {});
+  const nueva = () => { reset(); DB.SUGERENCIAS = []; };
+  nueva();
+  const tomas0 = ctl.estado().tomas;
+  const a = llama('GUARDAR_SUGERENCIA', mk());
+  eq('(el montaje) la sugerencia entra', a.ok + '/' + sug().length, 'true/1');
+  eq('★ …y toma el candado de verdad (hoy: ninguna toma, no pasaba por conLock)', ctl.estado().tomas - tomas0, 1);
+  eq('★ …y deja el sello (una escritura al caché con la clave de la acción)', opsDelCaché().map(p => p.k).join(','), claveSello('GUARDAR_SUGERENCIA', 'op_sug_h17_0001'));
+  M.reiniciar();
+  const b = llama('GUARDAR_SUGERENCIA', mk());
+  eq('★★ el MISMO OP_ID dos veces (el reintento tras un corte de red): UNA sola fila', sug().length, 1);
+  eq('   …y la segunda es la repetida, sin escribir nada', b.ok + '/' + (b.data && b.data.repetida) + '/' + M.total(), 'true/true/0');
+
+  nueva();
+  llama('GUARDAR_SUGERENCIA', mk()); global.__simCacheReset();          // el sello se evaporó (6 h) o el caché falló
+  const c = llama('GUARDAR_SUGERENCIA', mk());
+  eq('★ con el sello evaporado el reintento tampoco duplica: el id sale del OP_ID y la fila que ya está no se vuelve a insertar', c.ok + '/' + sug().length, 'true/1');
+  si('   …el id es PREFIJO_<op>_<huella> y seguro para un atributo HTML (la pantalla lo devuelve en SET_SUGERENCIA_ESTADO)', /^SUG_op_sug_h17_0001_[A-Za-z0-9]+$/.test((sug()[0] || {}).ID || ''));
+  eq('   …y la respuesta del reintento trae el MISMO id que la primera fila', c.data && c.data.id, (sug()[0] || {}).ID);
+
+  nueva();
+  llama('GUARDAR_SUGERENCIA', mk()); llama('GUARDAR_SUGERENCIA', mk({ OP_ID: 'op_sug_h17_0002' }));
+  eq('otra intención (OTRO OP_ID) con el mismo texto es otra sugerencia: dos filas, ids distintos', sug().length + '/' + new Set(sug().map(x => x.ID)).size, '2/2');
+  nueva();
+  llama('GUARDAR_SUGERENCIA', mk()); llama('GUARDAR_SUGERENCIA', mk({ texto: 'Que el tablero muestre la hora del ultimo cambio y el motivo' }));
+  eq('★ el mismo OP_ID con el texto EDITADO deja lo editado (no se pierde por «ya estaba»)', sug().map(x => x.TEXTO.length).sort().join(','), [mk().texto.length, mk().texto.length + 'y el motivo'.length + 1].sort().join(','));
+  nueva();
+  llama('GUARDAR_SUGERENCIA', mk({ OP_ID: undefined })); llama('GUARDAR_SUGERENCIA', mk({ OP_ID: undefined }));
+  eq('sin OP_ID todo igual que hoy: cada envío es una fila y no se toca el caché', sug().length + '/' + PUTS.length + '/' + GETS.length, '2/0/0');
+  si('   …con el id de siempre (SUG_<ms>_<azar>)', sug().every(x => /^SUG_\d{13}_[A-Z0-9]{1,5}$/.test(x.ID)));
+
+  const sc = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  const gs_ = sc((leer('svc_turnos.gs').match(/function guardarSugerencia\([\s\S]*?\n\}\n/) || [''])[0]);
+  si('★ la forma: guardarSugerencia toma el candado, deriva el id con uid(\'SUG\', clave) y no usa el reloj', /conLock\(/.test(gs_) && /uid\('SUG',\s*[^)]/.test(gs_) && !/Date\.now\(\)/.test(gs_));
+  si('   …y pregunta si la fila ya está ANTES de insertar (solo con operación en curso)', gs_.search(/repoBuscarFila\('SUGERENCIAS'/) > -1 && gs_.search(/repoBuscarFila\('SUGERENCIAS'/) < gs_.search(/repoInsertar\('SUGERENCIAS'/));
+});
+
+// ── H8 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// 🔴 EL DEFECTO. AGREGAR_HITO le pasaba al servicio `Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos)`: lo que mandara la pantalla
+// PISABA la firma de la sesión (un hito «de» otra persona) y, desde el paso 9, `hito.id` pasa a ser el ID_HITO: quien llama elegía el id, y dos
+// hitos con el mismo id dejaban la línea de tiempo con una clave repetida (el sello y el «insertar si falta» se apoyan en que sea única).
+tramo('H8 · AGREGAR_HITO', () => {
+  volverAlMundo();
+  const yo = (llama('WHOAMI', {}).data) || {};
+  si('(el montaje) la sesión de prueba tiene firma y correo', !!yo.firma && !!yo.email);
+  const hito = extra => Object.assign({ idCama: '3', tipo: 'nota', fecha: '2026-08-10', turno: 'Dia', EPISODIO_ABIERTO: MUNDO.PID_P }, extra);
+  const delH8 = () => DB.TIMELINE.filter(h => /\(H8\)/.test(h.TEXTO));
+
+  console.log('   · la firma de la sesión gana');
+  const r1 = llama('AGREGAR_HITO', hito({ texto: 'Hito con autor ajeno (H8)', autor: 'Otra Persona', autorEmail: 'otra@x' }));
+  const fila = delH8()[0] || {};
+  si('(el montaje) el hito entra', r1.ok && delH8().length === 1);
+  eq('★★ el autor es la firma de la SESIÓN y no la que mandó la pantalla', fila.AUTOR + '/' + fila.AUTOR_EMAIL, yo.firma + '/' + yo.email);
+  volverAlMundo();
+  llama('AGREGAR_HITO', hito({ texto: 'Hito sin autor (H8)' }));
+  eq('   …y sin autor en el paquete también (como siempre)', (delH8()[0] || {}).AUTOR + '/' + (delH8()[0] || {}).AUTOR_EMAIL, yo.firma + '/' + yo.email);
+  volverAlMundo();
+  llama('AGREGAR_HITO', hito({ texto: 'Hito con firma declarada (H8)', firmaKine: 'MFB', autor: 'Otra Persona' }));
+  eq('   …y la firma que la persona DECLARA como suya (la identidad de la sesión) sí es la que queda', (delH8()[0] || {}).AUTOR, 'MFB');
+
+  console.log('   · el id del hito no lo elige quien llama');
+  [['sin OP_ID', undefined], ['con OP_ID', 'op_hito_h8_0001']].forEach(([etq, op]) => {
+    volverAlMundo();
+    llama('AGREGAR_HITO', hito({ texto: 'Primer hito del choque (H8)', id: 'HITO_choque', ID_HITO: 'HITO_choque', OP_ID: op }));
+    llama('AGREGAR_HITO', hito({ texto: 'Segundo hito del choque (H8)', id: 'HITO_choque', ID_HITO: 'HITO_choque', OP_ID: op ? 'op_hito_h8_0002' : undefined }));
+    const ids = delH8().map(h => h.ID_HITO);
+    eq('★ ' + etq + ': dos hitos con el mismo `id` en el paquete NO dejan el mismo ID_HITO', ids.length + '/' + new Set(ids).size, '2/2');
+    eq('   …y ninguno lleva el id que eligió la pantalla', ids.filter(x => /HITO_choque/.test(x)).length, 0);
+  });
+  const dispatcher = leer('api.gs').match(/case 'AGREGAR_HITO':[\s\S]*?case 'SET_ASIGNACION_TURNO'/);
+  si('la forma: la puerta arma el hito con una función propia y no le pasa `datos` tal cual al servicio', !!dispatcher && !/agregarHito\(Object\.assign\(\{\s*autor/.test(dispatcher[0]) && /agregarHito\(\w+\(datos, ctx\)/.test(dispatcher[0]));
 });
 
 

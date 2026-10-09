@@ -3596,3 +3596,73 @@ momento real; ahora hay un caso por señal.
   candado de ingreso. Lo cierra `CONTRATO_ESTRICTO`.
 - 🪤 **Contar «escrituras» con un OP_ID incluye el sello del caché**: un reintento que no escribe a las hojas igual cuenta 1 en
   `sim_muerte` (el `CacheService.put`). Los casos de «cero escrituras» sin sello usan un payload sin OP_ID.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el sello sin texto libre, la sugerencia que no se duplica y el hito con la firma de la sesión
+
+**De dónde sale.** Paso «D sello y sugerencia» de la revisión de la tanda 2: H10, H15, H13, H17 y H8. Los cinco reproducidos con la guardia
+antes de tocar el código (34 rojos en `guardado_seguro_operacion_g16.js`) y los cinco cerrados con la misma guardia en verde.
+
+**Los defectos, en palabras.**
+- **H10 y H15 · el sello guardaba texto clínico libre en el caché.** El sello de operación (la memoria de seis horas que dice «esto ya lo
+  hice») conservaba la `accion` de la respuesta, cortada a 80 caracteres. En el ➕ esa acción ES lo que escribió la kinesióloga
+  (`evento rápido: <la nota, el hallazgo del cultivo, el detalle del procedimiento>`) y, al borrar un anexo, el nombre del anexo. Seis horas de
+  texto clínico en la memoria temporal del script, y la guardia de privacidad (sección 11) solo miraba el ingreso y el guardado de la evolución,
+  con un servicio de juguete: nunca llamó a esas dos puertas de verdad.
+  · **Arreglo.** `accion` y `entidad` salen de `_SELLO_CLAVES`: no se guardan ni acotadas. No hacen falta: la bitácora ya las anotó en la
+  primera respuesta (la repetida no vuelve a auditar) y **ninguna línea de `index.html` lee `.accion` ni `.entidad`** de una respuesta (la
+  guardia lo cuenta: 0). La repetida de ANEXAR_EVENTO y ANULAR_ANEXO sigue trayendo lo que la pantalla usa: `repetida`, la cama, el paciente y la
+  evolución. La regla escrita en el código: una clave nueva en esa lista tiene que ser un ID, jamás un texto que alguien escribió.
+  · **La guardia.** La sección 11b llama a ANEXAR_EVENTO (nota libre, cultivo, procedimiento con detalle) y a ANULAR_ANEXO con un texto
+  CENTINELA ficticio en cada campo libre y exige que no esté en ninguna clave ni valor puestos en el caché (ni lo que el caché devuelve de
+  verdad), ni siquiera las palabras clínicas sueltas. Se probó roja: la nota libre y el nombre del anexo estaban en el caché.
+- **H13 · una respuesta repetida decía «0 ventiladores movidos».** La repetida del lote perdía `total` y la pantalla arma su aviso con
+  `(r&&r.total)||0`: tras un corte de red —el caso para el que existe el sello— decía «0» de un lote que sí se aplicó. **Arreglo en dos
+  puntos:** (1) `total` se sella, pero **solo en MOVER_VENTILADORES_LOTE** (`_SELLO_NUMEROS`, por acción): en EVAL_REGISTRAR `total` es el
+  puntaje de una escala del paciente, un dato clínico, y no va al caché; (2) la pantalla guarda cuántos mandó (`enviados`) y lo usa de respaldo
+  si la respuesta no trae el total (el lote es todo o nada: si contesta ok se aplicaron todos), así que nunca más dice «0». `resumen`
+  (mover uno) ya caía a «Ventilador movido»; `fotoUrl` (registrar una falla) ahora cae a «la foto viajó en este mismo paquete»: si esta llamada la
+  mandó y la respuesta es la repetida, la falla quedó con foto. **No se dejó de sellar esas acciones:** sin sello, un reintento duplicaba la
+  falla (y la foto en Drive) o el movimiento en el libro del equipo.
+- **H17 · GUARDAR_SUGERENCIA se duplicaba con el mismo OP_ID.** No tomaba el candado (así que no pasaba por el sello) y su id era
+  `'SUG_' + Date.now()`: el reintento tras un corte de red insertaba una segunda fila. La guardia no lo veía porque sustituía
+  `guardarSugerencia` por un doble que SÍ tomaba el candado. **Arreglo:** `conLock`, id `uid('SUG', firma|texto)` derivado del OP_ID y del
+  contenido, e insertar solo si la fila no está (con operación en curso; sin OP_ID, como siempre). El mismo OP_ID con el texto editado deja
+  la sugerencia editada, igual que las demás puertas. Y la guardia **ya no sustituye** esa función: los anfitriones del juguete pasaron a
+  PLANTILLA_GUARDAR y PLANTILLA_RETIRAR, y la sección 29 prueba la de verdad (una toma del candado real, una fila con el mismo OP_ID, una fila
+  con el sello evaporado, dos con OP_ID distinto).
+- **H8 · AGREGAR_HITO dejaba elegir el autor y el id.** Armaba `Object.assign({autor: ctx.firma, autorEmail: ctx.email}, datos)`: lo que traía
+  el paquete iba después y pisaba la firma (un hito «de» otra persona), y desde el paso 9 `hito.id` es el `ID_HITO`, así que dos hitos con el
+  mismo `id` dejaban la línea de tiempo con una clave repetida. **Arreglo:** `_hitoDeLaPuerta(datos, ctx)` (api.gs) pone la identidad de la
+  sesión ENCIMA de lo que mande la pantalla y quita `id` e `ID_HITO`. `patientId` se respeta (es el episodio que el candado compara). Con OP_ID
+  el id ya salía derivado; el hueco era SIN OP_ID.
+
+**Rojo visto antes de arreglar.** 34 fallos en `guardado_seguro_operacion_g16.js`: el texto centinela en 8 sitios del caché, `total` ausente
+en la repetida del lote, «✅ 0 ventiladores movidos» ejecutando la función de verdad de la pantalla, la sugerencia con 0 tomas del candado y 2
+filas con el mismo OP_ID, el autor «Otra Persona» en TIMELINE y dos hitos con el mismo `ID_HITO`. Verde después.
+
+**Mutación.** 12 mutantes (poner `accion` de vuelta, `total` global o ausente, sugerencia sin candado / con clave vacía / que siempre inserta,
+el paquete pisando la firma, dejar pasar `id` o `ID_HITO`, el respaldo `||0` del lote, quitar la foto de la repetida): mueren los 12.
+
+**Qué se cambió.**
+- `v2/infra_lock.gs`: `_SELLO_CLAVES` sin `accion` ni `entidad`, `_SELLO_NUMEROS` (por acción) y `_selloDepurar(d, accion)`.
+- `v2/svc_turnos.gs`: `guardarSugerencia` con candado, id derivado e insertar-si-falta.
+- `v2/api.gs`: `_hitoDeLaPuerta` y la puerta AGREGAR_HITO.
+- `v2/index.html`: el aviso del lote (`enviados`) y el «con foto» de la falla repetida.
+- `build/checks/guardado_seguro_operacion_g16.js`: secciones 11 (actualizada: ya no hay `accion`/`entidad` en el sello), 11b y 29; los
+  anfitriones del juguete.
+- `build/checks/ayuda.js`: el arnés le presta `conLock` y `uid` al servicio de sugerencias (lo evalúa solo). Las aserciones no cambiaron.
+- `build/paquete_migracion/*`: los regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre
+  (`paridad_entrega` y `pwa_paquete` están rojas hasta regenerarlos).
+
+### Para no olvidar
+
+- 🪤 **La respuesta repetida ya no trae `accion` ni `entidad`.** Quien en el futuro las lea de una respuesta en la pantalla se encontrará
+  con `undefined` solo en el reintento: la guardia cuenta hoy 0 lecturas y se pondrá roja si aparece una.
+- 🪤 **`total` es un nombre peligroso en el sello:** el mismo nombre es un conteo en el lote y un puntaje clínico en las escalas. Por eso es
+  una tabla POR ACCIÓN. Agregar una acción ahí es una decisión de privacidad, no de comodidad.
+- 🪤 **El anfitrión de un servicio de juguete no puede ser una acción cuyo servicio real se quiere probar.** Eso escondió el hueco de
+  GUARDAR_SUGERENCIA. Si otra acción pasa a sellarse de verdad, se prueba con su función de verdad.
+- 🪤 **El id de una sugerencia cambió de forma** (`SUG_op_…_<huella>` con OP_ID, `SUG_<ms>_<azar>` sin él, antes `SUG_<ms>`). Nadie lo parsea:
+  la pantalla solo lo devuelve en SET_SUGERENCIA_ESTADO, y es seguro para un atributo HTML.
+- 🪤 **La sugerencia con el sello evaporado se reconoce por la fila** (mismo id derivado), no por el caché: cuesta una lectura de la
+  columna de ids, y solo cuando hay OP_ID.
