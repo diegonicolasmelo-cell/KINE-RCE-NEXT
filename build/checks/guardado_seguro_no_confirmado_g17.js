@@ -43,6 +43,15 @@
 //       formulario llevan el MISMO (la identidad es del formulario, no de cada intento). Si otro se adelantó (CONFLICTO) sale EN ROJO,
 //       el formulario, el borrador y el PATIENT_ID se conservan y SOLO se ofrece «Seguir editando»: reintentar mandaría lo mismo y
 //       recibiría lo mismo. Y ese borrador no se restaura sobre el paciente que ocupó la cama. Sobre una cama OCUPADA no se acuña nada.
+//   I · REVISIÓN DE LA TANDA 2, PANTALLA (H21, H29, H22, H30, H24, H32). Seis defectos que dejaron seis revisiones independientes:
+//       · INTERNO (una excepción del servidor) llega DESPUÉS de escrituras parciales: el embudo ya no suelta el OP_ID (el reintento es el
+//         MISMO, converge) y guardar() lo trata como «No confirmado» en ámbar —nunca «NO se guardó»—, con texto llano y el detalle
+//         técnico (lleva el id de la planilla) solo en la consola;
+//       · una sesión de guardado VIEJA no sigue reintentando la foto A tras cerrar y reabrir la misma cama y turno y guardar la B;
+//       · el borrador queda en el aparato desde que se aprieta guardar y en el primer ámbar, no al agotar los reintentos;
+//       · la respuesta «repetida» a un movimiento de stock (efecto aditivo) dice «Ya estaba registrado», no «actualizado»;
+//       · gs() avisa en ámbar «No sabemos si se hizo… es seguro repetirlo» ante una escritura sin respuesta (también el «offline» de
+//         la app instalada, que antes callaba) o con INTERNO, y las puertas con aviso propio no lo repiten en rojo encima.
 //
 // 🪤 RELOJ CONGELADO. El vencimiento de 6 h depende de la hora: `Date` se congela en la página en un día inventado
 // (lunes 10-ago-2026, 11:00; ni Fiestas Patrias, ni cambio de turno, ni cierre de año) y se ADELANTA a mano con
@@ -887,8 +896,8 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
   const CAMA_G = (id, pid, extra) => Object.assign({ ID_CAMA: String(id), OCUPADA: true, PATIENT_ID: pid, NOMBRE: 'Paciente ' + id, EDAD: 61, SEXO: 'M',
     DIAGNOSTICO: 'Dx', COD_PACIENTE: 'C' + id, VIA_AEREA: 'TOT', SOPORTE: 'VM', MODO: 'ACVC', FECHA_INGRESO: '2026-08-05', FECHA_INICIO_SOPORTE: '2026-08-05' }, extra || {});
   // Una página con la cama 2 de P, la 3 de R y la 5 libre (con un PATIENT_ID viejo que la fila conserva: una cama libre no tiene dueño).
-  async function abrirG(camas) {
-    const p = await abrir({ modo: 'gas' });
+  async function abrirG(camas, modo) {
+    const p = await abrir({ modo: modo || 'gas' });
     await p.evaluate(c => {
       window.__toasts = [];
       $('gDate').value = '2026-08-10'; $('gDate').classList.add('turno-hoy'); SHIFT = 'Dia';
@@ -1380,6 +1389,253 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     eq('★ H6 · el guardado siguiente del MISMO formulario reclama el episodio recién creado y ya no lleva PATIENT_ID',
       [ll.length, !!ll[1] && pidOk(pid) && ll[1].datos.EPISODIO_ABIERTO === pid, ll[1] && 'PATIENT_ID' in ll[1].datos], [2, true, false]);
     await p.cerrar();
+  }
+
+  /* ══ I · REVISIÓN DE LA TANDA 2 (pantalla): INTERNO, sesiones viejas, borrador, repetida y gs() ═════════════════════
+     Seis hallazgos de las revisiones adversariales (H21, H29, H22, H30, H24, H32). Cada caso nació ROJO contra la pantalla del paso 15. */
+  console.log('\nI · Revisión de la tanda 2: INTERNO ya no suelta el OP_ID ni dice «NO se guardó»; la sesión vieja no pisa; el borrador sale del primer fallo; la repetida no se disfraza; gs() no afirma lo que no sabe');
+  // Lo que el dispatcher contesta ante una excepción (api.gs: 'Error en X: ' + e.message, código INTERNO). Trae el id de la planilla: la
+  // kinesióloga no tiene por qué leerlo, y NADA de esto puede salir en una pantalla.
+  const TECNICO = 'guardarEvolucion: Exception: Service Spreadsheets timed out while accessing document with id 1AbCdEfGhIjKlMnOpQrStUvWxYz012345PLANILLA';
+  const INTERNO = { tipo: 'rechazo', error: TECNICO, codigo: 'INTERNO' };
+  const sinTecnico = t => !/Spreadsheets|1AbCdEfGh|PLANILLA|Exception/.test(String(t));
+  const toastsDeI = p => p.evaluate(() => [...document.querySelectorAll('#tc .toast')].map(t => ({
+    texto: t.textContent, rojo: t.classList.contains('toast-rojo'), ambar: t.classList.contains('toast-ambar'),
+    fondo: getComputedStyle(t).backgroundColor, color: getComputedStyle(t).color })));
+
+  /* ── I1 · H21/H29 · INTERNO NO suelta el OP_ID: llega después de escrituras parciales, y el reintento tiene que ser el MISMO ── */
+  for (const modo of ['gas', 'http']) {
+    const p = await abrir({ modo });
+    const A = 'ANEXAR_EVENTO';
+    const pq = { idCama: '2', tipo: 'otro', texto: 'intención con INTERNO', EPISODIO_ABIERTO: 'p2' };
+    await regla(p, A, INTERNO, INTERNO, { tipo: 'ok', data: { id: 'z' } });
+    const r1 = await llamar(p, A, pq), r2 = await llamar(p, A, pq), r3 = await llamar(p, A, pq);
+    let ids = opIds(await salidas(p, A));
+    eq('★★ I1 · ' + modo + ': tras INTERNO (dos veces) el reintento lleva el MISMO OP_ID (el servidor pudo escribir a medias; con otro OP_ID se duplicaría)',
+      [r1.codigo, r2.codigo, r3.resuelve, ids.length, mismos(ids)], ['INTERNO', 'INTERNO', true, 3, true]);
+    await regla(p, A, { tipo: 'ok', data: { id: 'w' } });
+    await llamar(p, A, pq);
+    ids = opIds(await salidas(p, A));
+    eq('   …y cuando por fin contesta ok se suelta (la siguiente es una intención nueva)', [ids.length, distintos([ids[2], ids[3]], 2)], [4, true]);
+    await p.cerrar();
+  }
+
+  /* ── I2 · H21/H29 · guardar() con INTERNO: ÁMBAR «No confirmado», nunca rojo; texto llano; el detalle técnico, solo a la consola ── */
+  {
+    const p = await abrirGuardar();
+    const consola = []; p.on('console', m => consola.push(m.text()));
+    await regla(p, GUARDAR, INTERNO, INTERNO, INTERNO, INTERNO);
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    let e = await pantalla(p), ll = await llamadasG(p);
+    eq('★★ I2 · el primer INTERNO deja la franja en ÁMBAR «No confirmado · Reintentando…» (el servidor tropezó: no se sabe qué quedó escrito)',
+      [e.estado, /No confirmado · Reintentando/.test(e.texto), e.modal], ['noconfirmado', true, false]);
+    si('★ …y el aviso habla de un tropiezo del servidor, NO de «Sin respuesta» (sí respondió)',
+      e.toasts.some(t => /tropiezo/i.test(t)) && !e.toasts.some(t => /Sin respuesta del servidor/.test(t)), JSON.stringify(e.toasts));
+    si('★★ …y NADA técnico llega a la kinesióloga: ni en los avisos ni en la franja', sinTecnico([e.toasts.join(' '), e.texto, e.titulo].join(' ')), JSON.stringify([e.toasts, e.texto, e.titulo]));
+    await irA(p, 3.1); ll = await llamadasG(p); e = await pantalla(p);
+    eq('★★ …el segundo INTERNO NO la pasa a rojo: a los 3 s sale el reintento con la MISMA foto y el MISMO OP_ID, y sigue en ámbar',
+      [ll.length, mismaFoto(ll), e.estado], [2, true, 'noconfirmado']);
+    await irA(p, 31); ll = await llamadasG(p); e = await pantalla(p);
+    eq('★★ …y agotados los cuatro envíos queda en ÁMBAR con el cuadro «No confirmado» (nunca «No se guardó»)',
+      [ll.length, mismaFoto(ll), e.estado, e.modal, e.modalTit, /NO se guardó/.test(e.texto)], [4, true, 'noconfirmado', true, 'No confirmado', false]);
+    si('★★ …sin texto técnico en el cuadro, la franja ni los avisos', sinTecnico([e.modalMsg, e.modalTit, e.texto, e.titulo, e.toasts.join(' ')].join(' ')), JSON.stringify([e.modalMsg, e.texto, e.toasts]));
+    si('★ …y el detalle crudo SÍ queda en la consola (para quien depure)', consola.some(t => /Spreadsheets/.test(t)), JSON.stringify(consola.slice(-3)));
+    eq('   …con el formulario, el «sin guardar» y el borrador intactos', [e.planes, e.dirty, e.borrador], [FORM_TXT, true, 1]);
+    await p.evaluate(() => { $('avErrReint').click(); });
+    await p.clock.runFor(50);
+    ll = await llamadasG(p); e = await pantalla(p);
+    eq('   …«Reintentar ahora» manda UN envío más con el mismo OP_ID y, al salir bien, pasa a «Guardado»', [ll.length, mismaFoto(ll), e.estado], [5, true, 'ok']);
+    await p.cerrar();
+  }
+  {
+    // un INTERNO y luego ok: el reintento de los 3 s es el MISMO OP_ID (si el primero escribió a medias, el servidor lo completa sin duplicar)
+    const p = await abrirGuardar();
+    await regla(p, GUARDAR, INTERNO, { tipo: 'ok', data: OK_DATA });
+    await apretar(p);
+    await p.clock.runFor(20); p.t += 20;
+    await irA(p, 3.1); await p.clock.runFor(20);
+    const ll = await llamadasG(p), e = await pantalla(p);
+    eq('★★ I2b · INTERNO y luego ok: el reintento lleva el MISMO OP_ID y la franja termina en «Guardado»', [ll.length, mismaFoto(ll), e.estado], [2, true, 'ok']);
+    await p.cerrar();
+  }
+
+  /* ── I3 · H22 · una sesión VIEJA no sigue reintentando la foto A después de guardar la foto B de la misma cama y turno ── */
+  for (const tipo of ['falla', 'colgado']) {
+    const p = await abrirGuardar('2', 'p2');
+    await llenar(p, 'foto A');
+    await regla(p, GUARDAR, { tipo }, { tipo }, { tipo }, { tipo });
+    await apretar(p);
+    await p.clock.runFor(30);
+    // Se cierra el panel y se reabre la MISMA cama y turno (otro `_panelSeq`); la persona escribe otra cosa y guarda bien.
+    await p.evaluate(() => { _formDirty = false; cerrarPanel(true); });
+    await abrirCama(p, '2', 'p2');
+    await llenar(p, 'foto B');
+    await regla(p, GUARDAR, { tipo: 'ok', data: OK_DATA });
+    await apretar(p);
+    await p.clock.runFor(35000);
+    const ll = await llamadasG(p), e = await pantalla(p);
+    const deA = ll.filter(x => x.datos.PLAN_PLANES === 'foto A'), deB = ll.filter(x => x.datos.PLAN_PLANES === 'foto B');
+    eq('★★ I3 · ' + tipo + ': la foto A se manda UNA vez (su salida original) y sus reintentos de 3, 10 y 30 s ya no salen tras guardar la B', [deA.length, deB.length], [1, 1]);
+    eq('★★ …la ÚLTIMA en llegar al servidor es la foto B (la A no la pisa) y la franja dice «Guardado»', [ll.length > 0 && ll[ll.length - 1].datos.PLAN_PLANES, e.estado], ['foto B', 'ok']);
+    await p.cerrar();
+  }
+
+  /* ── I3b · control: el relevo es por CAMA y TURNO. La sesión de OTRA cama sigue su curso (lo que escribió esa cama sigue sin guardar) ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    await llenar(p, 'foto A');
+    await regla(p, GUARDAR, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' });
+    await apretar(p);
+    await p.clock.runFor(30);
+    await p.evaluate(() => { _formDirty = false; cerrarPanel(true); });
+    await abrirCama(p, '3', 'p3');
+    await llenar(p, 'foto de otra cama');
+    await regla(p, GUARDAR, { tipo: 'ok', data: OK_DATA });
+    await apretar(p);
+    await p.clock.runFor(35000);
+    const ll = await llamadasG(p);
+    const cama2 = ll.filter(x => x.datos.ID_CAMA === '2'), cama3 = ll.filter(x => x.datos.ID_CAMA === '3');
+    eq('I3b · (control) guardar OTRA cama no cancela los reintentos de la cama 2: su reintento de los 3 s sí sale, con la foto A y su mismo OP_ID',
+      [cama2.length >= 2, cama2.every(x => x.datos.PLAN_PLANES === 'foto A'), mismos(opIds(cama2)), cama3.length], [true, true, true, 1]);
+    await p.cerrar();
+  }
+
+  /* ── I4 · H30 · el borrador queda en el aparato desde que se aprieta guardar / desde el PRIMER fallo, no al agotar reintentos ── */
+  for (const tipo of ['falla', 'colgado']) {
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo }, { tipo }, { tipo }, { tipo });
+    await apretar(p);
+    await p.clock.runFor(200); p.t += 200;
+    let e = await pantalla(p), b = await borradorH(p, '2');
+    eq('★★ I4 · ' + tipo + ': a los 0,2 s ya hay UN borrador con lo escrito' + (tipo === 'falla' ? ' (la franja ya está en ámbar)' : ' (todavía «Guardando…», sin respuesta)'),
+      [e.borrador, !!b && !!b.d && (b.d.campos || {}).fPlanes === FORM_TXT, e.estado], [1, true, tipo === 'falla' ? 'noconfirmado' : 'guardando']);
+    await irA(p, 10.1); e = await pantalla(p);
+    eq('   …y a los 10 s sigue ahí (no depende de que se agoten los reintentos)', e.borrador, 1);
+    if (tipo === 'colgado') {
+      await contestar(p, 0, { tipo: 'ok', data: OK_DATA });
+      await p.clock.runFor(20);
+    } else {
+      await irA(p, 31);
+      await p.evaluate(() => { $('avErrReint').click(); });     // el quinto envío tiene la respuesta por defecto: ok
+      await p.clock.runFor(50);
+    }
+    e = await pantalla(p);
+    eq('★ …y al confirmarse el guardado el borrador se limpia', [e.estado, e.borrador], ['ok', 0]);
+    await p.cerrar();
+  }
+
+  /* ── I4b · el primer ámbar REESCRIBE el borrador con lo último que se escribió (no solo el de antes de la llamada) ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' });
+    await p.evaluate(() => { pasoIr(5); });
+    await apretar(p);
+    // mientras la llamada vuela se sigue escribiendo; el «servidor» contesta que no llegó DESPUÉS de esa tecla
+    await p.evaluate(() => { const t = $('fPlanes'); t.value = 'escribí más con la llamada en vuelo'; t.dispatchEvent(new Event('input', { bubbles: true })); });
+    await p.clock.runFor(200);
+    const e = await pantalla(p), b = await borradorH(p, '2');
+    eq('★ I4b · al aparecer el ámbar el borrador ya trae lo último que se escribió (también lo tecleado con la llamada en vuelo)',
+      [e.estado, !!b && !!b.d && (b.d.campos || {}).fPlanes], ['noconfirmado', 'escribí más con la llamada en vuelo']);
+    await p.cerrar();
+  }
+
+  /* ── I5 · H24 · una respuesta «repetida» a una acción de efecto ADITIVO (stock) no se muestra como éxito nuevo ── */
+  {
+    const REPE = 'Ya estaba registrado';
+    const casos = [
+      { n: 'ajuste de stock (AJUSTAR_STOCK)', accion: 'AJUSTAR_STOCK', ok: /Stock actualizado/,
+        correr: () => { stkAbrir('STK-PRUEBA', -1); $('stkDet').value = 'detalle de prueba'; stkAplicar(); } },
+      { n: 'asignar a una cama desde el diálogo (ASIGNAR_STOCK)', accion: 'ASIGNAR_STOCK', ok: /Asignado a la cama 3/,
+        correr: () => { stkAbrirCama('STK-PRUEBA', 3); stkAplicar(); } },
+      { n: 'arrastrar al tablero (ASIGNAR_STOCK)', accion: 'ASIGNAR_STOCK', ok: /actualizado/,
+        correr: () => { stkDropMover('STK-PRUEBA', '', 'CAMA', '3'); } },
+    ];
+    for (const c of casos) {
+      const p = await abrirG();
+      await p.evaluate(() => { STOCK_ALL = [{ id: 'STK-PRUEBA', nombre: 'Filtro HME', cantidad: 10, enUso: 0, disponible: 10, asignacion: {} }]; window.stkCargar = () => {}; });
+      await regla(p, c.accion, { tipo: 'ok', data: { id: 'STK-PRUEBA' } });
+      await p.evaluate(c.correr);
+      await fin(p);
+      let t = (await toastsDeI(p)).map(x => x.texto);
+      si('I5 · (control) ' + c.n + ': la respuesta normal dice que se hizo, y no «ya estaba registrado»', t.some(x => c.ok.test(x)) && !t.some(x => x.indexOf(REPE) > -1), JSON.stringify(t));
+      await p.evaluate(() => { document.getElementById('tc').innerHTML = ''; });
+      await regla(p, c.accion, { tipo: 'ok', data: { id: 'STK-PRUEBA', repetida: true } });
+      await p.evaluate(c.correr);
+      await fin(p);
+      t = (await toastsDeI(p)).map(x => x.texto);
+      si('★★ I5 · ' + c.n + ': la respuesta REPETIDA dice «Ya estaba registrado» (no se sumó otra vez) y NO «actualizado / asignado»',
+        t.some(x => x.indexOf(REPE) > -1) && !t.some(x => c.ok.test(x)), JSON.stringify(t));
+      await p.cerrar();
+    }
+  }
+
+  /* ── I6 · H32 · las escrituras de gs() no afirman lo que no saben: «No sabemos si se hizo» en ámbar, también por la app instalada ── */
+  {
+    const SABER = /No sabemos si se hizo/, SEGURO = /es seguro repetirlo/;
+    const egresar = () => { egreso('2'); $('egDestino').value = 'Domicilio'; const f = $('egFirma'); f.innerHTML = '<option value="KIN">KIN</option>'; f.value = 'KIN'; confirmarEgreso(); _ucFin(true); };
+    for (const caso of [
+      { n: 'DAR_ALTA sin respuesta · dentro de Apps Script', modo: 'gas', r: { tipo: 'falla', mensaje: 'Se agotó el tiempo de espera' } },
+      { n: 'DAR_ALTA sin respuesta · app instalada («offline»: antes no decía NADA)', modo: 'http', r: { tipo: 'falla' } },
+      { n: 'DAR_ALTA con INTERNO (el servidor tropezó, quizá a medias) · con el detalle técnico', modo: 'gas', r: INTERNO },
+    ]) {
+      const p = await abrirG(null, caso.modo);
+      await regla(p, 'DAR_ALTA', caso.r, { tipo: 'ok', data: { patientId: 'pP' } });
+      await p.evaluate(egresar);
+      await p.waitForTimeout(400);
+      const t = await toastsDeI(p);
+      const amb = t.filter(x => SABER.test(x.texto));
+      eq('★★ I6 · ' + caso.n + ': UN aviso «No sabemos si se hizo… es seguro repetirlo»', [amb.length, amb[0] && SEGURO.test(amb[0].texto)], [1, true]);
+      si('★ …en ÁMBAR de tema claro (no en rojo) y sin emojis posteriores a 2019', !!amb[0] && amb[0].ambar === true && amb[0].rojo === false && claro(amb[0].fondo) && !claro(amb[0].color)
+        && [...amb[0].texto].every(c => c.codePointAt(0) < 0x2800 || c === '\uFE0F'), JSON.stringify(amb[0]));   // U+FE0F es el selector de presentación del ⚠ de siempre, no un emoji nuevo
+      si('★ …sin un «❌» que afirme un fallo, y sin texto técnico', !t.some(x => /❌/.test(x.texto)) && t.every(x => sinTecnico(x.texto)), JSON.stringify(t.map(x => x.texto)));
+      const bt = await p.evaluate(() => ({ off: $('egConfBtn').disabled, txt: $('egConfBtn').textContent.trim() }));
+      eq('   …y el botón del diálogo vuelve a quedar disponible para repetir', bt, { off: false, txt: '🏠 Confirmar egreso' });
+      await p.evaluate(() => { confirmarEgreso(); _ucFin(true); });
+      await p.waitForTimeout(300);
+      const ll = await salidas(p, 'DAR_ALTA');
+      eq('   …y repetir lo manda con el MISMO OP_ID (por eso es seguro)', [ll.length, mismos(opIds(ll))], [2, true]);
+      await p.cerrar();
+    }
+    // las puertas que tienen su PROPIO aviso de fallo no lo repiten en rojo encima del ámbar
+    for (const caso of [
+      { n: 'el ➕ (ANEXAR_EVENTO)', accion: 'ANEXAR_EVENTO', correr: () => { evGuardar(); },
+        antes: async p => { await anexarG(p, 'pP'); } },
+      { n: 'la entrega de turno (GUARDAR_ENTREGA_TURNO)', accion: 'GUARDAR_ENTREGA_TURNO', correr: () => { entGuardar(); },
+        antes: async p => { await p.evaluate(() => { ENT_DATA = { fecha: '2026-08-10', turno: 'Dia', resumen: 'x', fichas: [{ idCama: '2' }] }; }); } },
+      { n: 'un ajuste de stock (AJUSTAR_STOCK)', accion: 'AJUSTAR_STOCK', correr: () => { stkAbrir('STK-PRUEBA', -1); stkAplicar(); },
+        antes: async p => { await p.evaluate(() => { STOCK_ALL = [{ id: 'STK-PRUEBA', nombre: 'Filtro HME', cantidad: 10, enUso: 0, disponible: 10, asignacion: {} }]; }); } },
+      { n: 'arrastrar stock al tablero (ASIGNAR_STOCK)', accion: 'ASIGNAR_STOCK', correr: () => { stkDropMover('STK-PRUEBA', '', 'CAMA', '3'); },
+        antes: async p => { await p.evaluate(() => { STOCK_ALL = [{ id: 'STK-PRUEBA', nombre: 'Filtro HME', cantidad: 10, enUso: 0, disponible: 10, asignacion: {} }]; }); } },
+    ]) {
+      const p = await abrirG(null, 'http');
+      await caso.antes(p);
+      await regla(p, caso.accion, { tipo: 'falla' });
+      await p.evaluate(caso.correr);
+      await p.waitForTimeout(400);
+      const t = (await toastsDeI(p)).map(x => x.texto);
+      eq('★ I6 · ' + caso.n + ' sin respuesta: UN solo aviso, el ámbar «No sabemos si se hizo» (no un «❌ offline» ni «No se pudo registrar»)',
+        [t.length, t.length === 1 && SABER.test(t[0])], [1, true]);
+      await p.cerrar();
+    }
+    // lo que NO cambia: una LECTURA sin conexión sigue callada (el sondeo vive reintentando) y una lectura con falla sigue avisando como siempre
+    {
+      const p = await abrirG(null, 'http');
+      await regla(p, 'GET_NOTIFICACIONES', { tipo: 'falla' });
+      await p.evaluate(() => { gs('GET_NOTIFICACIONES', {}, () => {}, () => {}); });
+      await p.waitForTimeout(300);
+      eq('I6 · (control) una LECTURA sin conexión por la app instalada sigue sin avisar (el sondeo no debe llenar la pantalla de toasts)', (await toastsDeI(p)).length, 0);
+      await p.cerrar();
+    }
+    {
+      const p = await abrirG(null, 'gas');
+      await regla(p, 'GET_NOTIFICACIONES', { tipo: 'falla', mensaje: 'boom-de-lectura' });
+      await p.evaluate(() => { gs('GET_NOTIFICACIONES', {}, () => {}, () => {}); });
+      await p.waitForTimeout(300);
+      const t = (await toastsDeI(p)).map(x => x.texto);
+      eq('I6 · (control) una LECTURA que falla dentro de Apps Script avisa como siempre («❌ …») y no inventa «No sabemos si se hizo»', [t.length, /boom-de-lectura/.test(t[0] || ''), t.some(x => SABER.test(x))], [1, true, false]);
+      await p.cerrar();
+    }
   }
 
   eq('sin errores de JavaScript en ningún escenario', errores.filter(e => !/favicon/.test(e)), []);

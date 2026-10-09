@@ -3717,3 +3717,67 @@ Los tres reproducidos antes de tocar nada.
   automático a un re-guardado tiene que preguntarse si el payload nuevo ya trae lo que lo apaga.
 - 🪤 **Quitar la regla de los días no es «volver a como estaba»:** el cálculo de antes bajaba los días al volver a guardar una transición y
   la tanda 2 vive de que un reintento dé lo mismo que la corrida limpia. Si algún día se quita, caen las matrices de muerte de la sección 19.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el error INTERNO ya no duplica ni dice «NO se guardó», y la pantalla no afirma lo que no sabe
+
+**De dónde sale.** Paso «F pantalla: INTERNO y reintentos» de la revisión de la tanda 2: H21, H29, H22, H30, H24 y H32, todos en
+`v2/index.html`. Los seis reproducidos antes de tocar nada (la sección I de `guardado_seguro_no_confirmado_g17.js` nació con 34 fallos
+rojos contra la pantalla del paso 15).
+
+**Los defectos, en palabras.**
+- **H21 y H29 · el error INTERNO se leía como «el servidor dijo que no».** INTERNO es una excepción del servidor, y llega DESPUÉS de las
+  escrituras que alcanzó a hacer (la fila del turno, un hito) y antes de sellar. Pero la pantalla (a) soltaba el OP_ID, así que el
+  reintento salía con uno nuevo y ni el sello ni los ids derivados (`PROC_<op>`, `HITO_<op>_<huella>`, `EVAL_<op>`) reconocían lo escrito a
+  medias: se duplicaba; (b) con dos INTERNO seguidos terminaba en rojo «NO se guardó» aunque el turno ya estuviera escrito; (c) el aviso
+  decía «Sin respuesta del servidor» cuando sí había respondido; y (d) la kinesióloga leía el texto crudo de la excepción, con el id de la
+  planilla.
+  · **Arreglo.** `api()` conserva el OP_ID también con INTERNO (`_opSeConserva`: sin respuesta, LOCK_TIMEOUT e INTERNO; el resto son rechazos
+  definitivos y se sueltan). `_guardadoClase` lo clasifica como «ambiguo»: ÁMBAR «No confirmado», reintento con el mismo OP_ID, y nunca rojo.
+  El aviso dice «El servidor tuvo un tropiezo — reintentando…» (el de «Sin respuesta» queda solo para cuando de verdad no contestó), y el
+  detalle técnico va a la consola (`console.warn`), no a la pantalla. «No se pudo comprobar tu sesión» (también INTERNO) sigue siendo
+  «reintentable»: la identidad se mira antes de ejecutar, ahí sí se sabe que no se hizo.
+- **H22 · una sesión de guardado vieja seguía reintentando la foto A tras cerrar y reabrir el panel.** `_guardadoIniciar` solo relevaba a la
+  sesión del MISMO `_panelSeq`, y cerrar y reabrir lo cambia. La persona guardaba la foto B y a los 3, 10 y 30 s llegaba la A con su OP_ID viejo;
+  el servidor no tiene orden de versión y la última en llegar gana: se perdía lo último que escribió, sin aviso. Ahora cada sesión nueva
+  releva a las vivas de su misma cama y turno (`_guardadosVivos`, por `clave`); las de OTRA cama siguen su curso (control I3b).
+  · El «guardado exitoso cancela a las anteriores» que pedía el hallazgo no se programó: el único camino que manda GUARDAR_EVOLUCION es
+  `_guardadoIniciar`, y quien termina bien ya relevó a las anteriores al nacer.
+- **H30 · el borrador se guardaba tarde.** Con el ámbar con reintentos pendientes no había borrador hasta los 30 s (o los 45 s si el servidor
+  no contestaba nada): si el sistema mataba la pestaña en ese rato (en el celular, al cambiar de aplicación; `beforeunload` no corre), se
+  perdía la evolución entera. Ahora el borrador sale ANTES de la llamada y se reescribe en el primer ámbar con lo último que se escribió; se
+  borra solo al confirmarse. 🪤 Al escribirlo antes apareció un choque que el rojo de `H4` cazó: la llave del borrador es cama y turno, y el
+  borrador de un ingreso rechazado por CONFLICTO (trabajo de otra persona, G15) vive bajo la misma llave que la evolución del ocupante nuevo.
+  El borrador de antes de la llamada NO pisa el de otro paciente (`_borradorGuardar(true)`, por `ep`); el del ámbar y el del rechazo escriben
+  siempre, como antes.
+- **H24 · un movimiento de stock idéntico a uno sin respuesta se mostraba como éxito nuevo.** El OP_ID de un envío sin respuesta vive 6 h y
+  una acción idéntica reutiliza el mismo; el servidor contesta «repetida» sin sumar y la pantalla decía «✅ actualizado». **Lo mínimo
+  seguro:** NO se acortó la vida del OP_ID (son justo esas horas las que reconocen el reintento tardío de un movimiento que SÍ aterrizó; con
+  15 min ese reintento duplicaría el stock). Lo que cambió es lo que se le dice: una respuesta repetida a AJUSTAR_STOCK o ASIGNAR_STOCK (el
+  diálogo, la cama y el arrastre del tablero) dice «Ya estaba registrado: ese mismo movimiento ya se había hecho antes y no se repitió.
+  Revisa el stock.» y no «✅ …».
+- **H32 · las escrituras de `gs()` no usaban el contrato nuevo.** Ante falta de respuesta decían «❌ <texto crudo>» o, por la app instalada
+  («offline», que `gs()` callaba), NADA: el botón volvía a su rótulo y la persona no sabía si el egreso había quedado hecho. Ahora una
+  escritura de la lista `_ACC_ESCRITURA` que falla sin respuesta o con INTERNO avisa en ÁMBAR (toast nuevo `toast-ambar`, tema claro):
+  «No sabemos si se hizo. Revisa la cama; si no está hecho, vuelve a intentarlo: es seguro repetirlo.» (el embudo conserva el OP_ID, así que
+  repetir con el mismo contenido es lo que dice). Las lecturas sin conexión siguen calladas (el sondeo vive reintentando). `fail` recibe
+  ahora un segundo argumento, el `Error`, y las puertas con aviso propio (el ➕, la entrega de turno, el stock, el ventilador desde
+  prevención, la falla de un equipo) no repiten un «❌» en rojo encima del ámbar.
+
+**Qué se cambió.**
+- `v2/index.html`: `api()`/`_opSeConserva`, `_guardadoClase`, `_guardadoIniciar` (`_guardadosVivos`, `avisarReintento`, borrador), `_borradorGuardar`,
+  `gs()`/`_escrituraDudosa`, `toast()` con tono ámbar, `_stkRepetida` y los cinco avisos de fallo propios.
+- `build/checks/guardado_seguro_no_confirmado_g17.js`: sección I (I1 a I6, con controles I3b y I4b); `abrirG` acepta el camino (gas o http).
+  Ocho mutantes (soltar el OP_ID con INTERNO, INTERNO como reintentable, no relevar por cama y turno, el borrador de antes de la llamada,
+  el de reescribir en el ámbar, no pisar el ajeno, la repetida disfrazada, gs() sin INTERNO) mueren.
+- `build/paquete_migracion/index.html`: lo regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre.
+
+### Para no olvidar
+
+- 🪤 **«El servidor respondió» no es «el servidor no lo hizo».** Un código de error no dice si hubo escrituras antes: INTERNO es ambiguo igual
+  que la falta de respuesta. Solo VALIDACION, CONFLICTO, NO_AUTORIZADO, NO_ENCONTRADO y LOCK_TIMEOUT dicen «no se hizo».
+- 🪤 **Un reintento con otro OP_ID es una operación nueva.** Cualquier camino que suelte el OP_ID antes de saber (un `catch` que limpia el
+  mapa) vuelve a abrir la puerta del duplicado.
+- 🪤 **El borrador es por cama y turno, no por paciente.** Todo lo que lo escriba antes de saber si el guardado resultó tiene que preguntarse
+  de quién es el que ya está ahí.
+- **Queda del lado del servidor** (no es de este paso): rechazar un reintento rezagado cuyo momento de apertura es anterior al último
+  guardado del turno (el complemento que propuso H22), para el aparato que se cayó y volvió, o para la llamada original que sigue en la red.

@@ -1252,6 +1252,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* 🔴 El servidor RECHAZÓ por cambio de paciente o por CONFLICTO (tanda 2, paso 14): no es un tropiezo cualquiera, es que la
    pantalla iba a actuar sobre quien ya no estaba. Mismos tonos claros que «No se guardó» (`_EST_TONOS.error`). */
 .toast.toast-rojo{background:#fee2e2;color:#991b1b;border-left-color:#dc2626;}
+/* ⚠ ÁMBAR = «no sabemos» (revisión de la tanda 2, H32): una escritura cuya respuesta no llegó pudo haberse hecho o no. Mismos tonos
+   claros que «No confirmado» (`_EST_TONOS.noconfirmado`): el rojo es solo de lo que SE SABE que falló. */
+.toast.toast-ambar{background:#fef3c7;color:#92400e;border-left-color:#f59e0b;}
 @keyframes tin{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
 
 /* TEXTO */
@@ -5888,8 +5891,15 @@ function _enAppsScript() {
        intención. Contenido distinto es una intención nueva.
      · Se SUELTA solo cuando el servidor RESPONDE (ok o rechazo definitivo): lo
        que se vuelva a mandar igual después es otra intención. Con LOCK_TIMEOUT
-       («no se ejecutó») o sin respuesta NO se suelta: el reintento va con el
-       mismo.
+       («no se ejecutó»), sin respuesta o con INTERNO NO se suelta: el reintento
+       va con el mismo.
+       🪤 INTERNO es una EXCEPCIÓN del servidor, no un «no»: llega DESPUÉS de las
+       escrituras que ya alcanzó a hacer (una fila de EVOLUCIONES, un hito) y antes
+       de sellar. Soltar el OP_ID ahí hacía que el reintento saliera con uno nuevo,
+       que ni el sello ni los ids derivados (PROC_<op>, HITO_<op>_<huella>,
+       EVAL_<op>) reconocen: lo escrito a medias se duplicaba (revisión de la
+       tanda 2, H21 y H29). Un INTERNO que se repite no daña: sin sello, el
+       servidor vuelve a evaluar lo mismo y lo completa.
      · Vive en memoria y en localStorage ('rce_ops', vence a las 6 h, lo que
        dura el sello en el servidor), SIEMPRE en try/catch: sin almacenamiento
        (ventana privada, cuota llena) la pantalla funciona igual con la memoria
@@ -5926,8 +5936,17 @@ function api(accion, datos) {
   const vuelo = _enAppsScript() ? _apiGas(accion, op.paquete) : _apiHttp(accion, op.paquete);
   return vuelo.then(
     r => { _opSoltar(op); return r; },
-    e => { if (!(e && (e.sinRespuesta || e.codigo === 'LOCK_TIMEOUT'))) _opSoltar(op); throw e; }
+    e => { if (!_opSeConserva(e)) _opSoltar(op); throw e; }
   );
+}
+/* ¿Tras este error el servidor NO dijo definitivamente «no se hizo»? Entonces la intención sigue viva y el reintento lleva el MISMO OP_ID:
+     · sin respuesta  — el primer intento pudo haber aterrizado;
+     · LOCK_TIMEOUT   — «no se ejecutó» (no hubo candado): reintentar con el mismo no daña;
+     · INTERNO        — una excepción que pudo llegar después de escrituras parciales (H21/H29): el reintento con el mismo OP_ID
+                        converge, con uno nuevo se duplica.
+   Todo lo demás (VALIDACION, CONFLICTO, NO_AUTORIZADO, NO_ENCONTRADO) es un rechazo que el servidor dio antes de escribir: se suelta. */
+function _opSeConserva(e) {
+  return !!e && (e.sinRespuesta === true || e.codigo === 'LOCK_TIMEOUT' || e.codigo === 'INTERNO');
 }
 
 /* Un `Error` que dice QUÉ respondió el servidor. Dos fábricas y nada más: así no
@@ -6141,13 +6160,40 @@ function _sesionCoordCortada(msg) {
   return !_SES_SIN_COMPROBAR_RE.test(msg) && /sesión/i.test(msg);
 }
 
+/* ══ UNA ESCRITURA QUE NO SABEMOS SI SE HIZO — gs() no afirma lo que no sabe ═══════════════════════════════════
+   (revisión de la tanda 2, H32 y H29). Las puertas que escriben por `gs()` (egreso, anular, anexar, mover, entrega de turno, stock…)
+   no usaban el contrato nuevo del embudo: ante una falta de respuesta decían «❌ <texto crudo>» —una certeza que no tenían, porque el
+   primer intento pudo haber aterrizado— o no decían NADA (`gs()` callaba el mensaje «offline», que es justo lo que entrega la app
+   instalada: el botón volvía a su rótulo y la persona no sabía si había quedado hecho). Con INTERNO pasaba lo mismo y además se leía el
+   texto de la excepción, con el id de la planilla.
+
+   Una escritura de la lista `_ACC_ESCRITURA` cuya falla es de esas (`e.sinRespuesta`, o INTERNO) avisa en ÁMBAR que no se sabe y que
+   repetir es seguro (el embudo conserva el OP_ID: si había aterrizado, el servidor lo reconoce y no la repite). Una LECTURA sin conexión
+   sigue callada: el sondeo vive reintentando y llenaría la pantalla de avisos. El detalle técnico de un INTERNO queda en la consola.
+   🪤 «No se pudo comprobar tu sesión» (INTERNO) NO cuenta: la identidad se mira ANTES de ejecutar nada, así que ahí sí se sabe que no
+   se hizo (`_SES_SIN_COMPROBAR_RE`, igual que `_guardadoClase`).
+   Guardia: guardado_seguro_no_confirmado_g17.js (sección I). */
+const _AVISO_SIN_SABER = 'No sabemos si se hizo. Revisa la cama; si no está hecho, vuelve a intentarlo: es seguro repetirlo.';
+function _escrituraDudosa(accion, e) {
+  if (!e || _ACC_ESCRITURA.indexOf(accion) === -1) return false;
+  if (_SES_SIN_COMPROBAR_RE.test(String(e.message || ''))) return false;
+  return e.sinRespuesta === true || e.codigo === 'INTERNO';
+}
+
 //  GAS CALL — misma firma que v1, sobre el API v2
+//  `fail(msg, e)`: el segundo argumento es el `Error` del embudo, para quien tiene SU PROPIO aviso de fallo y no debe repetir en rojo
+//  lo que `gs()` ya dijo en ámbar (ver `_escrituraDudosa`).
 function gs(accion, datos, ok, fail) {
   api(accion, datos).then(d => { if (ok) ok(d); }).catch(e => {
     const msg = (e && e.message) || String(e);
     // Token GIS expirado a mitad de sesión → pedir re-login sin perder la vista
-    if (!_sesionCortadaALaEntrada(msg, msg) && msg !== 'offline') toastError(e);
-    if (fail) fail(msg);
+    if (_sesionCortadaALaEntrada(msg, msg)) { /* ya fue a la puerta */ }
+    else if (_escrituraDudosa(accion, e)) {
+      if (e.codigo === 'INTERNO') console.warn('[' + accion + '] el servidor devolvió INTERNO:', msg);   // el detalle crudo, solo para quien depure
+      toast('⚠️ ' + _AVISO_SIN_SABER, 9000, 'ambar');
+    }
+    else if (msg !== 'offline') toastError(e);
+    if (fail) fail(msg, e);
   });
 }
 
@@ -6436,7 +6482,7 @@ function loading(on, msg='Cargando...') {
 }
 function toast(msg, t=3200, tono) {
   const c=$('tc'), el=document.createElement('div');
-  el.className='toast'+(tono==='rojo'?' toast-rojo':''); el.textContent=msg; c.appendChild(el);
+  el.className='toast'+(tono==='rojo'?' toast-rojo':(tono==='ambar'?' toast-ambar':'')); el.textContent=msg; c.appendChild(el);
   setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
 }
 /* ❌ El aviso de un RECHAZO del servidor, en las puertas que actúan sobre «quien esté en la cama» (paso 14). Un error cualquiera
@@ -7316,7 +7362,7 @@ function prevVMelegir(){
       prevVMpintar(); prevPintar();
       toast('🔧 ' + x.nombre + ' asignado a la cama ' + cama);
       if(typeof recargarSilencioso === 'function') recargarSilencioso();
-    }, m => { toast('❌ No se pudo asignar: ' + (m || 'sin conexión')); prevVMpintar(); });
+    }, (m, e) => { if(!_escrituraDudosa('MOVER_VENTILADOR', e)) toast('❌ No se pudo asignar: ' + (m || 'sin conexión')); prevVMpintar(); });
   };
   if(enOtra){
     uiConfirm({ icono:'🔧', titulo:'Ese ventilador está en otra cama',
@@ -8309,10 +8355,19 @@ function _borradorEstado(){
   };
 }
 
-function _borradorGuardar(){
+/* `noPisarAjeno` (H30): el borrador que sale ANTES de la llamada de guardar no le quita su lugar al de OTRO paciente. La llave es cama y
+   turno y no dice quién (`ep` sí): tras un rechazo por cambio de paciente o CONFLICTO, el borrador de quien perdió la cama sigue bajo
+   esa llave (es trabajo de alguien, G14/G15) y guardar la evolución del ocupante NUEVO no puede borrarlo solo por apretar el botón. Sin
+   la bandera se escribe siempre, como antes: lo hacen el primer ámbar, el rechazo y «cerrar conservando». */
+function _borradorGuardar(noPisarAjeno){
   try{
     const id=$('cBed')?.value||''; if(!id) return false;
-    localStorage.setItem(_borradorLlave(id), JSON.stringify(_borradorEstado()));
+    const llave=_borradorLlave(id);
+    if(noPisarAjeno){
+      let d=null; try{ d=JSON.parse(localStorage.getItem(llave)||'null'); }catch(e){ d=null; }
+      if(d && !_borradorEsDe(d, _episodioAbierto)) return false;
+    }
+    localStorage.setItem(llave, JSON.stringify(_borradorEstado()));
     return true;
   }catch(e){ console.warn('borrador no guardado', e && e.name); return false; }
 }
@@ -10633,17 +10688,22 @@ function guardar() {
        sin respuesta lo dice; la llamada original sigue VIVA, y si su respuesta llega tarde corrige el estado (un éxito
        tardío pasa a «Guardado», un rechazo tardío a «No se guardó»). Agotados los reintentos se queda en ámbar: nunca pasa a
        «No se guardó» ni a «Guardado» por su cuenta;
-     · el servidor contestó «ahora no» (LOCK_TIMEOUT, un fallo interno, «No se pudo comprobar tu sesión») o el error no
-       salió del embudo: lo de siempre, un reintento a los 3 s y, si vuelve a pasar, «No se guardó».
+     · el servidor contestó «ahora no» (LOCK_TIMEOUT, «No se pudo comprobar tu sesión») o el error no salió del embudo: lo de
+       siempre, un reintento a los 3 s y, si vuelve a pasar, «No se guardó»;
+     · el servidor TROPEZÓ (INTERNO, una excepción): también ÁMBAR, igual que si no hubiera contestado. 🪤 Una excepción llega
+       DESPUÉS de las escrituras que alcanzó a hacer (la fila del turno, un hito) y antes de sellar: decir «NO se guardó» era una
+       certeza falsa (el turno podía estar escrito) y reintentar con otro OP_ID lo duplicaba (revisión de la tanda 2, H21 y H29). Se
+       dice en lenguaje llano, sin el texto de la excepción —lleva el id de la planilla—, que queda solo en la consola.
 
    🪤 Una sola llamada en vuelo por panel: un segundo toque o un Enter devuelven la MISMA promesa. Es comodidad, no defensa:
    el servidor valida igual con el sello y el OP_ID. Y lo escrito mientras la llamada volaba NO se da por guardado: al
    confirmarse solo se limpia «sin guardar» y se borra el borrador si el formulario no cambió desde la foto (`_formRev`).
    Guardia: guardado_seguro_no_confirmado_g17.js (sección F). */
 
-/* ¿Qué le pasó a UN intento? 'ambiguo' = no hubo respuesta; 'rechazo' = el servidor contestó que no y reenviar lo mismo
-   recibe lo mismo; 'reintentable' = el servidor contestó «ahora no» (LOCK_TIMEOUT es «no se ejecutó»; INTERNO es un
-   tropiezo de Sheets, la causa más común) o es un Error SIN bandera —no sale del embudo: un fallo de la propia pantalla o un
+/* ¿Qué le pasó a UN intento? 'ambiguo' = no se sabe si se hizo: no hubo respuesta, o el servidor TROPEZÓ (INTERNO: una excepción
+   que pudo llegar tras escrituras parciales, H21/H29); 'rechazo' = el servidor contestó que no y reenviar lo mismo recibe lo
+   mismo; 'reintentable' = el servidor contestó «ahora no» y se sabe que no se ejecutó (LOCK_TIMEOUT; «No se pudo comprobar tu
+   sesión», que se mira ANTES de ejecutar) o es un Error SIN bandera —no sale del embudo: un fallo de la propia pantalla o un
    banco de pruebas—, que conserva lo que siempre se hizo con él: un reintento a los 3 s. */
 function _guardadoClase(e){
   const m=(e&&e.message)||String(e||'');
@@ -10653,7 +10713,8 @@ function _guardadoClase(e){
   if(_EP_CAMBIO_RE.test(m)) return 'rechazo';
   if(_SES_SIN_COMPROBAR_RE.test(m)) return 'reintentable';
   if(e && e.sinRespuesta) return 'ambiguo';
-  if(e && e.codigo && e.codigo!=='LOCK_TIMEOUT' && e.codigo!=='INTERNO') return 'rechazo';
+  if(e && e.codigo==='INTERNO') return 'ambiguo';
+  if(e && e.codigo && e.codigo!=='LOCK_TIMEOUT') return 'rechazo';
   return 'reintentable';
 }
 
@@ -10667,13 +10728,23 @@ function _guardadoBotones(enVuelo, rotulo){
   if(PASO_ACTUAL===1 && typeof prevAvanceUI==='function') prevAvanceUI(); else a.disabled=false;
 }
 
+/* Las intenciones de guardado VIVAS de cualquier panel (revisión de la tanda 2, H22). Una sesión que se quedó en ámbar sigue
+   reintentando su foto a los 3, 10 y 30 s aunque se haya cerrado el panel, y eso es lo que se quiere con OTRA cama (lo que escribió
+   esa cama sigue sin guardar). Pero con la MISMA cama y el MISMO turno no: si la persona cierra, reabre, escribe otra cosa y guarda,
+   el reintento tardío de la foto vieja llegaba DESPUÉS, el servidor no tiene orden de versión y la última en llegar gana: se perdía lo
+   último que escribió, sin ningún aviso. Cada sesión nueva releva a las vivas de su misma cama y turno (`clave`). */
+const _guardadosVivos = new Set();
+
 function _guardadoIniciar(foto, id, tkey){
+  const clave=String(id)+'|'+String(tkey);
   // Otra intención en este MISMO panel releva a la anterior (el formulario es uno). Las de OTROS paneles siguen su curso:
-  // lo que escribió esa cama sigue sin guardar y sus reintentos no tienen por qué morir porque se abrió otra.
+  // lo que escribió esa cama sigue sin guardar y sus reintentos no tienen por qué morir porque se abrió otra… salvo que sean de
+  // la misma cama y turno que esta: esa foto ya no es lo último que se escribió.
   if(_sesionGuardado && _sesionGuardado.seq===_panelSeq) _sesionGuardado.cancelar();
+  [..._guardadosVivos].forEach(o=>{ if(o.clave===clave) o.cancelar(); });
   const ctx={ id:String(id), tkey:tkey, seq:_panelSeq, rev:_formRev, ep:foto.EPISODIO_ABIERTO };
-  const S={ seq:_panelSeq, cancelada:false, cerrado:false, cancelar:null };
-  _sesionGuardado=S;
+  const S={ seq:_panelSeq, clave:clave, cancelada:false, cerrado:false, cancelar:null };
+  _sesionGuardado=S; _guardadosVivos.add(S);
 
   let hecho=false;                 // ya se aplicó un éxito: las respuestas repetidas de los demás intentos no se aplican otra vez
   let rechazada=false;             // el servidor contestó que no (un éxito tardío todavía lo corrige)
@@ -10691,13 +10762,13 @@ function _guardadoIniciar(foto, id, tkey){
 
   const liberar=como=>{ if(_guardadoVuelo===vuelo) _guardadoVuelo=null; vuelo.soltar(como); };
   const apagar=()=>{ timers.forEach(clearTimeout); timers.length=0; quedan=0; if(esperaT){ clearTimeout(esperaT); esperaT=null; } };
-  S.cancelar=()=>{ S.cancelada=true; apagar(); liberar('relevada'); };
+  S.cancelar=()=>{ S.cancelada=true; _guardadosVivos.delete(S); apagar(); liberar('relevada'); };
   /* ¿La pantalla sigue siendo la de esta intención? Si se cerró el panel, se abrió otro o se cambió de cama, la respuesta
      NO toca el formulario, la franja ni los botones de lo que haya delante: solo avisa y refresca el censo. */
   const vigente=()=>!S.cerrado && ctx.seq===_panelSeq && String(v('cBed'))===ctx.id;
 
   const exito=r=>{
-    hecho=true; apagar(); liberar('ok');
+    hecho=true; _guardadosVivos.delete(S); apagar(); liberar('ok');
     const vig=vigente();
     const cambio=_formRev!==ctx.rev;     // se escribió algo mientras la llamada volaba
     const avisos=(r && Array.isArray(r.advertencias)) ? r.advertencias.filter(Boolean).map(String) : [];
@@ -10782,16 +10853,27 @@ function _guardadoIniciar(foto, id, tkey){
     }
     _cerrarTrasGuardar=false;
     _reintentoGuardado=reintentarAhora;
+    /* H30 · el borrador queda en el aparato desde el PRIMER ámbar, con lo último que se escribió, y no recién al agotar los
+       reintentos (30 s) o a los 45 s: en ese rato el sistema puede matar la pestaña o suspender la app (`beforeunload` no corre) y
+       la evolución entera se perdía. Al confirmarse el guardado el borrador se borra solo (`exito`). */
+    _borradorGuardar();
     _marcaNoConfirmado(hayMas);
     if(hayMas){
       _guardadoBotones(true,'⏳ Reintentando…');
-      if(!avisadoReint){ avisadoReint=true; toast('⚠️ Sin respuesta del servidor — reintentando…'); }
+      avisarReintento();
       return;
     }
     _guardadoBotones(false,'💾 Guardar Evolución');
     liberar('espera');
-    _borradorGuardar();
     if(!avisadoModal){ avisadoModal=true; avisoNoConfirmado(); }
+  };
+
+  /* El aviso de «reintentando», una vez por ronda. 🪤 Dice lo que pasó: si el servidor NO contestó, «Sin respuesta»; si contestó
+     «ahora no» o tropezó (INTERNO, LOCK_TIMEOUT), «sin respuesta» sería falso. Sin el texto de la excepción, que lleva el id de la
+     planilla (H29). */
+  const avisarReintento=()=>{
+    if(avisadoReint) return; avisadoReint=true;
+    toast(ultimo.tipo==='servidor' ? '⚠️ El servidor tuvo un tropiezo — reintentando…' : '⚠️ Sin respuesta del servidor — reintentando…');
   };
 
   const evaluar=()=>{
@@ -10807,7 +10889,7 @@ function _guardadoIniciar(foto, id, tkey){
     // Solo «ahora no» del servidor: todavía no hay nada que afirmar, pero sí que se reintenta.
     _guardadoBotones(true,'⏳ Reintentando…');
     _estadoGuardado('guardando','⏳ Reintentando…');
-    if(!avisadoReint){ avisadoReint=true; toast('⚠️ Sin respuesta del servidor — reintentando…'); }
+    avisarReintento();
   };
 
   const alExito=r=>{ if(S.cancelada || hecho) return; exito(r); };
@@ -10823,6 +10905,7 @@ function _guardadoIniciar(foto, id, tkey){
     // manda lo mismo y recibe lo mismo, y mientras tanto el aviso diría «sin respuesta».
     if(clase==='rechazo'){ falloFinal(m, 'servidor', e&&e.codigo); return; }
     ultimo={ m:m, tipo:(e&&e.codigo)?'servidor':'red' };
+    if(clase==='ambiguo' && e && e.codigo==='INTERNO') console.warn('guardar: el servidor devolvió INTERNO (detalle solo para quien depure):', m);
     if(clase==='ambiguo') ambiguos++;
     else {
       reintentables++;
@@ -10856,6 +10939,10 @@ function _guardadoIniciar(foto, id, tkey){
 
   // ── la primera salida ──
   _reintentoGuardado=null;
+  /* H30 · el borrador sale ANTES que la llamada: si el servidor tarda y el sistema mata la pestaña a mitad de la espera (en el
+     celular, al cambiar de aplicación), lo escrito sigue en el aparato. Si el guardado confirma, `exito` lo borra. No pisa el
+     borrador de otro paciente bajo la misma cama y turno (ver `_borradorGuardar`). */
+  _borradorGuardar(true);
   _guardadoBotones(true,'⏳ Guardando...');
   _estadoGuardado('guardando','⏳ Guardando…');
   toast('💾 Guardando en servidor...');
@@ -15908,7 +15995,7 @@ function evGuardar(){
       // El sello se pinta SOLO (24-ago-2026): sin esto, lo anexado no se veía
       // hasta recargar la página, la gente reintentaba y quedaban KTM dobles.
       recargarSilencioso();
-    }, e=>{ b.disabled=false; b.textContent='💾 Guardar'; toast('❌ '+e); });
+    }, (m,err)=>{ b.disabled=false; b.textContent='💾 Guardar'; if(!_escrituraDudosa('ANEXAR_EVENTO',err)) toast('❌ '+m); });   // dudosa: `gs()` ya avisó en ámbar
   };
   // El duplicado se frena ANTES de nacer — con aviso, nunca con bloqueo: dos
   // KTM reales en un mismo turno son legítimas.
@@ -20130,8 +20217,8 @@ function stkDragStart(ev){
    los ventiladores con nombre, que siguen pasando por su confirmación. */
 function stkDropMover(id, desde, tipo, det){
   const x=stkItem(id); if(!x) return;
-  const fin=()=>{ toast('✅ '+x.nombre+' actualizado'); stkCargar(); };
-  const errF=m=>toast('No se pudo registrar: '+(m||''));
+  const fin=r=>{ toast(_stkRepetida(r) || '✅ '+x.nombre+' actualizado', _stkRepetida(r)?7000:undefined); stkCargar(); };
+  const errF=(m,e)=>{ if(!_escrituraDudosa('ASIGNAR_STOCK',e)) toast('No se pudo registrar: '+(m||'')); };
   if(tipo==='CAMA'&&det&&!desde){
     if(!(x.disponible>0)){ toast('No quedan '+x.nombre+' disponibles.'); return; }
     gs('ASIGNAR_STOCK',{id:id,idCama:String(det),delta:1,detalle:'Arrastre en tablero',fecha:v('gDate')||hoy()},fin,errF);
@@ -20210,15 +20297,23 @@ function stkAplicar(){
     if(signo>0 && n>x.disponible){ toast('Solo hay '+x.disponible+' disponible(s).'); return; }
     if(signo<0 && n>enCama){ toast('La cama '+cama+' tiene '+enCama+'.'); return; }
     gs('ASIGNAR_STOCK',{id:x.id,idCama:cama,delta:signo*n,detalle:v('stkDet'),fecha:v('gDate')||hoy()},
-      ()=>{ stkCerrar(); toast(signo>0?'✅ Asignado a la cama '+cama:'✅ Devuelto a disponible'); stkCargar(); },
-      msg=>toast('No se pudo registrar: '+(msg||'')));
+      r=>{ stkCerrar(); toast(_stkRepetida(r) || (signo>0?'✅ Asignado a la cama '+cama:'✅ Devuelto a disponible'), _stkRepetida(r)?7000:undefined); stkCargar(); },
+      (msg,e)=>{ if(!_escrituraDudosa('ASIGNAR_STOCK',e)) toast('No se pudo registrar: '+(msg||'')); });
     return;
   }
   if(x.cantidad+signo*n<0){ toast('No puedes sacar más de lo que hay ('+x.cantidad+').'); return; }
   if(signo<0 && x.cantidad-n<x.enUso){ toast('Hay '+x.enUso+' en camas: devuélvelos antes.'); return; }
   gs('AJUSTAR_STOCK',{id:x.id,delta:signo*n,motivo:v('stkMotivo'),detalle:v('stkDet'),fecha:v('gDate')||hoy()},
-    ()=>{ stkCerrar(); toast('✅ Stock actualizado'); stkCargar(); },
-    msg=>toast('No se pudo registrar: '+(msg||'')));
+    r=>{ stkCerrar(); toast(_stkRepetida(r) || '✅ Stock actualizado', _stkRepetida(r)?7000:undefined); stkCargar(); },
+    (msg,e)=>{ if(!_escrituraDudosa('AJUSTAR_STOCK',e)) toast('No se pudo registrar: '+(msg||'')); });
+}
+/* El stock SUMA y RESTA: es la acción de efecto ADITIVO por excelencia (revisión de la tanda 2, H24). Un movimiento idéntico a uno cuya
+   respuesta nunca llegó reutiliza su OP_ID —así se reconoce el reintento de un éxito perdido— y el servidor lo contesta «repetida» SIN
+   volver a sumar. Si la persona de verdad quería hacerlo otra vez (mismo ítem, misma cantidad, mismo detalle y fecha), decirle «✅
+   actualizado» sería mentirle: no se movió nada. Se dice lo que pasó. (No se acortó la vida del OP_ID: son justo esas horas las que dejan
+   reconocer el reintento tardío de un movimiento que SÍ aterrizó.) Devuelve el aviso, o '' si la respuesta es una normal. */
+function _stkRepetida(r){
+  return (r && r.repetida===true) ? 'ℹ️ Ya estaba registrado: ese mismo movimiento ya se había hecho antes y no se repitió. Revisa el stock.' : '';
 }
 function stkHistorial(id){
   const x=stkItem(id); if(!x) return;
@@ -20523,7 +20618,7 @@ async function vmFallaRegistrar(){
     $('vmFallaDesc').value=''; $('vmFallaFoto').value=''; $('vmFallaFotoNom').textContent='sin foto';
     $('vmfEstado').value='Con falla';
     vmFallasCargar(idVm); vmCargar&&vmCargar();
-  }, e=>{ fin(); toast('❌ '+e); });
+  }, (m,err)=>{ fin(); if(!_escrituraDudosa('REGISTRAR_FALLA_VM',err)) toast('❌ '+m); });   // dudosa: `gs()` ya avisó en ámbar
 }
 function vmFallasCargar(idVm){
   const l=$('vmFallasLista'); if(!l) return;
@@ -23038,7 +23133,7 @@ function entGuardar(){
   const b=$('entSaveBtn'); b.disabled=true; b.textContent='⏳ Guardando…';
   gs('GUARDAR_ENTREGA_TURNO',payload,
     ()=>{ toast('💾 Entrega guardada en historial'); b.textContent='💾 Guardar'; b.disabled=false; },
-    e=>{ toast('❌ '+e); b.textContent='💾 Guardar'; b.disabled=false; });
+    (m,err)=>{ if(!_escrituraDudosa('GUARDAR_ENTREGA_TURNO',err)) toast('❌ '+m); b.textContent='💾 Guardar'; b.disabled=false; });   // dudosa: `gs()` ya avisó en ámbar
 }
 
 try{ document.documentElement.dataset.masc = (localStorage.getItem('rce_mascota')==='persona'?'persona':'servi'); }catch(e){ document.documentElement.dataset.masc='servi'; }
