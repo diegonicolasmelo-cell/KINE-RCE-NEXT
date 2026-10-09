@@ -147,6 +147,43 @@ function _sincronizarTimelineCama(idCama) {
   } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); return false; }
 }
 
+/**
+ * ¿La tarjeta de la cama (`TIMELINE_JSON`) ya muestra este hito? (H18, revisión de la tanda 2.) Una tarjeta con 30 hitos y ESTE fuera
+ * no está desactualizada: el tope de 30 de `_sincronizarTimelineCama` lo dejó fuera, y volver a sincronizar escribiría lo mismo.
+ */
+function _tarjetaMuestraHito(cama, idHito) {
+  const txt = String((cama && cama.TIMELINE_JSON) || '');
+  if (idHito && txt.indexOf(String(idHito)) !== -1) return true;
+  try { const l = JSON.parse(txt); return Array.isArray(l) && l.length >= 30; } catch (e) { return false; }
+}
+
+/**
+ * ¿Este paciente (episodio) YA EGRESÓ? Sí cuando tiene una fila en ARCHIVO_PACIENTES o un hito de egreso (H9, revisión de la tanda 2).
+ * El egreso se escribe primero en el archivo y después como hito, así que mirar el archivo basta en el camino normal; el hito cubre
+ * la fila que alguien borró a mano. Solo lee (el archivo primero: si está, no hace falta bajar la línea de tiempo). Un pid vacío no
+ * es de nadie. Vive aquí y no en svc_camas.gs porque la usan las dos puertas que ingresan (el guardado de la evolución y
+ * INGRESAR_PACIENTE) y las dos cargan este archivo.
+ */
+function _episodioYaEgresado(pid) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  if (repoBuscarFila('ARCHIVO_PACIENTES', 'PATIENT_ID', p) !== -1) return true;
+  return repoLeerTodos('TIMELINE', 'PATIENT_ID', p).some(function (h) { return String(h.TIPO) === 'egreso'; });
+}
+
+/**
+ * ¿Este PATIENT_ID ya lo tiene OTRA cama ocupada? (H14, revisión de la tanda 2.) Un mismo paciente en dos camas es un censo roto. Una
+ * cama LIBRE que conserva el pid escrito no cuenta: una cama libre no tiene dueño. Lee la columna de PATIENT_ID de CAMAS_ESTADO y,
+ * solo si el pid aparece, esas filas.
+ */
+function _pidEnOtraCamaOcupada(pid, idCama) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  return repoLeerTodos('CAMAS_ESTADO', 'PATIENT_ID', p).some(function (c) {
+    return String(c.ID_CAMA) !== String(idCama) && esVerdadero(c.OCUPADA);
+  });
+}
+
 // ── Público con lock ───────────────────────────────────────
 /**
  * Agrega un hito a la línea de tiempo de una cama.

@@ -3525,3 +3525,74 @@ debían ponerla roja.
 - 🪤 **Los guiones de reproducción corren sobre una copia.** Uno de los guiones del scratchpad apuntaba a una copia vieja del árbol y
   siguió mostrando «ambigua» después del arreglo; se rehízo apuntando al repositorio y contesta `ok`. Antes de dudar del arreglo,
   mirar contra qué árbol corre el guion.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el ingreso de un paciente que ya egresó, la forma del PATIENT_ID y el ingreso que murió a medias
+
+**De dónde sale.** Paso «C ingreso y forma del pid» de la revisión de la tanda 2: H9, H14 y H18. Los tres reproducidos con guardias
+antes de tocar el código (rojo visto en G15 y G16) y los tres cerrados con una guardia que ahora los ata.
+
+**Los defectos, en palabras.**
+- **H9 · un ingreso reenviado «resucitaba» a un paciente ya dado de alta.** Sin el sello de la operación (OP_ID nuevo, caché
+  evaporado) el ingreso con el `PATIENT_ID` de alguien ya egresado se aceptaba de nuevo: la cama volvía a ocuparse con ese pid, y el
+  segundo alta contestaba «ok» **sin escribir su egreso**, porque `ARCH_<pid>` ya existía y el insert se saltaba. Se perdían en
+  silencio el segundo egreso, su motivo y el conteo del REM. El camino real es el borrador de la pantalla (`pidIngreso`) restaurado
+  sobre la cama libre después de un alta.
+  · **Arreglo en dos puntos.** (1) Las dos puertas que ingresan (`_candadoDeIngreso`, del guardado de la evolución, e
+  `ingresarPaciente`) leen si el pid propio YA tiene su egreso (`_episodioYaEgresado`: una fila en ARCHIVO_PACIENTES o un hito de
+  egreso; el archivo primero) y la regla pura `decidirEpisodioPuerta('INGRESO')` contesta CONFLICTO con `archivado: true`, esté la
+  cama libre u ocupada por ese pid (un alta a medias). Solo se lee con identidad propia: sin PATIENT_ID no hay pid que juzgar.
+  (2) `darAltaPaciente`: si ya existe la fila `ARCH_<pid>` pero cuenta OTRA estadía que la de la cama ahora (`_esLaMismaEstadia`:
+  momento real del ingreso, fecha de ingreso y código del paciente), rechaza con CONFLICTO antes de escribir nada. El reintento del
+  alta del MISMO episodio sigue convergiendo (la matriz de muerte de G16 lo ata, y un caso nuevo cambia el NOMBRE entre la muerte y el
+  reintento para que nadie vuelva a comparar el nombre).
+- **H14 · `GUARDAR_EVOLUCION` no miraba la forma del PATIENT_ID.** Solo `validarPayloadIngreso` la exigía, y la pantalla ingresa por
+  `GUARDAR_EVOLUCION`: un valor como `X Y/../<b>` quedaba de identidad de la cama y de parte de `ARCH_<pid>`; tampoco se miraba que
+  el mismo pid no estuviera ya en otra cama. Arreglo: `_candadoDePidNuevo`, DENTRO del lock y antes de cualquier escritura, exige la
+  forma (`_errPatientIdAcunado`, la misma función que usa `validarPayloadIngreso`) y rechaza con VALIDACION un pid que ya ocupa
+  OTRA cama ocupada (una cama libre que conserva su pid no cuenta). **Solo a un pid NUEVO**, distinto del de la cama: las camas ya
+  ocupadas con pids antiguos (sin la forma acuñada) siguen guardando evoluciones normales (G3 de G15 lo ata). Misma regla de «otra
+  cama» en `ingresarPaciente`, para que las dos puertas que ingresan no diverjan.
+- **H18 · el reintento de un ingreso que murió a medias contestaba «ya estaba» y dejaba la cama sin hito.** El ingreso son tres
+  escrituras (la cama, el hito de ingreso, la tarjeta `TIMELINE_JSON`); si moría tras la primera o la segunda, el reintento
+  entraba por la rama `yaHecho` y no completaba nada. Arreglo: `_ingresoCompletarSiFalta` busca el hito de ingreso del paciente (por
+  paciente y tipo, así sirve con o sin OP_ID); si no está lo escribe con su tarjeta, si está pero la tarjeta no lo muestra
+  sincroniza la tarjeta, y con el ingreso entero **solo lee** (cero escrituras, como pedía C3 de G15).
+
+**Rojo visto antes de arreglar.** G15: 58 fallos contra el árbol sin arreglar (los de H9 por las dos puertas, el egreso por el hito sin
+fila de archivo, el alta a medias; los de H14 con ocho formas malas del pid y el pid en dos camas; y las comprobaciones de forma). G16:
+28 fallos (el segundo alta «ok» sin escribir, en cuatro variantes de «otra estadía»; y la matriz de INGRESAR_PACIENTE con PATIENT_ID acuñado en rojo en los cortes N=1
+«no hay UN hito de ingreso (hay 0)» y N=2 «la tarjeta de la cama no muestra el hito de ingreso (TIMELINE_JSON)», con y sin OP_ID).
+
+**Mutación.** 21 mutantes del arreglo (ignorar `archivado` en cada puerta, no mirar el archivo o el hito, no completar el hito o la
+tarjeta, re-sincronizar de más, tomar siempre/nunca la fila por la misma estadía, ignorar cada una de las tres señales, comparar
+también el nombre, no exigir la forma, exigirla al pid de la cama, no mirar otra cama, contar una cama libre): mueren todos. M12
+(ignorar `TS_INGRESO`) sobrevivía a la primera versión de la guardia: el caso realista, el mismo ingreso reenviado, solo cambia el
+momento real; ahora hay un caso por señal.
+
+**Qué se cambió.**
+- `v2/dominio_validacion.gs`: `_errPatientIdAcunado` (la forma, en un solo lugar), `_msgPidEnOtraCama`, y `archivado` en la regla
+  `INGRESO` de `decidirEpisodioPuerta`.
+- `v2/svc_timeline.gs`: `_episodioYaEgresado`, `_pidEnOtraCamaOcupada`, `_tarjetaMuestraHito` (lo usan las dos puertas que ingresan,
+  y las dos cargan este archivo).
+- `v2/svc_evoluciones.gs`: `_candadoDePidNuevo`, y `_candadoDeIngreso` lee `archivado` solo con identidad propia.
+- `v2/svc_camas.gs`: `_hitoDeIngreso`, `_ingresoCompletarSiFalta`, `_esLaMismaEstadia`; `ingresarPaciente` y `darAltaPaciente`.
+  `_egresoDeLaCama` devuelve además la fila que ya estaba.
+- `build/checks/guardado_seguro_ingreso_g15.js`: secciones F (H9) y G (H14) y los casos `archivado` de la tabla de verdad.
+- `build/checks/guardado_seguro_operacion_g16.js`: sección 19b (matriz de INGRESAR_PACIENTE) y el alta de un pid ya archivado.
+- `build/paquete_migracion/{dominio,servicios}.gs`: los regenera la guardia `paquete.js`. `entrega/` y la VERSION quedan para el cierre.
+
+### Para no olvidar
+
+- 🪤 **El mensaje del CONFLICTO de ingreso se reutiliza a propósito para el pid ya egresado** («la cama ya fue ocupada por otro paciente
+  mientras llenabas este ingreso»): la franja roja de la pantalla está fija para todo CONFLICTO y un texto distinto en el cuadro la
+  contradiría. No es exacto en este caso (quizá la cama está libre), pero la acción es la misma: cerrar y mirar la cama. Si Diego
+  quiere un texto propio, se cambia en el servidor y en `_marcaGuardadoError` de la pantalla.
+- 🪤 **La forma del pid se exige DENTRO del lock y no antes**: para saber qué es «nuevo» hace falta la cama, y una cama ya ocupada con
+  un pid antiguo no puede quedar sin guardar evoluciones. Sigue yendo antes de la primera escritura.
+- 🪤 **Un ingreso con PATIENT_ID acuñado cuesta 2 lecturas de columna más** (el archivo y la línea de tiempo del pid; más la de
+  camas cuando el pid es nuevo). En `medir_guardado` el ingreso con pid acuñado pasa de 13 a 15 viajes; el escenario que mide la
+  batería no manda PATIENT_ID y sigue en 13.
+- 🪤 **El hueco del modo tolerante sigue**: con `EPISODIO_ABIERTO` ausente (pantalla vieja) la regla del egresado NO corre, como todo el
+  candado de ingreso. Lo cierra `CONTRATO_ESTRICTO`.
+- 🪤 **Contar «escrituras» con un OP_ID incluye el sello del caché**: un reintento que no escribe a las hojas igual cuenta 1 en
+  `sim_muerte` (el `CacheService.put`). Los casos de «cero escrituras» sin sello usan un payload sin OP_ID.

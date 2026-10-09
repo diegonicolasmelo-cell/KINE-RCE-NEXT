@@ -70,6 +70,12 @@
 //       propio éxito contesta lo mismo que la corrida limpia (el pendiente ya no dice «ya está abierto» de su propio éxito).
 //  28 · LA FORMA: el orden de cada puerta, los ids derivados y que nadie parsea ni ordena por ellos.
 //
+// LO QUE SE SUMA EN LA REVISIÓN DE LA TANDA 2 (paso C, 5-oct-2026):
+//  H18 · LA MATRIZ DE MUERTE de INGRESAR_PACIENTE con PATIENT_ID acuñado (sección 19b): los cortes N=1 (tras crear la cama) y N=2 (tras
+//       el hito) entraban por la rama «ya estaba» y no completaban el hito ni la tarjeta de la línea de tiempo.
+//  H9 · DAR_ALTA de un pid que ya figura en el archivo cuando la cama volvió a ocuparse con él (otra estadía): ya no contesta ok sin
+//       escribir su egreso; el reintento del MISMO episodio sigue convergiendo.
+//
 // Uso: node build/checks/guardado_seguro_operacion_g16.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -834,6 +840,53 @@ tramo('DAR_ALTA', () => {
   matriz('DAR_ALTA sin OP_ID', 'DAR_ALTA', () => sinOpId(mk()), viola);
 });
 
+tramo('DAR_ALTA · pid ya archivado y cama ocupada de nuevo', () => {
+  // 🔴 H9 (revisión de la tanda 2, paso C). El egreso es `ARCH_<pid>` y se escribe solo si no existe. Si la cama volvía a ocuparse con
+  // el pid de alguien ya egresado, el segundo alta encontraba su fila vieja, saltaba el insert y contestaba ok: se perdía en silencio
+  // el segundo egreso, su motivo y el conteo del REM. La puerta distingue el reintento del MISMO episodio (la fila de archivo cuenta
+  // la misma estadía que la cama: mismo momento y fecha de ingreso y mismo código) de otra estadía con el mismo pid.
+  console.log('   · DAR_ALTA de un pid que YA figura en el archivo cuando la cama 3 volvió a ocuparse con él (otra estadía)');
+  const alta = extra => Object.assign({ idCama: '3', motivoEgreso: 'Traslado a sala', destinoEgreso: 'Medicina', firmaKine: 'DMV', EPISODIO_ABIERTO: MUNDO.PID_P }, extra || {});
+  // Qué cambia en la OTRA estadía respecto de la primera. Cada una por separado, para que ninguna de las tres señales sobre: el
+  // momento real del ingreso es lo que de verdad cambia cuando se reenvía el mismo ingreso (misma fecha y mismo código).
+  const OTRAS = [
+    ['solo el momento real del ingreso (TS_INGRESO): el reenvío del mismo ingreso', { TS_INGRESO: '2026-08-10 11:00:00' }],
+    ['solo la fecha de ingreso', { FECHA_INGRESO: '2026-08-10' }],
+    ['solo el código del paciente', { COD_PACIENTE: 'ALFA-2' }],
+    ['todo (momento, fecha y código)', { TS_INGRESO: '2026-08-10 11:00:00', FECHA_INGRESO: '2026-08-10', COD_PACIENTE: 'ALFA-2' }],
+  ];
+  OTRAS.forEach(([etq, cambia]) => {
+    volverAlMundo();
+    const cama0 = Object.assign({}, camaDe('3'));   // la primera estadía de P, tal como estaba al darle el alta
+    const a1 = llama('DAR_ALTA', alta());
+    si('(el montaje · ' + etq + ') P recibe su primer alta: UN egreso, motivo «Traslado a sala»', a1.ok && archivoDeP().length === 1 && archivoDeP()[0].MOTIVO_EGRESO === 'Traslado a sala');
+    // La cama 3 vuelve a ocuparse con el MISMO pid: lo que dejaba el ingreso reenviado, con la primera estadía como base.
+    Object.assign(camaDe('3'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', PATIENT_ID: MUNDO.PID_P, NOMBRE: cama0.NOMBRE, COD_PACIENTE: cama0.COD_PACIENTE,
+      FECHA_INGRESO: cama0.FECHA_INGRESO, TS_INGRESO: cama0.TS_INGRESO, VIA_AEREA: 'Natural', SOPORTE: 'Ambiente' }, cambia);
+    si('(el montaje) la otra estadía difiere de la primera en lo que se dice', Object.keys(cambia).every(k => String(camaDe('3')[k]) !== String(archivoDeP()[0][k])));
+    const antes = M.instantanea(SIN); M.reiniciar();
+    const r = llama('DAR_ALTA', alta({ motivoEgreso: 'Fallecido', destinoEgreso: '' }));
+    no('★★ ' + etq + ': el segundo alta NO contesta ok sin escribir su egreso, se RECHAZA', r.ok);
+    eq('   …con código CONFLICTO', r.codigo, 'CONFLICTO');
+    si('   …con un motivo que dice que ese paciente ya figura egresado y que no se dio el alta', /ya figura/.test(r.error || '') && /No se dio el alta/.test(r.error || ''));
+    si('   …sin dar el identificador ni nombrar a nadie (Ley 19.628)', !String(r.error || '').includes(MUNDO.PID_P) && !/Alfa|Bravo/.test(r.error || ''));
+    eq('★★ …sin una sola escritura y con la base idéntica', M.total() + '/' + (M.instantanea(SIN) === antes), '0/true');
+    eq('   …el egreso de P sigue siendo el primero, con su motivo (no se pisó) y la cama sigue ocupada', archivoDeP().length + '/' + archivoDeP()[0].MOTIVO_EGRESO + '/' + camaDe('3').OCUPADA, '1/Traslado a sala/true');
+  });
+
+  console.log('   · y el reintento del MISMO episodio (el alta que murió tras escribir el egreso) sigue convergiendo');
+  [['sin cambios entre la muerte y el reintento', null],
+   ['aunque entre la muerte y el reintento se corrigió el NOMBRE (el formulario lo reescribe en cada guardado: no es una señal de otra estadía)', { NOMBRE: 'Paciente Alfa Corregido' }]].forEach(([etq, cambia]) => {
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(1); llama('DAR_ALTA', alta()); });
+    si('(el montaje) el egreso de P quedó escrito y la cama 3 sigue ocupada por P', archivoDeP().length === 1 && camaDe('3').OCUPADA === true && camaDe('3').PATIENT_ID === MUNDO.PID_P);
+    if (cambia) Object.assign(camaDe('3'), cambia);
+    M.reiniciar();
+    const rr = llama('DAR_ALTA', alta());
+    eq('★★ ' + etq + ': el reintento contesta ok, libera la cama y deja UN egreso con UN hito', rr.ok + '/' + camaDe('3').OCUPADA + '/' + archivoDeP().length + '/' + hitosDe(MUNDO.PID_P, 'egreso').length, 'true/false/1/1');
+  });
+});
+
 tramo('LIMPIAR_CAMA', () => {
   const mk = () => ({ idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPC });
   const viola = fase => {
@@ -1031,6 +1084,48 @@ tramo('GUARDAR_EVOLUCION · ingreso', () => {
   console.log('   · el INGRESO de un paciente que llegó con la vía aérea de afuera (VA_EXTERNO: la vía parte antes del ingreso)');
   matriz('GUARDAR_EVOLUCION de un ingreso con TQT de afuera', 'GUARDAR_EVOLUCION',
     () => ingresoG10({ VENT_VIA_AEREA: 'TQT', VA_EXTERNO: true, VA_EXTERNO_DIAS: 5 }), violaGE('9', PID_NUEVO, TK, esp), OPTS_GE);
+});
+
+/* ══ 19b · H18 · INGRESAR_PACIENTE con PATIENT_ID acuñado, muerte y reintento ═ */
+// 🔴 EL DEFECTO (revisión de la tanda 2, paso C). Con el PATIENT_ID acuñado, el ingreso reconoce su propio reintento por el pid de la
+// cama (`yaHecho`, paso 8) y contestaba «ingreso (ya estaba)» SIN mirar lo que faltaba: si el script moría tras crear la cama (N=1) o
+// tras escribir el hito (N=2), el reintento daba ok y la cama quedaba sin hito de ingreso (N=1) o sin la tarjeta de la línea de tiempo
+// (N=2). El estado final no era el de una corrida limpia, y la kinesióloga veía «ya estaba» sin saber que faltaba el hito.
+const PID_API = '55555555-eeee-4eee-8eee-000000000005';
+const OP_ING = 'op_ingreso_h18_0001';
+tramo('INGRESAR_PACIENTE · matriz de muerte', () => {
+  const mk = () => ingreso('9', { PATIENT_ID: PID_API, OP_ID: OP_ING });
+  const hitosIng = () => DB.TIMELINE.filter(h => h.PATIENT_ID === PID_API && h.TIPO === 'ingreso');
+  const viola = fase => {
+    if (vecesEn(ocupantes(), PID_API) > 1) return 'el paciente está en más de una cama';
+    if (hitosIng().length > 1) return 'el hito de ingreso está repetido (' + hitosIng().length + ')';
+    if (fase !== 'final') return '';
+    if (camaDe('9').PATIENT_ID !== PID_API) return 'la cama 9 no es del paciente acuñado';
+    if (hitosIng().length !== 1) return 'no hay UN hito de ingreso (hay ' + hitosIng().length + ')';
+    if (String(camaDe('9').TIMELINE_JSON || '').indexOf(hitosIng()[0].ID_HITO) === -1) return 'la tarjeta de la cama no muestra el hito de ingreso (TIMELINE_JSON)';
+    return '';
+  };
+  const QUE = { queSeVe: 'un ingreso sin su hito en la línea de tiempo, sin su tarjeta o con el hito repetido' };
+  console.log('   · INGRESAR_PACIENTE con PATIENT_ID acuñado y OP_ID (cortes N=1: tras crear la cama; N=2: tras el hito)');
+  const a = matriz('INGRESAR_PACIENTE con PATIENT_ID acuñado y OP_ID', 'INGRESAR_PACIENTE', mk, viola, QUE);
+  eq('★ el ingreso escribe en este orden: la cama, el hito de ingreso y la tarjeta de la línea de tiempo (de ahí los cortes N=1 y N=2)',
+    a.reg.slice(0, 3).join(' > '), 'repoActualizar(CAMAS_ESTADO) > repoInsertar(TIMELINE) > repoActualizar(CAMAS_ESTADO)');
+  // Los dos cortes que importan, a la vista y con su reintento: el estado final es el de la corrida limpia, hito y tarjeta incluidos.
+  [1, 2].forEach(n => {
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(n); llama('INGRESAR_PACIENTE', mk()); });
+    const dejo = n === 1 ? 'la cama ya es de P y NO hay hito' : 'la cama ya es de P, hay hito y NO hay tarjeta';
+    eq('(el corte N=' + n + ') ' + dejo, (camaDe('9').PATIENT_ID === PID_API) + '/' + hitosIng().length + '/' + (!!camaDe('9').TIMELINE_JSON), 'true/' + (n === 1 ? '0' : '1') + '/false');
+    M.reiniciar();
+    const r = llama('INGRESAR_PACIENTE', mk());
+    eq('★★ N=' + n + ' · el reintento contesta ok y COMPLETA lo que faltaba (UN hito y la tarjeta que lo muestra)', r.ok + '/' + viola('final'), 'true/');
+  });
+  console.log('   · INGRESAR_PACIENTE con PATIENT_ID acuñado SIN OP_ID (la capa durable es el pid, no el sello)');
+  matriz('INGRESAR_PACIENTE con PATIENT_ID acuñado sin OP_ID', 'INGRESAR_PACIENTE', () => sinOpId(mk()), viola, QUE);
+  // Y repetir un ingreso COMPLETO sigue sin escribir nada a las hojas (la comprobación de lo que falta solo lee).
+  volverAlMundo(); llama('INGRESAR_PACIENTE', mk()); M.reiniciar();
+  const rep = llama('INGRESAR_PACIENTE', sinOpId(mk()));
+  eq('★ repetir un ingreso ya completo (sin sello): ok «ya estaba» y CERO escrituras', rep.ok + '/' + (rep.data || {}).yaEstaba + '/' + M.total(), 'true/true/0');
 });
 
 tramo('GUARDAR_EVOLUCION · turno nuevo', () => {

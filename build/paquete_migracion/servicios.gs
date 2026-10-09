@@ -1054,6 +1054,38 @@ function _apacheNorm(x) {
 }
 
 /**
+ * El hito de ingreso de INGRESAR_PACIENTE: lo escribe el camino normal y lo completa el reintento (`_ingresoCompletarSiFalta`) con
+ * EXACTAMENTE el mismo contenido. `fecha` solo la pasa quien ya la calculó (el camino normal); sin ella sale del payload, igual.
+ */
+function _hitoDeIngreso(datos, ctx, idCama, patientId, fecha) {
+  return {
+    idCama, patientId, fecha: fecha || datos.fechaIngreso || hoyISO(), turno: datos.turno || 'Dia', tipo: 'ingreso',
+    texto: 'Ingreso a UCI. Dx: ' + (datos.diagnostico || 'Sin especificar'),
+    autor: ctx.firma || '', autorEmail: ctx.email || '',
+  };
+}
+
+/**
+ * 🔐 H18 · EL REINTENTO DE UN INGRESO A MEDIAS COMPLETA LO QUE FALTA (revisión de la tanda 2, paso C, 5-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Con el PATIENT_ID acuñado, el reintento de un ingreso reconoce su propio éxito por el pid de la cama (rama `yaHecho` de
+ * `ingresarPaciente`) y contestaba «ingreso (ya estaba)» sin mirar nada más. Pero el ingreso son TRES escrituras en este orden —la
+ * cama, el hito de ingreso y la tarjeta de la línea de tiempo (`TIMELINE_JSON`)— y si el script moría tras la primera o la segunda, la
+ * cama quedaba ocupada y sin hito, o con hito y sin tarjeta, para siempre: el estado final no era el de una corrida limpia y la
+ * kinesióloga veía «ya estaba» sin saber que faltaba algo.
+ *
+ * LO QUE HACE. Busca el hito de ingreso del paciente (por paciente y tipo, no por id: el hito de ingreso es único por pid, igual que
+ * en el guardado de la evolución, y así sirve con o sin OP_ID). Si no está, lo escribe con la tarjeta (`_agregarHitoInterno`, las
+ * mismas escrituras del camino normal). Si está pero la tarjeta no lo muestra, vuelve a sincronizar la tarjeta. Si está todo, NO escribe
+ * nada: repetir un ingreso entero sigue costando solo lecturas.
+ */
+function _ingresoCompletarSiFalta(cama, idCama, patientId, hito) {
+  const previo = repoLeerTodos('TIMELINE', 'PATIENT_ID', patientId).filter(function (h) { return String(h.TIPO) === 'ingreso'; })[0];
+  if (!previo) { _agregarHitoInterno(hito); return; }
+  if (!_tarjetaMuestraHito(cama, previo.ID_HITO)) _sincronizarTimelineCama(String(idCama));
+}
+
+/**
  * 🔐 G15 · EL INGRESO CONCURRENTE (tanda 2 del guardado seguro, paso 8, 4-oct-2026).
  *
  * 🔴 EL DEFECTO. Esta puerta ingresaba a quien llegara primero a una cama libre y a todos los demás les contestaba «ya está
@@ -1072,6 +1104,11 @@ function _apacheNorm(x) {
  *     (CONFIG.CONTRATO_ESTRICTO = TRUE) un ingreso sin identidad propia sobre una cama con paciente es CONFLICTO.
  * Una cama ocupada por un episodio SIN ingreso formal (sin PATIENT_ID) sigue siendo «ya está ocupada»: esta puerta nunca
  * ingresa encima de una cama ocupada.
+ *
+ * 🔐 Revisión de la tanda 2 (paso C, 5-oct-2026), con el mismo pid acuñado:
+ *   · H9 — un pid que YA EGRESÓ (fila en ARCHIVO_PACIENTES o hito de egreso) es CONFLICTO, esté la cama libre o no: no se resucita.
+ *   · H14 — un pid que ya ocupa OTRA cama es VALIDACION: un mismo paciente no está en dos camas.
+ *   · H18 — el reintento «ya estaba» COMPLETA el hito de ingreso y la tarjeta que falten (`_ingresoCompletarSiFalta`).
  *
  * `ep` es el último parámetro y NO es obligatorio (los bancos antiguos, las llamadas internas): solo cuenta su `estricto`.
  * La regla solo se invoca con identidad propia o en modo estricto: un banco antiguo —que le pone un doble a
@@ -1096,12 +1133,19 @@ function ingresarPaciente(datos, ctx, ep) {
       if (propio || estricto) {
         const d = decidirEpisodioPuerta('INGRESO', {
           propio: propio, pid: ocupada ? String(cama.PATIENT_ID || '').trim() : '', idCama: idCama, estricto: estricto,
+          // H9: el pid propio de alguien que YA EGRESÓ no vuelve a ingresar (solo se lee con identidad propia).
+          archivado: propio ? _episodioYaEgresado(propio) : false,
         });
         if (d.estado === 'rechazo') return err(d.error, d.codigo);
         if (d.estado === 'yaHecho') {
+          // H18: el reintento de un ingreso cuya corrida murió a medias no puede contestar «ya estaba» y dejar la cama sin su hito
+          // ni su tarjeta. Completa lo que falte; con el ingreso entero solo lee.
+          _ingresoCompletarSiFalta(cama, idCama, propio, _hitoDeIngreso(datos, ctx, idCama, propio));
           return ok({ idCama, accion: 'ingreso (ya estaba)', patientId: propio, cod: cama.COD_PACIENTE, entidad: 'CAMAS_ESTADO', yaEstaba: true });
         }
       }
+      // H14: el mismo paciente no entra a dos camas (la misma regla que el guardado de la evolución, `_candadoDePidNuevo`).
+      if (propio && _pidEnOtraCamaOcupada(propio, idCama)) return err(_msgPidEnOtraCama(), ERR.VALIDACION);
       if (ocupada) return err('La cama ' + idCama + ' ya está ocupada.', ERR.VALIDACION);
 
       const nombre = String(datos.nombre || datos.NOMBRE || '').trim();
@@ -1149,11 +1193,7 @@ function ingresarPaciente(datos, ctx, ep) {
         ULTIMO_TURNO_KEY: '',
       });
 
-      _agregarHitoInterno({
-        idCama, patientId, fecha, turno: datos.turno || 'Dia', tipo: 'ingreso',
-        texto: 'Ingreso a UCI. Dx: ' + (datos.diagnostico || 'Sin especificar'),
-        autor: ctx.firma || '', autorEmail: ctx.email || '',
-      });
+      _agregarHitoInterno(_hitoDeIngreso(datos, ctx, idCama, patientId, fecha));
 
       SpreadsheetApp.flush();
       return ok({ idCama, accion: 'ingreso', patientId, cod, entidad: 'CAMAS_ESTADO' });
@@ -1292,25 +1332,48 @@ function _pidDeCama(c) {
  * tomándolo por el reintento del primero (un egreso menos en el REM). Por eso, si la fila de ese id es de OTRO episodio
  * (otro código, otro nombre u otra fecha de ingreso), se prueba el id siguiente (`_2`, `_3`…): el reintento del mismo episodio
  * vuelve a caer en SU fila, y uno distinto en una libre.
- * @returns {{id: string, existe: boolean, n: number}} `existe`: la fila de ESTE egreso ya está escrita (un reintento); `n`: cuál es
- *          de los egresos sin identidad de esa cama y esa fecha (1 si tiene PATIENT_ID o es el primero del día).
+ * @returns {{id: string, existe: boolean, n: number, fila: ?Object}} `existe`: la fila de ESTE egreso ya está escrita (un reintento);
+ *          `n`: cuál es de los egresos sin identidad de esa cama y esa fecha (1 si tiene PATIENT_ID o es el primero del día); `fila`:
+ *          la fila de archivo que ya estaba (para `_esLaMismaEstadia`), o null si no hay.
  */
 function _egresoDeLaCama(pid, idCama, fecha, cama) {
   const p = String(pid || '').trim();
   if (p) {
     const id = 'ARCH_' + p;
-    return { id: id, existe: !!repoBuscarPorId('ARCHIVO_PACIENTES', 'ID_ARCHIVO', id), n: 1 };
+    const f = repoBuscarPorId('ARCHIVO_PACIENTES', 'ID_ARCHIVO', id);
+    return { id: id, existe: !!f, n: 1, fila: f || null };
   }
   const base = 'ARCH_SINPID_' + idCama + '_' + fecha;
   const diaDe = function (x) { return String(x || '').slice(0, 10); };
   for (let n = 1; n <= 50; n++) {
     const id = n === 1 ? base : base + '_' + n;
     const f = repoBuscarPorId('ARCHIVO_PACIENTES', 'ID_ARCHIVO', id);
-    if (!f) return { id: id, existe: false, n: n };
+    if (!f) return { id: id, existe: false, n: n, fila: null };
     if (String(f.COD_PACIENTE || '') === String(cama.COD_PACIENTE || '') && String(f.NOMBRE || '') === String(cama.NOMBRE || '') &&
-        diaDe(f.FECHA_INGRESO) === diaDe(cama.FECHA_INGRESO)) return { id: id, existe: true, n: n };
+        diaDe(f.FECHA_INGRESO) === diaDe(cama.FECHA_INGRESO)) return { id: id, existe: true, n: n, fila: f };
   }
   throw new Error('darAltaPaciente: la cama ' + idCama + ' ya tiene 50 egresos sin identidad el ' + fecha + '.');
+}
+
+/**
+ * ¿La fila de archivo que ya existe para este pid cuenta la MISMA estadía que tiene la cama ahora? (H9, revisión de la tanda 2.)
+ *
+ * 🔴 EL DEFECTO. El egreso es `ARCH_<pid>` y se escribe solo si no existe: así el reintento de un alta que murió a mitad no egresa dos
+ * veces. Pero si la cama volvía a ocuparse con el pid de alguien ya egresado (el ingreso reenviado sin sello, ver
+ * `decidirEpisodioPuerta('INGRESO')`), el segundo alta encontraba la fila VIEJA, saltaba el insert y contestaba ok: se perdía en
+ * silencio el segundo egreso, su motivo y el conteo del REM.
+ *
+ * LA MARCA. El egreso se armó con la fila de la cama, así que el reintento del MISMO episodio ve en la fila de archivo lo mismo que
+ * hoy tiene la cama: el momento real del ingreso, la fecha de ingreso y el código del paciente. Otra estadía con el mismo pid no
+ * coincide en alguno. 🪤 El NOMBRE queda fuera a propósito: el formulario lo reescribe en cada guardado y una corrección entre la
+ * muerte y el reintento no puede volver «otra estadía» a la misma. Si alguno de estos tres cambió de verdad entre la muerte y el
+ * reintento (una corrección de coordinación), el alta se rechaza a la vista en vez de duplicar el egreso en silencio.
+ */
+function _esLaMismaEstadia(filaArchivo, cama) {
+  const txt = function (x) { return String(x === undefined || x === null ? '' : x).trim(); };
+  const dia = function (x) { return txt(x).slice(0, 10); };
+  return !!filaArchivo && txt(filaArchivo.TS_INGRESO) === txt(cama.TS_INGRESO) &&
+    dia(filaArchivo.FECHA_INGRESO) === dia(cama.FECHA_INGRESO) && txt(filaArchivo.COD_PACIENTE) === txt(cama.COD_PACIENTE);
 }
 
 /**
@@ -1363,6 +1426,20 @@ function darAltaPaciente(datos, ctx, ep) {
 
       const pid = cama.PATIENT_ID;
       const fechaEgreso = hoyISO();
+
+      /* 🔐 G16 · EL EGRESO SE ESCRIBE UNA VEZ (paso 9). Con el id que le ponía `uid('ARCH')` —reloj más azar— cada intento
+         escribía una fila NUEVA: si el script moría después de este insert (el tiempo agotado, un corte, la pestaña cerrada
+         en mal momento) y la pantalla reintentaba, el paciente quedaba egresado DOS veces y el REM contaba un egreso de más,
+         sin error en ninguna pantalla. Ahora el id sale del paciente (`ARCH_<pid>`) y el egreso se escribe solo si no
+         existe: el reintento encuentra su propia fila y sigue con lo que falta.
+         🔐 H9 (revisión de la tanda 2): pero esa fila puede ser de OTRA estadía del mismo pid (la cama volvió a ocuparse con un
+         paciente ya egresado): contestar ok sin escribir perdía el segundo egreso en silencio. Si la fila de archivo no cuenta la
+         misma estadía que la cama, se rechaza ANTES de escribir nada. */
+      const egreso = _egresoDeLaCama(pid, idCama, fechaEgreso, cama);
+      if (egreso.existe && String(pid || '').trim() && !_esLaMismaEstadia(egreso.fila, cama)) {
+        return err('La cama ' + idCama + ' tiene a un paciente que ya figura dado de alta en el archivo, de una estadía anterior. ' +
+          'No se dio el alta para no pisar ese registro. Avisa a coordinación para revisarlo.', ERR.CONFLICTO);
+      }
 
       // Estadísticas del episodio (por PATIENT_ID, no por cama)
       const evos = pid ? repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', pid) : [];
@@ -1421,12 +1498,7 @@ function darAltaPaciente(datos, ctx, ep) {
       const barthelEgr = _primeroNoVacio(datos.barthelEgreso);
       const interp  = _interpEgreso(mrcEgr, fssEgr, dinEgr, cama.SEXO);
 
-      /* 🔐 G16 · EL EGRESO SE ESCRIBE UNA VEZ (paso 9). Con el id que le ponía `uid('ARCH')` —reloj más azar— cada intento
-         escribía una fila NUEVA: si el script moría después de este insert (el tiempo agotado, un corte, la pestaña cerrada
-         en mal momento) y la pantalla reintentaba, el paciente quedaba egresado DOS veces y el REM contaba un egreso de más,
-         sin error en ninguna pantalla. Ahora el id sale del paciente (`ARCH_<pid>`) y el egreso se escribe solo si no
-         existe: el reintento encuentra su propia fila y sigue con lo que falta. */
-      const egreso = _egresoDeLaCama(pid, idCama, fechaEgreso, cama);
+      // El egreso se escribe solo si no existe (ver arriba el porqué): el reintento encuentra su propia fila.
       if (!egreso.existe) repoInsertar('ARCHIVO_PACIENTES', {
         ID_ARCHIVO: egreso.id, PATIENT_ID: pid, CAMA_ORIGEN: idCama, COD_PACIENTE: cama.COD_PACIENTE,
         FECHA_INGRESO: cama.FECHA_INGRESO, TS_INGRESO: cama.TS_INGRESO || '', FECHA_EGRESO: fechaEgreso,
@@ -5829,6 +5901,14 @@ function validarEpisodioAbierto(abierto, pidCama, idCama) {
  * paciente (CONFLICTO). Sin identidad propia y con el modo tolerante no se compara nada: es el hueco que dejan las
  * pantallas viejas hasta que se enciende el modo estricto, y no se disimula.
  *
+ * 🔐 H9 (revisión de la tanda 2, 5-oct-2026). Un ingreso con el PATIENT_ID de alguien que YA EGRESÓ tampoco entra, esté la cama
+ * libre u ocupada por él: sin el sello (otro OP_ID, el caché evaporado) el reenvío de un ingreso viejo —el borrador de la pantalla
+ * sobre la cama libre— volvía a ocuparla con ese pid, y el segundo alta no escribía su egreso porque `ARCH_<pid>` ya existía (se
+ * perdía en silencio el egreso, su motivo y el conteo del REM). Se lee SOLO con identidad propia (`_episodioYaEgresado`: la fila del
+ * archivo o el hito de egreso) y decide la misma regla pura (`archivado`). El reintento legítimo —cama ocupada por ese pid, SIN
+ * egreso— sigue siendo «ya hecho» y converge. 🪤 Con EPISODIO_ABIERTO ausente (pantalla vieja, modo tolerante) esta regla NO corre,
+ * como el resto de este candado: es el hueco que cierra el modo estricto.
+ *
  * Con VALOR en EPISODIO_ABIERTO no hace nada: eso ya lo comparó `validarEpisodioAbierto`. Va DENTRO del lock, con la cama
  * que se leyó adentro, y ANTES de la primera escritura. Devuelve la respuesta de rechazo para devolver tal cual, o null si
  * se puede seguir.
@@ -5854,8 +5934,35 @@ function _candadoDeIngreso(datos, cama, idCama, ep) {
   // Quien ocupa la cama AHORA: una cama libre no tiene dueño aunque la fila conserve un pid viejo, y un episodio sin
   // ingreso formal (ocupada, sin PATIENT_ID) tampoco tiene a quién reclamarle.
   const pidAhora = esVerdadero(cama.OCUPADA) ? String(cama.PATIENT_ID || '').trim() : '';
-  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto });
+  // H9: el pid propio de alguien que YA EGRESÓ no vuelve a ingresar (ver `decidirEpisodioPuerta`). Solo se lee con identidad propia.
+  const archivado = propio ? _episodioYaEgresado(propio) : false;
+  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto, archivado: archivado });
   return d.estado === 'rechazo' ? err(d.error, d.codigo) : null;   // «yaHecho» aquí es el reintento propio: sigue (idempotente)
+}
+
+/**
+ * _candadoDePidNuevo — el PATIENT_ID que llega en el payload y NO es el de la cama tiene la forma de siempre y no está en OTRA cama
+ * ocupada (H14, revisión de la tanda 2, 5-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Solo `validarPayloadIngreso` miraba la forma del PATIENT_ID, y la pantalla no entra por esa puerta: ingresa por
+ * GUARDAR_EVOLUCION. Un valor como «X Y/../<b>» quedaba de identidad de la cama y de parte de los ids derivados (`ARCH_<pid>`). Y
+ * nada impedía que el mismo pid estuviera en dos camas.
+ *
+ * LA REGLA. Un pid NUEVO —distinto del que ya tiene la cama— tiene que cumplir la forma acuñada y no pertenecer a otra cama
+ * OCUPADA. 🪤 A un pid que es el de la cama NO se le exige la forma: las camas ya ocupadas con pids antiguos (cargados a mano, de
+ * versiones previas) siguen guardando evoluciones normales, y la pantalla solo manda PATIENT_ID en el ingreso acuñado. Por eso
+ * no vive en `validarPayloadEvolucion` (pura, antes del lock, sin cama): necesita la cama para saber qué es «nuevo». Va DENTRO del
+ * lock, con la cama leída ahí, y ANTES de la primera escritura. No repite el identificador en el mensaje (Ley 19.628).
+ * @return la respuesta de rechazo (VALIDACION) para devolver tal cual, o null si se puede seguir.
+ */
+function _candadoDePidNuevo(datos, cama, idCama) {
+  const crudo = datos.PATIENT_ID;
+  if (crudo === undefined || crudo === null || crudo === '') return null;
+  if (typeof crudo === 'string' && crudo.trim() === String(cama.PATIENT_ID || '').trim()) return null;   // el de la cama: no es nuevo
+  const eForma = _errPatientIdAcunado(crudo);
+  if (eForma) return err('Validación: ' + eForma, ERR.VALIDACION);
+  if (_pidEnOtraCamaOcupada(crudo, idCama)) return err(_msgPidEnOtraCama(), ERR.VALIDACION);
+  return null;
 }
 
 // ═══ ESCRITURA ════════════════════════════════════════════
@@ -5941,6 +6048,12 @@ function guardarEvolucion(datos, ctx, ep) {
          produce un mensaje que habla de otro paciente. */
       const _errEpisodio = validarEpisodioAbierto(datos.EPISODIO_ABIERTO, cama.PATIENT_ID, idCama);
       if (_errEpisodio) return err(_errEpisodio, ERR.VALIDACION);
+
+      /* 🔐 H14 (revisión de la tanda 2). Un PATIENT_ID NUEVO en el payload (distinto del de la cama) tiene la forma acuñada y no
+         está en otra cama ocupada. Antes de cualquier escritura y de la regla del ingreso de abajo: un pid mal formado no debe llegar
+         ni a las búsquedas de esa regla. El de la cama no se toca (las camas con pids antiguos siguen guardando). */
+      const _rPid = _candadoDePidNuevo(datos, cama, idCama);
+      if (_rPid) return _rPid;
 
       /* 🔐 EL INGRESO CONCURRENTE (G15, 4-oct-2026). Con el episodio abierto VACÍO —el formulario se abrió sobre una cama
          libre— la regla de arriba no puede juzgar nada; la identidad propia del ingreso (`datos.PATIENT_ID`, acuñado por
@@ -10804,6 +10917,43 @@ function _sincronizarTimelineCama(idCama) {
     repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, { TIMELINE_JSON: JSON.stringify(hitos.slice(0, 30)) });
     return true;
   } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); return false; }
+}
+
+/**
+ * ¿La tarjeta de la cama (`TIMELINE_JSON`) ya muestra este hito? (H18, revisión de la tanda 2.) Una tarjeta con 30 hitos y ESTE fuera
+ * no está desactualizada: el tope de 30 de `_sincronizarTimelineCama` lo dejó fuera, y volver a sincronizar escribiría lo mismo.
+ */
+function _tarjetaMuestraHito(cama, idHito) {
+  const txt = String((cama && cama.TIMELINE_JSON) || '');
+  if (idHito && txt.indexOf(String(idHito)) !== -1) return true;
+  try { const l = JSON.parse(txt); return Array.isArray(l) && l.length >= 30; } catch (e) { return false; }
+}
+
+/**
+ * ¿Este paciente (episodio) YA EGRESÓ? Sí cuando tiene una fila en ARCHIVO_PACIENTES o un hito de egreso (H9, revisión de la tanda 2).
+ * El egreso se escribe primero en el archivo y después como hito, así que mirar el archivo basta en el camino normal; el hito cubre
+ * la fila que alguien borró a mano. Solo lee (el archivo primero: si está, no hace falta bajar la línea de tiempo). Un pid vacío no
+ * es de nadie. Vive aquí y no en svc_camas.gs porque la usan las dos puertas que ingresan (el guardado de la evolución y
+ * INGRESAR_PACIENTE) y las dos cargan este archivo.
+ */
+function _episodioYaEgresado(pid) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  if (repoBuscarFila('ARCHIVO_PACIENTES', 'PATIENT_ID', p) !== -1) return true;
+  return repoLeerTodos('TIMELINE', 'PATIENT_ID', p).some(function (h) { return String(h.TIPO) === 'egreso'; });
+}
+
+/**
+ * ¿Este PATIENT_ID ya lo tiene OTRA cama ocupada? (H14, revisión de la tanda 2.) Un mismo paciente en dos camas es un censo roto. Una
+ * cama LIBRE que conserva el pid escrito no cuenta: una cama libre no tiene dueño. Lee la columna de PATIENT_ID de CAMAS_ESTADO y,
+ * solo si el pid aparece, esas filas.
+ */
+function _pidEnOtraCamaOcupada(pid, idCama) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  return repoLeerTodos('CAMAS_ESTADO', 'PATIENT_ID', p).some(function (c) {
+    return String(c.ID_CAMA) !== String(idCama) && esVerdadero(c.OCUPADA);
+  });
 }
 
 // ── Público con lock ───────────────────────────────────────

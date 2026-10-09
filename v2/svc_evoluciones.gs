@@ -87,6 +87,14 @@ function validarEpisodioAbierto(abierto, pidCama, idCama) {
  * paciente (CONFLICTO). Sin identidad propia y con el modo tolerante no se compara nada: es el hueco que dejan las
  * pantallas viejas hasta que se enciende el modo estricto, y no se disimula.
  *
+ * 🔐 H9 (revisión de la tanda 2, 5-oct-2026). Un ingreso con el PATIENT_ID de alguien que YA EGRESÓ tampoco entra, esté la cama
+ * libre u ocupada por él: sin el sello (otro OP_ID, el caché evaporado) el reenvío de un ingreso viejo —el borrador de la pantalla
+ * sobre la cama libre— volvía a ocuparla con ese pid, y el segundo alta no escribía su egreso porque `ARCH_<pid>` ya existía (se
+ * perdía en silencio el egreso, su motivo y el conteo del REM). Se lee SOLO con identidad propia (`_episodioYaEgresado`: la fila del
+ * archivo o el hito de egreso) y decide la misma regla pura (`archivado`). El reintento legítimo —cama ocupada por ese pid, SIN
+ * egreso— sigue siendo «ya hecho» y converge. 🪤 Con EPISODIO_ABIERTO ausente (pantalla vieja, modo tolerante) esta regla NO corre,
+ * como el resto de este candado: es el hueco que cierra el modo estricto.
+ *
  * Con VALOR en EPISODIO_ABIERTO no hace nada: eso ya lo comparó `validarEpisodioAbierto`. Va DENTRO del lock, con la cama
  * que se leyó adentro, y ANTES de la primera escritura. Devuelve la respuesta de rechazo para devolver tal cual, o null si
  * se puede seguir.
@@ -112,8 +120,35 @@ function _candadoDeIngreso(datos, cama, idCama, ep) {
   // Quien ocupa la cama AHORA: una cama libre no tiene dueño aunque la fila conserve un pid viejo, y un episodio sin
   // ingreso formal (ocupada, sin PATIENT_ID) tampoco tiene a quién reclamarle.
   const pidAhora = esVerdadero(cama.OCUPADA) ? String(cama.PATIENT_ID || '').trim() : '';
-  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto });
+  // H9: el pid propio de alguien que YA EGRESÓ no vuelve a ingresar (ver `decidirEpisodioPuerta`). Solo se lee con identidad propia.
+  const archivado = propio ? _episodioYaEgresado(propio) : false;
+  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto, archivado: archivado });
   return d.estado === 'rechazo' ? err(d.error, d.codigo) : null;   // «yaHecho» aquí es el reintento propio: sigue (idempotente)
+}
+
+/**
+ * _candadoDePidNuevo — el PATIENT_ID que llega en el payload y NO es el de la cama tiene la forma de siempre y no está en OTRA cama
+ * ocupada (H14, revisión de la tanda 2, 5-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Solo `validarPayloadIngreso` miraba la forma del PATIENT_ID, y la pantalla no entra por esa puerta: ingresa por
+ * GUARDAR_EVOLUCION. Un valor como «X Y/../<b>» quedaba de identidad de la cama y de parte de los ids derivados (`ARCH_<pid>`). Y
+ * nada impedía que el mismo pid estuviera en dos camas.
+ *
+ * LA REGLA. Un pid NUEVO —distinto del que ya tiene la cama— tiene que cumplir la forma acuñada y no pertenecer a otra cama
+ * OCUPADA. 🪤 A un pid que es el de la cama NO se le exige la forma: las camas ya ocupadas con pids antiguos (cargados a mano, de
+ * versiones previas) siguen guardando evoluciones normales, y la pantalla solo manda PATIENT_ID en el ingreso acuñado. Por eso
+ * no vive en `validarPayloadEvolucion` (pura, antes del lock, sin cama): necesita la cama para saber qué es «nuevo». Va DENTRO del
+ * lock, con la cama leída ahí, y ANTES de la primera escritura. No repite el identificador en el mensaje (Ley 19.628).
+ * @return la respuesta de rechazo (VALIDACION) para devolver tal cual, o null si se puede seguir.
+ */
+function _candadoDePidNuevo(datos, cama, idCama) {
+  const crudo = datos.PATIENT_ID;
+  if (crudo === undefined || crudo === null || crudo === '') return null;
+  if (typeof crudo === 'string' && crudo.trim() === String(cama.PATIENT_ID || '').trim()) return null;   // el de la cama: no es nuevo
+  const eForma = _errPatientIdAcunado(crudo);
+  if (eForma) return err('Validación: ' + eForma, ERR.VALIDACION);
+  if (_pidEnOtraCamaOcupada(crudo, idCama)) return err(_msgPidEnOtraCama(), ERR.VALIDACION);
+  return null;
 }
 
 // ═══ ESCRITURA ════════════════════════════════════════════
@@ -199,6 +234,12 @@ function guardarEvolucion(datos, ctx, ep) {
          produce un mensaje que habla de otro paciente. */
       const _errEpisodio = validarEpisodioAbierto(datos.EPISODIO_ABIERTO, cama.PATIENT_ID, idCama);
       if (_errEpisodio) return err(_errEpisodio, ERR.VALIDACION);
+
+      /* 🔐 H14 (revisión de la tanda 2). Un PATIENT_ID NUEVO en el payload (distinto del de la cama) tiene la forma acuñada y no
+         está en otra cama ocupada. Antes de cualquier escritura y de la regla del ingreso de abajo: un pid mal formado no debe llegar
+         ni a las búsquedas de esa regla. El de la cama no se toca (las camas con pids antiguos siguen guardando). */
+      const _rPid = _candadoDePidNuevo(datos, cama, idCama);
+      if (_rPid) return _rPid;
 
       /* 🔐 EL INGRESO CONCURRENTE (G15, 4-oct-2026). Con el episodio abierto VACÍO —el formulario se abrió sobre una cama
          libre— la regla de arriba no puede juzgar nada; la identidad propia del ingreso (`datos.PATIENT_ID`, acuñado por

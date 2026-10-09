@@ -32,6 +32,17 @@
 //   E · LA FORMA: la regla va DENTRO del lock, después de validarEpisodioAbierto y antes de la primera escritura; solo se
 //       invoca con identidad propia o en modo estricto (los bancos antiguos, con lista fija de archivos, no cargan la regla).
 //
+// LO QUE SE SUMA EN LA REVISIÓN DE LA TANDA 2 (paso C, 5-oct-2026), secciones F y G:
+//   F · H9 · EL INGRESO DE UN PACIENTE QUE YA EGRESÓ. Sin el sello (OP_ID nuevo, caché evaporado) el ingreso reenviado con el
+//       PATIENT_ID de alguien ya dado de alta volvía a ocupar la cama con ese pid, y el segundo alta contestaba ok sin escribir su
+//       egreso (ARCH_<pid> ya existía): se perdía en silencio el segundo egreso, su motivo y el conteo del REM. Ahora las dos
+//       puertas que ingresan contestan CONFLICTO, sin escribir, cuando el pid propio ya tiene fila en ARCHIVO_PACIENTES o un hito
+//       de egreso; el reintento legítimo (cama ocupada por ese pid, SIN egreso) sigue convergiendo.
+//   G · H14 · LA FORMA Y LA UNICIDAD DEL PATIENT_ID EN GUARDAR_EVOLUCION. Solo validarPayloadIngreso miraba la forma; por la
+//       pantalla real un valor como «X Y/../<b>» quedaba de identidad de la cama y de parte de ids derivados (ARCH_<pid>), y
+//       el mismo pid podía estar en dos camas. La forma se exige a un pid NUEVO (distinto del de la cama): las camas ya ocupadas
+//       con pids antiguos siguen guardando normal.
+//
 // Uso: node build/checks/guardado_seguro_ingreso_g15.js
 //
 // 🪤 EL RELOJ VA CONGELADO. Las fechas se INVENTAN (SIM.fecha = 2026-08-10, un lunes lejos de Fiestas Patrias y a las
@@ -121,6 +132,18 @@ tramo('A · regla pura', () => {
   caso('   …un propio solo de espacios cuenta como vacío', { propio: '   ', pid: PID_Q, estricto: true }, 'rechazo', CON);
   caso('   …pero sí sobre una cama libre (el primer ingreso de una pantalla vieja)', { propio: '', pid: '', estricto: true }, 'seguir');
   caso('   …y sobre una ocupada sin PATIENT_ID (no hay a quién reclamar)', { propio: '', pid: undefined, estricto: true }, 'seguir');
+
+  console.log('   · H9: el pid propio de un paciente que YA EGRESÓ (`archivado`, lo que la puerta lee de ARCHIVO_PACIENTES y TIMELINE)');
+  const cA = caso('★★ cama LIBRE y el pid propio ya egresó: CONFLICTO (el ingreso no resucita al egresado)', { propio: PID_P, pid: '', archivado: true }, 'rechazo', CON);
+  caso('★★ …la cama con ESE MISMO pid y ya egresado (un alta a medias) tampoco es un reintento del ingreso: CONFLICTO', { propio: PID_P, pid: PID_P, archivado: true }, 'rechazo', CON);
+  caso('   …sobre una cama ocupada sin PATIENT_ID igual', { propio: PID_P, pid: undefined, archivado: true }, 'rechazo', CON);
+  caso('   …en modo estricto también', { propio: PID_P, pid: '', archivado: true, estricto: true }, 'rechazo', CON);
+  caso('★ `archivado` en falso no cambia nada: cama libre entra', { propio: PID_P, pid: '', archivado: false }, 'seguir');
+  caso('   …ni el reintento propio (ya hecho)', { propio: PID_P, pid: PID_P, archivado: false }, 'yaHecho');
+  caso('   …ni `archivado` sin definir (los bancos antiguos no lo mandan)', { propio: PID_P, pid: PID_P }, 'yaHecho');
+  caso('   …y SIN identidad propia no hay pid que juzgar: `archivado` no se mira', { propio: '', pid: '', archivado: true }, 'seguir');
+  eq('★ el mensaje del egresado es el MISMO del conflicto de ingreso (la pantalla lo muestra tal cual; sin nombres ni identificadores)',
+    (cA || {}).error, (c1 || {}).error);
 
   console.log('   · el mensaje del conflicto');
   const m = (c1 || {}).error || '';
@@ -463,6 +486,155 @@ tramo('D estricto', () => {
   volver();
 });
 
+/* ══ F · H9 · EL INGRESO DE UN PACIENTE QUE YA EGRESÓ ═════════════════════ */
+console.log('\nF · H9: un ingreso con el PATIENT_ID de un paciente ya egresado NO resucita la cama');
+const OP_A = 'op_ingreso_h9_a0001', OP_B = 'op_ingreso_h9_b0002';
+const filasArchivo = pid => DB.ARCHIVO_PACIENTES.filter(a => a.PATIENT_ID === pid);
+const egresosDe = pid => DB.TIMELINE.filter(h => h.TIPO === 'egreso' && h.PATIENT_ID === pid).length;
+const libre = idCama => !camaDe(idCama).OCUPADA;
+
+tramo('F1 GUARDAR_EVOLUCION', () => {
+  console.log('   · F1 · GUARDAR_EVOLUCION: ingreso, alta y el MISMO ingreso reenviado con otro OP_ID (el sello no está)');
+  volver();
+  const r1 = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_A }));
+  const a1 = darAlta('9');
+  si('(el montaje) el ingreso entra, se da el alta y queda UN egreso de P con su hito', r1.ok && a1.ok && libre('9') && filasArchivo(PID_P).length === 1 && egresosDe(PID_P) === 1);
+  const base = sinBit(); M.reiniciar(); const a0 = DB.AUDIT_LOG.length;
+  const r2 = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_B }));
+  conflicto('el ingreso de un paciente ya egresado (otro OP_ID)', r2, M.registro(), sinBit() === base,
+    DB.AUDIT_LOG.slice(a0).filter(f => String(f.accion).indexOf('GUARDAR_EVOLUCION') === 0), 'GUARDAR_EVOLUCION', '9');
+  eq('★★ la cama 9 SIGUE libre (el ingreso no resucitó al egresado)', libre('9') + '/' + (camaDe('9').PATIENT_ID || '(vacío)'), 'true/(vacío)');
+  eq('   …y el egreso de P sigue siendo UNO', filasArchivo(PID_P).length + '/' + egresosDe(PID_P), '1/1');
+  eq('   …el rechazo no deja sello en el caché (reintentar vuelve a evaluar)', PUTS.filter(k => /^op\|/.test(k) && k.indexOf(OP_B) !== -1).length, 0);
+
+  // La respuesta SELLADA del primer ingreso sigue valiendo: es lo que el reintento legítimo recibe, sin escribir.
+  M.reiniciar();
+  const r3 = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_A }));
+  eq('   …y el MISMO OP_ID del primer ingreso (el sello sigue) devuelve la respuesta sellada, sin escribir', r3.ok + '/' + (r3.data || {}).repetida + '/' + M.total(), 'true/true/0');
+  eq('   …y la cama sigue libre', libre('9'), true);
+
+  // Con una segunda alta posterior de OTRO paciente en la misma cama nada se mezcla: Q entra normal.
+  const q = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_Q, { PAC_NOMBRE: 'Paciente Bravo' }));
+  eq('   …y un paciente NUEVO (otro pid) puede ocupar esa cama con normalidad', q.ok + '/' + camaDe('9').PATIENT_ID, 'true/' + PID_Q);
+});
+
+tramo('F2 INGRESAR_PACIENTE', () => {
+  console.log('   · F2 · INGRESAR_PACIENTE: la misma secuencia');
+  volver();
+  const i1 = llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P, OP_ID: OP_A }));
+  const a1 = darAlta('7');
+  si('(el montaje) el ingreso entra, se da el alta y queda UN egreso de P', i1.ok && a1.ok && libre('7') && filasArchivo(PID_P).length === 1);
+  const base = sinBit(); M.reiniciar(); const a0 = DB.AUDIT_LOG.length;
+  const i2 = llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P, OP_ID: OP_B }));
+  conflicto('INGRESAR_PACIENTE de un paciente ya egresado (otro OP_ID)', i2, M.registro(), sinBit() === base,
+    DB.AUDIT_LOG.slice(a0).filter(f => String(f.accion).indexOf('INGRESAR_PACIENTE') === 0), 'INGRESAR_PACIENTE', '7');
+  eq('★★ la cama 7 SIGUE libre y el egreso de P sigue siendo UNO', libre('7') + '/' + filasArchivo(PID_P).length, 'true/1');
+  // Sin OP_ID (sin sello posible) lo mismo.
+  M.reiniciar();
+  const i3 = llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P }));
+  eq('   …y sin OP_ID también', i3.ok + '/' + i3.codigo + '/' + M.total() + '/' + libre('7'), 'false/CONFLICTO/0/true');
+});
+
+tramo('F3 hito de egreso sin fila de archivo', () => {
+  console.log('   · F3 · el egreso también se reconoce por su HITO (aunque la fila del archivo no esté)');
+  volver();
+  llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_A }));
+  darAlta('9');
+  DB.ARCHIVO_PACIENTES.length = 0;
+  si('(el montaje) el hito de egreso de P sigue y la fila del archivo no', egresosDe(PID_P) === 1 && filasArchivo(PID_P).length === 0);
+  const base = sinBit(); M.reiniciar();
+  const r = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_B }));
+  eq('★ GUARDAR_EVOLUCION: CONFLICTO, sin escribir y la cama libre', r.ok + '/' + r.codigo + '/' + M.total() + '/' + libre('9') + '/' + (sinBit() === base), 'false/CONFLICTO/0/true/true');
+  const i = llama('INGRESAR_PACIENTE', ingresoAPI('9', { PATIENT_ID: PID_P, OP_ID: OP_B }));
+  eq('★ INGRESAR_PACIENTE: igual', i.ok + '/' + i.codigo + '/' + M.total() + '/' + libre('9') + '/' + (sinBit() === base), 'false/CONFLICTO/0/true/true');
+});
+
+tramo('F4 alta a medias y reintento legítimo', () => {
+  console.log('   · F4 · un alta que murió después de escribir el egreso: el ingreso reenviado NO es un reintento, el ALTA reintentada sí converge');
+  volver();
+  llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_A }));
+  callando(() => { M.muereTrasLaEscritura(1); darAlta('9'); });   // la primera escritura del alta es el egreso en el archivo
+  M.reiniciar();
+  si('(el montaje) el egreso de P quedó escrito y la cama 9 sigue OCUPADA por P', filasArchivo(PID_P).length === 1 && !libre('9') && camaDe('9').PATIENT_ID === PID_P);
+  const base = sinBit(); M.reiniciar();
+  const r = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_B }));
+  eq('★ el ingreso reenviado de quien YA TIENE egreso escrito es CONFLICTO, aunque la cama siga ocupada por él: no se vuelve a ingresar', r.ok + '/' + r.codigo + '/' + M.total() + '/' + (sinBit() === base), 'false/CONFLICTO/0/true');
+  const a = darAlta('9');
+  eq('★★ y el REINTENTO DEL ALTA sí converge: termina (ok), libera la cama y deja UN egreso con UN hito', a.ok + '/' + libre('9') + '/' + filasArchivo(PID_P).length + '/' + egresosDe(PID_P), 'true/true/1/1');
+});
+
+tramo('F5 reintento legítimo del ingreso', () => {
+  console.log('   · F5 · el reintento legítimo del ingreso (cama ocupada por ese pid, SIN egreso) sigue convergiendo con otro OP_ID o sin sello');
+  volver();
+  const r1 = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_A }));
+  const r2 = llama('GUARDAR_EVOLUCION', ingresoGE('9', PID_P, { OP_ID: OP_B }));
+  eq('GUARDAR_EVOLUCION con otro OP_ID: ok, UNA evolución y UN hito de ingreso', r1.ok + '/' + r2.ok + '/' + filasDe('9').length + '/' + ingresosDe(PID_P), 'true/true/1/1');
+  volver();
+  llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P, OP_ID: OP_A }));
+  M.reiniciar();
+  const j = llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P, OP_ID: OP_B }));
+  // (la única «escritura» que cuenta el banco con un OP_ID es el sello del caché; a las hojas no se escribe nada)
+  eq('INGRESAR_PACIENTE con otro OP_ID: ok «ya estaba», sin escribir a las hojas', j.ok + '/' + (j.data || {}).yaEstaba + '/' + M.registro().filter(x => !/^CacheService\./.test(x)).length, 'true/true/0');
+});
+
+/* ══ G · H14 · LA FORMA Y LA UNICIDAD DEL PATIENT_ID EN GUARDAR_EVOLUCION ══ */
+console.log('\nG · H14: el PATIENT_ID nuevo que llega al guardado tiene la forma de siempre y no está en OTRA cama ocupada');
+
+tramo('G1 la forma', () => {
+  console.log('   · G1 · un PATIENT_ID mal formado se RECHAZA (VALIDACION) sin escribir');
+  const MALOS = [['con espacios y barras', 'X Y/../<b>'], ['con barra vertical', 'pid|con|barra|01'], ['corto', 'pid_123'],
+    ['de 65 caracteres', 'o'.repeat(65)], ['con tilde', 'pid-ñandú-0001'], ['un número', 12345678], ['una lista', [PID_P]], ['un objeto', { a: 1 }]];
+  MALOS.forEach(([etq, malo]) => {
+    volver(); M.reiniciar();
+    const r = llama('GUARDAR_EVOLUCION', ingresoGE('6', malo));
+    eq('★ ingreso con PATIENT_ID ' + etq + ': VALIDACION, la cama sigue libre y CERO escrituras', r.ok + '/' + r.codigo + '/' + libre('6') + '/' + M.total(), 'false/VALIDACION/true/0');
+    si('   …el motivo dice PATIENT_ID y no repite el valor recibido', /PATIENT_ID/.test(r.error || '') && !/X Y|barra vertical|ñandú|pid_123|ooooo/.test(r.error || ''));
+  });
+  // Y un uuid bien formado entra como siempre.
+  volver();
+  eq('★ un uuid acuñado por la pantalla entra (la forma no estorba al camino normal)', llama('GUARDAR_EVOLUCION', ingresoGE('6', PID_P)).ok, true);
+});
+
+tramo('G2 el pid ya está en otra cama', () => {
+  console.log('   · G2 · un PATIENT_ID que YA ocupa OTRA cama se rechaza sin escribir (el mismo paciente no puede estar en dos camas)');
+  volver();
+  llama('GUARDAR_EVOLUCION', ingresoGE('6', PID_P));
+  const base = sinBit(); M.reiniciar();
+  const r = llama('GUARDAR_EVOLUCION', ingresoGE('7', PID_P, { PAC_NOMBRE: 'Paciente Bravo' }));
+  no('★ el ingreso a la cama 7 con el pid que ya está en la 6: se RECHAZA', r.ok);
+  eq('   …sin escribir nada (base idéntica) y la cama 7 sigue libre', M.total() + '/' + (sinBit() === base) + '/' + libre('7'), '0/true/true');
+  si('   …con un motivo que dice que ese identificador ya está en otra cama', /otra cama/.test(r.error || ''));
+  si('   …sin dar el identificador ni nombrar a nadie (Ley 19.628)', sinDatosAjenos(r.error || ''));
+  eq('   …y P sigue ÚNICAMENTE en la cama 6', DB.CAMAS_ESTADO.filter(c => c.PATIENT_ID === PID_P && c.OCUPADA === true).map(c => c.ID_CAMA).join(','), '6');
+
+  console.log('   · G2b · INGRESAR_PACIENTE, la puerta gemela');
+  M.reiniciar();
+  const i = llama('INGRESAR_PACIENTE', ingresoAPI('7', { PATIENT_ID: PID_P, nombre: 'Paciente Bravo' }));
+  eq('★ INGRESAR_PACIENTE con el pid de otra cama ocupada: rechazo, sin escribir y la cama 7 libre', i.ok + '/' + M.total() + '/' + libre('7'), 'false/0/true');
+
+  console.log('   · G2c · una cama LIBRE que conserva ese pid escrito no cuenta (una cama libre no tiene dueño)');
+  volver();
+  Object.assign(camaDe('9'), { OCUPADA: false, STATUS_CAMA: 'Libre', PATIENT_ID: PID_P });
+  const l = llama('GUARDAR_EVOLUCION', ingresoGE('6', PID_P));
+  eq('★ el ingreso de P a la cama 6 entra aunque la cama 9 (libre) conserve su pid viejo', l.ok + '/' + camaDe('6').PATIENT_ID, 'true/' + PID_P);
+});
+
+tramo('G3 pids antiguos', () => {
+  console.log('   · G3 · las camas YA ocupadas con un pid antiguo (que no tiene la forma acuñada) siguen guardando normal');
+  volver();
+  Object.assign(camaDe('8'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', PATIENT_ID: 'PID-ANT', NOMBRE: 'Paciente Antiguo', EDAD: 70, SEXO: 'M' });
+  const g1 = llama('GUARDAR_EVOLUCION', evo('8', { EPISODIO_ABIERTO: 'PID-ANT', PAC_NOMBRE: 'Paciente Antiguo' }));
+  eq('★ un guardado normal de esa cama (episodio abierto = su pid antiguo, sin PATIENT_ID) guarda', g1.ok + '/' + camaDe('8').PATIENT_ID, 'true/PID-ANT');
+  const g2 = llama('GUARDAR_EVOLUCION', evo('8', { EPISODIO_ABIERTO: 'PID-ANT', PATIENT_ID: 'PID-ANT', PAC_NOMBRE: 'Paciente Antiguo' }));
+  eq('★ y mandando ese MISMO pid en el payload (no es un pid nuevo: no se le exige la forma) también', g2.ok + '/' + camaDe('8').PATIENT_ID, 'true/PID-ANT');
+  const g3 = llama('GUARDAR_EVOLUCION', ingresoGE('8', 'PID-ANT', { ES_INGRESO: false, PAC_NOMBRE: 'Paciente Antiguo' }));
+  eq('   …y el reintento de un ingreso sobre esa cama con ese mismo pid antiguo (vacío + pid de la cama) tampoco se rechaza por la forma', g3.ok, true);
+  // El cambio de identidad con un pid nuevo mal formado sí se rechaza, aunque la cama tenga un pid antiguo.
+  M.reiniciar();
+  const g4 = llama('GUARDAR_EVOLUCION', evo('8', { EPISODIO_ABIERTO: 'PID-ANT', PATIENT_ID: 'X Y/../<b>', PAC_NOMBRE: 'Paciente Antiguo' }));
+  eq('★ pero un pid NUEVO mal formado sobre esa cama se rechaza (VALIDACION) sin escribir', g4.ok + '/' + g4.codigo + '/' + M.total(), 'false/VALIDACION/0');
+});
+
 /* ══ E · LA FORMA ═════════════════════════════════════════════════════════ */
 console.log('\nE · La forma: la regla va DENTRO del lock, después de validarEpisodioAbierto y antes de la primera escritura');
 tramo('E forma', () => {
@@ -499,6 +671,32 @@ tramo('E forma', () => {
   const dom = leer('dominio_validacion.gs');
   si('★ la regla del ingreso vive en dominio_validacion.gs, en la misma tabla de puertas que las demás', /case 'INGRESO':/.test(dom));
   si('   …y su mensaje no es el del cambio de paciente (la pantalla distingue los dos por la frase)', /function _msgIngresoConflicto\(/.test(dom));
+  // H14 · el pid nuevo (forma y otra cama) se comprueba DENTRO del lock, tras comparar el episodio y antes de la regla del ingreso
+  // y de la primera escritura; la forma sale de UNA sola función de dominio (la misma de validarPayloadIngreso).
+  const iPidNuevo = ge.indexOf('_candadoDePidNuevo(');
+  si('★ H14 · guardarEvolucion llama a _candadoDePidNuevo DENTRO del lock, DESPUÉS de validarEpisodioAbierto y ANTES de la regla del ingreso',
+    iPidNuevo > iAbierto && iAbierto > -1 && iPidNuevo < iIngreso);
+  const cpn = cuerpoDeEn('svc_evoluciones.gs', '_candadoDePidNuevo');
+  si('   …que exige la forma solo a un pid DISTINTO del de la cama (las camas con pids antiguos siguen guardando)',
+    /cama\.PATIENT_ID/.test(cpn) && cpn.indexOf('_errPatientIdAcunado(') > cpn.indexOf('cama.PATIENT_ID'));
+  si('   …y mira las otras camas con la función compartida (la misma en INGRESAR_PACIENTE)',
+    /_pidEnOtraCamaOcupada\(/.test(cpn) && /_pidEnOtraCamaOcupada\(/.test(ip));
+  si('   …y la forma sale de UNA función de dominio que validarPayloadIngreso también usa',
+    /function _errPatientIdAcunado\(/.test(dom) && /_errPatientIdAcunado\(d\.PATIENT_ID\)/.test(dom));
+  // H9 · el egresado se lee solo con identidad propia y la regla pura decide.
+  si('★ H9 · _candadoDeIngreso lee si el pid propio ya egresó SOLO con identidad propia y se lo da a la regla (archivado)',
+    /propio \? _episodioYaEgresado\(propio\)/.test(ci) && /archivado: archivado/.test(ci));
+  si('   …igual que ingresarPaciente (las dos puertas que ingresan deciden con la misma fila)',
+    /archivado: propio \? _episodioYaEgresado\(propio\)/.test(ip));
+  // H18 · el reintento «ya estaba» completa lo que falte ANTES de contestar.
+  const iYa = ip.indexOf("d.estado === 'yaHecho'");
+  const iCompl = ip.indexOf('_ingresoCompletarSiFalta(');
+  const iOkYa = ip.indexOf("accion: 'ingreso (ya estaba)'");
+  si('★ H18 · la rama «ya estaba» de ingresarPaciente completa el hito y la tarjeta ANTES de contestar', iYa > -1 && iCompl > iYa && iOkYa > iCompl);
+  // H9 · darAltaPaciente rechaza la fila de archivo de OTRA estadía antes de la primera escritura.
+  const da = cuerpoDeEn('svc_camas.gs', 'darAltaPaciente');
+  const iMisma = da.indexOf('_esLaMismaEstadia('), iIns = da.indexOf("repoInsertar('ARCHIVO_PACIENTES'");
+  si('★ H9 · darAltaPaciente rechaza la fila de archivo de otra estadía ANTES de escribir el egreso', iMisma > -1 && iIns > iMisma);
   const api_ = leer('api.gs');
   si('★ api.gs le pasa el reclamo a las dos puertas (GUARDAR_EVOLUCION e INGRESAR_PACIENTE)',
     /guardarEvolucion\(datos, ctx, _epDeDatos\(datos\)\)/.test(api_) && /ingresarPaciente\(datos, ctx, _epDeDatos\(datos\)\)/.test(api_));
