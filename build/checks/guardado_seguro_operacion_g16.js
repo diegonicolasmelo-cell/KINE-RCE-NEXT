@@ -1434,6 +1434,85 @@ tramo('ANULAR_ANEXO', () => {
   });
 });
 
+/* ══ 25b · ANULAR_ANEXO CON DOS ANEXOS IGUALES: EL REINTENTO NO BORRA EL HITO DEL OTRO (H12) ══════════ */
+console.log('\n25b · ANULAR_ANEXO con dos anexos del mismo nombre: la muerte tras borrar el hito y el reintento no tocan el hito del OTRO');
+// 🔴 EL DEFECTO (revisión adversarial de la tanda 2, H12). Un reintento CON OP_ID y SIN hito propio (la anulación anterior murió justo después
+// de borrar el hito y antes de borrar la fila) seguía adelante y tomaba el candidato más cercano por TIMESTAMP. Con dos anexos del MISMO
+// nombre en el mismo turno (el caso de los «KTM dobles» que originó esta puerta) el único candidato que quedaba era el hito del OTRO anexo:
+// lo borraba. El registro terminaba con un procedimiento SIN hito en la línea de tiempo (0 hitos, 1 fila), y la corrida limpia deja 1 y 1.
+// La regla: solo se borra un hito candidato si hay AL MENOS tantos hitos como anexos de ese nombre; si faltan, el que falta es el de este
+// anexo (ya lo borró el intento que murió) y lo que queda es de los demás.
+tramo('ANULAR_ANEXO · dos anexos iguales', () => {
+  const OP1 = 'op_anexo_h12_0001', OP2 = 'op_anexo_h12_0002';
+  enMundo(() => {
+    SIM.hora = '12:00:00';
+    const a1 = llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: OP1 }));
+    SIM.hora = '12:00:05';                      // otra hora: las dos filas y los dos hitos tienen TIMESTAMP distinto
+    const a2 = llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: OP2 }));
+    si('(el montaje) los dos anexos IGUALES entran', a1.ok && a2.ok);
+  }, () => {
+    const filas = procsDe(MUNDO.PID_P, 'ECOGRAFÍA');
+    const hitos = hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA');
+    si('(el montaje) hay dos filas, dos hitos y dos instancias en la evolución, todo con ids distintos',
+      filas.length === 2 && hitos.length === 2 && cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA') === 2 && filas[0].ID_PROC !== filas[1].ID_PROC && hitos[0].ID_HITO !== hitos[1].ID_HITO);
+    const idProc1 = filas[0].ID_PROC, idProc2 = filas[1].ID_PROC, idHito1 = hitos[0].ID_HITO;
+    // Se anula el SEGUNDO anexo. En la corrida limpia se va su hito (el de TIMESTAMP más cercano) y queda el del primero.
+    const mk2 = () => ({ idProc: idProc2, idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPN });
+    const viola = fase => {
+      const enJson = cuantas(jsonDeTurno('3', TK), 'ECOGRAFÍA'), fs_ = procsDe(MUNDO.PID_P, 'ECOGRAFÍA'), hs = hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA');
+      if (enJson > 2 || fs_.length > 2 || hs.length > 2) return 'quedó algo repetido';
+      if (fase !== 'final') return '';
+      if (enJson !== 1 || fs_.length !== 1 || hs.length !== 1) return 'quedó a medias: ' + enJson + ' en la evolución, ' + fs_.length + ' fila(s) y ' + hs.length + ' hito(s) (debe quedar el primer anexo ENTERO: 1, 1 y 1)';
+      if (fs_[0].ID_PROC !== idProc1) return 'se borró la fila del anexo equivocado';
+      if (hs[0].ID_HITO !== idHito1) return 'el hito que quedó no es el del primer anexo';
+      if (String(filaTurno('3', TK).PROC_CANTIDAD) !== '1') return 'PROC_CANTIDAD no bajó a 1 (' + filaTurno('3', TK).PROC_CANTIDAD + ')';
+      return enCache('3', 'ECOGRAFÍA') ? '' : 'la tarjeta de la cama dejó de mostrar el hito del primer anexo';
+    };
+    matriz('ANULAR_ANEXO del segundo de dos anexos iguales, con OP_ID', 'ANULAR_ANEXO', mk2, viola, { queSeVe: 'un anexo repetido o el hito de otro anexo borrado' });
+
+    // El caso del defecto, a la vista: muere tras borrar el hito del segundo (N=1) y se reintenta.
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(1); llama('ANULAR_ANEXO', mk2()); });
+    eq('(el corte N=1) el hito del segundo ya se borró y su fila sigue: queda el hito del primero y las dos filas', hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').map(h => h.ID_HITO).join(',') + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, idHito1 + '|2');
+    M.reiniciar();
+    const r = llama('ANULAR_ANEXO', mk2());
+    eq('★★ el reintento con el mismo OP_ID termina SIN borrar el hito del primer anexo (hoy: 0 hitos y 1 fila, un procedimiento sin hito)',
+      r.ok + '|' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').map(h => h.ID_HITO).join(',') + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').map(p => p.ID_PROC).join(','), 'true|' + idHito1 + '|' + idProc1);
+
+    // El otro orden: se anula el PRIMERO y muere tras borrar su hito. Las dos corridas (limpia y reintentada) dejan la fila y el hito del segundo.
+    const mk1 = () => ({ idProc: idProc1, idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: 'op_anular_h12_0002' });
+    volverAlMundo();
+    callando(() => { M.muereTrasLaEscritura(1); llama('ANULAR_ANEXO', mk1()); });
+    M.reiniciar();
+    const r1 = llama('ANULAR_ANEXO', mk1());
+    eq('   …y anulando el PRIMERO la cuenta también cuadra: queda UNA fila y UN hito (el del segundo)', r1.ok + '|' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').map(p => p.ID_PROC).join(','), 'true|1|' + idProc2);
+
+    // Sin la muerte, anular uno de dos anexos iguales con OP_ID se lleva EXACTAMENTE un hito (el de la corrida limpia no cambia).
+    volverAlMundo();
+    const limpia = llama('ANULAR_ANEXO', mk2());
+    eq('control: la corrida limpia (sin muerte) se lleva UN solo hito y UNA sola fila', limpia.ok + '|' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, 'true|1|1');
+    // SIN OP_ID la regla de siempre no cambia: se lleva el hito más cercano (anexo_anular.js).
+    volverAlMundo();
+    const sinOp = llama('ANULAR_ANEXO', sinOpId(mk2()));
+    eq('control: sin OP_ID la anulación de siempre sigue igual (un hito y una fila menos)', sinOp.ok + '|' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length, 'true|1|1');
+  });
+
+  // Un procedimiento del GUARDADO con el mismo nombre no es un anexo ni tiene hito de anexo: no entra en la cuenta. Si entrara, anular el único
+  // anexo creería que «falta un hito» y dejaría el suyo vivo en la línea de tiempo (un hito de un anexo que ya no existe).
+  enMundo(() => {
+    const a = llama('ANEXAR_EVENTO', mkAnexo({ OP_ID: OP1 }));
+    DB.PROCEDIMIENTOS.push({ ID_PROC: 'PROC_del_guardado_01', ID_EVOLUCION: 'CAMA_3_' + TK, ID_CAMA: '3', PATIENT_ID: MUNDO.PID_P, FECHA: '2026-08-10', TURNO: 'Dia',
+      TIPO_PROC: 'procedimiento', NOMBRE_PROC: 'ECOGRAFÍA', DESCRIPCION: '', AUTOR_EMAIL: '', TIMESTAMP: '2026-08-10 12:00:03' });
+    si('(el montaje) un anexo y un procedimiento del guardado con el MISMO nombre', a.ok && DB.PROCEDIMIENTOS.filter(p => p.PATIENT_ID === MUNDO.PID_P && p.NOMBRE_PROC === 'ECOGRAFÍA').length === 2);
+  }, () => {
+    const idProc = procsDe(MUNDO.PID_P, 'ECOGRAFÍA')[0].ID_PROC;
+    const r = llama('ANULAR_ANEXO', { idProc, idCama: '3', EPISODIO_ABIERTO: MUNDO.PID_P, OP_ID: OPN });
+    eq('★ anular el único anexo con OP_ID se lleva SU hito aunque haya un procedimiento del guardado con el mismo nombre',
+      r.ok + '|' + hitosAnexoDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '|' + procsDe(MUNDO.PID_P, 'ECOGRAFÍA').length + '|' + DB.PROCEDIMIENTOS.filter(p => p.ID_PROC === 'PROC_del_guardado_01').length,
+      'true|0|0|1');
+  });
+});
+
 /* ══ 26 · ANULAR_EVENTO: LA EVOLUCIÓN SE ESCRIBE AL FINAL ═════════════════ */
 console.log('\n26 · ANULAR_EVENTO: la evolución (el compromiso) se reescribe al final, y el reintento re-sincroniza la cama');
 // 🔴 EL DEFECTO. Reescribía la fila de la evolución PRIMERO y después sincronizaba la cama y le restauraba las fechas de inicio. Una muerte entre

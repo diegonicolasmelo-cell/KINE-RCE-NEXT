@@ -3464,3 +3464,64 @@ pared antes de cada `runFor`, lo que hace una máquina cargada) y una sección n
   esperan con `waitForTimeout` reales de 40 a 700 ms a que conteste el doble. G17 entera aguantó tres corridas con la máquina
   cargada (hasta 10 de carga en 4 núcleos, dos guardias más corriendo a la vez); si alguna vez una de esas secciones se pone roja
   sola, el camino es esperar una condición con `waitForFunction` y no alargar el tiempo.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: las puertas del servidor y una cama libre que conserva su PATIENT_ID
+
+**De dónde sale.** Paso «B puertas servidor» de la revisión de la tanda 2. Siete hallazgos del servidor, todos reproducidos con un
+guion antes de tocar nada, y uno de la guardia misma (H4): `guardado_seguro_episodio_g14.js` daba verde con mutantes del código que
+debían ponerla roja.
+
+**Los defectos, en palabras.**
+- **H1 · anular una evolución desde una cama libre.** `ANULAR_EVENTO` sobre una cama libre, con el `patientId` de un paciente que
+  está vivo en OTRA cama, localizaba la evolución de ese paciente y le copiaba su estado a la cama libre (la «ocupaba» de nuevo con
+  la vía aérea de otro). Ahora se rechaza con VALIDACION y no se escribe nada.
+- **H3/H7 · «ambigua» aunque la pantalla ya había dicho de quién se habla.** Cuando dos pacientes pasaron por la misma cama en el
+  mismo turno, anular sin `patientId` contestaba «la cama tuvo dos pacientes». La pantalla manda el reclamo (`EPISODIO_ABIERTO`),
+  que es exactamente esa respuesta: ahora el localizador usa el reclamo cuando no viene `patientId`. Si viene `patientId`, manda ése.
+  Una fila antigua sin `PATIENT_ID` sigue encontrándose por la clave del turno.
+- **H5 · la cama libre «tiene dueño».** Una cama que quedó libre conserva su `PATIENT_ID` viejo (es a propósito: es el rastro). Pero
+  `anularEvento`, `anexarEventoRapido` y `anularAnexo` lo leían como si fuera su ocupante, y con eso decidían «es de otro paciente»
+  o pedían la clave de coordinación sobre una cama vacía. Ahora toman el dueño igual que `_pidDeCama`: **cama libre = sin dueño**.
+  (La expresión va escrita en línea y no llamando a `_pidDeCama` porque los bancos de pruebas viejos cargan estos archivos con una
+  lista fija que no incluye `svc_camas.gs`.)
+- **H2/H6 · `evalRegistrar` no comparaba al paciente que el payload declara.** Un `patientId` de otro paciente, o un `anulaId` que
+  es la medición de otro paciente, pasaba mientras el reclamo fuera el de la cama: la medición de P quedaba anulada desde la cama
+  de R. Decisión tomada: **se rechaza con VALIDACION** (lo más conservador; no se «corrige» en silencio). Un `anulaId` que no
+  existe no estorba: sigue su camino de antes.
+- **H12 · el reintento de `anularAnexo` borraba el hito de OTRO anexo.** Con dos anexos iguales (mismo nombre) y el servidor
+  muriendo a mitad de la anulación del segundo, el reintento (mismo `OP_ID`) veía «ya no queda fila para este anexo» y borraba el
+  hito que quedaba, que era el del primero: una fila de procedimiento sin hito. Ahora, con `OP_ID`, el hito solo se borra si hay al
+  menos tantos hitos del nombre como anexos vivos del nombre; si no, se entiende que el hito de ese anexo ya se había ido.
+
+**Rojo visto antes de tocar el código.**
+- G14 extendida (secciones B8, D6, E1b): **77 fallos** contra el código sin arreglar, entre ellos «la medición de P NO se anuló y R no
+  ganó ninguna: true/1».
+- G16 sección 25b: roja con la muerte tras el corte N=1, 2 y 3 («quedó a medias: 1 en la evolución, 1 fila y 0 hitos»), y también al
+  anular el primero de los dos anexos.
+- H4, con la herramienta de mutación (copia del árbol fuera del repo, una mutación a la vez): sobrevivían a la guardia de antes 11 de
+  los 12 mutantes (intercambio con «ya hecho» mirando solo a B; mover con «ya hecho» sin exigir origen libre; anexar, anular anexo,
+  medir, alta, limpiar, intercambiar y mover leyendo el `PATIENT_ID` de una cama libre; el 12.º, «ya hecho» mirando solo a A, ya
+  moría). Con la guardia extendida mueren los 23 mutantes de la lista, contando los de H1/H2/H3/H5/H6/H7/H12.
+
+**Qué se cambió.**
+- `v2/svc_evoluciones.gs` (`anularEvento`): dueño de cama con `OCUPADA`; localizador por reclamo (con respaldo por clave para filas
+  sin `PATIENT_ID`); rechazo de H1.
+- `v2/svc_eventos.gs` (`anexarEventoRapido`, `anularAnexo`): dueño de cama con `OCUPADA`; la cuenta de anexos contra hitos de H12.
+- `v2/svc_evaluaciones.gs` (`evalRegistrar`): compara con el reclamo el `patientId` declarado y el paciente de la medición que se anula.
+- `build/checks/guardado_seguro_episodio_g14.js`: B8, C6, D6, E1b nuevas (alta, limpiar, intercambiar y mover sobre camas libres con
+  `PATIENT_ID` viejo; los dos «ya hecho»; anexar y anular anexo; las dos puertas de `evalRegistrar`).
+- `build/checks/guardado_seguro_operacion_g16.js`: sección 25b (dos anexos iguales con `OP_ID`, matriz de muerte, y un procedimiento del
+  guardado con el mismo nombre insertado directo para que la cuenta no mezcle tipos).
+- `build/paquete_migracion/servicios.gs`: lo regenera la guardia `paquete.js`. `entrega/` queda para el cierre.
+
+### Para no olvidar
+
+- 🪤 **Cama libre ≠ cama sin `PATIENT_ID`.** Al liberar una cama el `PATIENT_ID` se queda (es el rastro del último paciente). Cualquier
+  puerta nueva que lea el dueño de una cama tiene que preguntar `OCUPADA` primero; la regla vive en `_pidDeCama` y G14 tiene ahora
+  un caso por puerta con una cama libre que conserva el id.
+- 🪤 **Un mutante que sobrevive es una afirmación que falta.** Los 11 de H4 estaban «cubiertos» por una guardia verde. M19 sobrevivió
+  incluso a la sección 25b hasta que se agregó el control de «mismo nombre, otro tipo»: la prueba de mutación se repite cada vez que
+  se amplía una guardia.
+- 🪤 **Los guiones de reproducción corren sobre una copia.** Uno de los guiones del scratchpad apuntaba a una copia vieja del árbol y
+  siguió mostrando «ambigua» después del arreglo; se rehízo apuntando al repositorio y contesta `ok`. Antes de dudar del arreglo,
+  mirar contra qué árbol corre el guion.

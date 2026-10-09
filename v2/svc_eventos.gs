@@ -195,7 +195,12 @@ function anexarEventoRapido(datos, ctx, ep) {
       const fechaEf = _fechaEfectivaTurno(fecha, turno);
 
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-      const pidCama = String((cama && cama.PATIENT_ID) || '');
+      /* 🔴 EL DUEÑO DE UNA CAMA LIBRE ES NADIE (revisión de la tanda 2, H5). Con el PATIENT_ID crudo, una cama LIBRE cuya fila conserva
+         el de P (una fila editada a mano en la planilla) hacía `enCama` verdadero para la evolución viva de P: el ➕ entraba sin la clave
+         de coordinación que se le pide a P cuando ya no está en su cama, y el cambio de un filtro le reiniciaba el reloj a una cama sin
+         paciente. Es la regla de `_pidDeCama` (svc_camas.gs: alta, limpiar, intercambiar y mover), en línea porque los bancos antiguos
+         cargan este servicio con una lista fija de archivos, sin svc_camas.gs. */
+      const pidCama = (cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '') : '';
 
       /* 🔴 LA CAMA YA NO AUTORIZA: CLASIFICA. Antes bastaba con que la cama
          estuviera ocupada, y el turno se resolvía por `ID_EVOLUCION`, que
@@ -258,7 +263,7 @@ function anexarEventoRapido(datos, ctx, ep) {
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
         const _declarado = String(datos.patientId || '').trim();
         const _reclamo = (_ep.a !== undefined && _ep.a !== null) ? _ep.a : (_declarado || undefined);
-        const _atribuido = pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _atribuido = pidEvo || pidCama;
         const _msgEp = validarEpisodioPuerta(_reclamo, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
@@ -603,7 +608,8 @@ function anularAnexo(datos, ctx, ep) {
       }
 
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-      const pidCama = String((cama && cama.PATIENT_ID) || '');
+      // El dueño de una cama LIBRE es nadie aunque la fila conserve un PATIENT_ID viejo (H5; ver anexarEventoRapido).
+      const pidCama = (cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '') : '';
       const pidEvo = String((ubic && ubic.obj && ubic.obj.PATIENT_ID) || '');
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA) && (!pidProc || pidProc === pidCama));
@@ -618,7 +624,7 @@ function anularAnexo(datos, ctx, ep) {
          coordinación de abajo queda tal cual. Solo se invoca con reclamo o con el modo estricto (ver anexarEventoRapido). */
       const _ep = ep || {};
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
-        const _atribuido = pidProc || pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _atribuido = pidProc || pidEvo || pidCama;
         const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
@@ -659,6 +665,12 @@ function anularAnexo(datos, ctx, ep) {
         return err('No se encontró el hito de ese anexo en la línea de tiempo, así que NO se borró nada: ' +
           'borrar solo la fila dejaría el registro y la línea de tiempo diciendo cosas distintas. Repórtalo.', ERR.VALIDACION);
       }
+      /* Las filas de PROCEDIMIENTOS de esa evolución, leídas UNA vez y solo si hace falta (el reintento sin hito y la cuenta de abajo). */
+      let _filasEvo = null;
+      const filasEvo = function () {
+        if (_filasEvo === null) _filasEvo = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(filaProc.ID_EVOLUCION || ''));
+        return _filasEvo;
+      };
       let hito = null;
       if (cand.length) {
         const tsRef = Date.parse(String(filaProc.TIMESTAMP || '')) || 0;
@@ -668,6 +680,20 @@ function anularAnexo(datos, ctx, ep) {
           return da - db;
         });
         hito = cand[0];
+        /* 🔴 EL HITO MÁS CERCANO NO SIEMPRE ES EL DE ESTE ANEXO (revisión de la tanda 2, H12). Con dos anexos del MISMO nombre en el mismo
+           turno (los «KTM dobles» que originaron esta puerta) cada uno tiene su hito, y si una anulación murió justo después de borrar el
+           hito del suyo y antes de borrar su fila, el reintento (con OP_ID) no tiene hito propio: el único candidato que queda es el del
+           OTRO anexo, y tomar «el más cercano» lo borraba. El registro terminaba con un procedimiento sin hito en la línea de tiempo. Cada
+           anexo tiene su hito: si hay MENOS hitos candidatos que anexos de ese nombre, falta uno y es el de este (ya lo borró el intento
+           que murió); los que quedan son de los demás y no se tocan. Es la misma invariante que usa el PROC_JSON de abajo. Solo con OP_ID:
+           sin él, sin hito emparejable ya se rechazó arriba y la regla de siempre no cambia (anexo_anular.js). */
+        if (op) {
+          const anexosDelNombre = filasEvo().filter(function (r) {
+            return String(r.TIPO_PROC) === 'anexo' && String(r.NOMBRE_PROC).indexOf(nombre) === 0 &&
+                   (!r.PATIENT_ID || !pidProc || String(r.PATIENT_ID) === pidProc);
+          }).length;
+          if (cand.length < anexosDelNombre) hito = null;
+        }
       }
 
       /* EL ORDEN DE LAS ESCRITURAS (G16, paso 11): el hito, la tarjeta de la cama, la evolución y —AL FINAL, el compromiso— la
@@ -699,7 +725,7 @@ function anularAnexo(datos, ctx, ep) {
              anexo siga ahí, las instancias del nombre en PROC_JSON son tantas como las filas si NO se quitó y una menos
              si ya se quitó: solo se quita si no sobran respecto de las filas (misma invariante que `_anexoEscribirProcedimiento`). */
           const enJson = procs.filter(function (x) { return x === nombre; }).length;
-          const filasIguales = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(filaProc.ID_EVOLUCION || '')).filter(function (r) {
+          const filasIguales = filasEvo().filter(function (r) {
             return String(r.NOMBRE_PROC) === nombre && (!r.PATIENT_ID || !pidProc || String(r.PATIENT_ID) === pidProc);
           }).length;
           quitado = enJson >= filasIguales;

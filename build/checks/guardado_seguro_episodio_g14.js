@@ -527,16 +527,18 @@ tramo('B', () => {
     };
   }
   // El contrato de un rechazo: sin éxito, con el código y la frase que se espera, sin escribir NADA y dejando la huella.
-  function rechazo(etiqueta, i, codigo, frase) {
+  // `cama` es la del intento (la 6 por omisión, la de P en esta sección); los casos de la revisión (B8) prueban otras.
+  function rechazo(etiqueta, i, codigo, frase, cama) {
+    cama = cama || '6';
     no('★ ' + etiqueta + ': se RECHAZA', i.r.ok);
     eq('   …con código ' + codigo, i.r.codigo, codigo);
     si('   …y el motivo que se le muestra a la persona (' + frase + ')', frase.test(i.r.error || ''));
-    si('   …nombra la cama 6', /\bcama 6\b/.test(i.r.error || ''));
+    si('   …nombra la cama ' + cama, new RegExp('\\bcama ' + cama + '\\b').test(i.r.error || ''));
     si('★★ …sin nombrar a nadie ni dar el identificador de ningún paciente (Ley 19.628)', sinDatosAjenosB(i.r.error || ''));
     eq('★★ ' + etiqueta + ': NINGUNA escritura aterrizó', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
     si('★★ …y la base COMPLETA quedó idéntica (salvo la bitácora)', i.igual);
     eq('   …la bitácora gana UNA fila: <ACCION>_RECHAZADO', i.bit.map(f => f.accion).join(','), 'ANULAR_EVENTO_RECHAZADO');
-    eq('   …que nombra la cama del intento', (i.bit[0] || {}).idEntidad, '6');
+    eq('   …que nombra la cama del intento', (i.bit[0] || {}).idEntidad, cama);
   }
 
   /* ── B1 · lo de todos los días sigue igual ──────────────────────────── */
@@ -670,6 +672,86 @@ tramo('B', () => {
   eq('   …sin escribir nada', i.escrituras.length, 0);
   i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
   si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ── B8 · los huecos que dejó la revisión (H1, H3, H5, H7) ─────────── */
+  console.log('   · B8 · cama libre o sin dueño, el dueño de una cama LIBRE y el ocupante nuevo que comparte la clave del turno');
+
+  // H1 · La cama 7 está LIBRE y un cliente armado a mano declara (patientId) a P, que está vivo en OTRA cama. El localizador hallaba la
+  // fila de P por episodio, el rechazo «es de otro episodio» solo corría con la cama OCUPADA, la fila era viva (no archivada) y el sync le
+  // escribía el estado de P a la cama libre dejándola OCUPADA: P en dos camas. La pantalla real no manda patientId, pero un payload armado
+  // a mano sí, y el modo estricto no lo frena (el vacío sobre una cama libre pasa).
+  const FRASE_NO_ESTA = /no est[aá] en la cama/i;
+  volver();
+  si('(montaje) la cama 7 está LIBRE y P está en la 6 con su turno vivo', camaDe('7').OCUPADA !== true && camaDe('6').PATIENT_ID === PID_P && !!evoDe(TK1, PID_P));
+  const cama7 = JSON.stringify(camaDe('7'));
+  i = intento(anula({ idCama: '7', patientId: PID_P, EPISODIO_ABIERTO: '' }));
+  rechazo('H1 · cama LIBRE + patientId de un paciente vivo en OTRA cama (la pantalla vacía no reclama nada)', i, 'VALIDACION', FRASE_NO_ESTA, '7');
+  eq('★★ …la cama 7 sigue LIBRE y sin un solo cambio (P no quedó en dos camas)', camaDe('7').OCUPADA + '|' + (JSON.stringify(camaDe('7')) === cama7), 'false|true');
+  eq('   …y P sigue en la 6 con su extubación', camaDe('6').PATIENT_ID + '|' + String(evoDe(TK1, PID_P).EXT_OCURRIO), PID_P + '|true');
+  volver();
+  i = intento(anula({ idCama: '7', patientId: PID_P }));
+  rechazo('H1 · lo mismo con la pantalla VIEJA (sin EPISODIO_ABIERTO)', i, 'VALIDACION', FRASE_NO_ESTA, '7');
+  volver();
+  i = intento(anula({ idCama: '7', patientId: PID_P, EPISODIO_ABIERTO: PID_P }));
+  rechazo('H1 · declarando además a P como episodio abierto: la cama 7 no es de P', i, 'VALIDACION', EP_CAMBIO_RE, '7');
+  // …o una cama OCUPADA sin PATIENT_ID (episodio sin ingreso formal): el sync le habría puesto el PATIENT_ID de P (P en dos camas).
+  volver();
+  Object.assign(camaDe('8'), { OCUPADA: true, STATUS_CAMA: 'Ocupada', NOMBRE: 'Carga manual', PATIENT_ID: '' });
+  const cama8 = JSON.stringify(camaDe('8'));
+  i = intento(anula({ idCama: '8', patientId: PID_P, EPISODIO_ABIERTO: '' }));
+  rechazo('H1 · cama OCUPADA sin PATIENT_ID + patientId de un paciente vivo en otra cama', i, 'VALIDACION', FRASE_NO_ESTA, '8');
+  eq('★★ …la cama 8 sigue como estaba (sin el PATIENT_ID de P)', JSON.stringify(camaDe('8')) === cama8, true);
+
+  // H5 · Una cama LIBRE no tiene dueño aunque la fila conserve el PATIENT_ID viejo (la fila editada a mano en la planilla): el reclamo
+  // de P NO puede coincidir con quien ya no está. Antes la puerta leía el PATIENT_ID crudo, el reclamo coincidía, `ubic` era la fila
+  // viva de P y el sync reocupaba la cama (OCUPADA:true). DAR_ALTA, LIMPIAR_CAMA, INTERCAMBIAR y MOVER ya la trataban como sin dueño.
+  volver();
+  camaDe('6').OCUPADA = false;                      // libre; PATIENT_ID sigue siendo el de P
+  si('(montaje) la cama 6 está LIBRE pero conserva el PATIENT_ID de P, y el turno de P sigue vivo', camaDe('6').PATIENT_ID === PID_P && !!evoDe(TK1, PID_P));
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('H5 · el formulario de P sobre una cama LIBRE que conserva su PATIENT_ID', i, 'VALIDACION', EP_CAMBIO_RE);
+  eq('★★ …la cama 6 sigue LIBRE (no se reocupó con el estado de P)', camaDe('6').OCUPADA, false);
+  volver(); camaDe('6').OCUPADA = false;
+  i = intento(anula());
+  rechazo('H5 · lo mismo con la pantalla VIEJA: sin reclamo, una evolución viva de alguien que no está en la cama tampoco se anula', i, 'VALIDACION', FRASE_NO_ESTA);
+  eq('★★ …la cama 6 sigue LIBRE', camaDe('6').OCUPADA, false);
+
+  // H3 · H7 · Misma cama y mismo turno para dos pacientes: P recibió el alta (su fila va al archivo CONSERVANDO la clave) y Q ingresó a
+  // la misma cama y guardó ese turno con una extubación. La clave CAMA_6_<turno> está UNA vez en EVOLUCIONES y UNA en EVOLUCIONES_ARCHIVO.
+  // La pantalla manda {idCama, turnoKey, tipo, EPISODIO_ABIERTO} y no patientId: el localizador resolvía por clave, contaba dos y
+  // contestaba «dos pacientes»; Q no tenía cómo anular su propio evento. El reclamo (ya comparado con la cama) lo identifica sin duda.
+  volver(); darAlta('6');
+  rr = ingresa('6', 'Paciente Bravo'); PID_Q = camaDe('6').PATIENT_ID;
+  rr = api('GUARDAR_EVOLUCION', payload('6', TK1, Object.assign({ EPISODIO_ABIERTO: PID_Q }, EXT)), null);
+  si('(montaje) P salió y Q guardó el MISMO turno con una extubación', rr.ok && PID_Q && PID_Q !== PID_P && String(evoDe(TK1, PID_Q).EXT_OCURRIO) === 'true');
+  si('(montaje) la clave del turno está en las DOS hojas (una fila viva de Q y una de archivo de P)',
+    DB.EVOLUCIONES.some(e => e.ID_EVOLUCION === 'CAMA_6_' + TK1 && e.PATIENT_ID === PID_Q) && DB.EVOLUCIONES_ARCHIVO.some(e => e.ID_EVOLUCION === 'CAMA_6_' + TK1 && e.PATIENT_ID === PID_P));
+  const archivoP = JSON.stringify(DB.EVOLUCIONES_ARCHIVO.filter(e => e.PATIENT_ID === PID_P));
+  const fotoDosPacientes = M.foto();
+  i = intento(anula({ EPISODIO_ABIERTO: PID_Q }));
+  si('★ H3/H7 · Q anula SU evento con lo que manda la pantalla (EPISODIO_ABIERTO, sin patientId): PASA', i.r.ok);
+  eq('   …y no es un «ya estaba»', i.r.data && i.r.data.yaEstaba, undefined);
+  eq('   …el evento ya no está en el turno de Q', String(evoDe(TK1, PID_Q).EXT_OCURRIO), '');
+  eq('★★ …y la fila ARCHIVADA de P quedó como estaba', JSON.stringify(DB.EVOLUCIONES_ARCHIVO.filter(e => e.PATIENT_ID === PID_P)) === archivoP, true);
+  eq('   …la cama 6 sigue siendo de Q', camaDe('6').PATIENT_ID, PID_Q);
+  M.restaurar(fotoDosPacientes);
+  i = intento(anula());
+  no('control: un cliente SIN reclamo ni patientId sigue sin poder elegir entre dos pacientes (la ambigüedad queda para él)', i.r.ok);
+  si('   …y lo dice', /dos pacientes en ese turno/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  M.restaurar(fotoDosPacientes);
+  i = intento(anula({ EPISODIO_ABIERTO: PID_Q, patientId: PID_P }));
+  no('control: un patientId declarado manda sobre el reclamo para ubicar la fila (la de P no es del ocupante: no se anula)', i.r.ok);
+  si('   …y lo dice (es de un episodio anterior de la cama)', /episodio anterior/i.test(i.r.error || ''));
+  eq('   …sin escribir nada', i.escrituras.length, 0);
+  // Una fila ANTIGUA sin PATIENT_ID: el localizador por episodio no la halla, y la puerta tiene que seguir hallándola por la clave
+  // como antes (adoptar su identidad no es asunto del reclamo).
+  volver();
+  evoDe(TK1, PID_P).PATIENT_ID = '';
+  i = intento(anula({ EPISODIO_ABIERTO: PID_P }));
+  si('★ una fila antigua SIN PATIENT_ID se sigue ubicando por la clave aunque la pantalla declare el episodio', i.r.ok);
+  eq('   …y se le anuló el evento', String(DB.EVOLUCIONES.find(e => e.ID_EVOLUCION === 'CAMA_6_' + TK1).EXT_OCURRIO), '');
   volver();
 
   /* ── B7 · la forma ──────────────────────────────────────────────────── */
@@ -1040,6 +1122,77 @@ tramo('C', () => {
   yaHecho('el «ya hecho» también vale en modo estricto', i, 'MOVER_A_CAMA_VACIA');
   volver();
 
+  /* ═════════ C6 · LA CAMA LIBRE NO TIENE DUEÑO Y EL «YA HECHO» NO SE REGALA (H4) ═════════ */
+  console.log('   · C6 · una cama LIBRE con el PATIENT_ID viejo no es de nadie, y el «ya hecho» exige las DOS mitades');
+  // 🔴 DE DÓNDE SALE. La revisión mutó cada puerta y estas variantes SOBREVIVÍAN con la guardia en verde, porque nadie ejercitaba el
+  // caso que el código dice manejar: una cama LIBRE cuya fila conserva un PATIENT_ID (una fila editada a mano en la planilla). Con el
+  // mutante «el pid ignora OCUPADA» el reclamo de P coincide con quien ya no está ahí: el alta cambia de mensaje, la limpieza archiva
+  // las evoluciones VIVAS de P, el traslado reconoce un «ya hecho» que no ocurrió. Y dos «ya hecho» eran más generosos de lo que dice su
+  // tabla: el intercambio evaluando solo la mitad B y el traslado sin exigir que el origen haya quedado libre.
+  const libreConPid = (id, pid) => Object.assign(camaDe(id), { OCUPADA: false, PATIENT_ID: pid });
+
+  // — DAR_ALTA —
+  volver(); libreConPid('3', PID_P);
+  si('(montaje) la cama 3 está LIBRE, conserva el PATIENT_ID de P y P NO está archivado', camaDe('3').OCUPADA === false && camaDe('3').PATIENT_ID === PID_P && archivoDe(PID_P) === 0);
+  i = corre('DAR_ALTA', alta({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('H4 · alta con el formulario de P sobre una cama LIBRE que conserva su PATIENT_ID (P no está archivado)', i, 'DAR_ALTA', VAL, EP_CAMBIO_RE, '3');
+  eq('★★ …P no se archivó y sus evoluciones siguen vivas', archivoDe(PID_P) + '/' + evosDe(PID_P), '0/2');
+
+  // — LIMPIAR_CAMA —
+  volver(); libreConPid('3', PID_P);
+  i = corre('LIMPIAR_CAMA', limpia({ EPISODIO_ABIERTO: PID_P }));
+  yaHecho('H4 · limpiar con el formulario de P sobre una cama LIBRE (no hay nada que limpiar)', i, 'LIMPIAR_CAMA');
+  eq('★★ …las evoluciones VIVAS de P NO se archivaron', evosDe(PID_P) + '/' + DB.EVOLUCIONES_ARCHIVO.filter(e => e.PATIENT_ID === PID_P).length, '2/0');
+
+  // — INTERCAMBIAR_CAMAS —
+  // El intercambio aterrizó (3 = R, 4 = P); R recibió el alta y entró Q a la 3. El formulario VIEJO manda (P, R): B ya tiene a P, pero A la
+  // ocupa un TERCERO. Con el «ya hecho» mirando solo la mitad B contestaba «ya estaba» y anotaba un traslado a nombre de Q.
+  volver();
+  const sw1 = corre('INTERCAMBIAR_CAMAS', swap({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: PID_R }));
+  si('(el intercambio aterriza: 3 = R, 4 = P)', sw1.r.ok && camaDe('3').PATIENT_ID === PID_R && camaDe('4').PATIENT_ID === PID_P);
+  altaDe('3'); entraQ('3');
+  si('(montaje) R salió, la 3 es de Q y la 4 sigue con P', camaDe('3').PATIENT_ID === PID_Q && camaDe('4').PATIENT_ID === PID_P && archivoDe(PID_R) === 1);
+  const trasladosQ0 = () => DB.TIMELINE.filter(h => h.PATIENT_ID === PID_Q && /^Traslado a Cama/.test(h.TEXTO || '')).length;
+  i = corre('INTERCAMBIAR_CAMAS', swap({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: PID_R }));
+  rechazo('H4 · el formulario VIEJO del intercambio: la B ya tiene a P pero la A la ocupa un TERCERO', i, 'INTERCAMBIAR_CAMAS', VAL, EP_CAMBIO_RE, '3');
+  eq('★★ …Q sigue en la 3 y P en la 4, y no se anotó ningún traslado a nombre de Q', camaDe('3').PATIENT_ID + '/' + camaDe('4').PATIENT_ID + '/' + trasladosQ0(), PID_Q + '/' + PID_P + '/0');
+  // El simétrico: P recibió el alta y entró Q a la 4. La A (3) ya tiene a R, pero la B la ocupa un tercero.
+  volver();
+  corre('INTERCAMBIAR_CAMAS', swap({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: PID_R }));
+  altaDe('4'); entraQ('4');
+  si('(montaje) P salió, la 4 es de Q y la 3 sigue con R', camaDe('4').PATIENT_ID === PID_Q && camaDe('3').PATIENT_ID === PID_R && archivoDe(PID_P) === 1);
+  i = corre('INTERCAMBIAR_CAMAS', swap({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: PID_R }));
+  rechazo('H4 · el formulario VIEJO del intercambio: la A ya tiene a R pero la B la ocupa un TERCERO', i, 'INTERCAMBIAR_CAMAS', VAL, EP_CAMBIO_RE, '3');
+  eq('★★ …R sigue en la 3 y Q en la 4, y no se anotó ningún traslado a nombre de Q', camaDe('3').PATIENT_ID + '/' + camaDe('4').PATIENT_ID + '/' + trasladosQ0(), PID_R + '/' + PID_Q + '/0');
+  // Dos camas LIBRES que conservan los PATIENT_ID cruzados: ninguna tiene dueño, así que no hay «ya hecho» que reconocer.
+  volver(); libreConPid('3', PID_R); libreConPid('4', PID_P);
+  i = corre('INTERCAMBIAR_CAMAS', swap({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: PID_R }));
+  rechazo('H4 · dos camas LIBRES con los PATIENT_ID viejos cruzados', i, 'INTERCAMBIAR_CAMAS', VAL, EP_CAMBIO_RE, '3');
+
+  // — MOVER_A_CAMA_VACIA —
+  // El traslado aterrizó (P en la 9, la 3 libre) y entró Q a la 3. El formulario viejo manda (P, destino libre): el destino ya tiene a P,
+  // pero el ORIGEN lo ocupa otro. Sin exigir el origen libre contestaba «ya estaba» a una cama que ahora es de Q.
+  volver();
+  const mv1 = corre('MOVER_A_CAMA_VACIA', mueve({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: '' }));
+  si('(el traslado aterriza: P en la 9)', mv1.r.ok && camaDe('9').PATIENT_ID === PID_P && camaDe('3').OCUPADA === false);
+  entraQ('3');
+  si('(montaje) la 3 es de Q y P sigue en la 9', camaDe('3').PATIENT_ID === PID_Q && camaDe('9').PATIENT_ID === PID_P);
+  i = corre('MOVER_A_CAMA_VACIA', mueve({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: '' }));
+  rechazo('H4 · el destino ya tiene a P pero el ORIGEN lo ocupa OTRO', i, 'MOVER_A_CAMA_VACIA', VAL, EP_CAMBIO_RE, '3');
+  eq('★★ …Q sigue en la 3 con su turno y P en la 9', camaDe('3').PATIENT_ID + '/' + evosDe(PID_Q) + '/' + camaDe('9').PATIENT_ID, PID_Q + '/1/' + PID_P);
+  // El origen LIBRE que conserva el PATIENT_ID de P: el reclamo de P no coincide con nadie (el motivo es el cambio de paciente, no «la cama
+  // origen está libre»).
+  volver(); libreConPid('3', PID_P);
+  i = corre('MOVER_A_CAMA_VACIA', mueve({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: '' }));
+  rechazo('H4 · el origen LIBRE que conserva el PATIENT_ID de P', i, 'MOVER_A_CAMA_VACIA', VAL, EP_CAMBIO_RE, '3');
+  // El DESTINO libre que conserva el PATIENT_ID de P, con el origen ya limpio: sin dueño no hay «ya hecho» (reconocerlo reetiquetaba las
+  // evoluciones de P a la 9 sin que P se hubiera movido).
+  volver(); libreConPid('3', ''); libreConPid('9', PID_P);
+  i = corre('MOVER_A_CAMA_VACIA', mueve({ EPISODIO_ABIERTO: PID_P, EPISODIO_ABIERTO_B: '' }));
+  rechazo('H4 · el DESTINO libre que conserva el PATIENT_ID de P y el origen ya limpio', i, 'MOVER_A_CAMA_VACIA', VAL, EP_CAMBIO_RE, '3');
+  eq('★★ …las evoluciones de P siguen etiquetadas a la cama 3', DB.EVOLUCIONES.filter(e => e.PATIENT_ID === PID_P).every(e => e.ID_CAMA === '3'), true);
+  volver();
+
   /* ═════════ C5 · la forma ═════════ */
   console.log('   · C5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes');
   const svc = leer('svc_camas.gs');
@@ -1377,6 +1530,56 @@ tramo('D', () => {
   si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
   volver();
 
+  /* ═════════ D6 · UNA CAMA LIBRE NO TIENE DUEÑO, AUNQUE LA FILA CONSERVE UN PATIENT_ID VIEJO (H5, H4) ═════════ */
+  console.log('   · D6 · cama LIBRE que conserva el PATIENT_ID de P (fila editada a mano): el ➕ y anular un anexo la tratan como sin dueño');
+  // 🔴 DE DÓNDE SALE. Estas puertas tomaban el dueño de la cama con el PATIENT_ID crudo de la fila, no con «solo cuenta si está
+  // OCUPADA»: con la cama libre y el PATIENT_ID de P retenido, el reclamo de P coincidía con quien ya no está, `enCama` salía verdadero y
+  // el ➕ escribía (y el reloj de un filtro se reiniciaba) sin pedir la clave de coordinación que se le pide a P cuando ya no está en la
+  // cama. DAR_ALTA, LIMPIAR_CAMA, INTERCAMBIAR y MOVER ya la trataban como libre; estas dos eran la excepción.
+  const libreDeP = () => { volver(); camaDe('7').OCUPADA = false; };
+  libreDeP();
+  si('(montaje) la cama 7 está LIBRE, conserva el PATIENT_ID de P y el turno de P sigue vivo', camaDe('7').OCUPADA === false && camaDe('7').PATIENT_ID === PID_P && !!DB.EVOLUCIONES.find(e => e.PATIENT_ID === PID_P && e.TURNO_KEY === TK1));
+  // Un turno que nadie guardó: no hay fila que ubicar y el ➕ caía a «quien esté en la cama».
+  ['otro', 'cultivo'].forEach(tipo => {
+    libreDeP();
+    i = corre('ANEXAR_EVENTO', evento(tipo, { EPISODIO_ABIERTO: PID_P }));
+    rechazo('H4 · «' + tipo + '» sobre un turno sin evolución, con la cama LIBRE que conserva el PATIENT_ID de P', i, 'ANEXAR_EVENTO', VAL, EP_CAMBIO_RE, '7');
+  });
+  // Un turno con la evolución viva de P: antes el ➕ entraba sin clave como si P estuviera en su cama.
+  libreDeP();
+  const hitosP0 = hitosDe(PID_P).length;
+  i = corre('ANEXAR_EVENTO', evento('otro', { turnoKey: TK1, EPISODIO_ABIERTO: PID_P }));
+  no('★ H5 · «otro» sobre el turno vivo de P con la cama LIBRE: NO entra sin clave (P ya no está en su cama)', i.r.ok);
+  eq('   …se pide la clave de coordinación, como a cualquier episodio cerrado', i.r.codigo, NA);
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  libreDeP();
+  i = conClave(() => corre('ANEXAR_EVENTO', evento('otro', { turnoKey: TK1, EPISODIO_ABIERTO: PID_P, coordToken: 'COORD_OK' })));
+  si('★ …CON la clave entra (el candado de coordinación sigue como hoy): el hito es de P', i.r.ok && hitosDe(PID_P).length === hitosP0 + 1);
+  eq('★★ …y NO se reocupa la cama 7 (el hito va sin sincronizar la tarjeta)', camaDe('7').OCUPADA, false);
+  // El cambio de un filtro es el reloj de LA CAMA: con la cama libre no hay a quién reiniciárselo.
+  libreDeP();
+  const disp0 = JSON.stringify([camaDe('7').DISP_HME_FECHA, camaDe('7').DISP_CONFIRMADO]);
+  i = corre('ANEXAR_EVENTO', evento('hme', { turnoKey: TK1, EPISODIO_ABIERTO: PID_P }));
+  no('★ H5 · el cambio de HME sobre el turno vivo de P con la cama LIBRE: pide la clave de coordinación', i.r.ok);
+  eq('   …con el código de la clave', i.r.codigo, NA);
+  eq('★★ …sin escribir nada', i.escrituras.join(' | ') || '(ninguna)', '(ninguna)');
+  libreDeP();
+  i = conClave(() => corre('ANEXAR_EVENTO', evento('hme', { turnoKey: TK1, EPISODIO_ABIERTO: PID_P, coordToken: 'COORD_OK' })));
+  no('★ …y ni con la clave: el reloj es de la cama y la cama ya no es de P (no se anota hacia atrás)', i.r.ok);
+  si('   …y lo dice (hacia atrás)', /hacia atr[aá]s/i.test(i.r.error || ''));
+  eq('★★ …el reloj de la cama 7 no se tocó', JSON.stringify([camaDe('7').DISP_HME_FECHA, camaDe('7').DISP_CONFIRMADO]), disp0);
+  // ANULAR_ANEXO: el anexo es de P (su fila lo dice); lo que cambia es si P ESTÁ en su cama, y con la cama libre no está.
+  libreDeP();
+  i = corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P }));
+  no('★ H5 · anular el anexo de P con la cama LIBRE que conserva su PATIENT_ID: pide la clave de coordinación', i.r.ok);
+  eq('   …con el código de la clave', i.r.codigo, NA);
+  eq('★★ …sin escribir nada y el anexo sigue en el registro', (i.escrituras.join(' | ') || '(ninguna)') + '/' + anexosDe(PID_P), '(ninguna)/1');
+  libreDeP();
+  i = conClave(() => corre('ANULAR_ANEXO', anula({ EPISODIO_ABIERTO: PID_P, coordToken: 'COORD_OK' })));
+  si('★ …CON la clave se borra el anexo de P', i.r.ok && anexosDe(PID_P) === 0);
+  eq('★★ …y la cama 7 sigue LIBRE (no se reocupó)', camaDe('7').OCUPADA, false);
+  volver();
+
   /* ═════════ D5 · la forma ═════════ */
   console.log('   · D5 · la forma: la comparación va DENTRO del lock, antes de la primera escritura, y nada se lee antes');
   const cuerpoDeEn = (archivo, nombre) => {
@@ -1552,6 +1755,50 @@ tramo('E', () => {
   eq('   …sin escribir nada', i.escrituras.length, 0);
   i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
   si('★ con el episodio vigente PASA también en modo estricto', i.r.ok);
+  volver();
+
+  /* ═════════ E1b · LO DECLARADO APARTE DEL RECLAMO (H2, H6) Y LA CAMA LIBRE CON PID VIEJO (H4) ═════════ */
+  console.log('   · E1b · patientId y anulaId de OTRO paciente no esquivan el reclamo; una cama LIBRE no tiene dueño');
+  // 🔴 DE DÓNDE SALE. El candado comparaba EPISODIO_ABIERTO con la CAMA, pero `_evalRegistrarInterno` atribuye la fila a
+  // `datos.patientId || datos.PATIENT_ID || cama.PATIENT_ID`, y `anulaId` anula cualquier fila de EVALUACIONES por id sin mirar de quién
+  // es. Con el reclamo de quien ocupa la cama (el candado pasa) y OTRO paciente declarado, la medición se escribía a nombre del otro, el
+  // espejo ULT_* se copiaba a la ficha del ocupante y el hito de la línea de tiempo quedaba atribuido al ajeno; con un anulaId ajeno se
+  // anulaba la medición de otro paciente. La pantalla real no manda ninguno de los dos (hace falta un payload armado a mano), pero la
+  // promesa del reclamo es proteger a quien ocupa la cama.
+  const evalsP0 = () => evalsDe(PID_P).length;
+  volver();
+  let ev0 = evalsP0();
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, patientId: PID_P }));
+  rechazo('H6 · el reclamo es el de la cama 2 (R) pero el payload declara a P (patientId)', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '2');
+  eq('★★ …R no ganó el espejo ULT_MRC de P, ni hito, y P no ganó una medición de más', String(camaDe('2').ULT_MRC || '(vacío)') + '/' + hitosDe(PID_R).filter(h => h.TIPO === 'evaluacion').length + '/' + evalsP0(), '(vacío)/0/' + ev0);
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, PATIENT_ID: PID_P }));
+  rechazo('H6 · lo mismo declarado como PATIENT_ID (la forma de las columnas)', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '2');
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, patientId: PID_R }));
+  si('control: declarar ADEMÁS al mismo episodio de la cama no estorba (la medición es de R)', i.r.ok && evalsDe(PID_R).length === 1);
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, anulaId: ID_EVAL_P }));
+  rechazo('H2 · el reclamo es el de la cama 2 (R) pero anulaId es la medición de P', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '2');
+  eq('★★ …la medición de P NO se anuló y R no ganó ninguna', String((evalsDe(PID_P).find(e => e.ID_EVAL === ID_EVAL_P) || {}).ANULADA) + '/' + evalsDe(PID_R).length, 'false/0');
+  // La corrección PROPIA sigue pasando: R mide y después corrige su propia medición.
+  volver();
+  const rMide = api('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, total: '30' }), null);
+  const idEvalR = rMide.ok && rMide.data && rMide.data.idEval;
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, total: '32', anulaId: idEvalR }));
+  si('control: corregir la medición PROPIA con anulaId sigue pasando (agrega la nueva y anula la vieja)',
+    !!idEvalR && i.r.ok && String((DB.EVALUACIONES.find(e => e.ID_EVAL === idEvalR) || {}).ANULADA) === 'true' && evalsDe(PID_R).length === 2);
+  // Un anulaId que no existe sigue como hoy: no hay de quién ser, y la puerta no inventa un rechazo.
+  volver();
+  i = corre('EVAL_REGISTRAR', mide({ idCama: '2', EPISODIO_ABIERTO: PID_R, anulaId: 'EVAL_no_existe' }));
+  si('control: un anulaId que no existe no rechaza (la medición nueva se registra, como hoy)', i.r.ok && evalsDe(PID_R).length === 1);
+
+  // H4 · una cama LIBRE que conserva el PATIENT_ID de P: el reclamo de P no coincide con nadie.
+  volver(); Object.assign(camaDe('1'), { OCUPADA: false });
+  si('(montaje) la cama 1 está LIBRE pero conserva el PATIENT_ID de P', camaDe('1').OCUPADA === false && camaDe('1').PATIENT_ID === PID_P);
+  i = corre('EVAL_REGISTRAR', mide({ EPISODIO_ABIERTO: PID_P }));
+  rechazo('H4 · el formulario de P sobre una cama LIBRE que conserva su PATIENT_ID', i, 'EVAL_REGISTRAR', VAL, EP_CAMBIO_RE, '1');
+  eq('★★ …la cama 1 sigue libre y no ganó el espejo ULT_MRC', camaDe('1').OCUPADA + '/' + String(camaDe('1').ULT_MRC), 'false/40');
   volver();
 
   /* ═════════ E2 · EPISODIO_ESCALA ═════════ */

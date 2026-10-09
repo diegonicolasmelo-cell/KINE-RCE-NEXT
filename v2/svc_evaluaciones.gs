@@ -82,7 +82,16 @@ function evalRegistrar(datos, ctx, ep) {
          Va ANTES de `_evalRegistrarInterno`, que queda intacta: la llama también guardarEvolucion, que ya comparó el
          episodio con su propia regla. Solo se invoca con reclamo o con el modo estricto: los bancos antiguos, que cargan
          una lista fija de archivos, no traen dominio_validacion.gs. Si alguien lo pide sin cargarlo REVIENTA (INTERNO) en
-         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice. */
+         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice.
+
+         🔴 LO DECLARADO APARTE NO ESQUIVA AL RECLAMO (revisión de la tanda 2, H2 y H6). El reclamo se compara con la cama, pero el
+         interno atribuye la fila a `datos.patientId || datos.PATIENT_ID || cama.PATIENT_ID`, y `anulaId` anula cualquier fila de
+         EVALUACIONES por su id sin mirar de quién es. Con el reclamo de quien ocupa la cama (el candado pasa) y OTRO paciente
+         declarado, la medición se escribía a nombre del otro y su espejo ULT_* caía igual en la ficha del ocupante; con un `anulaId`
+         ajeno se anulaba la medición de otro paciente. Dentro del mismo candado, entonces: un `patientId` declarado tiene que ser
+         el de la cama, y un `anulaId` tiene que ser una medición de ese mismo paciente (con el mismo mensaje y sin nombrar a nadie).
+         Un `anulaId` que no existe, o una medición antigua sin PATIENT_ID, siguen como hoy. La pantalla real no manda ninguno de los
+         dos: esto cierra al cliente armado a mano. */
       const _ep = ep || {};
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
         const _d = datos || {};
@@ -92,6 +101,13 @@ function evalRegistrar(datos, ctx, ep) {
           const _atribuido = esVerdadero(_cama.OCUPADA) ? String(_cama.PATIENT_ID || '') : '';
           const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, _idCama, _ep.estricto === true);
           if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+          const _msgDecl = validarEpisodioPuerta(String(_d.patientId || _d.PATIENT_ID || ''), _atribuido, _idCama, false);
+          if (_msgDecl) return err(_msgDecl, ERR.VALIDACION);
+          if (_d.anulaId) {
+            const _previa = repoBuscarPorId('EVALUACIONES', 'ID_EVAL', String(_d.anulaId));
+            const _msgPrev = _previa ? validarEpisodioPuerta(String(_previa.PATIENT_ID || ''), _atribuido, _idCama, false) : '';
+            if (_msgPrev) return err(_msgPrev, ERR.VALIDACION);
+          }
         }
       }
       // 🔐 G16 (paso 11): con OP_ID, el id de la medición y el de su hito se DERIVAN de la operación (`derivar` = true).

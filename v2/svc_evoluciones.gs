@@ -1809,7 +1809,12 @@ function anularEvento(datos, ctx, ep) {
   return conLock(function () {
     // La cama, leída UNA vez y dentro del lock: la comparan el reclamo de la pantalla y el candado de abajo.
     const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-    const _pidCama = String((_camaAnu && _camaAnu.PATIENT_ID) || '');
+    /* 🔴 EL DUEÑO DE UNA CAMA LIBRE ES NADIE (revisión de la tanda 2, H5). Una cama libre cuya fila conserva un PATIENT_ID viejo
+       (una fila editada a mano en la planilla) no tiene dueño: con el PATIENT_ID crudo el reclamo de P coincidía con quien ya no está
+       ahí, la evolución viva de P se anulaba y `_syncCamaDesdeEvolucion` reocupaba la cama libre. Es la misma regla de `_pidDeCama`
+       (svc_camas.gs, que usan el alta, limpiar, intercambiar y mover); aquí va en línea porque los bancos antiguos cargan este
+       servicio con una lista fija de archivos, sin svc_camas.gs. */
+    const _pidCama = (_camaAnu && esVerdadero(_camaAnu.OCUPADA)) ? String(_camaAnu.PATIENT_ID || '').trim() : '';
 
     /* El candado de episodio de las demás puertas: lo que la pantalla abrió contra quien ocupa la cama AHORA, antes de
        la primera escritura. Solo corre si la pantalla declaró EPISODIO_ABIERTO o está encendido el modo estricto: los
@@ -1823,7 +1828,16 @@ function anularEvento(datos, ctx, ep) {
 
     // La evolución del turno, por EPISODIO (no por la clave de la cama, que dos pacientes comparten cuando la cama
     // rota) y mirando las DOS hojas: el localizador avisa cuando no puede decidir en vez de elegir por su cuenta.
-    const ubic = _ubicarEvolucionDeTurno(String(datos.patientId || ''), turnoKey, idCama);
+    /* 🔴 EL RECLAMO TAMBIÉN IDENTIFICA LA FILA (revisión de la tanda 2, H3/H7). La pantalla no manda `patientId` en ANULAR_EVENTO, solo
+       EPISODIO_ABIERTO, así que en una cama que rotó dentro del mismo turno (P recibió el alta y Q ingresó y guardó el mismo turno) la
+       clave `CAMA_<n>_<turno>` está una vez en EVOLUCIONES y otra en EVOLUCIONES_ARCHIVO: el localizador por clave contaba dos y contestaba
+       «dos pacientes», y Q no tenía forma de anular su propio evento. El reclamo —que arriba ya se comparó con la cama: si no es vacío,
+       ES el ocupante— lo identifica sin duda. Un `patientId` declarado manda sobre él (como siempre). Si por episodio no hay fila (una fila
+       antigua sin PATIENT_ID) se vuelve a la clave de antes: adoptar la identidad de esa fila no es asunto del reclamo. */
+    const _declarado = String(datos.patientId || '').trim();
+    const _reclamado = (_ep.a === undefined || _ep.a === null) ? '' : String(_ep.a).trim();
+    let ubic = _ubicarEvolucionDeTurno(_declarado || _reclamado, turnoKey, idCama);
+    if (!ubic && !_declarado && _reclamado) ubic = _ubicarEvolucionDeTurno('', turnoKey, idCama);
     if (ubic && ubic.ambigua) {
       return err('La cama ' + idCama + ' tuvo dos pacientes en ese turno: hay que indicar de cuál ' +
         'se está hablando.', ERR.VALIDACION);
@@ -1851,6 +1865,16 @@ function anularEvento(datos, ctx, ep) {
     if (!ubic.vivo) {
       return err('Ese turno ya está archivado: el paciente egresó de la cama ' + idCama + '. Desde aquí no se puede ' +
         'anular un evento de un turno archivado. No se guardó nada.', ERR.VALIDACION);
+    }
+
+    /* 🔴 UNA CAMA SIN DUEÑO NO RECIBE EL ESTADO DE NADIE (revisión de la tanda 2, H1). El rechazo de arriba solo corría con la cama
+       CON paciente. Con la cama LIBRE (o ocupada sin PATIENT_ID: un episodio sin ingreso formal) y un `patientId` declarado de un
+       paciente vivo en OTRA cama, el localizador hallaba su fila viva, ningún candado saltaba y `_syncCamaDesdeEvolucion` le escribía
+       el estado de ese paciente a esta cama y la dejaba OCUPADA: el paciente en dos camas. Mismo daño que el egresado de arriba, por la
+       variante «fila viva de otra cama». Va DESPUÉS del rechazo por archivado: ese tiene su propio motivo. */
+    if (_pidEvo && !_pidCama) {
+      return err('Esa evolución es de un paciente que no está en la cama ' + idCama + ': la cama no tiene un paciente registrado. ' +
+        'Anular desde aquí le copiaría el estado de ese paciente a la cama. No se guardó nada.', ERR.VALIDACION);
     }
 
     // Guard: sin evoluciones posteriores del mismo paciente. Dentro del lock: un turno que otra petición guardó

@@ -4503,7 +4503,16 @@ function evalRegistrar(datos, ctx, ep) {
          Va ANTES de `_evalRegistrarInterno`, que queda intacta: la llama también guardarEvolucion, que ya comparó el
          episodio con su propia regla. Solo se invoca con reclamo o con el modo estricto: los bancos antiguos, que cargan
          una lista fija de archivos, no traen dominio_validacion.gs. Si alguien lo pide sin cargarlo REVIENTA (INTERNO) en
-         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice. */
+         vez de saltarse el candado. Una cama que no existe se deja al interno, que ya lo dice.
+
+         🔴 LO DECLARADO APARTE NO ESQUIVA AL RECLAMO (revisión de la tanda 2, H2 y H6). El reclamo se compara con la cama, pero el
+         interno atribuye la fila a `datos.patientId || datos.PATIENT_ID || cama.PATIENT_ID`, y `anulaId` anula cualquier fila de
+         EVALUACIONES por su id sin mirar de quién es. Con el reclamo de quien ocupa la cama (el candado pasa) y OTRO paciente
+         declarado, la medición se escribía a nombre del otro y su espejo ULT_* caía igual en la ficha del ocupante; con un `anulaId`
+         ajeno se anulaba la medición de otro paciente. Dentro del mismo candado, entonces: un `patientId` declarado tiene que ser
+         el de la cama, y un `anulaId` tiene que ser una medición de ese mismo paciente (con el mismo mensaje y sin nombrar a nadie).
+         Un `anulaId` que no existe, o una medición antigua sin PATIENT_ID, siguen como hoy. La pantalla real no manda ninguno de los
+         dos: esto cierra al cliente armado a mano. */
       const _ep = ep || {};
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
         const _d = datos || {};
@@ -4513,6 +4522,13 @@ function evalRegistrar(datos, ctx, ep) {
           const _atribuido = esVerdadero(_cama.OCUPADA) ? String(_cama.PATIENT_ID || '') : '';
           const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, _idCama, _ep.estricto === true);
           if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+          const _msgDecl = validarEpisodioPuerta(String(_d.patientId || _d.PATIENT_ID || ''), _atribuido, _idCama, false);
+          if (_msgDecl) return err(_msgDecl, ERR.VALIDACION);
+          if (_d.anulaId) {
+            const _previa = repoBuscarPorId('EVALUACIONES', 'ID_EVAL', String(_d.anulaId));
+            const _msgPrev = _previa ? validarEpisodioPuerta(String(_previa.PATIENT_ID || ''), _atribuido, _idCama, false) : '';
+            if (_msgPrev) return err(_msgPrev, ERR.VALIDACION);
+          }
         }
       }
       // 🔐 G16 (paso 11): con OP_ID, el id de la medición y el de su hito se DERIVAN de la operación (`derivar` = true).
@@ -5110,7 +5126,12 @@ function anexarEventoRapido(datos, ctx, ep) {
       const fechaEf = _fechaEfectivaTurno(fecha, turno);
 
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-      const pidCama = String((cama && cama.PATIENT_ID) || '');
+      /* 🔴 EL DUEÑO DE UNA CAMA LIBRE ES NADIE (revisión de la tanda 2, H5). Con el PATIENT_ID crudo, una cama LIBRE cuya fila conserva
+         el de P (una fila editada a mano en la planilla) hacía `enCama` verdadero para la evolución viva de P: el ➕ entraba sin la clave
+         de coordinación que se le pide a P cuando ya no está en su cama, y el cambio de un filtro le reiniciaba el reloj a una cama sin
+         paciente. Es la regla de `_pidDeCama` (svc_camas.gs: alta, limpiar, intercambiar y mover), en línea porque los bancos antiguos
+         cargan este servicio con una lista fija de archivos, sin svc_camas.gs. */
+      const pidCama = (cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '') : '';
 
       /* 🔴 LA CAMA YA NO AUTORIZA: CLASIFICA. Antes bastaba con que la cama
          estuviera ocupada, y el turno se resolvía por `ID_EVOLUCION`, que
@@ -5173,7 +5194,7 @@ function anexarEventoRapido(datos, ctx, ep) {
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
         const _declarado = String(datos.patientId || '').trim();
         const _reclamo = (_ep.a !== undefined && _ep.a !== null) ? _ep.a : (_declarado || undefined);
-        const _atribuido = pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _atribuido = pidEvo || pidCama;
         const _msgEp = validarEpisodioPuerta(_reclamo, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
@@ -5518,7 +5539,8 @@ function anularAnexo(datos, ctx, ep) {
       }
 
       const cama = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-      const pidCama = String((cama && cama.PATIENT_ID) || '');
+      // El dueño de una cama LIBRE es nadie aunque la fila conserve un PATIENT_ID viejo (H5; ver anexarEventoRapido).
+      const pidCama = (cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '') : '';
       const pidEvo = String((ubic && ubic.obj && ubic.obj.PATIENT_ID) || '');
       const enCama = ubic ? (!pidEvo || (!!pidCama && pidEvo === pidCama))
                           : (!!cama && esVerdadero(cama.OCUPADA) && (!pidProc || pidProc === pidCama));
@@ -5533,7 +5555,7 @@ function anularAnexo(datos, ctx, ep) {
          coordinación de abajo queda tal cual. Solo se invoca con reclamo o con el modo estricto (ver anexarEventoRapido). */
       const _ep = ep || {};
       if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
-        const _atribuido = pidProc || pidEvo || ((cama && esVerdadero(cama.OCUPADA)) ? pidCama : '');
+        const _atribuido = pidProc || pidEvo || pidCama;
         const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
         if (_msgEp) return err(_msgEp, ERR.VALIDACION);
       }
@@ -5574,6 +5596,12 @@ function anularAnexo(datos, ctx, ep) {
         return err('No se encontró el hito de ese anexo en la línea de tiempo, así que NO se borró nada: ' +
           'borrar solo la fila dejaría el registro y la línea de tiempo diciendo cosas distintas. Repórtalo.', ERR.VALIDACION);
       }
+      /* Las filas de PROCEDIMIENTOS de esa evolución, leídas UNA vez y solo si hace falta (el reintento sin hito y la cuenta de abajo). */
+      let _filasEvo = null;
+      const filasEvo = function () {
+        if (_filasEvo === null) _filasEvo = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(filaProc.ID_EVOLUCION || ''));
+        return _filasEvo;
+      };
       let hito = null;
       if (cand.length) {
         const tsRef = Date.parse(String(filaProc.TIMESTAMP || '')) || 0;
@@ -5583,6 +5611,20 @@ function anularAnexo(datos, ctx, ep) {
           return da - db;
         });
         hito = cand[0];
+        /* 🔴 EL HITO MÁS CERCANO NO SIEMPRE ES EL DE ESTE ANEXO (revisión de la tanda 2, H12). Con dos anexos del MISMO nombre en el mismo
+           turno (los «KTM dobles» que originaron esta puerta) cada uno tiene su hito, y si una anulación murió justo después de borrar el
+           hito del suyo y antes de borrar su fila, el reintento (con OP_ID) no tiene hito propio: el único candidato que queda es el del
+           OTRO anexo, y tomar «el más cercano» lo borraba. El registro terminaba con un procedimiento sin hito en la línea de tiempo. Cada
+           anexo tiene su hito: si hay MENOS hitos candidatos que anexos de ese nombre, falta uno y es el de este (ya lo borró el intento
+           que murió); los que quedan son de los demás y no se tocan. Es la misma invariante que usa el PROC_JSON de abajo. Solo con OP_ID:
+           sin él, sin hito emparejable ya se rechazó arriba y la regla de siempre no cambia (anexo_anular.js). */
+        if (op) {
+          const anexosDelNombre = filasEvo().filter(function (r) {
+            return String(r.TIPO_PROC) === 'anexo' && String(r.NOMBRE_PROC).indexOf(nombre) === 0 &&
+                   (!r.PATIENT_ID || !pidProc || String(r.PATIENT_ID) === pidProc);
+          }).length;
+          if (cand.length < anexosDelNombre) hito = null;
+        }
       }
 
       /* EL ORDEN DE LAS ESCRITURAS (G16, paso 11): el hito, la tarjeta de la cama, la evolución y —AL FINAL, el compromiso— la
@@ -5614,7 +5656,7 @@ function anularAnexo(datos, ctx, ep) {
              anexo siga ahí, las instancias del nombre en PROC_JSON son tantas como las filas si NO se quitó y una menos
              si ya se quitó: solo se quita si no sobran respecto de las filas (misma invariante que `_anexoEscribirProcedimiento`). */
           const enJson = procs.filter(function (x) { return x === nombre; }).length;
-          const filasIguales = repoLeerTodos('PROCEDIMIENTOS', 'ID_EVOLUCION', String(filaProc.ID_EVOLUCION || '')).filter(function (r) {
+          const filasIguales = filasEvo().filter(function (r) {
             return String(r.NOMBRE_PROC) === nombre && (!r.PATIENT_ID || !pidProc || String(r.PATIENT_ID) === pidProc);
           }).length;
           quitado = enJson >= filasIguales;
@@ -7509,7 +7551,12 @@ function anularEvento(datos, ctx, ep) {
   return conLock(function () {
     // La cama, leída UNA vez y dentro del lock: la comparan el reclamo de la pantalla y el candado de abajo.
     const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-    const _pidCama = String((_camaAnu && _camaAnu.PATIENT_ID) || '');
+    /* 🔴 EL DUEÑO DE UNA CAMA LIBRE ES NADIE (revisión de la tanda 2, H5). Una cama libre cuya fila conserva un PATIENT_ID viejo
+       (una fila editada a mano en la planilla) no tiene dueño: con el PATIENT_ID crudo el reclamo de P coincidía con quien ya no está
+       ahí, la evolución viva de P se anulaba y `_syncCamaDesdeEvolucion` reocupaba la cama libre. Es la misma regla de `_pidDeCama`
+       (svc_camas.gs, que usan el alta, limpiar, intercambiar y mover); aquí va en línea porque los bancos antiguos cargan este
+       servicio con una lista fija de archivos, sin svc_camas.gs. */
+    const _pidCama = (_camaAnu && esVerdadero(_camaAnu.OCUPADA)) ? String(_camaAnu.PATIENT_ID || '').trim() : '';
 
     /* El candado de episodio de las demás puertas: lo que la pantalla abrió contra quien ocupa la cama AHORA, antes de
        la primera escritura. Solo corre si la pantalla declaró EPISODIO_ABIERTO o está encendido el modo estricto: los
@@ -7523,7 +7570,16 @@ function anularEvento(datos, ctx, ep) {
 
     // La evolución del turno, por EPISODIO (no por la clave de la cama, que dos pacientes comparten cuando la cama
     // rota) y mirando las DOS hojas: el localizador avisa cuando no puede decidir en vez de elegir por su cuenta.
-    const ubic = _ubicarEvolucionDeTurno(String(datos.patientId || ''), turnoKey, idCama);
+    /* 🔴 EL RECLAMO TAMBIÉN IDENTIFICA LA FILA (revisión de la tanda 2, H3/H7). La pantalla no manda `patientId` en ANULAR_EVENTO, solo
+       EPISODIO_ABIERTO, así que en una cama que rotó dentro del mismo turno (P recibió el alta y Q ingresó y guardó el mismo turno) la
+       clave `CAMA_<n>_<turno>` está una vez en EVOLUCIONES y otra en EVOLUCIONES_ARCHIVO: el localizador por clave contaba dos y contestaba
+       «dos pacientes», y Q no tenía forma de anular su propio evento. El reclamo —que arriba ya se comparó con la cama: si no es vacío,
+       ES el ocupante— lo identifica sin duda. Un `patientId` declarado manda sobre él (como siempre). Si por episodio no hay fila (una fila
+       antigua sin PATIENT_ID) se vuelve a la clave de antes: adoptar la identidad de esa fila no es asunto del reclamo. */
+    const _declarado = String(datos.patientId || '').trim();
+    const _reclamado = (_ep.a === undefined || _ep.a === null) ? '' : String(_ep.a).trim();
+    let ubic = _ubicarEvolucionDeTurno(_declarado || _reclamado, turnoKey, idCama);
+    if (!ubic && !_declarado && _reclamado) ubic = _ubicarEvolucionDeTurno('', turnoKey, idCama);
     if (ubic && ubic.ambigua) {
       return err('La cama ' + idCama + ' tuvo dos pacientes en ese turno: hay que indicar de cuál ' +
         'se está hablando.', ERR.VALIDACION);
@@ -7551,6 +7607,16 @@ function anularEvento(datos, ctx, ep) {
     if (!ubic.vivo) {
       return err('Ese turno ya está archivado: el paciente egresó de la cama ' + idCama + '. Desde aquí no se puede ' +
         'anular un evento de un turno archivado. No se guardó nada.', ERR.VALIDACION);
+    }
+
+    /* 🔴 UNA CAMA SIN DUEÑO NO RECIBE EL ESTADO DE NADIE (revisión de la tanda 2, H1). El rechazo de arriba solo corría con la cama
+       CON paciente. Con la cama LIBRE (o ocupada sin PATIENT_ID: un episodio sin ingreso formal) y un `patientId` declarado de un
+       paciente vivo en OTRA cama, el localizador hallaba su fila viva, ningún candado saltaba y `_syncCamaDesdeEvolucion` le escribía
+       el estado de ese paciente a esta cama y la dejaba OCUPADA: el paciente en dos camas. Mismo daño que el egresado de arriba, por la
+       variante «fila viva de otra cama». Va DESPUÉS del rechazo por archivado: ese tiene su propio motivo. */
+    if (_pidEvo && !_pidCama) {
+      return err('Esa evolución es de un paciente que no está en la cama ' + idCama + ': la cama no tiene un paciente registrado. ' +
+        'Anular desde aquí le copiaría el estado de ese paciente a la cama. No se guardó nada.', ERR.VALIDACION);
     }
 
     // Guard: sin evoluciones posteriores del mismo paciente. Dentro del lock: un turno que otra petición guardó
