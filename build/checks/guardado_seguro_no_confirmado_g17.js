@@ -57,6 +57,12 @@ const { chromium } = require('playwright-core');
 const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
 const T0 = new Date('2026-08-10T11:00:00').getTime();
 const HORA = 3600 * 1000;
+const ANTES_DE_PAUSAR = 3600 * 1000;   // cuánto antes de T0 se instala el reloj de Playwright (ver abrir())
+// 🪤 DEMORA REAL DE PRUEBA. `RCE_DEMORA_REAL_MS=1500 node build/checks/guardado_seguro_no_confirmado_g17.js` mete una pausa REAL (reloj de
+// pared) antes de CADA `runFor` de las páginas con reloj de Playwright, que es lo que hace una máquina cargada entre dos pasos de la guardia.
+// Con el reloj de verdad congelado no cambia nada; con un reloj que sigue corriendo, el reintento de 3, 10 o 30 s sale antes de lo
+// esperado y las afirmaciones de «todavía no» (2,9 / 9,9 / 29,9 / 44,9 s) se ponen rojas sin que el código esté mal.
+const DEMORA_REAL = Math.max(0, parseInt(process.env.RCE_DEMORA_REAL_MS || '0', 10) || 0);
 const EXEC_FALSO = 'https://ejemplo.invalid/macros/s/PRUEBA/exec';   // nunca una dirección real: ver CLAUDE.md
 const OP_RE = /^op_[A-Za-z0-9_-]{5,61}$/;                           // 'op_' + [A-Za-z0-9_-]{8,64} en total
 const SENTINELA = 'SENTINELA-TEXTO-CLINICO-INVENTADO';
@@ -164,7 +170,19 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     const ctx = await navegador.newContext({ viewport: { width: 1100, height: 900 } });
     const p = await ctx.newPage();
     p.on('pageerror', e => errores.push('[' + o.modo + (o.almacen ? '/' + o.almacen : '') + '] ' + e.message));
-    if (o.relojPW) await p.clock.install({ time: T0 });     // Date y temporizadores falsos desde ANTES de cargar la página
+    if (o.relojPW) {
+      /* 🪤 `install` NO congela: el reloj falso sigue corriendo con el de pared y cualquier demora real entre dos pasos (una máquina
+         cargada, 4 guardias a la vez) se suma al tiempo falso, así que el reintento de 3, 10 o 30 s sale antes de lo que la guardia
+         espera y las afirmaciones de «todavía no» (2,9 / 9,9 / 29,9 / 44,9 s) fallan sin que el código esté mal. `pauseAt` lo detiene y
+         desde ahí solo `runFor` lo mueve. Contrapartida: un `setTimeout(…, 0)` de la página (la respuesta del doble de `google.script.run`)
+         tampoco dispara solo, así que cada acción que espera al «servidor» va seguida de un `runFor`.
+         🪤 Y se instala UNA HORA ANTES de T0: `pauseAt` solo viaja hacia adelante («Cannot fast-forward to the past») y entre `install` y
+         `pauseAt` el reloj corre con el de pared. Instalar en T0 y pausar en T0 funciona sin carga y revienta con ella, según cuánto tarde
+         el segundo viaje; instalar antes deja un margen que ninguna demora real alcanza a gastar, y el reloj queda parado en T0 EXACTO. */
+      await p.clock.install({ time: T0 - ANTES_DE_PAUSAR });   // Date y temporizadores falsos desde ANTES de cargar la página
+      await p.clock.pauseAt(T0);
+    }
+    if (o.relojPW && DEMORA_REAL) { const avanzar = p.clock.runFor.bind(p.clock); p.clock.runFor = async ms => { await p.waitForTimeout(DEMORA_REAL); return avanzar(ms); }; }
     await p.addInitScript(PRELUDIO, { modo: o.modo, t0: T0, boot: BOOT, exec: EXEC_FALSO, almacen: o.almacen, sinUUID: o.sinUUID, relojPW: o.relojPW });
     await p.goto('file://' + IDX);
     if (o.relojPW) await p.clock.runFor(1500); else await p.waitForTimeout(700);
@@ -542,6 +560,22 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
   // Tema claro = el fondo es claro (luminancia relativa alta). El ámbar #fef3c7 es claro aunque su canal azul sea 199.
   const claro = c => { const n = String(c).match(/\d+/g).map(Number); return (0.2126 * n[0] + 0.7152 * n[1] + 0.0722 * n[2]) / 255 > 0.8; };
 
+  /* ── F00 · el reloj de Playwright está de verdad CONGELADO: solo runFor lo mueve ── */
+  {
+    const p = await abrir({ modo: 'gas', relojPW: true });
+    const antes = await p.evaluate(() => { window.__sono = false; setTimeout(() => { window.__sono = true; }, 100); return Date.now(); });
+    await p.waitForTimeout(1500);                 // 1,5 s de pared, sin tocar el reloj falso
+    const quieto = await p.evaluate(() => ({ t: Date.now(), sono: window.__sono }));
+    eq('★ F00 · el reloj parte EXACTO en el día inventado (T0 + los 1,5 s de arranque que avanzó runFor), no una hora antes de la instalación', antes, T0 + 1500);
+    eq('★ F00 · pasados 1,5 s REALES sin runFor, Date.now() de la página no se movió (el reloj falso no corre con el de pared)', quieto.t - antes, 0);
+    eq('★ …y un temporizador de 100 ms NO disparó solo', quieto.sono, false);
+    await p.clock.runFor(100);
+    const despues = await p.evaluate(() => ({ t: Date.now(), sono: window.__sono }));
+    eq('   …solo runFor lo mueve: tras runFor(100) pasaron exactamente 100 ms falsos', despues.t - antes, 100);
+    eq('   …y el temporizador de 100 ms disparó', despues.sono, true);
+    await p.cerrar();
+  }
+
   /* ── F0 · las constantes de tiempo viven en UN lugar ── */
   {
     const p = await abrirGuardar();
@@ -812,6 +846,9 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     await apretar(p);
     let ll = await llamadasG(p);
     eq('★ F12 · con la franja en ámbar se puede apretar guardar otra vez, y el mismo contenido lleva el MISMO OP_ID', [ll.length, ll[4] && ll[4].datos.OP_ID === ll[0].datos.OP_ID], [5, true]);
+    // El quinto envío no tiene regla y el «servidor» le contesta ok (por defecto) con un setTimeout(0): con el reloj congelado hay que dejarlo
+    // contestar antes de seguir, porque mientras vuela, guardar() devuelve LA MISMA promesa (F5) y el cambio de abajo no abriría otra llamada.
+    await p.clock.runFor(20);
     await p.evaluate(() => { const t = $('fPlanes'); t.value = 'cambié lo escrito'; t.dispatchEvent(new Event('input', { bubbles: true })); });
     await p.evaluate(() => { guardar(); });
     ll = await llamadasG(p);

@@ -35,6 +35,11 @@ const { chromium } = require('playwright-core');
 const path = require('path');
 const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
 const T0 = new Date('2026-08-10T11:00:00').getTime();
+const ANTES_DE_PAUSAR = 3600 * 1000;   // cuánto antes de T0 se instala el reloj falso (ver abrir())
+// 🪤 DEMORA REAL DE PRUEBA. `RCE_DEMORA_REAL_MS=1500 node build/checks/fallo_guardado_visible.js` mete una pausa REAL (reloj de pared)
+// antes de CADA `runFor`, que es lo que hace una máquina cargada entre dos pasos de la guardia. Con el reloj de verdad congelado no
+// cambia nada; con un reloj que sigue corriendo, los reintentos de 3/10/30 s salen antes de lo esperado y la guardia se pone roja.
+const DEMORA_REAL = Math.max(0, parseInt(process.env.RCE_DEMORA_REAL_MS || '0', 10) || 0);
 
 (async () => {
   const fails = [];
@@ -48,7 +53,16 @@ const T0 = new Date('2026-08-10T11:00:00').getTime();
     const ctx = await b.newContext({ viewport: { width: 1100, height: 900 } });
     const p = await ctx.newPage();
     p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push('c:' + m.text()); });
-    await p.clock.install({ time: T0 });          // Date y temporizadores falsos desde ANTES de cargar la página
+    /* 🪤 `install` NO congela: el reloj falso sigue corriendo con el de pared y cualquier demora real entre dos pasos (una máquina cargada)
+       se suma al tiempo falso, así que el reintento de 3, 10 o 30 s sale antes de lo que la guardia espera. `pauseAt` lo detiene y desde
+       ahí solo `runFor` lo mueve. Contrapartida: un `setTimeout(…, 0)` de la página tampoco dispara solo, así que todo lo que espera una
+       respuesta del doble de `google.script.run` va seguido de un `runFor`.
+       🪤 Y se instala UNA HORA ANTES de T0: `pauseAt` solo viaja hacia adelante («Cannot fast-forward to the past»), y entre `install` y
+       `pauseAt` el reloj corre con el de pared. Instalar en T0 y pausar en T0 funciona sin carga y revienta con ella, según cuánto tarde
+       el segundo viaje; instalar antes deja un margen que ninguna demora real alcanza a gastar, y el reloj queda parado en T0 EXACTO. */
+    await p.clock.install({ time: T0 - ANTES_DE_PAUSAR });   // Date y temporizadores falsos desde ANTES de cargar la página
+    await p.clock.pauseAt(T0);
+    if (DEMORA_REAL) { const avanzar = p.clock.runFor.bind(p.clock); p.clock.runFor = async ms => { await p.waitForTimeout(DEMORA_REAL); return avanzar(ms); }; }
     await p.addInitScript(() => {
       window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
         api(a) { setTimeout(() => ok({ ok: true, data: (a === 'GET_CONFIG_UI' ? { NUM_CAMAS: 12, BANNERS: {} } : []) }), 5); }
@@ -132,6 +146,23 @@ const T0 = new Date('2026-08-10T11:00:00').getTime();
     eq('…_formDirty vuelve a false', r.dirty, false);
     eq('…el cuadro del centro se cierra solo', r.cuadro, false);
     eq('…y el borrador local se descarta (ya está en el servidor)', r.borrador, 0);
+  }
+
+  /* ══ 0 · EL RELOJ ESTÁ DE VERDAD CONGELADO ══════════════════════════════════════════════════════════════════════ */
+  console.log('0 · El reloj falso solo se mueve con runFor (1,5 s REALES sin runFor no mueven nada)');
+  {
+    const p = await abrir();
+    const antes = await p.evaluate(() => { window.__sono = false; setTimeout(() => { window.__sono = true; }, 100); return Date.now(); });
+    await p.waitForTimeout(1500);                 // 1,5 s de pared, sin tocar el reloj falso
+    const quieto = await p.evaluate(() => ({ t: Date.now(), sono: window.__sono }));
+    eq('★ el reloj parte EXACTO en el día inventado (T0 + los 1,5 s de arranque que avanzó runFor), no una hora antes de la instalación', antes, T0 + 1500);
+    eq('★ pasados 1,5 s REALES sin runFor, Date.now() de la página no se movió', quieto.t - antes, 0);
+    eq('★ …y un temporizador de 100 ms NO disparó solo', quieto.sono, false);
+    await p.clock.runFor(100);
+    const despues = await p.evaluate(() => ({ t: Date.now(), sono: window.__sono }));
+    eq('…solo runFor lo mueve: tras runFor(100) pasaron exactamente 100 ms falsos', despues.t - antes, 100);
+    eq('…y el temporizador de 100 ms disparó', despues.sono, true);
+    await p.cerrar();
   }
 
   /* ══ A · LA RED CAYÓ DE VERDAD (el servidor no contestó): ÁMBAR, con reintentos a los 3, 10 y 30 s ═══════════════ */

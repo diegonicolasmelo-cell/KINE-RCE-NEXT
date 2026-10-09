@@ -3422,3 +3422,45 @@ agotar), no lo que falta.
   siguientes y las contaminan. Al terminar, se da por cancelada la intención (`_sesionGuardado.cancelar()`).
 - 🪤 **Reconciliar no es aflojar**: las afirmaciones de antes quedaron (sección C) y se sumaron las nuevas; ninguna aserción
   se borró para tapar un rojo, porque no hubo rojo que tapar.
+
+## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: los relojes de dos guardias no estaban congelados
+
+**De dónde sale.** Seis revisiones independientes de la tanda 2 dejaron 34 hallazgos; dos de ellos (H20 y H28) bloqueaban el cierre
+porque ponían la batería roja **al azar, sin que el código estuviera mal**: `guardado_seguro_no_confirmado_g17.js` y
+`fallo_guardado_visible.js` llamaban a `page.clock.install({ time })` creyendo que eso congelaba el reloj. No lo congela: el reloj
+falso **sigue corriendo con el de pared**, así que cualquier demora real entre dos pasos de la guardia (la batería corre 4 a la vez)
+se suma al tiempo falso y el reintento de 3, 10 o 30 s sale antes de lo que la guardia espera. Es la trampa de «congelar el reloj»
+que CLAUDE.md ya nombra, ahora en su forma de Playwright.
+
+**Rojo visto antes de tocar el código.** Se le dio a las dos guardias una demora **real** de prueba (`RCE_DEMORA_REAL_MS`: una pausa de
+pared antes de cada `runFor`, lo que hace una máquina cargada) y una sección nueva que espera 1,5 s de verdad sin mover el reloj:
+- `guardado_seguro_no_confirmado_g17.js` con 1500 ms: 9 fallos, entre ellos los cuatro de la revisión («a los 2,9 s todavía una sola
+  llamada», «a los 9,9 s siguen siendo 2», «a los 29,9 s siguen siendo 3», «a los 44,9 s todavía Guardando») y dos más que nadie había
+  visto (F11 «el guardado en vuelo de la cama 2 NO impide guardar la 3» y el control de H4).
+- `fallo_guardado_visible.js` con 4000 ms: «a los 3 s sale el primer reintento: dos viajes» dio 3. Con 1500 ms esta guardia aguanta
+  por casualidad (sus afirmaciones son «al menos»), pero el reloj corría igual: lo prueba la sección 0.
+- La sección nueva (0 en una, F00 en la otra) falla **sin** demora artificial: pasados 1,5 s reales el `Date.now()` de la página se
+  movió 1505 ms.
+
+**Qué se cambió (solo las dos guardias; ningún archivo del producto).**
+- `abrir()` instala el reloj **una hora antes** de T0 y lo detiene con `pauseAt(T0)`: desde ahí solo `runFor` lo mueve y la página
+  parte en T0 exacto. Las secciones de G17 y fallo_guardado_visible ya avanzaban con `runFor`; la única que dependía del tiempo real
+  era F12 (el quinto envío contesta ok con un `setTimeout(0)` del doble, y con el reloj parado hay que dejarlo contestar con un
+  `runFor(20)` antes del cambio de contenido; mientras vuela, `guardar()` devuelve la misma promesa).
+- La sección 0 / F00 queda como guardia permanente de la trampa: 1,5 s reales no mueven el reloj, un temporizador de 100 ms no
+  dispara solo, `runFor(100)` mueve exactamente 100 ms, y el reloj parte en T0 + 1500 (no una hora antes).
+- `RCE_DEMORA_REAL_MS` queda disponible para repetir la prueba de estrés: con 1500 (G17) y 4000 (fallo_guardado_visible) las dos pasan.
+
+### Para no olvidar
+
+- 🪤 **`page.clock.install` no congela; `pauseAt` sí.** Y después de `pauseAt` un `setTimeout(…, 0)` de la página tampoco dispara solo:
+  toda acción que espera al doble de `google.script.run` necesita su `runFor`.
+- 🪤 **`pauseAt(T0)` justo después de `install({ time: T0 })` es una carrera**: `pauseAt` solo viaja hacia adelante («Cannot fast-forward
+  to the past») y entre las dos llamadas el reloj ya avanzó con el de pared. Sin carga pasa; con la máquina ocupada revienta. Se
+  instaló en T0 y se pausó en T0 la primera vez, y una corrida con 6 bucles de CPU lo tumbó. Se instala antes (aquí, una hora).
+- 🪤 **Una guardia de reloj se prueba con una demora real inyectada**, no esperando a que la batería salga roja sola: es la única forma
+  de verla roja a pedido y de saber que el arreglo aguanta.
+- Quedan fuera de esto, a propósito, las secciones A a E y G de G17: no usan `page.clock`, doblan `Date` a mano (`window.__t`) y
+  esperan con `waitForTimeout` reales de 40 a 700 ms a que conteste el doble. G17 entera aguantó tres corridas con la máquina
+  cargada (hasta 10 de carga en 4 núcleos, dos guardias más corriendo a la vez); si alguna vez una de esas secciones se pone roja
+  sola, el camino es esperar una condición con `waitForFunction` y no alargar el tiempo.
