@@ -19,9 +19,22 @@ navegador del hospital o de su casa.
 > Diego decide, se escriben en **`docs/ACUERDOS_REDISENO.md` con sus palabras**.
 > Ése es hoy la vara: si contradice algo de `docs/archivo/`, manda él.
 >
-> 🪤 Archivar los planes NO archiva las guardias: un acuerdo de producto se
-> puede cambiar, una cicatriz no. Las reglas de este archivo y `build/checks/`
-> siguen valiendo enteras.
+> 🟢 **9-oct-2026 · Lo que vino de RCE-KINE no es un acuerdo de NEXT.** Palabras
+> de Diego: «estoy desdiciéndome en acuerdos que ya había tomado, pero para el
+> otro proyecto… esto, si bien es parecido, es distinto». Cuando Diego decide
+> algo distinto de lo heredado **no se desdice: decide por primera vez**. No se
+> le pide justificar el cambio ni se le cita el sistema viejo como argumento.
+>
+> 🪤 Archivar los planes NO archiva las **cicatrices**: un acuerdo de producto
+> se puede cambiar, una cicatriz no. Las guardias están separadas en tres
+> montones en `docs/INVENTARIO_GUARDIAS.md`:
+> · **T · cicatriz técnica** (privacidad, datos que no se mezclan ni se pierden,
+>   cohete, rendimiento…): vale entera, como siempre.
+> · **H · heredada de RCE-KINE**: fija cómo funcionaba el sistema viejo. Diego
+>   la deja o la saca con una frase; si la saca, se borra y se anota en la
+>   bitácora, sin ceremonia.
+> · **N · decidida en NEXT**: acuerdo de Diego en este proyecto; vale hasta que
+>   él lo cambie.
 
 ---
 
@@ -167,6 +180,9 @@ depuración.
 - **Si una guardia falla, se arregla el código.** No se «ajusta la guardia» ni
   se esconde detrás de una excepción: así es como se pudren. Si la convención
   cambió de verdad, se borra con su razón escrita acá o en la bitácora.
+  · Excepción, y solo esa: una guardia **H** (heredada) que contradice una
+  decisión nueva de Diego no se defiende. Se le muestra qué fija, él decide, y
+  si se va, se borra con su frase en la bitácora.
 - **La guardia se escribe PRIMERO y se ve ROJA** contra el código sin arreglar.
   Una guardia que nunca se vio roja no prueba lo que dice probar.
 - 🪤 **Congelar el reloj.** Una guardia que lee el reloj real da distinto según

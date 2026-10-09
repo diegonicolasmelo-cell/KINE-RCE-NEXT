@@ -3321,3 +3321,17 @@ existen los pasos (miran `offsetParent`). Ver `PENDIENTES.md` 4b.
 
 Sello `NEXT-5.4-revision-maxima`.
 
+
+### «Estoy desdiciéndome en acuerdos que eran del otro proyecto» · 9-oct-2026
+
+Diego, mirando el mockup: muchas cosas se tomaron del proyecto anterior «a rajatabla», y cambiarlas se sentía como
+contradecirse. Tenía razón y parte era culpa de cómo trabajaba yo: trataba cada guardia como ley, y 97 de las 212 no
+protegen contra un error, fijan cómo funcionaba RCE-KINE.
+
+- **Regla nueva en `CLAUDE.md`:** lo que vino de RCE-KINE no es un acuerdo de NEXT; cuando Diego decide distinto, decide
+  por primera vez. La excepción a «si una guardia falla se arregla el código» es solo para las heredadas.
+- **`docs/INVENTARIO_GUARDIAS.md`:** las 212 en tres montones — T cicatriz técnica (64, valen enteras), H heredada (97,
+  Diego decide), N decidida en NEXT (51, con fecha). La clasificación es mía, leyendo la cabecera de cada guardia; Diego
+  la puede corregir.
+- Diego marca en una página (artefacto «Guardias heredadas»); sus marcas quedan guardadas y se leen desde aquí. Las H
+  que «se van» se borran en una tanda propia, con su frase.
