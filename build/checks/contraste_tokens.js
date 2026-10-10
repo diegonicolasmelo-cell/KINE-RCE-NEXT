@@ -18,12 +18,17 @@
 //      `color:var(--muted)` sobre un fondo nuevo y oscuro, esto lo ve.
 //   B. LISTA CERRADA de pares que no son `--muted` (agregar uno es una decisión consciente, no se «ajusta» la lista para que pase):
 //      · el título de cada tarjeta del panel (`.fcard-title`, un color por dominio)
-//      · `.bdx`, `.bmov`, `.balt` de la tarjeta de cama
+//      · `.bdx`, `.bmov` (en reposo Y con el cursor encima), `.balt` de la tarjeta de cama
 //      · `#gFalta`, la línea «Falta:» de la barra de acciones
 //      · el botón principal DESACTIVADO (`#pasoAvanza`, `#btnGuardar`, `.btn-p`), con su opacidad compuesta
 //   C. No es una guardia vacía: exige haber medido un mínimo de textos `--muted` y haber VISTO los usos que más fallaban (etiqueta
 //      de campo, edad/sexo de la tarjeta, «Disponible»).
 //
+// 🪤 EL ICONO DE TRASLADO CON EL CURSOR ENCIMA (revisión de la tanda 5, hallazgo R22, 10-oct-2026). La tanda 5 oscureció el color de
+//    REPOSO de `.bmov` (#475569, 5,43:1 sobre el manila) y dejó el de `:hover` en #3b82f6 sobre #e2e8f0 = 2,98:1: peor con el cursor encima
+//    que sin él, y justo cuando se mira el botón para saber si es el que se quiere. Se mide el nodo con el cursor puesto de verdad
+//    (`mouse.move`, sin forzar el estado) y se exige ≥ 4,5:1, como el de reposo. Va en escritorio y en celular (el estado queda pegado
+//    tras el toque).
 // 🪤 El ámbar y el rojo con significado clínico (alertas, VM prolongada, «Falta:» heredado) NO se oscurecen para pasar un número:
 //    esta tanda solo toca grises, títulos y el desactivado. `#gFalta` entra en la lista porque su color es de la barra, no una
 //    alarma de un dato.
@@ -217,7 +222,7 @@ const resumen = (lista, max = 8) => {
     r.salida.forEach(x => { usos.add(x.sel); sweep[donde + ' · ' + x.sel + ' sobre ' + x.bg + ' → ' + x.r + ':1'] = (sweep[donde + ' · ' + x.sel + ' sobre ' + x.bg + ' → ' + x.r + ':1'] || { r: x.r, t: [] }); sweep[donde + ' · ' + x.sel + ' sobre ' + x.bg + ' → ' + x.r + ':1'].t.push(x.texto); });
     return r;
   };
-  const titulos = [], bd = [], bm = [], ba = [], falta = [], desact = [];
+  const titulos = [], bd = [], bm = [], bmh = [], ba = [], falta = [], desact = [];
   const juntar = (dest, donde) => lista => lista.forEach(x => dest.push(Object.assign({ donde }, x)));
 
   for (const ancho of [1400, 390]) {
@@ -232,6 +237,15 @@ const resumen = (lista, max = 8) => {
     await barrer(pag, donde + ' tablero');
     juntar(bd, donde)(await pag.evaluate(() => window.__C.pares('#bedGrid .bdx')));
     juntar(bm, donde)(await pag.evaluate(() => window.__C.pares('#bedGrid .bmov')));
+    {   // …y el mismo icono con el cursor encima (el estado :hover real, no uno forzado)
+      const caja = await pag.locator('#bedGrid .bcard.occ .bmov').first().boundingBox();
+      await pag.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+      await pag.waitForTimeout(150);
+      const encima = await pag.evaluate(() => document.querySelector('#bedGrid .bcard.occ .bmov').matches(':hover'));
+      si('el cursor quedó de verdad sobre el botón de traslado (' + donde + ' px)', encima, 'algo tapa el botón y el :hover no se aplicó: la medición de abajo no valdría');
+      juntar(bmh, donde)(await pag.evaluate(() => window.__C.pares('#bedGrid .bmov:hover')));
+      await pag.mouse.move(0, 0);
+    }
     juntar(ba, donde)(await pag.evaluate(() => window.__C.pares('#bedGrid .balt')));
 
     /* ── Panel: seis pasos ─────────────────────────────────────────────────────────────────────── */
@@ -297,6 +311,7 @@ const resumen = (lista, max = 8) => {
     ['el título de cada tarjeta del panel (.fcard-title, un color por dominio)', titulos, 10],
     ['el diagnóstico de la tarjeta de cama (.bdx)', bd, 1],
     ['el icono de traslado (.bmov)', bm, 1],
+    ['el icono de traslado CON EL CURSOR ENCIMA (.bmov:hover)', bmh, 2],
     ['«Egreso» de la tarjeta de cama (.balt; antes «Egr.», en verde)', ba, 1],
     ['la línea «Falta:» (#gFalta)', falta, 1],
     ['el botón principal DESACTIVADO (#pasoAvanza, #btnGuardar, .btn-p)', desact, 3],

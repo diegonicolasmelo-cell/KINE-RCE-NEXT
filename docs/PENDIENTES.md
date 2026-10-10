@@ -25,9 +25,9 @@
 > (el cuadro «¿Quién midió?») ya la cerró la tanda 5.
 >
 > 🟠 **La sección 2f es de la tanda 5**: nueve decisiones de pantalla ya implementadas (✅)
-> y once por decidir. Las más visibles: si los cinco emojis de 2020 se ven bien en el
-> computador del hospital (la 11), el rótulo del ➕ (la 12) y la cabecera del panel que
-> se sale de la pantalla a 360 px (la 17).
+> y trece por decidir (la 21 y la 22 son nuevas, de la revisión). Las más visibles: si los cinco emojis de 2020 se ven bien en el
+> computador del hospital (la 11), el rótulo del ➕ (la 12), la cabecera del panel que
+> se sale de la pantalla a 360 px (la 17) y los textos que aún se leen poco (la 21).
 
 ---
 
@@ -118,7 +118,7 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 > 🔴 **Antes de pegar nada en la planilla de NEXT hace falta una prueba práctica con DOS aparatos** (la 12): todo lo de esta tanda se
 > probó con un servidor simulado en un navegador de laboratorio, no en el Chrome del hospital ni contra el Apps Script real.
 >
-> ⚙️ **El «modo estricto» (`CONTRATO_ESTRICTO`) nace APAGADO** (la 3). Mientras esté apagado, una pantalla vieja puede seguir
+> ⚙️ **El «modo estricto» (una casilla de la hoja CONFIG) nace APAGADO** (la 3). Mientras esté apagado, una pantalla vieja puede seguir
 > escribiendo sobre el paciente equivocado; se enciende recién después de la prueba con dos aparatos.
 >
 > ✍️ **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escriben con tus palabras cuando respondas. Dilas por
@@ -139,7 +139,7 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    *Recomendado: sí.* (La alternativa es dejarlos al azar y aceptar esos repetidos.)
 3. **Modo estricto: cuándo encenderlo.** ⚙️ Encendido, una pantalla vieja (que no avisa a qué paciente le abrió la ventana) se
    rechaza con «esta pantalla es de una versión anterior, recárgala». Apagado, esa pantalla pasa y puede actuar sobre el paciente
-   equivocado. Se enciende escribiendo `TRUE` en `CONTRATO_ESTRICTO` de la hoja CONFIG de la planilla de NEXT (no hay función nueva).
+   equivocado. Se enciende escribiendo `TRUE` en la fila `CONTRATO_ESTRICTO` de la hoja CONFIG de la planilla de NEXT (así se llama la fila en la hoja; no hay función nueva).
    ¿Cuándo, y quién confirma que todos los aparatos ya tienen la versión nueva? *Recomendado: apagado hasta la prueba con dos aparatos,
    y encenderlo recién después.*
 4. **Ingreso perdido porque otra persona ocupó la cama.** ✅ Si dos personas ingresan a la misma cama libre, la segunda ve un aviso
@@ -163,17 +163,18 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    La pantalla de hoy no las llama; el servidor las mantiene y ya llevan la misma comprobación de paciente. De paso, «agregar hito» ya no
    deja que quien llama elija el autor ni el número. ¿Se retiran del servidor? *Recomendado: no en esta tanda; se decide después.*
 8. **Tiempos.** ✅ Después de **45 segundos** sin respuesta aparece «No confirmado»; el sistema reintenta solo a los **3, 10 y 30
-   segundos** con exactamente lo mismo que ella escribió, y después solo a mano con «Reintentar ahora». Se ajustan en un solo lugar del
-   código (`GUARDADO_ESPERA_MS` y `GUARDADO_REINTENTOS_MS`). Con una red lenta de verdad, 45 s puede ser mucho o poco: conviene verlo
+   segundos** con exactamente lo mismo que ella escribió, y después solo a mano con «Reintentar ahora». Los dos números viven juntos
+   en un solo lugar del código y se ajustan ahí (sus nombres técnicos están en la bitácora, entrada «paso F4»). Con una red lenta de verdad, 45 s puede ser mucho o poco: conviene verlo
    en la prueba. *Recomendado: sí.*
 9. **Colores y textos.** ✅ Ámbar: «No confirmado · No sabemos si se guardó. Tu texto sigue aquí.» con «Reintentar ahora» y «Seguir
    editando»; «Guardado con aviso» cuando el servidor guardó pero algo quedó pendiente; rojo «NO se guardó» **solo** cuando el servidor
    contestó que no. Reemplaza al «NO se guardó» que antes salía a los 3 s sin respuesta y afirmaba algo que no se sabía. *Recomendado: sí.*
-10. **Bitácora de auditoría: ¿registrar cada repetición evitada?** Una fila corta `<ACCIÓN>_REPETIDA` cada vez que la memoria de 6
+10. **Bitácora de auditoría: ¿registrar cada repetición evitada?** Una fila corta en la bitácora de auditoría (con el nombre de la acción y la palabra «repetida») cada vez que la memoria de 6
     horas evita repetir algo, para medir cuánto ayuda. **Esta NO está hecha**: hoy una repetición no deja rastro. Lo que sí está es la
-    marca `[sin episodio]` en la bitácora cuando una pantalla vieja llama sin avisar el paciente (salvo al guardar la evolución), que
+    marca «sin episodio» en esa bitácora cuando una pantalla vieja llama sin avisar el paciente (salvo al guardar la evolución), que
     sirve para decidir cuándo encender el modo estricto. *Recomendado: sí.*
-11. **Ampliar `auditoriaIntegridad`** con lecturas puras (egresos duplicados, camas con paciente y a la vez fila de archivo). No se
+11. **Ampliar la revisión de integridad de la planilla** (la que corre coordinación desde el editor para encontrar turnos que no cuadran) con
+    lecturas que no escriben nada (egresos duplicados, camas con paciente y a la vez fila de archivo). No se
     incluyó porque no se pidió. *Recomendado: tanda aparte.*
 12. **Prueba práctica con dos aparatos, antes de pegar en NEXT y antes de encender el modo estricto.** Casos: dos personas ingresan a la
     misma cama a la vez; dar un alta con un formulario viejo abierto; guardar con el celular en modo avión y volver la señal; doble toque
@@ -222,7 +223,7 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 21. **Alta de un paciente que ya figura en el archivo de una estadía anterior.** ✅ Si la cama volvió a ocuparse con un paciente cuyo
     egreso anterior ya está en el archivo, el alta se **bloquea**: «La cama N tiene a un paciente que ya figura dado de alta en el archivo,
     de una estadía anterior. No se dio el alta para no pisar ese registro. Avisa a coordinación para revisarlo.» La alternativa es
-    escribir un segundo egreso (`ARCH_<paciente>_2`), pero eso cambia cómo cuenta el REM. *Recomendado: bloquear.*
+    escribir un segundo egreso para el mismo paciente (con otro número interno), pero eso cambia cómo cuenta el REM. *Recomendado: bloquear.*
 22. **Cada ingreso hace dos consultas más a la planilla.** ✅ Para saber si el paciente ya egresó antes y que no esté en otra cama, un
     ingreso hecho por la pantalla pasa de 13 a **15** viajes a la planilla (una sola vez por estadía). La batería mide un ingreso sin
     identificador propio y no ve esos dos viajes; su techo es 14. *Recomendado: aceptarlo;* si prefieres no pagarlo, se puede dejar solo la
@@ -321,16 +322,16 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     ingreso, (3) dejarlo así porque en un ingreso la TQT se anota como llegada. Es decisión clínica. *Recomendado: mirarlo juntos en la
     planilla de NEXT antes de hacer el cambio 6; mi inclinación es la 1* (reutiliza el camino de eventos que ya existe y deja hora, técnica y
     cánula), salvo que en la unidad una TQT al ingreso siempre sea «llegó con TQT», caso en que la 3 es válida.
-13. ✅ **RESUELTA el 10-oct-2026 (paso F2): `guardar()` usa `_irAlCampo('fFirma')`; la guardia `abrir_hasta_el_campo.js` pasó de «conocido» a aserción.**
+13. ✅ **RESUELTA el 10-oct-2026 (paso F2): al apretar Guardar sin firma estando en Planes, la pantalla ya te lleva hasta el cuadro de la firma aunque la tarjeta esté plegada; la prueba automática que lo vigila pasó de «caso conocido» a exigirlo.**
     **La firma sin elegir, en el celular.** Si aprietas Guardar sin firma estando en Planes, el aviso dice «Debes seleccionar la firma» pero la
-    firma no se ve (la tarjeta «Cerrar el turno» nace plegada): `guardar()` hace un `focus()` directo que no abre nada. Dos caminos,
-    combinables: (a) autorizar tocar UNA línea de `guardar()` (usar `_irAlCampo('fFirma')` en vez de ese `focus()`), o (b) dejar abierta la
-    tarjeta única de Planes al entrar en celular (decisión 4 de la tanda 4). *Recomendado: (a)* —`guardar()` está cerrado desde la tanda 2, por
-    eso espera tu visto bueno—; la guardia pasa sola y su línea «conocido» se vuelve una aserción.
-14. ✅ **RESUELTA el 10-oct-2026 (paso F2): `pasoEvalMedir` abre la tarjeta plegada; `transOfIr`, medido, tenía un defecto más hondo (no cambiaba de paso y apuntaba a controles escondidos) y ahora lleva al botón del evento. Ver la entrada de la bitácora «paso F2».**
-    **Los chips de Evaluaciones y `transOfIr` con el mismo defecto de tarjeta plegada.** A 390 px, con las tarjetas plegadas como las deja el
+    firma no se veía (la tarjeta «Cerrar el turno» nace plegada): el botón de guardar solo le pedía el cursor al campo y eso no abre nada. Dos caminos,
+    combinables: (a) autorizar tocar UNA línea del botón de guardar para que lleve hasta la firma por el mismo camino de todos los avisos (abre la tarjeta plegada
+    y destaca el campo), o (b) dejar abierta la tarjeta única de Planes al entrar en celular (decisión 4 de la tanda 4, la 7 de la sección 2e). *Recomendado: (a)* —el botón de guardar está cerrado desde la tanda 2, por
+    eso esperaba tu visto bueno—; la prueba automática pasa sola.
+14. ✅ **RESUELTA el 10-oct-2026 (paso F2): los chips de Evaluaciones abren la tarjeta plegada; el atajo de la ventana «Revisa antes de guardar» que lleva al evento de vía aérea olvidado, medido, tenía un defecto más hondo (no cambiaba de paso y apuntaba a controles escondidos) y ahora lleva al botón del evento. Ver la entrada de la bitácora «paso F2».**
+    **Los chips de Evaluaciones y el atajo al evento olvidado, con el mismo defecto de tarjeta plegada.** A 390 px, con las tarjetas plegadas como las deja el
     acordeón al abrir, los 7 chips que «llevan al campo» sin abrir un modal (PIM, dinamometría, PEM, FEmáx, IMS, ecografía, deglución) dejan su campo
-    invisible; `transOfIr` tiene el mismo patrón y no se midió. La corrección es llamar `_abrirHastaCampo(el)` antes de su `scrollIntoView`.
+    invisible; el atajo de «Revisa antes de guardar» tiene el mismo patrón y no se midió. La corrección es abrir antes la tarjeta plegada y recién después llevar la vista hasta el campo.
     *Recomendado: sí,* una línea por sitio; es la misma clase de defecto que la tanda 3 ya corrigió para los avisos, y va con la tanda de Evaluaciones.
 
 ## 2e · Decisiones de la tanda 4 (terapia física y Planes, 10-oct)
@@ -351,14 +352,14 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 1. **El nivel de KTM que la cama recuerda ya no se cuela de noche ni en el primer día tras una noche.** ✅ Hasta ahora, de noche el formulario podía llevar escondido el nivel
    de la noche anterior (sin ningún botón encendido que lo delatara): si marcabas «Realizada» sin elegir nivel, la sesión salía con ese nivel y el relato decía «nivel 3». Ahora el
    formulario parte sin nivel cuando no hay nada que heredar. *Lo que ves:* de noche la terapia física parte de verdad en blanco; el primer turno de día tras una noche abre sin
-   nivel; de día tras otro día, el nivel se hereda y se ve encendido, como siempre. *Recomendado: dejarlo* (es lo que dicen 8.6 y 8.7). Si dices que no, se revierte una línea de `fillFormReplica`.
+   nivel; de día tras otro día, el nivel se hereda y se ve encendido, como siempre. *Recomendado: dejarlo* (es lo que dicen 8.6 y 8.7). Si dices que no, se vuelve atrás una sola línea de la carga del turno anterior al abrir una cama.
 2. **Reabrir una evolución guardada devuelve la terapia física tal como se guardó.** ✅ Antes, reabrir dejaba la tarjeta en blanco: de día, un turno con la KTM realizada no se podía volver a
    guardar («indica la razón por la que NO se realizó», con el campo escondido); de noche se borraban IMT, EMS, válvula, Borg y minutos. Ahora vuelven el estado de la KTM, el nivel, la asistencia,
    los minutos, el Borg, el IMT y la EMS con sus datos, y la válvula con sus minutos y tolerancia, y el relato que se regenera los narra. Nada se inventa: un turno que nunca declaró estado se reabre sin estado.
    *Recomendado: dejarlo.* No hay una versión intermedia que sirva: sin esto, el que reabre para corregir otra cosa pierde lo anotado sin darse cuenta.
 3. **«← Atrás» salta la pestaña de Prevención cuando está oculta, y no aparece en el primer paso.** ✅ En un paciente sin TOT, TQT ni VM, «Atrás» desde el Turno llevaba a una pantalla vacía
    («Sin dispositivos de vía aérea en este paciente»); en un ingreso caía ahí en vez de volver a la identificación. Ahora el Turno es el primer paso y el botón no se ofrece; en un ingreso vuelve al paso 0.
-   Con un paciente que sí tiene prevención nada cambia. *Recomendado: esconderlo,* igual que ya pasa en el primer paso con prevención. Si prefieres que el botón siga visible sin hacer nada, es una línea en `pasoIr`.
+   Con un paciente que sí tiene prevención nada cambia. *Recomendado: esconderlo,* igual que ya pasa en el primer paso con prevención. Si prefieres que el botón siga visible sin hacer nada, es una línea del cambio de pasos.
 
 **B · Falta decidir (no están hechas)**
 
@@ -366,8 +367,8 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    (la que cuenta en el REM B.6), aunque el comentario del código dice que la educación es «visible siempre». ¿Esas dos cosas deben seguir visibles aunque la KTM se bloquee?
    *Recomendado: sí:* sacar la educación (y la válvula, si hay TQT) del bloqueo y bloquear solo la KTM; en confort, la educación a la familia es de lo más plausible. Es un cambio pequeño y aparte.
 5. **La válvula de fonación de noche suma 12 horas para la decanulación aunque nadie la haya declarado** (es la 16 de la sección 2), **y la racha no viaja al reabrir.** Al reabrir un turno, la
-   frase de decanulación cuenta solo las 12 h del propio turno, sin las rachas de turnos anteriores (`_VFON_HORAS` es un transitorio de la previa que la fila del turno no trae). Es regla clínica de decanulación;
-   no se toca sin tu respuesta. *Recomendado:* sumar solo si ese turno quedó con la válvula declarada (`VFON_USADA` verdadero), y que reabrir conserve la racha.
+   frase de decanulación cuenta solo las 12 h del propio turno, sin las rachas de turnos anteriores (las horas que traen los turnos de antes se calculan al abrir la cama y la fila del turno guardado no las trae). Es regla clínica de decanulación;
+   no se toca sin tu respuesta. *Recomendado:* sumar solo si ese turno quedó con la válvula declarada, y que reabrir conserve la racha.
 6. **La KTM de DÍA parte ya marcada «Realizada»; de noche parte en blanco.** El sistema decide por defecto en un caso y no en el otro. Tras una noche, el primer día abre «Realizada» pero ahora sin nivel (paso 1
    de esta tanda). *Recomendado: que el sistema no decida por ti:* de día que parta neutra, en ámbar («falta elegir»), y se confirme con un toque. No se cambió porque altera el flujo diario de todo el equipo y
    puede mover el REM (hoy una KTM de día que nadie eligió cuenta como realizada).
@@ -389,10 +390,10 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     ✅ **El título del cuadro ya se cambió en la tanda 5** (ver la 8 de la sección 2f); los 18 chips y las sugerencias «Medir X» siguen sin tocar.
 11. **Números de las pestañas.** Cuando no hay nada que prevenir (pestaña 1 oculta), la primera visible es la «2». ¿Se dejan los números fijos (Turno siempre 2, Terapia física siempre 4, Planes siempre 5) o se renumeran por lo que
     se ve? *Recomendado: fijos:* es lo que ya hay, lo que usan las guardias y el equipo, y «paso 4» significa siempre lo mismo. Solo se corrigió que «Atrás» no caiga en el paso oculto (la 3).
-12. **Los dos caminos de `fillCama` sin réplica siguen copiando el nivel de la cama de noche.** Un paciente sin turno previo y el servidor que no contesta al abrir. No se alcanzan con datos reales, porque una cama que recuerda un
-    nivel siempre tiene turno previo; por eso no se cerraron. *Recomendado: sí, sin apuro:* una condición (de noche no copiar) cuando se toque `fillCama` por otra razón, con su caso en la guardia.
-13. **Un turno de DÍA que nunca declaró estado de KTM** (una fila anterior al trío de estados, o guardada por la API sin pasar por la pantalla) **se reabre sin estado elegido**, y al volver a guardarlo `guardar()` manda
-    «no realizada» sin razón y el servidor lo rechaza. La pantalla actual no produce ese caso. ¿Debe quedar así (la kinesióloga elige) o partir «Realizada» como un turno de día nuevo? *Recomendado: dejarlo sin estado:*
+12. **Si abres un paciente que aún no tiene ningún turno guardado, de noche la terapia física puede traer el nivel que la cama recordaba.** Lo mismo pasa si, justo al abrir, el servidor no contesta. No se alcanzan con datos reales, porque una cama que recuerda un
+    nivel siempre tiene turno previo; por eso no se cerraron. *Recomendado: sí, sin apuro:* una condición (de noche, no copiar el nivel de la cama) la próxima vez que se toque esa carga de la cama por otra razón, con su caso en la prueba automática.
+13. **Si reabres un turno de día antiguo que nunca marcó estado de KTM, al guardarlo el sistema le pide la razón de «no realizada».** Es un turno de DÍA anterior al trío de estados (o guardado directo en el servidor sin pasar por la pantalla): **se reabre sin estado elegido**, y al volver a guardarlo
+    la pantalla manda «no realizada» sin razón y el servidor lo rechaza. La pantalla actual no produce ese caso. ¿Debe quedar así (la kinesióloga elige) o partir «Realizada» como un turno de día nuevo? *Recomendado: dejarlo sin estado:*
     «Realizada» por defecto puede inflar el REM, y «no realizada» sin razón entra al denominador de la estadística; ninguna de las dos se inventa.
 14. **La Prevención no aparece si la vía aérea o el soporte se eligen DENTRO del turno.** La pestaña 1 se decide una sola vez, al abrir la cama; si un paciente sin dispositivos recibe uno durante el turno, la Prevención no
     aparece hasta reabrir la cama, y «Atrás» sigue a la barra. ¿Debe aparecer sola? *Recomendado: no por ahora* (sería abrir un paso que el flujo acordó saltar); si lo quieres, es otra pieza, con su guardia.
@@ -400,10 +401,10 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 ## 2f · Decisiones de la tanda 5 (limpieza visual, 10-oct)
 
 > 🟢 **Las ✅ de la parte A (de la 1 a la 9) YA ESTÁN HECHAS con la opción que recomiendo** y esperan que las confirmes o las cambies. Todas son de pantalla: ninguna toca el esquema de la
-> planilla ni lo que se guarda en una evolución. Revertir cada una cuesta una línea de CSS (se dice cuál), salvo el botón único (la 7), que va en un commit propio.
+> planilla ni lo que se guarda en una evolución. Revertir cada una cuesta una línea de estilo (se dice cuál), salvo el botón único (la 7), que se hizo en un paso propio y no se deshace con un solo botón (se dice cómo en la 7).
 >
-> 🟠 **Las de la parte B (de la 10 a la 20) NO se hicieron**, a propósito: unas cambian una palabra de la unidad (la 10 y la 12), otras necesitan que alguien mire un computador del hospital
-> (la 11) y otras son hallazgos o ajustes finos de la tanda que quedaron sin hacer (de la 14 a la 20).
+> 🟠 **Las de la parte B (de la 10 a la 22) NO se hicieron**, a propósito: unas cambian una palabra de la unidad (la 10 y la 12), otras necesitan que alguien mire un computador del hospital
+> (la 11) y otras son hallazgos o ajustes finos de la tanda que quedaron sin hacer (de la 14 a la 22; la 21 y la 22 salieron de la revisión).
 >
 > 👀 **Las capturas del antes y el después** (tablero, traslado, retrospectiva y los seis pasos del panel, a 390 y 1400 px, en tema claro) quedaron en la carpeta de trabajo de la sesión,
 > fuera del repositorio: hay que mostrártelas desde ahí para que decidas mirando, no leyendo.
@@ -413,14 +414,14 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 **A · Ya implementadas, esperan confirmación**
 
 1. **El texto gris de toda la app se lee más firme.** ✅ (decisión 7 de la auditoría) El gris azulado del texto secundario pasó de `#5B7793` a `#4A6580`: el mismo azul grisáceo, más hondo, porque
-   sobre el fondo manila de la cama no llegaba al contraste mínimo (3,69:1; hoy el peor par de toda la app mide 4,80:1). En la misma línea: los títulos de Hemodinamia, Rehabilitación e IMT, el
-   diagnóstico de la cama, el «Egreso» y el icono de traslado (que casi no se veía, 1,84:1) se oscurecieron, y «Siguiente» sin poder avanzar pasó de azul pálido con letra blanca a gris claro con letra oscura.
-   *Recomendado: dejarlo* (es una sola línea, uniforme y sin parches por pantalla). Si prefieres oscurecerlo solo sobre el manila y el fondo gris, se vuelve `--muted` de la piel a su valor y se parcha por pantalla.
+   sobre el fondo manila de la cama no llegaba al contraste mínimo (3,69:1; el peor par de --muted, el gris de los textos secundarios, mide 4,80:1; los textos con colores escritos a mano son otro asunto: ver la 21). En la misma línea: los títulos de Hemodinamia, Rehabilitación e IMT, el
+   diagnóstico de la cama, el «Egreso» y el icono de traslado (que casi no se veía, 1,84:1; con el cursor encima mide 10,3:1 y el botón mide 24×24 px, corregido en la revisión) se oscurecieron, y «Siguiente» sin poder avanzar pasó de azul pálido con letra blanca a gris claro con letra oscura.
+   *Recomendado: dejarlo* (es una sola línea, uniforme y sin parches por pantalla). Si prefieres oscurecerlo solo sobre el manila y el fondo gris, se devuelve ese gris a su valor anterior y se oscurece solo donde hace falta, pantalla por pantalla.
 2. **Piso de letra de 11 px en el celular.** ✅ (decisión 5) Ningún texto visible baja de 11 px en el tablero, el traslado, la retrospectiva, los seis pasos y el ingreso (antes llegaba a 9,3 px: barra de abajo, chips
-   de ventilador y equipos, palabras de estado, etiquetas). Nada se pierde ni se mueve un botón; el panel crece unos pocos píxeles (16 como máximo en la medición del paso 5.1). *Recomendado: dejarlo.* Si prefieres densidad antes que lectura, el piso baja a 10,5 px
-   (una constante en la guardia `piso_letra_celular.js`). **Solo es del celular**: el escritorio sigue con letra de 9,3 a 10,7 px (ver la 16).
+   de ventilador y equipos, palabras de estado, etiquetas) y, desde la revisión, tampoco en el popup del ➕, el Historial (con su Hoja UCI), el Egreso y la pestaña Registro (antes llegaban a 8,5 px en la Hoja UCI; el diálogo de Egreso ya estaba en regla). Nada se pierde ni se mueve un botón; el panel crece unos pocos píxeles (16 como máximo en la medición del paso 5.1). *Recomendado: dejarlo.* Si prefieres densidad antes que lectura, el piso baja a 10,5 px
+   (es un solo número en la prueba que vigila el piso de letra). **Solo es del celular**: el escritorio sigue con letra de 9,3 a 10,7 px (ver la 16).
 3. **El título de cada tarjeta sube un escalón** (de 11,5 a 12,5 px) para que haya tres niveles: tarjeta, bloque, etiqueta de campo. ✅ (decisión 6) *Recomendado: dejarlo;* sin ese escalón no hay tres niveles. Revertir:
-   `.fcard-title{font-size:.72rem}`, y entonces la guardia `titulos_tres_niveles.js` pide reconciliar la escalera.
+   volver el título de la tarjeta a su tamaño anterior (una línea), y entonces la prueba de los tres niveles de título pide reconciliar la escalera.
 4. **Los títulos de bloque pierden su color de dominio y van todos en gris, en negrita y mayúsculas** (Respiratorio azul, Rehabilitación ámbar, Evaluaciones turquesa, AET morado; y los tres de Planes, que eran azul, verde y ámbar
    en minúscula grande). ✅ El dominio sigue en el punto y el borde de cada tarjeta, y en Planes en el borde y el fondo de cada bloque. El ámbar de «Lo que queda pendiente» medía 3,07:1 como título. *Recomendado: dejarlo* (es lo que
    hace que sean «una sola tupla»). Si quieres conservar el color en alguna familia, se acepta como excepción escrita en la guardia, no con una segunda regla.
@@ -431,38 +432,58 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    *Recomendado: dejarlo.* Volver al verde es una línea de CSS.
 7. **Un solo botón principal: azul liso, sin degradado ni resplandor.** ✅ (decisión 1) **La hipótesis de la auditoría no se confirmó:** no había un índigo a la vista (era código muerto, la piel institucional lo pisaba
    siempre). Lo que sí difería era el degradado hacia azul marino, el resplandor azul y un «hover» que aclara en vez de oscurecer. Ahora «Guardar» y «Siguiente» son del mismo azul que «Evolución», con su tamaño grande de 52 px
-   (pedido tuyo del 15-ago). *Recomendado: dejarlo.* **Va en un commit propio: `git revert 392ba34` devuelve el relieve de antes sin tocar la corrección de la barra** (la 9).
+   (pedido tuyo del 15-ago). *Recomendado: dejarlo.* **Se hizo en un paso propio, aparte de la corrección de la barra (la 9), pero deshacerlo NO es apretar un botón:** hay que volver a escribir a mano cuatro reglas de estilo del botón, borrar la prueba que exige el azul liso y regenerar los paquetes de entrega (el detalle está en la bitácora, cierre de la tanda 5). Lo más simple: pedírselo a Claude, que lo hace y corre la batería sin tocar la corrección de la barra.
 8. **El cuadro de firma de los pendientes ya no pregunta «¿Quién midió?».** ✅ Dice «¿Quién deja el pendiente?» al dejarlo y «¿Quién cierra el pendiente?» al cerrarlo desde la cama (esto último lo agregué yo; el pedido
-   hablaba solo de «dejar»). Las evaluaciones siguen con «¿Quién midió?». Cierra la parte de texto de la 10 de la sección 2e. *Recomendado: dejarlo.* Si prefieres el cierre como estaba, es una línea (`pendEpiCerrar`).
+   hablaba solo de «dejar»). Las evaluaciones siguen con «¿Quién midió?». Cierra la parte de texto de la 10 de la sección 2e. *Recomendado: dejarlo.* Si prefieres el cierre como estaba, es una línea del cierre de pendientes desde la cama.
 9. **«⚠️ Sin guardar» es una franja de ancho completo arriba de los botones, en el celular.** ✅ Antes era una pastilla en la misma fila y dejaba el botón principal en 141 px: «Siguiente: evaluaciones →» se
    partía en tres líneas y se salía de su botón. Ahora el principal mide 258 px y se lee en una línea; **la barra queda 28 px más alta mientras hay cambios sin guardar.** *Recomendado: dejarlo.* Si prefieres la pastilla
-   compacta, la alternativa es una insignia más chica o un icono solo (cambia el texto de `#gSinGuardar`, que es del otro flujo).
+   compacta, la alternativa es una insignia más chica o un icono solo (cambia el texto de esa insignia, que es del otro flujo).
 
 **B · Falta decidir (no están hechas)**
 
 10. **La palabra del botón principal de la tarjeta de cama: «Evolución» (cuando falta) y «Editar» (cuando ya está).** (decisión 2) Es un sustantivo, no un verbo, y el tutorial dice «Se abre con Evolución». *Recomendado: no cambiarla:* el
-    problema no era el nombre sino que compitiera con otros tres botones del mismo peso, y eso ya se resolvió (la 5). Si quieres «Evolucionar», se cambia en un solo lugar del `renderGrid`, en el texto del tutorial y en su guardia.
+    problema no era el nombre sino que compitiera con otros tres botones del mismo peso, y eso ya se resolvió (la 5). Si quieres «Evolucionar», se cambia en un solo lugar de la tarjeta de cama, en el texto del tutorial y en la prueba del tutorial.
 11. **Los cinco emojis posteriores a 2019 que viven en producción.** (decisión 4, con la lista real) Son **cinco, no cuatro**: 🫁 pulmones (**27 sitios**: título de la tarjeta Respiratorio, botón «Intubación», timeline, bodega, estadísticas, la
     campana, la entrega de turno), 🫀 corazón anatómico (la insignia **UPOT de cada tarjeta de cama**, que la auditoría no listó), 🫧 burbujas, 🪶 pluma y 😮‍💨 cara exhalando. En el Chrome de Windows 10 pueden salir como un cuadrado. *Recomendado:*
     pide a alguien que abra, en un computador del hospital, la tarjeta Respiratorio **y** la insignia UPOT de una cama, y me dices si salen como cuadrado. Si es así, se reemplazan por un SVG propio o un emoji de 2019 en una tanda aparte, y cada emoji que
-    se cambie se borra de la lista `BASE` de `emojis_nuevos.js` (la guardia lo exige). Si se ven bien, se dejan: el candado ya impide que entren más.
+    se cambie se borra de la lista de emojis permitidos de la prueba de emojis (la prueba lo exige). Si se ven bien, se dejan: el candado ya impide que entren más (también los que se escriban como código: la revisión le cerró esos huecos).
 12. **El ➕ del pie de la tarjeta sigue sin rótulo.** Es un icono solo y en el celular no existe el *tooltip*: quien no sabe qué hace no tiene cómo enterarse. ¿Le ponemos «Evento»? *Recomendado: sí;* en el celular el botón mide 110 px
-    de ancho, hay lugar de sobra. En escritorio se mide con la guardia `tarjeta_acciones.js` al hacerlo. Cambia una palabra de la interfaz, por eso no se hizo.
+    de ancho, hay lugar de sobra. En escritorio se mide con la prueba de las acciones de la tarjeta al hacerlo. Cambia una palabra de la interfaz, por eso no se hizo.
 13. **Durante un traslado, cada cama ocupada muestra dos botones azules a ancho completo** («Intercambiar con esta cama» y «Evolución») uno sobre otro, más la fila de secundarios. Queda ordenado pero largo, y el riesgo de tocar uno por el
     otro existía igual antes. ¿Se esconde «Evolución» mientras dura el traslado? *Recomendado: dejarlo así por ahora* (el pie del traslado es lo acordado) y esconderla solo si ves toques equivocados cuando lo uses.
-14. **El «sin registrar» en cursiva gris del encabezado de cada bloque, en el celular, mide 2,23:1** (`#b3ada2`). No estaba en la auditoría y es el «vacío» apagado a propósito de la tanda 3, así que no se tocó. ¿Quieres que también se lea?
-    *Recomendado: sí,* oscurecerlo hasta 4,5:1 conserva la cursiva y su carácter de apagado; es una línea de CSS y una aserción más en `contraste_tokens.js`.
+14. **El «sin registrar» en cursiva gris del encabezado de cada bloque, en el celular, mide 2,23:1** (un gris muy pálido). No estaba en la auditoría y es el «vacío» apagado a propósito de la tanda 3, así que no se tocó. ¿Quieres que también se lea?
+    *Recomendado: sí,* oscurecerlo hasta 4,5:1 conserva la cursiva y su carácter de apagado; es una línea de estilo y una comprobación más en la prueba de contraste.
 15. **¿Subimos los dos niveles superiores de título, T2 a .74rem y T1 a .8rem?** En el celular el escalón entre el título de un bloque (11,5 px) y la etiqueta de sus campos (11,2 px) es de solo 0,3 px, porque el piso de 11 px deja la etiqueta
     en .7rem; los separan el peso, el espaciado, el gris y la posición. *Recomendado: primero míralo en el celular real;* si no se distingue, sí, los dos juntos (no se baja la etiqueta).
 16. **¿Un piso de letra también en el escritorio?** Hoy el escritorio sigue con 9,3 a 10,7 px en los títulos en línea y los chips; el piso de 11 px es solo del celular. *Recomendado: no a ciegas:* mira las capturas de 1400 px y dime si hay
     algo que se lea mal en el computador. Si dices que sí, se hace en una pieza propia, con una constante de piso para el escritorio y su guardia.
 17. **La cabecera del panel desborda por debajo de 390 px.** Con un diagnóstico largo en una sola línea, el título y la ✕ de cerrar terminan 20 px fuera de la pantalla a 360 px (y 60 px a 320 px), el foco de la ✕ desliza el panel y la barra
-    aparece corrida. Es de la cabecera, no de la barra, y no se arregló. ¿Importan los celulares de 360 px o menos en la unidad? *Recomendado: sí, arreglarlo* (`min-width:0` y elipsis en el diagnóstico); una ✕ de cerrar fuera de la
+    aparece corrida. Es de la cabecera, no de la barra, y no se arregló. ¿Importan los celulares de 360 px o menos en la unidad? *Recomendado: sí, arreglarlo* (que el diagnóstico largo se corte con «…» en vez de empujar la ✕ fuera de la pantalla); una ✕ de cerrar fuera de la
     pantalla no es algo para dejar.
-18. **El botón muerto `#btnCerrarPost`** (`display:none` en línea; nunca se ve) sigue en el HTML, pegado a la zona del guardado. No es un duplicado visible de «Cerrar la evolución». *Recomendado: borrarlo en una tanda aparte,* junto con lo que lo nombra.
-19. **Con una franja de falla (ámbar o de aviso) la barra de abajo mide 160 a 180 px** y el borde de un campo enfocado puede quedar cubierto: el `scroll-padding` fijo (112 px) cubre la barra con la insignia (100 px), no con la franja. Es la zona
+18. **Hay un botón muerto de «cerrar» que nunca se ve** (está escondido de origen) y sigue en la pantalla, pegado a la zona del guardado. No es un duplicado visible de «Cerrar la evolución». *Recomendado: borrarlo en una tanda aparte,* junto con lo que lo nombra.
+19. **Con una franja de falla (ámbar o de aviso) la barra de abajo mide 160 a 180 px** y el borde de un campo enfocado puede quedar cubierto: el margen fijo de desplazamiento (112 px) cubre la barra con la insignia (100 px), no con la franja. Es la zona
     del otro flujo y no se midió el foco con ella puesta. *Recomendado: medirlo cuando se toque esa franja,* no antes.
-20. **Escribir en `CLAUDE.md` que la regla de emojis «la fija `checks/emojis_nuevos.js`»**, como las demás reglas. Un mensaje de agente no autoriza cambiarlo; es tuyo. *Recomendado: sí,* es una frase, y le dice a la próxima sesión dónde está el candado.
+20. **Escribir en el archivo de reglas (`CLAUDE.md`) que la regla de emojis la vigila una prueba automática (la de emojis nuevos)**, como las demás reglas. Un mensaje de agente no autoriza cambiarlo; es tuyo. *Recomendado: sí,* es una frase, y le dice a la próxima sesión dónde está el candado.
+
+21. **Textos que todavía se leen poco, en las mismas pantallas que arregló la tanda** (hallazgo de la revisión). El texto gris secundario quedó en regla, pero con colores escritos a mano
+    quedan pares bajo el mínimo de lectura (4,5:1). Medidos en Chromium, con el reloj congelado y datos ficticios:
+    **(a)** el chip gris «📋 MRC/FSS no evaluables aún» de cada tarjeta ocupada: gris `#64748b` sobre el manila de la carpeta = 3,5:1 (el mismo gris y el mismo manila por los que se oscureció el diagnóstico de la cama);
+    arreglo de una línea: pasar ese gris a un gris azulado más hondo (`#475569`, 5,6:1).
+    **(b)** el chip ámbar de una evaluación vieja («📋 MRC 52 · hace 8d · DMV»): `#b45309` sobre su fondo ámbar = 3,7:1. **Es el ámbar con significado clínico («esto es de hace días»): no se toca sin tu decisión.**
+    Si dices que sí, un tono más hondo del mismo ámbar (`#92400e`, unos 5,2:1); si prefieres, se deja como está.
+    **(c)** en la vista retrospectiva, el botón apagado «— sin evolución —» de las camas sin evolución ese día: `#94a3b8` sobre gris claro = 2,25:1 (justo la clase de rótulo que se pierde cuando se quiere saber por qué);
+    arreglo de una línea: el mismo gris azulado más hondo (`#475569`, 6,7:1).
+    **(d)** en la barra del Turno, «Sin colegas asignados» y «N camas sin asignar»: `#94a3b8` sobre el fondo de la app = 2,3:1; arreglo de una línea: el mismo gris azulado más hondo (6,8:1).
+    **(e)** en el aviso de la vista retrospectiva, «↩︎ Volver a hoy»: letra blanca sobre el naranja `#FF9F0A` = 2,06:1. **Es el naranja del aviso: decisión tuya.** Opciones: letra oscura sobre el mismo naranja (unos 7:1) o un naranja más hondo con letra blanca.
+    **(f)** el icono de traslado con el cursor encima: era 2,98:1, peor que en reposo; **ya se corrigió en la revisión** (ahora 10,3:1) y su botón pasó de 21×21 a 24×24 px.
+    Un barrido de todo el texto visible dio 457 textos bajo el mínimo contra 1.131 antes de la tanda: ningún par empeoró por la tanda. *Recomendado: sí a la (a), la (c) y la (d)* (tres líneas de color, grises sin significado clínico); *la (b) y la (e) son tuyas.*
+    Si dices que sí, esos tres pares entran a la lista cerrada de la prueba de contraste para que no vuelvan a bajar (hoy no están en esa lista; entran junto con el arreglo, viendo antes la prueba roja).
+22. **Las otras pestañas y la barra de botones del Registro, en el celular** (hallazgo de la revisión, medido a 390 px y sin datos; con datos pueden aparecer más). El piso de 11 px de la 2 ya vale en el popup del ➕, el Historial (con su Hoja UCI), el Egreso y la pestaña Registro.
+    **Quedaron fuera a propósito, con su medida**, porque no se pidieron y son pantallas de lectura más que de trabajo de pie junto a la cama: **Estadísticas** (la letra más chica mide 10,6 px: las etiquetas de los indicadores),
+    **Entrega** (10,6 px: el texto bajo el número de cada cama) y **Ventiladores** (10,1 px: los rótulos de las bodegas).
+    Y aparte: **la barra de botones del Registro** (buscador, Documentos, Lista del día, Filtros, Cambios de esta noche y CSV) es una sola fila que a 390 px mide 836 px, así que **toda la página se desliza hacia el lado**, no solo la tabla.
+    Es de antes del piso y no depende de la letra; la prueba del piso de letra no la mide para no ocultarla ni tapar su arreglo. *Recomendado: sí a las dos:* el mismo piso de 11 px a las tres pestañas (una regla de estilo por cada clase, como se hizo en el Historial)
+    y que la barra de botones del Registro pase a dos o tres filas en el celular. Son cambios de pantalla: no tocan lo que se guarda.
 
 **Y dos que ya estaban y siguen igual:** los 18 chips fijos y las sugerencias «Medir X» de Planes (la 10 de la sección 2e) no se tocaron en esta tanda, y **nada de lo de aquí se ha visto en un aparato real**: todo se midió en Chromium con datos ficticios, no
 en el Chrome de Windows 10 ni con pulgar y guantes.
@@ -491,6 +512,7 @@ en el Chrome de Windows 10 ni con pulgar y guantes.
 | 🟠 **La cabecera del panel desborda por debajo de 390 px** (tanda 5) | `index.html` | Con un diagnóstico largo la ✕ de cerrar queda 20 px fuera a 360 px (60 a 320 px) y el foco de la ✕ desliza el panel. `act_bar_390.js` lo esquiva. Decisión 17 de la 2f. |
 | 🟠 **El «sin registrar» del celular mide 2,23:1** (tanda 5) | `.mres.vacio` | El «vacío» apagado a propósito de la tanda 3; `contraste_tokens.js` solo mide `--muted` y su lista cerrada, no lo ve. Decisión 14 de la 2f. |
 | 🟠 **`#btnCerrarPost` es un botón muerto** (tanda 5) | `index.html` | `display:none` en línea; nunca se ve. Decisión 18 de la 2f. |
+| 🟠 **La barra de botones del Registro se sale de la pantalla en el celular** (tanda 5, revisión) | `#tcP`, fila de botones | Una sola fila sin envoltura que a 390 px mide 836 px: la página entera se desliza hacia el lado (la tabla ya desliza dentro de su marco). Decisión 22 de la 2f; `piso_letra_celular.js` la deja fuera a propósito. |
 | 🟠 **Una tecla suelta no repinta el estado de un bloque** (tanda 3) | `index.html` | Se repinta con `input`, `change`, `click` sobre un botón y al cambiar de paso. El Enter en «Resultado(s)» del cultivo no repinta hasta el siguiente evento (la casilla «Cultivo» ya cuenta). |
 
 Los que figuraban aquí el 1-oct —el FEM narrado en L/min, el BDT con las dos

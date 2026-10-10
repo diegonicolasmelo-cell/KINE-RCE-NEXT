@@ -4602,7 +4602,7 @@ significado clínico (ámbar de heredado y pendiente, rojo de VM prolongada, ale
   Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes.
 - **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian; no hay hoja ni columna nueva.
 - **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app instalada para que el sello de versión renueve su caché. El sello `NEXT-5.9-limpieza-visual` debe aparecer en «Cargando…»; si no aparece, lo pegado no es lo nuevo. Recordatorio de la tanda 2: la prueba con DOS aparatos sigue pendiente antes de pegar en NEXT.
-- **Cómo revertir:** cada paso es un commit (08f8ade, 9babf13, f5cd0c9, 24a421e, 392ba34, 8795dbe, 40f8e09) y el cierre es otro; `git revert` deshace lo que se quiera. **El botón único va aparte a propósito: `git revert 392ba34` devuelve el degradado y el resplandor sin tocar la corrección de la barra.** Ninguna columna cambió, así que no hay datos que migrar de vuelta.
+- **Cómo revertir:** cada paso es un commit (08f8ade, 9babf13, f5cd0c9, 24a421e, 392ba34, 8795dbe, 40f8e09) y el cierre es otro, **pero `git revert` NO los deshace limpio** (corregido el 10-oct-2026 por la revisión de la tanda 5, hallazgo R25: esta nota decía que `git revert 392ba34` bastaba, y no basta). Cada commit tocó también `build/paquete_migracion/index.html` (generado, que los pasos y los cierres siguientes volvieron a tocar) y esta bitácora, y el revert choca ahí: en una copia de trabajo fuera del repositorio, `git revert --no-commit 392ba34` fusionó solo `v2/index.html`, pero dejó conflicto en `build/paquete_migracion/index.html` y en `BITACORA.md` y borró `boton_principal_unico.js`; quien no programa no resuelve esos conflictos, y aun resueltos faltaría regenerar `entrega/` y `pwa/` para que `paridad_entrega.js` y `pwa_paquete.js` queden verdes. **Los pasos reales para deshacer solo el botón principal único** (el degradado y el resplandor de «Guardar» y «Siguiente», sin tocar la corrección de la barra del paso 5.4): (1) en `v2/index.html`, **a mano**, volver a escribir las cuatro reglas que ese commit borró (las del índigo y el degradado de la barra que le ganaban a `.btn-p`; `git show 392ba34 -- v2/index.html` las muestra); (2) borrar `build/checks/boton_principal_unico.js`, que exige lo contrario; (3) regenerar con `node build/paquete_migracion.js entrega` y `node build/empaquetar_pwa.js` y correr la batería. **Lo más simple, para Diego: pedírselo a Claude**, que hace los tres pasos y corre la batería. Ninguna columna cambió, así que no hay datos que migrar de vuelta.
 
 ### Para no olvidar (de toda la tanda)
 
@@ -4884,7 +4884,7 @@ Con `-j 2`, las guardias de la zona —`convenciones`, `piel`, `legibilidad`, `m
 
 O sea: un mismo azul, pero **tres «hover» distintos entre cinco botones principales**, y el de la barra con degradado y resplandor contra los planos de todos los demás. Es ese lo que se unificó, siguiendo lo pedido («un solo botón principal: el azul institucional, manteniendo el tamaño grande de 52 px»).
 
-**El cambio (CSS, cuatro reglas menos).** Se **borraron** las dos reglas base con el índigo y las dos de la piel con el degradado azul y la sombra. «Guardar» y «Siguiente» quedan siendo `.btn-p` a secas: `--primary` plano, `--pdark` con el cursor encima, sin sombra, degradado ni filtro. **Conservan su tamaño** (52 px de alto, 1,02rem de letra: pedido de Diego del 15-ago-2026) y su radio de 12 px: se unifica el aspecto, no el tamaño. El desactivado (gris claro con letra oscura, de los pasos 5.1 y 5.2) **no cambia**: sus reglas de la piel se quedan, que además arreglan la opacidad en línea del paso 1. No se tocó `_guardadoBotones`, `guardar()`, la franja, el HTML ni `#btnCerrarPost`. **Revertir** es `git revert` de este commit: devuelve las cuatro reglas.
+**El cambio (CSS, cuatro reglas menos).** Se **borraron** las dos reglas base con el índigo y las dos de la piel con el degradado azul y la sombra. «Guardar» y «Siguiente» quedan siendo `.btn-p` a secas: `--primary` plano, `--pdark` con el cursor encima, sin sombra, degradado ni filtro. **Conservan su tamaño** (52 px de alto, 1,02rem de letra: pedido de Diego del 15-ago-2026) y su radio de 12 px: se unifica el aspecto, no el tamaño. El desactivado (gris claro con letra oscura, de los pasos 5.1 y 5.2) **no cambia**: sus reglas de la piel se quedan, que además arreglan la opacidad en línea del paso 1. No se tocó `_guardadoBotones`, `guardar()`, la franja, el HTML ni `#btnCerrarPost`. **Revertir:** `git revert` de este commit NO sirve limpio (choca con el archivo generado y con esta bitácora; ver «Cómo revertir» del cierre de esta tanda, corregido en la revisión, R25): se vuelven a escribir a mano las cuatro reglas, se borra `boton_principal_unico.js` y se regenera, o se le pide a Claude.
 
 ### Guardia nueva `build/checks/boton_principal_unico.js` (A a F, 24 aserciones)
 
@@ -5240,3 +5240,89 @@ esperadas: `paridad_entrega` y `pwa_paquete` por la regeneración que queda para
   una sonda fuera del repositorio; la réplica y reabrir los cierran). Es el mismo defecto en **otra tarjeta** que el paso no pedía: no se tocó, queda anotado.
 - El nivel **oculto** que `fillCama` copia en los caminos sin réplica (decisión 12) y la decisión 9b (la cama de noche) esperan a Diego.
 - Si la fila vieja tiene `KTM_CANT` mayor que 1 pero la KTM no está «realizada» no se conserva nada: el servidor ya la normaliza a vacío en ese caso.
+
+## 10-oct-2026 · Limpieza visual (tanda 5), revisión adversarial · paso F4 «limpieza visual y documentos»: el candado de emojis lee tres formas más, el icono de traslado cumple 24 px y un hover legible, el piso de 11 px llega al ➕, al Historial y al Registro, y los documentos hablan en palabras de la unidad
+
+**De dónde sale.** Los hallazgos R21, R26, R22, R23, R25, R27 y R20 de la revisión de la tanda 5. **Se reprodujo todo antes de tocar** (Chromium con reloj congelado
+al 10-mar-2026 10:00 y el servidor real en memoria, `build/sim/sim_srv.js`) y las guardias nacieron rojas contra el código sin arreglar. Lo único de producto que
+cambia es CSS de `v2/index.html`; el servidor, `guardar()`, `api()`, `gs()`, `_guardadoBotones`, `#gEstadoGuardado` y los `avErr*` no se tocaron. Sin migración de
+esquema. El naranja `#FF9F0A`, el ámbar de «heredado» y el de la evaluación vieja **no se cambiaron**: son decisión de Diego (21 de la sección 2f de `docs/PENDIENTES.md`).
+
+**R21 y R26 · el candado de emojis (`emojis_nuevos.js`) no veía tres formas con que un emoji nuevo SÍ se dibuja.** Sobre el código sin tocar se armaron copias fuera del
+repositorio con cada forma, y el candado dijo «0 problemas» en las tres:
+- **Escape de CSS** (`content:"\1FA7B"`): el navegador lo dibuja como 🩻. Se lee como el CSS: de 1 a 6 cifras hexadecimales y UN espacio de cierre opcional
+  (`\1F972 ` se come el espacio; `\01FA7B` lleva ceros delante). Solo se decodifica donde el navegador lo hace: dentro de un `<style>`, de un `style="…"` y de una
+  cadena `content:"…"`; **en un `.js`/`.gs` armado como cadena, la barra va doble** (`\\1FA7B`) y también se lee.
+- **`String.fromCodePoint(n)` y `String.fromCharCode(a, b)`** con números escritos a la vista (decimal, `0x`, `0b`, `0o`; varios argumentos, espacios, coma final, el par
+  subrogado de `fromCharCode`). Si el argumento no es un literal (una variable) no se puede saber qué dibuja y no se inventa.
+- **Entidades numéricas sin `;`** (`&#x1FA7B`, `&#129659`, pegadas a la etiqueta que las cierra): el navegador las acepta igual. Las cifras son voraces: `&#x1FA7Bz` es 🩻 y
+  una «z».
+Y el encabezado decía «las cuatro formas»; ahora cuenta las que de verdad lee. **Los comentarios no se cazan** (no se dibujan), con un control para cada lenguaje.
+**Rojo antes:** 22 fallos (15 casos ★ de la sección 1, el control del número de línea y los 6 ★★ de la pantalla real, inyectados en memoria). **Verde después:** 117 aserciones.
+**Seis mutantes** (copias del árbol en el scratchpad, fuera del repositorio: escape de CSS, escape con comillas simples y espacio, `fromCodePoint`, `fromCharCode`, entidad hexadecimal y entidad decimal, ambas
+sin `;`) sobreviven con la guardia de antes y **mueren** con la nueva. Sin falsos positivos: los 5 emojis de producción (`BASE`) siguen pasando y los escapes que NO son emojis nuevos
+(`\1F4CB`, `\2714`, `\25BE`) tampoco se cazan.
+
+**R22 · el botón de traslado de la tarjeta (`.bmov`).** Medido con `getBoundingClientRect` en las 5 camas ocupadas, a 390 y a 1400 px: **21×21 px**, bajo los 24×24 de un objetivo
+táctil, y con el cursor encima pasaba a `#3b82f6` sobre `#e2e8f0` = **2,98:1**, peor que en reposo (5,43:1). Ahora `min-width/min-height:24px` más un margen vertical negativo de 2 px
+(como el lápiz de la ficha, `.pname-lap`): la pestaña de la cama **no crece** (37 px antes, 36 ahora) y el tablero no se alarga. El hover usa `var(--pdark)`: **10,3:1**.
+`tarjeta_acciones.js` (item K) mide el tamaño y la altura de la pestaña en los dos anchos; `contraste_tokens.js` pasa el cursor de verdad (`mouse.move`), exige que el botón esté en
+`:hover` y mide el color compuesto. **Rojo antes:** 3 fallos (los dos tamaños y el hover 2,983:1). **Verde después.**
+
+**R23 · el piso de 11 px llega a donde abren los botones de la tarjeta.** El piso de la tanda 5 solo cubría `#sp` y `#bedGrid`. Medido a 390 px (sección 5 nueva de
+`piso_letra_celular.js`, con datos ficticios sembrados para que el Historial y el Registro tengan algo que mostrar): popup del ➕ «TURNO» a 9,9 y «HORA» a 10,2; Historial «Día 7» y
+fechas del riel a 9,9, la Hoja UCI desde **8,5** (nota de NAVM) hasta 10,9; Registro «CAMA» y «KTR» a 9,9, los tres encabezados a 10,7, las cajas de totales a 10,1. El diálogo de
+Egreso **ya estaba sobre el piso** (verde de entrada; queda listado para que no baje). Mismo mecanismo que antes: selectores de atributo con `!important` para los tamaños en
+línea, **solo dentro de `#evPop`, `#tlp`, `#egMod` y `#tcP`**, y una regla por clase (`.7rem` = 11,2 px) para los que vienen de la hoja de estilo. La guardia mide ocho pantallas
+(`#evPop` en sus cuatro estados: lista de tipos, procedimiento, cultivo y el candado de «corregir el pasado»; `#tlp` en Resumen y Hoja UCI; `#egMod`; `#tcP`), exige haber VISTO los
+textos que más fallaban y que con la letra más grande nada se rompa. **Rojo antes:** 7 fallos (todos los de arriba salvo el Egreso). **Verde después:** 76 aserciones.
+🪤 **Fuera a propósito, con su medida (decisión 22 de la 2f):** Estadísticas (10,6 px), Entrega (10,6) y Ventiladores (10,1), que no se pidieron subir.
+🪤 **Hallazgo que NO se arregló:** la barra de botones del Registro (`#tcP`, buscador + 5 botones, un `div` con `display:flex` y sin `flex-wrap`) mide **836 px a 390**, y la pantalla
+entera se desliza hacia el lado. Es de antes del piso y no depende de la letra; la guardia mide el Registro con `sinDesbordeDePagina:true` (opción nueva de `CAJAS`) y lo dice en un comentario,
+para no tapar el defecto ni mezclarlo con este arreglo. Quedó en la sección 4 de `docs/PENDIENTES.md` y en la decisión 22.
+
+**R25 · «revertir el botón único» estaba mal dicho.** La nota del cierre de la tanda 5 decía que `git revert 392ba34` bastaba. Medido en un clon descartable: el revert **choca** (los
+paquetes generados y esta misma bitácora cambiaron después). Los pasos reales —volver a escribir a mano las cuatro reglas que borró 392ba34, borrar
+`boton_principal_unico.js`, regenerar con `node build/paquete_migracion.js entrega` y `node build/empaquetar_pwa.js`— quedaron en el cierre de la tanda 5, con «o pídeselo a Claude».
+
+**R27 y R20 · los documentos.** La decisión 1 de la 2f decía «hoy el peor par de toda la app mide 4,80:1»: solo vale para los textos con `--muted`. Se reescribió, y los pares de las mismas pantallas
+con colores a mano **se midieron de nuevo con el medidor real** (los números del informe, 3,51 y 3,70, salen 3,45 y 3,66 con el fondo compuesto; el documento usa 3,5 y 3,7) y se
+escribieron en lenguaje de unidad como las **decisiones 21 y 22** nuevas, cada una con su arreglo de una línea. Las dos anuncian lo mismo arriba: «trece por decidir».
+Las decisiones de las secciones 2c, 2d, 2e y 2f ya no usan nombres internos: dicen qué pasa en pantalla y qué elige Diego. **Número y sentido de cada decisión: sin cambios.**
+Los nombres que salieron del texto de Diego, para quien los busque:
+
+| En PENDIENTES decía | Es |
+|---|---|
+| `GUARDADO_ESPERA_MS`, `GUARDADO_REINTENTOS_MS` | los dos números del reintento automático del guardado (sección 2c) |
+| `<ACCIÓN>_REPETIDA`, `[sin episodio]` | las dos marcas de la bitácora de auditoría (sección 2c) |
+| `auditoriaIntegridad` | la revisión de integridad que corre coordinación desde el editor (sección 2c) |
+| `ARCH_<paciente>_2` | el identificador de un segundo egreso (sección 2c) |
+| `guardar()`, `_irAlCampo('fFirma')`, `focus()`, `abrir_hasta_el_campo.js` | el botón de guardar y el camino único «llevar hasta el campo» (sección 2d) |
+| `pasoEvalMedir`, `transOfIr`, `_abrirHastaCampo(el)`, `scrollIntoView` | los chips de Evaluaciones y el atajo de «Revisa antes de guardar» (sección 2d) |
+| `fillFormReplica`, `pasoIr`, `_VFON_HORAS`, `VFON_USADA`, `fillCama` | la carga del turno anterior, el cambio de pasos, las horas de válvula y la carga de la cama (sección 2e) |
+| `.fcard-title{font-size:.72rem}`, `titulos_tres_niveles.js`, `piso_letra_celular.js` | el título de tarjeta y sus pruebas (sección 2f) |
+| `git revert 392ba34` | el botón único (sección 2f): ver R25 arriba |
+| `pendEpiCerrar`, `#gSinGuardar`, `renderGrid`, `BASE` de `emojis_nuevos.js` | el cierre de pendientes, la insignia «sin guardar», la tarjeta de cama y la lista de emojis permitidos (sección 2f) |
+| `#b3ada2`, `min-width:0`, `#btnCerrarPost`, `scroll-padding` | un gris pálido, el corte con «…» del diagnóstico, el botón muerto y el margen de desplazamiento (sección 2f) |
+| `CLAUDE.md` / `checks/emojis_nuevos.js` | el archivo de reglas y la prueba de emojis (sección 2f) |
+Se dejaron a propósito `CONTRATO_ESTRICTO` (es el nombre de la fila que Diego escribe en la hoja CONFIG), `--muted` (una vez, entre paréntesis y explicado, porque el informe lo cita así) y `ARCH_` (lo que se ve en la hoja).
+
+**Guardias.**
+- `emojis_nuevos.js`: lee escapes de CSS, `String.fromCodePoint`/`fromCharCode` con números y entidades sin `;`; sección 1 con 15 casos ★ y un control del número de línea, sección 4 con inyecciones en la pantalla real. **Rojo antes: 22 fallos. Verde después (117).**
+- `tarjeta_acciones.js` (K): el traslado mide ≥ 24×24 y la pestaña no crece. **Rojo antes: 2 fallos. Verde después (110).**
+- `contraste_tokens.js` (B): el traslado con el cursor encima ≥ 4,5:1, con `mouse.move` real. **Rojo antes: 1 fallo (2,983:1). Verde después (22).**
+- `piso_letra_celular.js` (sección 5): ocho pantallas nuevas. **Rojo antes: 7 fallos. Verde después (76).**
+- Nada de `build/checks/base/` se tocó.
+
+**Vecinas.** La **batería completa** con `-j 2` (en tres lotes de 80, 76 y 84 por el tope de tiempo del comando): **238 verdes y 2 rojas**, las dos esperadas: `paridad_entrega` y `pwa_paquete`
+por la regeneración que queda para el cierre. `paquete.js` regeneró `build/paquete_migracion/index.html` (incluido en el commit).
+
+**Lo que ve distinto la kinesióloga.**
+- El **icono de traslado** de cada cama es un poco más grande (24×24 px) y, al pasar el cursor, se pone azul hondo y se lee (antes pasaba a un azul pálido más difícil de ver que en reposo).
+- En el celular, las letras del **popup del ➕** (TURNO, HORA), del **Historial** (incluida la Hoja UCI, que llegaba a 8,5 px) y de la **pestaña Registro** (CAMA, KTR, encabezados y totales) suben a 11 px:
+  nada se mueve de lugar; la Hoja UCI y el Registro, que ya se deslizaban dentro de su marco, quedan apenas más anchos.
+
+**Lo que NO se hizo y queda dicho.**
+- La barra de botones del Registro que se sale de la pantalla en el celular, y las pestañas Estadísticas, Entrega y Ventiladores bajo 11 px: decisión 22.
+- Los pares de color a mano de la decisión 21 (el gris del chip «no evaluables», el ámbar de la evaluación vieja, «— sin evolución —», «Sin colegas asignados» y el naranja de «Volver a hoy»): esperan a Diego; **el ámbar y el naranja no se tocan sin su palabra.**
+- Los textos de `docs/archivo/` y la sección 4 de PENDIENTES (tabla técnica «dónde está») siguen con nombres internos: son tablas para quien programa, no decisiones.

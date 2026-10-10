@@ -27,7 +27,22 @@
 //
 // 🪤 EL FUENTE TAMBIÉN ESCRIBE EMOJIS COMO CÓDIGO. No solo el carácter: index.html trae `&#128274;` (el candado de «Modo
 //    Coordinación») y `&#128101;` de verdad, así que el mismo emoji de 2021 se puede colar como `&#x1FA7B;`, como `&#129659;`,
-//    como `\u{1FA7B}` o como el par de sustitutos `\uD83E\uDE7B` sin que un grep por el carácter lo vea. Se decodifican las cuatro formas.
+//    como `\u{1FA7B}` o como el par de sustitutos `\uD83E\uDE7B` sin que un grep por el carácter lo vea. Se decodifican esas cuatro
+//    formas Y TRES MÁS que la primera versión de la guardia (tanda 5) NO veía y que dibujan el mismo cuadrado en el hospital
+//    (revisión de la tanda 5, hallazgos R21 y R26, 10-oct-2026; el comentario de entonces decía «las cuatro formas» y había una
+//    quinta, sexta y séptima vía). Se demostró con SEIS copias de v2/ fuera del repositorio, cada una con un emoji de 2021 escrito de una
+//    de las formas nuevas: con la guardia de antes las seis salían VERDES (exit 0, «ningún emoji de 2020 en adelante»); con ésta,
+//    rojas, de a un hallazgo cada una y sin falsos positivos sobre los cinco emojis que ya viven en producción.
+//      · escape de CSS: `content:"\1FA7B"` (también `\01FA7B`, y `\1F972 ` con el espacio que cierra el escape y el navegador se come).
+//        Se lee en <style>, en style="" y en toda declaración `content:` (también la que un .gs o un script arman en una cadena, con la
+//        barra doble `\\1FA7B`). FUERA de CSS la barra con cifras no es nada: una expresión regular o el texto `\1FA7B` no son un emoji.
+//      · String.fromCodePoint(0x1FA7B) y String.fromCharCode(0xD83E, 0xDE7B) con los números escritos (decimal o 0x). El emoji no está
+//        en el fuente sino que lo fabrica la llamada: se reemplaza por lo que devolvería.
+//      · entidad numérica SIN punto y coma: `&#x1FAE0 listo` y `&#129659 `. El HTML perdona el `;` y la decodifica igual. Las cifras
+//        se leen enteras (`&#x1FA7BA` es un solo número fuera de rango, que el navegador pone como �).
+//    LÍMITE CONOCIDO (es una guardia estática: lee archivos, no corre código): un argumento que no es un número escrito
+//    (`String.fromCodePoint(cp)`, `0x1FA00 + 0x7B`) o un escape de CSS armado por partes no se puede leer sin ejecutar. Hoy el fuente
+//    no usa ninguna de esas formas (ni escapes de CSS, ni fromCodePoint, ni entidades sin punto y coma): un uso nuevo se mira a mano.
 //
 // QUÉ SE CONSIDERA «NUEVO»
 //   1. Todo pictograma que Unicode NO tenía asignado al 12.1 (oct-2019, el último emoji «de 2019»). No es una lista de emojis
@@ -42,13 +57,17 @@
 //
 // QUÉ EXIGE
 //   1. El lector de comentarios y de formas escritas como código funciona (casos armados, incluidos los rojos: un 🩻 en una cadena,
-//      en una plantilla, después de una `//` dentro de un texto, como `&#x1FA7B;`, como `\u{1FA7B}`, como par subrogado).
+//      en una plantilla, después de una `//` dentro de un texto, como `&#x1FA7B;` (con y sin punto y coma), como `\u{1FA7B}`, como par
+//      subrogado, como escape de CSS y como String.fromCodePoint / fromCharCode; y los controles que NO deben saltar: los mismos
+//      escapes de emojis viejos, dentro de un comentario, o una barra con cifras que no es CSS).
 //   2. Los archivos reales se leen enteros y sin descarrilar (sin cadenas a medias, y con el JavaScript sin comentarios todavía
 //      compilando en el motor de verdad: es la prueba independiente de que el lector no se llevó código por comentario).
 //   3. Ningún emoji nuevo FUERA DE COMENTARIOS que no esté en BASE.
 //   4. No es una guardia vacía: cada emoji de BASE sigue apareciendo (si uno desaparece —porque Diego decidió cambiarlo— se borra
 //      de la base y el candado se aprieta; así un emoji quitado no puede volver).
-//   5. Prueba roja permanente: se inyecta un 🩻 en la pantalla real, en memoria, y el lector TIENE que rechazarlo.
+//   5. Prueba roja permanente: se inyecta un 🩻 en la pantalla real, en memoria, y el lector TIENE que rechazarlo. Y lo mismo con cada
+//      una de las tres formas nuevas (escape de CSS en el <style> real, la llamada en el <script> real, la entidad sin `;` en el
+//      <body> real), que dentro de un comentario NO se cazan.
 //
 // QUÉ MIRA: v2/index.html y todos los v2/*.gs (también escriben texto de interfaz: las alertas de la campana, la entrega de turno).
 // Es ESTÁTICA: lee archivos, no abre el navegador y no mira el reloj, así que da lo mismo cuándo se corra.
@@ -148,6 +167,7 @@ function leer(txt, modo) {
   const mascara = new Uint8Array(n);
   const problemas = [];
   const scripts = [];
+  const estilos = [];   // tramos de <style>…</style>: ahí la barra invertida es de CSS (`\1FA7B`), ver `regionesCss`
   const marcar = (a, b) => { for (let k = a; k < b; k++) mascara[k] = 1; };
   const linea = (pos) => { let l = 1; for (let k = txt.indexOf('\n'); k >= 0 && k < pos; k = txt.indexOf('\n', k + 1)) l++; return l; };
   const dentroDeScript = (modo === 'html');   // en html el JS termina en </script, en .gs no hay fin
@@ -267,42 +287,101 @@ function leer(txt, modo) {
         const esScript = etiqueta[1].toLowerCase() === 'script';
         const fin = esScript ? pasarJs(finEtiqueta + 1, false) : pasarCss(finEtiqueta + 1);
         if (esScript) scripts.push([finEtiqueta + 1, Math.min(fin, n)]);
+        else estilos.push([finEtiqueta + 1, Math.min(fin, n)]);
         if (fin >= n) problemas.push('línea ' + linea(k) + ': el <' + etiqueta[1].toLowerCase() + '> no termina donde debe (el lector se descarriló)');
         i = fin; continue;
       }
       i = k + 1;
     }
   }
-  return { mascara, problemas, scripts };
+  return { mascara, problemas, scripts, estilos };
 }
 
 /* ══ LAS FORMAS ESCRITAS COMO CÓDIGO ══════════════════════════════════════════════════════════════════════════════════════════
-   Arma el texto que de verdad se vería: sin comentarios y con `&#N;`, `&#xH;`, `\u{H}`, `\uHHHH` y pares subrogados ya
-   convertidos en su carácter. `lineas[k]` es la línea del k-ésimo carácter del resultado. */
-function vistaVisible(txt, mascara) {
+   Arma el texto que de verdad se vería: sin comentarios y con cada forma de escribir un emoji «como código» ya convertida en su
+   carácter. `lineas[k]` es la línea del k-ésimo carácter del resultado. Las formas, todas con el criterio del NAVEGADOR (no con el
+   de quien escribe: lo que cuenta es lo que el Chrome del hospital dibuja):
+     · entidad numérica `&#N;` / `&#xH;` — 🪤 el `;` es OPCIONAL: el HTML lo perdona (error de forma, pero la decodifica) y las cifras
+       se leen enteras y seguidas (`&#x1FA7BA` es UN número fuera de rango, que el navegador pone como �, no «🩻 y una A»)
+     · JavaScript: `\u{H}`, `\uHHHH` y el par de sustitutos `🩻`
+     · 🪤 escape de CSS `\HHHHHH` (1 a 6 cifras, y un espacio o salto que la cierra y se come): `content:"\1FA7B"` pone el 🩻 en
+       pantalla sin que el fuente tenga el carácter. Solo vale donde HAY CSS (ver `regionesCss`): una barra con cifras en una
+       expresión regular, en el texto o en una cadena corriente de JavaScript no es un escape y no se toca.
+     · 🪤 `String.fromCodePoint(0x1FA7B)` y `String.fromCharCode(0xD83E, 0xDE7B)` con los números ESCRITOS (decimal, 0x, 0b u 0o). La
+       llamada se reemplaza por lo que devolvería, pegado, para que una secuencia armada con varios argumentos se lea como una.
+   Un argumento que no es un número escrito (una variable, una suma) no se puede leer sin correr el código: es un límite conocido de
+   una guardia estática, y está escrito como control en la sección 1. */
+const RE_ENTIDAD = /&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));?/y;
+const RE_UNICODE_JS = /\\u\{([0-9a-fA-F]{1,6})\}/y;
+const RE_SUBROGADOS = /\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})/y;
+const RE_UNICODE_4 = /\\u([0-9a-fA-F]{4})/y;
+const RE_CSS_SIMPLE = /\\([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\r\f])?/y;
+const RE_CSS_DOBLE = /\\\\([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\r\f])?/y;
+const NUM = '0[xXbBoO][0-9a-fA-F]+|[0-9]+';
+const RE_DESDE_NUMEROS = new RegExp('String\\s*\\.\\s*(fromCodePoint|fromCharCode)\\s*\\(\\s*((?:(?:' + NUM + ')\\s*,\\s*)*(?:' + NUM + ')\\s*,?\\s*)\\)', 'y');
+const esCp = (cp) => Number.isInteger(cp) && cp >= 0x80 && cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF);
+
+/* Dónde HAY CSS (0 = no, 1 = sí con la barra suelta, 2 = sí y la barra puede ir doble porque el CSS viaja dentro de una cadena de JS):
+     · dentro de <style>…</style>: CSS crudo, barra suelta (1)
+     · dentro de un style="…" / style='…': en el HTML va suelta y en una plantilla de JS que lo arma va doble (2)
+     · una declaración `content:"…"` en CUALQUIER sitio (por ejemplo CSS armado en una cadena de JavaScript o de un .gs): doble (2)
+   Es lo que separa un escape de CSS de una barra con cifras que no lo es. */
+function regionesCss(txt, estilos) {
+  const n = txt.length;
+  const css = new Uint8Array(n);
+  const pon = (a, b, v) => { for (let k = a; k < b && k < n; k++) if (css[k] < v) css[k] = v; };
+  for (const [a, b] of estilos) pon(a, b, 1);
+  for (const m of txt.matchAll(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*')/gi)) pon(m.index, m.index + m[0].length, 2);
+  for (const m of txt.matchAll(/\bcontent\s*:\s*(["'])/g)) {
+    let j = m.index + m[0].length;
+    while (j < n && txt[j] !== m[1] && txt[j] !== '\n') j += (txt[j] === '\\' ? 2 : 1);
+    pon(m.index, j, 2);
+  }
+  return css;
+}
+
+function vistaVisible(txt, mascara, css) {
   const n = txt.length;
   const lineas = new Uint32Array(n + 1);
   let s = '', l = 1, k = 0;
   const poner = (str) => { for (let q = 0; q < str.length; q++) lineas[k++] = l; s += str; };
+  // Reemplaza `consumido` (el texto fuente de la forma) por `glifo`. Si el texto fuente cruzaba líneas (una llamada partida, el salto
+  // que cierra un escape de CSS), se siguen contando para que los hallazgos de más abajo digan la línea de verdad.
+  const reemplazar = (consumido, glifo) => { poner(glifo); for (const ch of consumido) if (ch === '\n') { poner('\n'); l++; } };
+  const leerEn = (re, pos) => { re.lastIndex = pos; return re.exec(txt); };
   let i = 0;
   while (i < n) {
     const c = txt[i];
     if (c === '\n') { poner('\n'); l++; i++; continue; }
     if (mascara[i]) { poner(' '); i++; continue; }
     let m;
-    if (c === '&' && txt[i + 1] === '#' && (m = /^&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/.exec(txt.slice(i, i + 12)))) {
-      const cp = m[1] ? parseInt(m[1], 16) : parseInt(m[2], 10);
-      if (cp >= 0x80 && cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF)) { poner(String.fromCodePoint(cp)); i += m[0].length; continue; }
-    } else if (c === '\\' && txt[i + 1] === 'u') {
-      const t = txt.slice(i, i + 14);
-      if ((m = /^\\u\{([0-9a-fA-F]{1,6})\}/.exec(t))) {
+    if (c === '&' && txt[i + 1] === '#') {
+      if ((m = leerEn(RE_ENTIDAD, i))) {
+        const cp = m[1] ? parseInt(m[1], 16) : parseInt(m[2], 10);
+        if (esCp(cp)) { reemplazar(m[0], String.fromCodePoint(cp)); i += m[0].length; continue; }
+      }
+    } else if (c === '\\') {
+      if (txt[i + 1] === 'u') {
+        if ((m = leerEn(RE_UNICODE_JS, i))) {
+          const cp = parseInt(m[1], 16);
+          if (esCp(cp)) { reemplazar(m[0], String.fromCodePoint(cp)); i += m[0].length; continue; }
+        } else if ((m = leerEn(RE_SUBROGADOS, i))) {
+          reemplazar(m[0], String.fromCharCode(parseInt(m[1], 16), parseInt(m[2], 16))); i += m[0].length; continue;
+        } else if ((m = leerEn(RE_UNICODE_4, i))) {
+          const cp = parseInt(m[1], 16);
+          if (cp >= 0x2000 && !(cp >= 0xD800 && cp <= 0xDFFF)) { reemplazar(m[0], String.fromCodePoint(cp)); i += m[0].length; continue; }
+        }
+      } else if (css[i] && ((m = leerEn(RE_CSS_SIMPLE, i)) || (css[i] === 2 && (m = leerEn(RE_CSS_DOBLE, i))))) {
         const cp = parseInt(m[1], 16);
-        if (cp >= 0x80 && cp <= 0x10FFFF && !(cp >= 0xD800 && cp <= 0xDFFF)) { poner(String.fromCodePoint(cp)); i += m[0].length; continue; }
-      } else if ((m = /^\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})/.exec(t))) {
-        poner(String.fromCharCode(parseInt(m[1], 16), parseInt(m[2], 16))); i += m[0].length; continue;
-      } else if ((m = /^\\u([0-9a-fA-F]{4})/.exec(t))) {
-        const cp = parseInt(m[1], 16);
-        if (cp >= 0x2000 && !(cp >= 0xD800 && cp <= 0xDFFF)) { poner(String.fromCodePoint(cp)); i += m[0].length; continue; }
+        if (esCp(cp)) { reemplazar(m[0], String.fromCodePoint(cp)); i += m[0].length; continue; }
+      }
+    } else if (c === 'S' && txt.startsWith('String', i) && (m = leerEn(RE_DESDE_NUMEROS, i))) {
+      const nums = m[2].split(',').map(x => x.trim()).filter(x => x !== '').map(Number);
+      if (nums.every(Number.isInteger)) {
+        let glifo = null;
+        if (m[1] === 'fromCodePoint') { if (nums.every(x => x >= 0 && x <= 0x10FFFF)) glifo = String.fromCodePoint(...nums); }
+        else glifo = String.fromCharCode(...nums);
+        if (glifo !== null) { reemplazar(m[0], glifo); i += m[0].length; continue; }
       }
     }
     poner(c); i++;
@@ -340,8 +419,8 @@ function motivoDeNovedad(cps) {
 
 // Analiza UN texto fuente. Devuelve cada hallazgo de 2020 en adelante (los de la base aparte) y los problemas del lector.
 function analizar(txt, modo) {
-  const { mascara, problemas, scripts } = leer(txt, modo);
-  const { s, lineas } = vistaVisible(txt, mascara);
+  const { mascara, problemas, scripts, estilos } = leer(txt, modo);
+  const { s, lineas } = vistaVisible(txt, mascara, regionesCss(txt, estilos));
   const nuevos = [], enBase = [];
   for (const m of s.matchAll(GRUPO)) {
     const cps = cpsDe(m[0]);
@@ -389,6 +468,37 @@ const casos = [
   ['control · la ratonera 🪤 de los comentarios no cuenta',              "<script>// " + RATONERA + " trampa\nvar a = 1;</script>", 'html', 0],
   ['control · pero una ratonera 🪤 en la pantalla SÍ es un emoji nuevo', '<div>' + RATONERA + '</div>', 'html', 1],
   ['control · una barra de división no abre un comentario',              "var a = b / 2; var c = d / 3; var t = '" + RAYOS_X + "';", 'js', 1],
+  // ── R21 y R26 (revisión de la tanda 5): TRES formas más que dibujan un emoji nuevo y que el lector no veía ──────────────────
+  // 1) escape de CSS: `content:"\1FA7B"` pone el 🩻 en pantalla igual que el carácter, y ningún grep por el carácter lo ve
+  ['★ …escrito como escape de CSS en un content (\\1FA7B)',               '<style>.a::before{content:"\\1FA7B";}</style>', 'html', 1, '1FA7B'],
+  ['★ …el escape de CSS con comillas simples y su espacio de cierre (\\1F972 )', "<style>.a::before{content:'\\1F972 Listo';}</style>", 'html', 1, '1F972'],
+  ['★ …el escape de CSS con ceros delante, seis cifras (\\01FA7B)',       '<style>.a::before{content:"\\01FA7B";}</style>', 'html', 1, '1FA7B'],
+  ['★ …el escape de CSS en un style="" del HTML',                         '<li style="list-style-type:\'\\1FA7B \'">x</li>', 'html', 1, '1FA7B'],
+  ['★ …el escape de CSS armado desde JavaScript (la barra va doble)',     "<script>st.textContent = '.a::before{content:\"\\\\1FA7B\"}';</script>", 'html', 1, '1FA7B'],
+  ['★ …el escape de CSS en un .gs que arma CSS (la barra va doble)',      "var css = '.a::before{content:\"\\\\1FA7B\"}';", 'js', 1, '1FA7B'],
+  ['control · escapes de CSS de emojis de 2019 o anteriores pasan (\\1F4CB, \\2714)', '<style>.a::before{content:"\\1F4CB";}.b::before{content:"\\2714 ";}</style>', 'html', 0],
+  ['control · …ni un escape de CSS dentro de un comentario CSS',          '<style>/* content:"\\1FA7B" */ .a{color:red}</style>', 'html', 0],
+  ['control · …ni la barra con dígitos en una expresión regular, en una cadena corriente o en el texto (no son CSS)',
+   "<script>const re = /\\1FA7B/; const t = 'a\\\\1FA7B';</script><div>\\1FA7B</div>", 'html', 0],
+  ['control · …ni un content con un símbolo corriente (▾)',               '<style>.a::before{content:"\\25BE";}.b::after{content:\'▾\';}</style>', 'html', 0],
+  ['control · …ni un escape que cae fuera de rango (\\1FA7BA: seis cifras seguidas, el navegador pone �)', '<style>.a::before{content:"\\1FA7BA";}</style>', 'html', 0],
+  // 2) String.fromCodePoint / String.fromCharCode con números escritos: la pantalla recibe el emoji aunque en el fuente no haya ninguno
+  ['★ …escrito como String.fromCodePoint(0x1FA7B)',                       '<script>document.title += String.fromCodePoint(0x1FA7B);</script>', 'html', 1, '1FA7B'],
+  ['★ …con el número en decimal (String.fromCodePoint(129659))',          '<script>document.title += String.fromCodePoint(129659);</script>', 'html', 1, '1FA7B'],
+  ['★ …con varios argumentos (una secuencia ZWJ de 2020 armada con piezas viejas)', '<script>t = String.fromCodePoint(0x2764, 0xFE0F, 0x200D, 0x1F525);</script>', 'html', 1],
+  ['★ …con String.fromCharCode y el par subrogado (0xD83E, 0xDE7B)',      '<script>document.title += String.fromCharCode(0xD83E, 0xDE7B);</script>', 'html', 1, '1FA7B'],
+  ['★ …en un .gs, con espacios dentro de la llamada y una coma final',    "var t = String . fromCodePoint( 0x1FA7B , );", 'js', 1, '1FA7B'],
+  ['control · String.fromCodePoint de un emoji de 2019 o anterior pasa (0x1F4CB) y un String.fromCharCode corriente también', '<script>t = String.fromCodePoint(0x1F4CB) + String.fromCharCode(65, 66);</script>', 'html', 0],
+  ['control · …ni dentro de un comentario',                               '<script>// String.fromCodePoint(0x1FA7B)\nvar a = 1;</script>', 'html', 0],
+  ['control · …ni con un argumento que no es un número escrito (no se puede saber sin correr el código: límite conocido)', '<script>t = String.fromCodePoint(cp);</script>', 'html', 0],
+  // 3) entidad numérica SIN punto y coma: el navegador la decodifica igual (es un error de HTML que perdona)
+  ['★ …escrito como &#x1FA7B sin punto y coma',                           '<div>&#x1FA7B Imágenes</div>', 'html', 1, '1FA7B'],
+  ['★ …escrito como &#129659 sin punto y coma (decimal)',                 '<div>&#129659 Imágenes</div>', 'html', 1, '1FA7B'],
+  ['★ …escrito como &#x1FAE0 pegado a la etiqueta que lo cierra',         '<span>&#x1FAE0</span>', 'html', 1, '1FAE0'],
+  ['★ …escrito como &#x1FA7Bz (la z no es cifra hexadecimal: se lee 🩻 y después una z)', '<div>&#x1FA7Bz</div>', 'html', 1, '1FA7B'],
+  ['control · una entidad de un emoji de 2010 sin punto y coma pasa (&#128274 y &#x1F512)', '<div>&#128274 &#x1F512</div>', 'html', 0],
+  ['control · …y &#x1FA7BA se lee como UN número fuera de rango (el navegador pone �), no como 🩻 y una A', '<div>&#x1FA7BA</div>', 'html', 0],
+  ['control · …ni "&#" sin cifras, ni dentro de un comentario HTML',      '<div>a &# b &#xyz</div><!-- &#x1FA7B -->', 'html', 0],
 ];
 for (const [desc, txt, modo, esperados, clave] of casos) {
   const r = analizar(txt, modo);
@@ -397,6 +507,9 @@ for (const [desc, txt, modo, esperados, clave] of casos) {
 }
 const baseOk = analizar('<span>' + PULMONES + '</span>', 'html');
 si('control · el de la base se cuenta aparte, no como nuevo', baseOk.nuevos.length === 0 && baseOk.enBase.length === 1);
+si('control · el número de línea sigue bien después de una llamada, un escape y una entidad partidos en varias líneas',
+   JSON.stringify(analizar('<script>var a = String.fromCodePoint(\n  0x1FA7B\n);</script>\n<style>.a::before{content:"\\1FA7B\n";}</style>\n<b>' + RAYOS_X + '</b>', 'html').nuevos.map(h => h.linea)) === '[1,4,6]',
+   JSON.stringify(analizar('<script>var a = String.fromCodePoint(\n  0x1FA7B\n);</script>\n<style>.a::before{content:"\\1FA7B\n";}</style>\n<b>' + RAYOS_X + '</b>', 'html').nuevos.map(h => h.linea)));
 si('control · el número de línea del hallazgo es el de la línea (3)', analizar('a\n<!-- c -->\n<b>' + RAYOS_X + '</b>', 'html').nuevos[0].linea === 3);
 si('control · la tabla de asignados distingue 2019 de 2020 (🩺 sí, 🫁 y 🩻 no)',
    esAsignadoA2019(0x1FA7A) && !esAsignadoA2019(0x1FAC1) && !esAsignadoA2019(0x1FA7B) && esAsignadoA2019(0x2705) && !esAsignadoA2019(0x1FAFF));
@@ -488,6 +601,27 @@ if (indice) {
     const enComentario = real.slice(0, donde) + '<!-- ' + RAYOS_X + ' -->' + real.slice(donde);
     si('★ …y el mismo 🩻 dentro de un comentario NO lo caza (no se dibuja)', analizar(enComentario, 'html').nuevos.length === antes);
   }
+  /* R21 y R26 · las TRES formas que el lector no veía, inyectadas en la pantalla REAL (cada una donde de verdad se escribiría). El fuente
+     no se toca: todo es en memoria. Cada una cae en su sitio natural: el escape de CSS dentro del primer <style>, la llamada en el primer
+     <script> y la entidad sin punto y coma en el <body>. */
+  const dentroDe = (etiqueta, texto) => { const a = real.indexOf('<' + etiqueta); const d = a < 0 ? -1 : real.indexOf('>', a) + 1; return d > 0 ? real.slice(0, d) + texto + real.slice(d) : null; };
+  const antes2 = analizar(real, 'html').nuevos.length;
+  const formas = [
+    ['un escape de CSS (content:"\\1FA7B") en el <style> real',             dentroDe('style', '.zzz::before{content:"\\1FA7B";}\n')],
+    ['un escape de CSS con comillas simples y espacio (\\1F972 )',          dentroDe('style', ".zzz::before{content:'\\1F972 ';}\n")],
+    ['String.fromCodePoint(0x1FA7B) en el <script> real',                   dentroDe('script', 'document.title += String.fromCodePoint(0x1FA7B);\n')],
+    ['String.fromCharCode(0xD83E, 0xDE7B) en el <script> real',             dentroDe('script', 'document.title += String.fromCharCode(0xD83E, 0xDE7B);\n')],
+    ['una entidad &#x1FAE0 sin punto y coma en el <body> real',             dentroDe('body', '<span>&#x1FAE0 listo</span>')],
+    ['una entidad &#129659 (decimal) sin punto y coma en el <body> real',   dentroDe('body', '<span>&#129659 listo</span>')],
+  ];
+  for (const [desc, fuente] of formas) {
+    si('★★ con ' + desc + ', el candado lo caza (acá se colaba)', fuente !== null && analizar(fuente, 'html').nuevos.length === antes2 + 1,
+       fuente === null ? 'no se encontró dónde inyectar' : 'antes ' + antes2 + ', ahora ' + analizar(fuente, 'html').nuevos.length);
+  }
+  si('★ …y las mismas formas dentro de un comentario (CSS, JavaScript y HTML) NO se cazan (no se dibujan)',
+     analizar(dentroDe('style', '/* .zzz::before{content:"\\1FA7B";} */\n'), 'html').nuevos.length === antes2
+     && analizar(dentroDe('script', '// document.title += String.fromCodePoint(0x1FA7B);\n'), 'html').nuevos.length === antes2
+     && analizar(dentroDe('body', '<!-- <span>&#x1FAE0 listo</span> -->'), 'html').nuevos.length === antes2);
 }
 
 console.log('');

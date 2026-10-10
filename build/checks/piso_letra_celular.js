@@ -31,6 +31,15 @@
 //   6. No es una guardia vacía: exige haber medido un mínimo de textos por pantalla y haber VISTO las clases que más se
 //      quedaban abajo (barra inferior, chips, palabra de estado, etiquetas). Si un cambio las esconde, esto se pone rojo en vez
 //      de pasar medio vacío.
+//   7. LO QUE ABREN LOS BOTONES DE LA TARJETA Y LA PESTAÑA REGISTRO (revisión de la tanda 5, hallazgo R23, 10-oct-2026). El piso de
+//      11 px se escribió para `#sp` y `#bedGrid`, y el popup del evento (➕), el Historial, el diálogo de Egreso y la pestaña Registro
+//      viven FUERA de los dos: a 390 px el popup tenía «TURNO» a 9,9 px, el Historial «Turno:» a 10,9 (y, con datos, el riel de hitos a
+//      9,9 y la Hoja UCI de 8,5 a 10,7) y el Registro «CAMA» y «KTR» a 9,9 (los tres encabezados a 10,7 y las cajas de totales a 10,1):
+//      más chico que el botón que los abre (11,2). Se miden con el cliente real, con un paciente con historia (turnos guardados, hitos) y,
+//      en cada pantalla, sus ramas ocultas destapadas (el formulario del evento según el tipo, el candado de «corregir el pasado», las
+//      ramas «Otro» y APACHE del egreso, las dos pestañas del Historial). El Egreso ya estaba sobre el piso: entra para que no baje.
+//      🪤 FUERA A PROPÓSITO, escrito con su medida en docs/PENDIENTES.md y NO medido acá: las pestañas Estadísticas (10,6), Entrega (10,6)
+//      y Ventiladores (10,1) que el hallazgo nombra de pasada pero no pidió subir; son pantallas de lectura de escritorio.
 //
 // 🪤 LISTA CERRADA DE EXCEPCIONES: una entrada se agrega con su motivo escrito y es una decisión consciente (ver EXCEPCIONES).
 // 🪤 NO se mide en escritorio ni se baja el piso para que pase: si un chip desborda con la letra más grande, se le da espacio a ESE
@@ -121,7 +130,7 @@ const bajoElPiso = vistos => {
 
 /** Corre en la página. Lo que se rompe al agrandar la letra: etiquetas en 3+ líneas, pantalla que se sale, texto cortado sin elipsis,
     y chips (ventilador / equipos del paciente) pisándose entre sí. Cada hallazgo es una frase lista para leer. */
-const CAJAS = ({ raiz }) => {
+const CAJAS = ({ raiz, sinDesbordeDePagina }) => {
   const R = raiz ? document.querySelector(raiz) : document;
   const hall = [];
   const nom = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '');
@@ -155,7 +164,7 @@ const CAJAS = ({ raiz }) => {
   });
   // 4. La pantalla no se sale por la derecha.
   const de = document.documentElement;
-  if (de.scrollWidth > de.clientWidth + 1) hall.push('la pantalla se sale por la derecha (' + de.scrollWidth + ' > ' + de.clientWidth + ')');
+  if (!sinDesbordeDePagina && de.scrollWidth > de.clientWidth + 1) hall.push('la pantalla se sale por la derecha (' + de.scrollWidth + ' > ' + de.clientWidth + ')');
   const pc = document.querySelector('#sp .pcontent');
   if (raiz === '#sp' && pc && pc.scrollWidth > pc.clientWidth + 1) hall.push('el panel se desliza de lado (' + pc.scrollWidth + ' > ' + pc.clientWidth + ')');
   return [...new Set(hall)];
@@ -335,6 +344,87 @@ const CAJAS = ({ raiz }) => {
   si('escritorio: los chips de evaluaciones siguen en su tamaño de siempre (10,7 px)', E.abadge === 10.7, JSON.stringify(E));
   si('escritorio: las etiquetas de campo siguen en su tamaño de siempre (10,9 px)', E.label === null || E.label === 10.9, JSON.stringify(E));
   await pagE.close();
+
+  /* ── 5 · LO QUE ABREN LOS BOTONES DE LA TARJETA Y LA PESTAÑA REGISTRO (R23) ───────────────────────── */
+  console.log('\n5 · Popup del evento, Historial, Egreso y pestaña Registro a 390 px');
+  /* Un paciente con historia: dos días de turnos guardados y un hito de intubación. Se siembran ACÁ, después de las secciones de arriba,
+     para no cambiar lo que ellas miden (una evolución del turno de hoy marcaría la cama 1 como evolucionada en el tablero). Fechas pasadas. */
+  for (const dAtras of [2, 1]) for (const tu of ['Dia', 'Noche']) {
+    const f = menosDias(dAtras), k = f + '-' + tu;
+    S.DB.EVOLUCIONES.push({ ID_EVOLUCION: 'CAMA_1_' + k, ID_CAMA: '1', PATIENT_ID: 'pid-1', TURNO_KEY: k, FECHA: f, TURNO: tu, PAC_NOMBRE: 'Rosa Elena Contreras Pino', PAC_EDAD: 74,
+      PAC_SEXO: 'F', PAC_DIAGNOSTICO: 'Neumonía grave adquirida en la comunidad', VENT_SOPORTE: 'VM', VENT_VIA_AEREA: 'TOT', VENT_MODO: 'ACVC', DIA_ESTADIA: 9 - dAtras, DIAS_VM: 9 - dAtras,
+      RESP_KTR_CANT: 2, KTM_REALIZADA: true, KTM_NIVEL: 3, PLAN_FIRMA_KINE: 'DMV', FASE_JSON: '["Agudo"]', INTUB_OCURRIO: dAtras === 2 && tu === 'Dia',
+      PVE_RESULTADO: dAtras === 1 && tu === 'Dia' ? 'superada' : '', PROC_JSON: '["IMT"]' });
+  }
+  S.DB.TIMELINE.push({ ID_HITO: 'h-piso-1', ID_CAMA: '1', PATIENT_ID: 'pid-1', FECHA: menosDias(2), TIPO: 'INTUBACION', EVENTO: 'INTUBACION', TURNO: 'Dia' });
+
+  const pag5 = await navegador.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  pag5.on('pageerror', e => errores.push(e.message));
+  await pag5.clock.setFixedTime(HOY);
+  await pag5.exposeFunction('__gasApi', (a, d, t) => { let r; try { r = S.api(a, d, t); } catch (e) { r = { ok: false, error: e.message }; } return JSON.stringify(r); });
+  await pag5.addInitScript(() => {
+    window.google = { script: { run: { withSuccessHandler(o) { return { withFailureHandler(f) { return {
+      async api(a, d, t) { const r = JSON.parse(await window.__gasApi(a, d || {}, t || null)); if (r.ok) o(r); else f(r.error); }
+    }; } }; } } } };
+  });
+  await pag5.goto('file://' + compilado);
+  await pag5.waitForTimeout(1500);
+  await pag5.evaluate(() => { document.querySelectorAll('.tut-hola, .toast, .tut-bubble').forEach(n => n.remove()); const m = document.getElementById('tutBtn'); if (m) m.style.display = 'none'; });
+  const medir5 = raiz => pag5.evaluate(MEDIR, { raiz, excepciones: EXCEPCIONES.map(e => e.sel) });
+  const vistos5 = {};   // pantalla → textos medidos (para exigir que se midió de verdad y se VIO lo que fallaba)
+  /* Cada pantalla: cómo se abre, dónde vive (`raiz`), qué ramas ocultas se destapan un momento y cómo se cierra. */
+  const PANTALLAS = [
+    { n: 'popup del evento ➕ (la lista de tipos)', raiz: '#evPop', min: 6, ver: ['TURNO'],
+      abrir: () => { document.querySelector('#bedGrid .bcard.occ .ev-cand').click(); }, cerrar: () => { evCerrar(); } },
+    { n: 'popup del evento: formulario de procedimiento', raiz: '#evPop', min: 10, ver: ['TURNO', 'HORA'], destapar: true,
+      abrir: () => { document.querySelector('#bedGrid .bcard.occ .ev-cand').click(); evTipo('procedimiento'); }, cerrar: () => { evCerrar(); } },
+    { n: 'popup del evento: formulario de cultivo', raiz: '#evPop', min: 10, ver: ['HORA'], destapar: true,
+      abrir: () => { document.querySelector('#bedGrid .bcard.occ .ev-cand').click(); evTipo('cultivo'); }, cerrar: () => { evCerrar(); } },
+    { n: 'popup del evento: el candado de «corregir el pasado»', raiz: '#evPop', min: 4, ver: ['TURNO'], visible: '#evLlave',
+      abrir: () => { const g = document.getElementById('gDate'); g.value = '2026-03-09'; g.classList.remove('turno-hoy'); evAbrir('1', null, 'pid-1'); },
+      cerrar: () => { evCerrar(); const g = document.getElementById('gDate'); g.value = '2026-03-10'; g.classList.add('turno-hoy'); } },
+    { n: 'Historial · Resumen (con un paciente con historia)', raiz: '#tlp', min: 20, ver: ['Turno:', 'Día 7', 'Agudo'],
+      abrir: () => { abrirTL('1'); }, esperar: () => document.querySelectorAll('#tlBody .tlr-fold').length >= 2, cerrar: () => { cerrarTL(); } },
+    { n: 'Historial · Hoja UCI', raiz: '#tlp', min: 40, ver: ['PARÁMETRO', 'TENDENCIA'], destapar: true,
+      abrir: () => { abrirTL('1'); setTLtab('hoja'); }, esperar: () => !!document.querySelector('#tlBody table.hj'), cerrar: () => { cerrarTL(); } },
+    { n: 'diálogo de Egreso (con las ramas «Otro» y APACHE abiertas)', raiz: '#egMod', min: 15, ver: [], destapar: true,
+      abrir: () => { egreso('1'); }, cerrar: () => { cerrarEgreso(); } },
+    /* 🪤 `sinDesbordeDePagina`: la barra de botones del Registro (buscador, Documentos, Filtros, Cambios de esta noche, CSV) es una fila
+       `display:flex` SIN envoltura que mide 836 px a 390 y hace deslizar la PÁGINA entera hacia el lado. Es de antes de este piso y no es de
+       letra (con la letra a su tamaño de siempre ya pasaba); no se arregla acá. Está escrito en docs/PENDIENTES.md. Lo demás de la pantalla
+       (la tabla, que sí desliza dentro de su propio marco) se mide igual. */
+    { n: 'pestaña Registro (con los dos turnos y un egreso del día)', raiz: '#tcP', min: 60, ver: ['CAMA', 'KTR', 'DATOS', 'KTR TOTAL'], sinDesbordeDePagina: true,
+      abrir: () => {
+        _regEgrKey = '2026-03-10';
+        REG_EGR = { '3': [{ nombre: 'Paciente Egresado', sexo: 'M', edad: 60, dias: 5, diasVM: 2, diasVA: 2, diagnostico: 'EPOC', motivo: 'Traslado a sala', destino: 'Medicina', firma: 'DMV' }] };
+        EVOS_DIA = ['Dia', 'Noche'].map(tu => ({ ID_CAMA: '1', TURNO_KEY: '2026-03-10-' + tu, PAC_NOMBRE: 'Rosa Elena Contreras Pino', PAC_EDAD: 74, PAC_SEXO: 'F', PAC_DIAGNOSTICO: 'Neumonía grave',
+          VENT_SOPORTE: 'VM', VENT_VIA_AEREA: 'TOT', VENT_MODO: 'ACVC', DIA_ESTADIA: 9, DIAS_VM: 9, RESP_KTR_CANT: 2, PLAN_FIRMA_KINE: 'DMV' }));
+        EVO_SET = new Set(['1']); setTab('P');
+      }, cerrar: () => { setTab('G'); } },
+  ];
+  for (const P of PANTALLAS) {
+    await pag5.evaluate(() => { try { renderGrid(); } catch (e) {} });
+    await pag5.waitForTimeout(250);
+    await pag5.evaluate(P.abrir);
+    if (P.esperar) await pag5.waitForFunction(P.esperar, null, { timeout: 5000, polling: 50 }).catch(() => {});
+    await pag5.waitForTimeout(700);
+    if (P.visible) si(P.n + ': es el estado que dice ser (se ve ' + P.visible + ')', await pag5.evaluate(s => { const e = document.querySelector(s); return !!e && e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }); }, P.visible), '');
+    /* Las ramas con `.hidden` se destapan un momento (solo se mide el tamaño de la letra) y se vuelven a tapar enseguida. */
+    if (P.destapar) await pag5.evaluate(r => { const q = [...document.querySelectorAll(r + ' .hidden')]; q.forEach(e => e.classList.remove('hidden')); window.__q5 = q; }, P.raiz);
+    const M = await medir5(P.raiz);
+    vistos5[P.n] = M;
+    si(P.n + ': se midió la pantalla (' + M.length + ' textos)', M.length >= P.min, M.length + ' textos; se esperaban al menos ' + P.min);
+    si(P.n + ': se VIERON los textos que más fallaban (' + (P.ver.join(', ') || 'ninguno en particular') + ')', P.ver.every(s => M.some(x => x.texto.includes(s))),
+      'faltan: ' + P.ver.filter(s => !M.some(x => x.texto.includes(s))).join(', '));
+    const bajo = bajoElPiso(M);
+    si(P.n + ': ningún texto visible baja de ' + PISO + ' px', bajo.length === 0, bajo.join('\n   '));
+    const roto = await pag5.evaluate(CAJAS, { raiz: P.raiz, sinDesbordeDePagina: !!P.sinDesbordeDePagina });
+    si(P.n + ': con la letra más grande nada se rompe (texto cortado, pantalla que se sale)', roto.length === 0, roto.join('\n   '));
+    if (P.destapar) await pag5.evaluate(() => { (window.__q5 || []).forEach(e => e.classList.add('hidden')); });
+    await pag5.evaluate(P.cerrar);
+    await pag5.waitForTimeout(250);
+  }
+  await pag5.close();
 
   await navegador.close();
   fs.unlinkSync(compilado);

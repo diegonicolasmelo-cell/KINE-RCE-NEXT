@@ -31,6 +31,12 @@
 //      no decoración.
 //   J. No es una guardia vacía: exige haber VISTAS las cuatro tarjetas (ocupada sin evolucionar, ya evolucionada, libre, retrospectiva)
 //      y la de traslado, en los dos anchos.
+//   K. EL BOTÓN DE TRASLADO (`.bmov`, el icono de las dos flechas en la pestaña de la cama) mide al menos 24×24 px en los dos anchos y la
+//      pestaña no crece por eso (revisión de la tanda 5, hallazgo R22, 10-oct-2026). La tanda 5 le corrigió el color de reposo pero lo dejó
+//      en 21×21 px: bajo los 24 px mínimos de un objetivo táctil, y medido con `getBoundingClientRect` en las 5 camas del tablero, a 390 y a
+//      1400 px. Está en la cabecera, lejos del pie y de Egreso: crecer 3 px no lo acerca a ningún botón peligroso. El área de toque crece
+//      con `min-width/min-height` y un margen vertical negativo, el mismo truco del lápiz de la ficha (`.pname-lap`): la pestaña NO crece
+//      (medía 37 px; con el margen negativo mide 36). El contraste del icono, en reposo y con el cursor encima, lo mide contraste_tokens.js.
 //
 // 🪤 NO se renombra ninguna clase (`.bevo`, `.btl`, `.balt`, `.bmov`, `.pname-lap`) ni se cambia un onclick ni el orden del DOM: lo
 //    sostienen `tutorial.js`, `retro_camas.js`, `mover_camas.js` y `ficha_y_antes.js`.
@@ -113,6 +119,7 @@ const EN_PAGINA = () => {
             lineas: lineas(b),
           };
         }),
+        traslado: (() => { const b = card.querySelector('.bmov'), h = card.querySelector('.bhdr'); if (!b) return null; const r = b.getBoundingClientRect(); return { ancho: Math.round(r.width * 10) / 10, alto: Math.round(r.height * 10) / 10, pestana: h ? Math.round(h.getBoundingClientRect().height * 10) / 10 : null }; })(),
         lapiz: (() => { const l = card.querySelector('.pname-lap'); if (!l) return null; const r = l.getBoundingClientRect(); return { ancho: Math.round(r.width * 10) / 10, alto: Math.round(r.height * 10) / 10 }; })(),
         filaNombre: (() => { const n = card.querySelector('.pname'); return n ? Math.round(n.getBoundingClientRect().height * 10) / 10 : null; })(),
       };
@@ -205,6 +212,13 @@ const esSec = b => /\b(btl|balt)\b/.test(b.clase);
         si(D + ' · ' + nombre + ': el lápiz de la ficha (`.pname-lap`) mide al menos 36×36 px', !!m.lapiz && m.lapiz.ancho >= 36 && m.lapiz.alto >= 36, m.lapiz ? m.lapiz.ancho + '×' + m.lapiz.alto : 'no hay lápiz');
       }
       console.log('   (tarjeta de ' + m.alto + ' px de alto; botones: ' + bs.map(b => b.texto + ' ' + b.ancho + '×' + b.alto).join(' · ') + (m.lapiz ? ' · lápiz ' + m.lapiz.ancho + '×' + m.lapiz.alto : '') + ')');
+    }
+    /* ── K · el botón de traslado ─────────────────────────────────────────────────────────────────── */
+    {
+      const tr = sin.traslado;
+      si(D + ' · el botón de traslado (`.bmov`) mide al menos 24×24 px (hoy ' + (tr ? tr.ancho + '×' + tr.alto : 'no está') + ')', !!tr && tr.ancho >= 24 && tr.alto >= 24,
+        tr ? 'mide ' + tr.ancho + '×' + tr.alto + ' px; un objetivo táctil no baja de 24×24' : 'no hay botón de traslado en la tarjeta');
+      si(D + ' · …y la pestaña de la cama no crece por eso (' + (tr ? tr.pestana : '?') + ' px; medía 37)', !!tr && tr.pestana !== null && tr.pestana <= 38, 'la pestaña mide ' + (tr && tr.pestana) + ' px');
     }
     // El lápiz no empuja el nombre: la fila del nombre mide lo mismo con o sin el área táctil de 36 px.
     if (movil) si(D + ' · la fila del nombre no crece por el área táctil del lápiz (' + sin.filaNombre + ' px)', sin.filaNombre <= 24, 'la fila del nombre mide ' + sin.filaNombre + ' px; con el lápiz de 36 px sin margen negativo crecería');
