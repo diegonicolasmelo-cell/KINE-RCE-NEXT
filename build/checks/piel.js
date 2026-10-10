@@ -19,12 +19,14 @@ const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk 
 
 // ── 1. Contraste AA de los pares del tema ──
 [
-  ['texto sobre fondo app', '#0D2B4E', '#EEF3F9'],
-  ['texto atenuado sobre tarjeta', '#5B7793', '#ffffff'],
-  ['blanco sobre azul San Pablo', '#ffffff', '#0058A0'],
-  ['blanco sobre azul profundo', '#ffffff', '#04345E'],
-  ['dorado sobre azul profundo', '#F0A000', '#04345E'],
-  ['pestaña inactiva sobre azul', '#cfe3f5', '#0058A0'],
+  // 🎨 10-oct-2026: Diego eligió el aspecto «Sereno cálido y táctil» (rebranding): azul petróleo y fondo crema
+  // en lugar del azul/dorado institucional. Los pares se recalcularon; el logo del hospital se mantiene.
+  ['texto sobre fondo app', '#22303c', '#f8f6f2'],
+  ['texto atenuado sobre fondo app', '#5f6872', '#f8f6f2'],
+  ['texto atenuado sobre tarjeta', '#5f6872', '#ffffff'],
+  ['blanco sobre azul petróleo', '#ffffff', '#1f6f8b'],
+  ['blanco sobre petróleo profundo', '#ffffff', '#134b5f'],
+  ['pestaña inactiva sobre petróleo', '#e1f0f4', '#1f6f8b'],
   ['chip ámbar heredado', '#8a5c00', '#fdf3df'],
 ].forEach(([nombre, fg, bg]) => {
   const r = Math.round(ratio(fg, bg) * 100) / 100;
@@ -62,7 +64,7 @@ const eq = (l, g, w) => { const okk = String(g) === String(w); console.log((okk 
     return r;
   });
   eq('piel única: institucional', R.piel, 'inst');
-  eq('cromo institucional azul profundo', R.hdr, 'rgb(4, 52, 94)');
+  eq('cromo azul petróleo profundo (tema Sereno, 10-oct-2026)', R.hdr, 'rgb(19, 75, 95)');
   eq('logo visible', R.logoVisible, true);
   eq('logo incrustado (base64, sin red)', R.logoIncrustado, true);
   eq('logo grande (>= 44 px)', R.logoAlto >= 44, true);

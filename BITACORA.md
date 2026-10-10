@@ -3337,3 +3337,18 @@ protegen contra un error, fijan cómo funcionaba RCE-KINE.
   que «se van» se borran en una tanda propia, con su frase.
 - **10-oct · Diego:** «respecto a las decisiones de las guardias, mejor déjalo como está, y con el uso te voy diciendo». La
   lista no se marca de una vez; todas siguen y lo heredado se suelta caso a caso cuando el uso lo pida.
+
+### Tanda 6.0 · Aspecto «Sereno cálido y táctil» · 10-oct-2026
+
+Diego eligió el estilo (acuerdo 8.8) y pidió programarlo. Se hizo como **capa de aspecto**, sin tocar markup ni lógica:
+
+- Tokens de `:root` y de la piel institucional pasan a azul petróleo y crema; el cromo (encabezado, pestañas, cabecera del panel)
+  a petróleo profundo. Capa al final de la hoja con toques ≥ 44 px, esquinas de 16 px y pasos terminados en verde.
+- Guardia nueva `tema_sereno.js` (vista ROJA contra el código anterior: 17 fallos; verde ahora): paleta, contraste del texto
+  atenuado (≥ 4,5:1), toques ≥ 44 px y paso activo, a 390 y 1200 px.
+- **Guardia heredada cambiada con su razón (regla del 9-oct):** `piel.js` fijaba el azul y dorado institucional; Diego decidió
+  otra paleta, así que se actualizaron sus pares de contraste y el color del cromo. No se defendió la guardia vieja.
+- 🪤 La piel institucional sobrescribe los tokens de `:root`: cambiar solo `:root` no cambia nada en pantalla. La guardia
+  nueva lo cazó al medir el color real, no el escrito.
+- Batería: 213 verdes. Sello `NEXT-6.0-sereno`.
+

@@ -1437,3 +1437,18 @@ y uno era solo comentarios. Lo que importa:
   **están muertos en el flujo por pasos** (miran qué campos se ven, y los de otros pasos no). Arreglarlo haría aparecer un
   aviso nuevo en cada guardado; no lo toqué. Ver `PENDIENTES.md`.
 
+### 8.8 · El aspecto nuevo: «Sereno, más cálido y táctil» (10-oct-2026)
+
+Diego: «aprovechando ahora podríamos hacer hasta un rebranding». Se le mostraron tres estilos sobre la misma pantalla
+(Sereno, Cálido y táctil, Monitor) y eligió: **«Sereno más cálido y táctil»**.
+
+- **Paleta:** azul petróleo `#1f6f8b` como color primario, fondo crema `#f8f6f2`, texto `#22303c`. Reemplaza el azul y dorado
+  institucional del sistema viejo. El logo del hospital se mantiene; los semáforos clínicos (rojo, ámbar, verde) no cambian.
+- **Táctil:** toques de al menos 44 px (pestañas de pasos, nivel de KTM 48 px, campos 44 px, botón de guardar 50 px), tarjetas
+  redondeadas de 16 px, el paso activo pintado de lleno y los pasos terminados con ✓ verde.
+- **Es una capa de aspecto:** no cambió el orden de los pasos ni ninguna regla. Se hizo al final de la hoja de estilos y en los
+  tokens de color.
+- **Pendiente de este tema:** los mockups de Prevención (1), Planes (5) e Ingreso (0) no se dibujaron; en la app se ven con la
+  misma capa, falta mirarlos con Diego. El encabezado quedó azul petróleo profundo (`#134b5f`), no blanco como en el mockup:
+  tiene mucho texto blanco encima y pasarlo a blanco era arriesgado sin verlo en el celular.
+
