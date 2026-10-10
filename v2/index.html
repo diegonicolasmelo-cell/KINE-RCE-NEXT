@@ -1245,6 +1245,22 @@ table.rhb2 .rl{width:128px;text-align:left;}
 #btnGuardar,#pasoAvanza{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
 #btnGuardar:hover,#pasoAvanza:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
 #btnGuardar:disabled,#pasoAvanza:disabled{background:#94a3b8;box-shadow:none;filter:none;}
+/* 🔴 LA FRANJA DEL ÚLTIMO GUARDADO Y SUS BOTONES (revisión de la tanda 2, H27 y H31, 10-oct-2026). Antes el diseño de la franja vivía
+   escrito a mano en el HTML (`white-space:nowrap`) y el de sus botones en cada `_marca…` (`padding:1px 9px`): en un celular de 390 px
+   el «Reintentar ahora» medía 112 x 16 px —no se podía tocar— y la franja ámbar, de 330 px sin partirse, empujaba el botón principal
+   hasta x=581: el panel se deslizaba de lado, sin ninguna pista de que ahí había un botón. Ahora el diseño vive aquí, en un solo
+   lugar: el botón mide al menos 32 px (40 en el celular) y, en el celular, la franja ocupa una fila entera y parte su texto.
+   Los colores no se tocan acá: los pone `_estadoGuardado` según el estado. `.hidden` (display:none!important) sigue mandando. */
+#gEstadoGuardado{align-self:center;font-size:.72rem;font-weight:800;border-radius:20px;padding:3px 10px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
+.est-btn{font:inherit;font-size:.8rem;border:1px solid currentColor;background:#fff;border-radius:18px;padding:6px 14px;min-height:32px;cursor:pointer;}
+.est-btn-ambar{color:#92400e;border-color:#92400e;}
+.est-btn-rojo{color:#991b1b;border-color:#991b1b;}
+/* H33b · «Guardado con aviso»: la instrucción del servidor se LEE en la franja (no solo en un toast de 9 s ni en un title, que en una
+   pantalla táctil no se ve). La franja se parte en dos líneas: lo que pasó y lo que hay que hacer. */
+#gEstadoGuardado[data-estado="aviso"]{flex-wrap:wrap;white-space:normal;border-radius:14px;max-width:min(100%,560px);}
+#gEstadoGuardado .est-det{flex:1 1 100%;font-size:.78rem;font-weight:600;line-height:1.35;}
+/* H25 · el anuncio del cuadro del centro cuando NO se le quita el foco a quien escribe: solo lo oye el lector de pantalla. */
+.solo-lector{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}
 
 /* TOAST */
 #tc{position:fixed;bottom:20px;right:20px;z-index:9998;display:flex;flex-direction:column;gap:6px;pointer-events:none;}
@@ -1887,6 +1903,13 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .fcard.mcol{margin-bottom:8px;}
   #sp .pcontent{padding:8px 8px 0;}
   .act-bar{position:sticky;bottom:0;background:#fff;padding:10px 10px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 18px rgba(15,23,42,.1);z-index:6;border-radius:12px 12px 0 0;}
+  /* H27/H31 · la barra se PARTE en filas en vez de desbordarse: la franja del guardado ocupa una fila entera (con su texto partido si
+     hace falta) y los botones van debajo. El botón principal deja de pedir el 100% (`.btn{width:100%}`): con `flex-wrap` eso lo mandaba
+     solo a su propia fila aun sin franja; con `flex:1 1 0` toma lo que sobra de la fila, como antes. */
+  .act-bar{flex-wrap:wrap;gap:6px 8px;}
+  .act-bar #pasoAvanza{width:auto;flex:1 1 0;}
+  #gEstadoGuardado{flex:1 1 100%;white-space:normal;border-radius:14px;padding:6px 10px;margin-right:0;}
+  .est-btn{min-height:40px;padding:8px 16px;}
   /* Toques más generosos */
   .col input,.col select{height:42px;}
   .ktm-state,.ktm-niv-btn,.ktm-asis-btn{min-height:38px;}
@@ -5480,7 +5503,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
       <div id="gFalta"></div>
       <div class="act-bar">
         <span id="gSinGuardar" class="hidden" style="align-self:center;font-size:.72rem;font-weight:800;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:20px;padding:3px 10px;margin-right:6px;white-space:nowrap;">⚠️ Sin guardar</span>
-        <span id="gEstadoGuardado" class="hidden" data-estado="" style="align-self:center;font-size:.72rem;font-weight:800;border-radius:20px;padding:3px 10px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;"></span>
+        <span id="gEstadoGuardado" class="hidden" data-estado="" role="status" aria-live="polite"></span>
         <button type="button" id="pasoAtras" class="btn" style="width:auto;padding:0 16px;flex-shrink:0;background:#fff;color:var(--txt);border:1px solid var(--border);display:none;" data-nodirty onclick="pasoRetroceder()">← Atrás</button>
         <!-- 🪤 btnGuardar SIGUE EXISTIENDO y sigue llamando a guardar(): es
              el que usan las guardias y el que dispara el guardado real. En el
@@ -5718,6 +5741,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
 <!-- TOAST -->
 <div id="tc"></div>
+<!-- H25 · anuncio del cuadro «No confirmado» / «No se guardó» cuando NO se le quita el foco a quien está escribiendo (`_avErrAbrir`). -->
+<div id="avErrAnuncio" class="solo-lector no-print" role="alert" aria-atomic="true"></div>
 
 <!-- Modal confirmación reintubación --><!-- Modal confirmación reintubación -->
 <div id="modalReintubOverlay">
@@ -6295,6 +6320,17 @@ const $  = id => document.getElementById(id);
    pensadas (el aviso de fin de turno y el cuadro de «No se guardó» NO se
    cierran de un manotazo: cerrarlos así es justo lo que hace perder la
    evolución). Duplicarlo acá sería reabrir esa decisión por accidente. */
+/* H25 · ¿la persona está ESCRIBIENDO? Un campo donde las teclas cambian algo: texto, número, fecha, lista desplegable o contenteditable.
+   Un botón, una casilla o un deslizador no: ahí mover el foco al cuadro es lo correcto (una barra espaciadora sobre una casilla la marcaría
+   sin querer). Un campo de solo lectura o apagado no recibe teclas: tampoco cuenta. */
+function _enCampoEditable(el){
+  if(!el || el===document.body || el.readOnly || el.disabled) return false;
+  const t=String(el.tagName||'').toUpperCase();
+  if(t==='TEXTAREA' || t==='SELECT') return true;
+  if(el.isContentEditable) return true;
+  if(t==='INPUT') return !/^(button|submit|reset|checkbox|radio|image|file|range|color|hidden)$/.test(String(el.type||'text').toLowerCase());
+  return false;
+}
 const Modal = (function () {
   /* id → nombre que anuncia el lector de pantalla. Un modal que no está en
      esta lista no se vigila: agregarlo es una línea, y así la lista dice
@@ -6321,6 +6357,11 @@ const Modal = (function () {
     aftOvl:       'Fin de turno: camas sin evolucionar',
     loginOvl:     'Iniciar sesión',
   };
+
+  /* H25 · modales que NO le quitan el foco a quien está escribiendo cuando se abren solos. El cuadro de «No confirmado» / «No se guardó»
+     sale a los 45 s sin que nadie lo pida: llevarse el cursor a su botón hacía perder lo que la persona seguía tecleando. Los demás
+     modales los abre una acción de la persona y siguen como siempre. El cuadro se anuncia por `#avErrAnuncio` (`_avErrAbrir`). */
+  const SIN_ROBAR_FOCO = { avErrOvl: true };
 
   const FOCUSABLES = [
     'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
@@ -6350,6 +6391,7 @@ const Modal = (function () {
     setTimeout(function () {
       if (!abierto(el)) return;
       if (el.contains(document.activeElement)) return;
+      if (SIN_ROBAR_FOCO[id] && _enCampoEditable(document.activeElement)) return;
       const f = focosDe(el);
       if (f.length) { try { f[0].focus(); } catch (e) {} }
       else { el.setAttribute('tabindex', '-1'); try { el.focus(); } catch (e) {} }
@@ -8180,7 +8222,10 @@ function _marcaGuardadoOK(d){
 }
 function _marcaGuardadoAviso(avisos, d){
   _guardadoConfirmado();
-  _estadoGuardado('aviso','✓ Guardado con aviso '+_hhmm(d));
+  /* H33b · la instrucción («Vuelve a guardar el turno para completarlas») se LEE en la franja, que no se va sola: el toast dura 9 s y el
+     `title` no se ve en una pantalla táctil, y quien cierra la evolución sin volver a guardar pierde en silencio la medición que quedó a
+     medias. El texto viene del servidor: se escapa (`escapeHtml`) como todo lo que no es nuestro. */
+  _estadoGuardado('aviso','<span>✓ Guardado con aviso '+_hhmm(d)+'</span> '+avisos.map(a=>'<span class="est-det">'+escapeHtml(a)+'</span>').join(' '));
   const e=$('gEstadoGuardado'); if(e) e.title=avisos.join('\n');
   toast('⚠ Guardado, pero: '+avisos.join(' · '), 9000);
 }
@@ -8194,7 +8239,7 @@ function _guardadoConfirmado(){
    no llegó; «No se guardó» sería mentir si llegó y solo se perdió la respuesta). `quedan` = todavía hay reintentos
    automáticos programados. El texto escrito sigue en pantalla, y el botón manda EL MISMO paquete con el MISMO OP_ID. */
 function _marcaNoConfirmado(quedan){
-  _estadoGuardado('noconfirmado','⚠ No confirmado'+(quedan?' · Reintentando…':'')+' <button type="button" data-nodirty onclick="reintentarGuardado()" style="font:inherit;border:1px solid #92400e;background:#fff;color:#92400e;border-radius:14px;padding:1px 9px;cursor:pointer;">Reintentar ahora</button>');
+  _estadoGuardado('noconfirmado','⚠ No confirmado'+(quedan?' · Reintentando…':'')+' <button type="button" class="est-btn est-btn-ambar" data-nodirty onclick="reintentarGuardado()">Reintentar ahora</button>');
   const e=$('gEstadoGuardado'); if(e) e.title='No sabemos si se guardó. Tu texto sigue aquí.';
 }
 
@@ -8215,11 +8260,11 @@ function _marcaGuardadoError(detalle, codigo){
      principal es cerrar la cama (y volver a abrirla para verla como está ahora), no «Reintentar». Lo escrito no
      se pierde: `_falloFinal` ya lo dejó de borrador de SU paciente. */
   if(_EP_CAMBIO_RE.test(detalle||'')){
-    _estadoGuardado('error','❌ NO se guardó <button type="button" data-nodirty onclick="cerrarCamaTrasRechazo()" style="font:inherit;border:1px solid #991b1b;background:#fff;color:#991b1b;border-radius:14px;padding:1px 9px;cursor:pointer;">Cerrar la cama</button>');
+    _estadoGuardado('error','❌ NO se guardó <button type="button" class="est-btn est-btn-rojo" data-nodirty onclick="cerrarCamaTrasRechazo()">Cerrar la cama</button>');
     avisoErrorGuardado(detalle);
     return;
   }
-  _estadoGuardado('error','❌ NO se guardó <button type="button" data-nodirty onclick="reintentarGuardado()" style="font:inherit;border:1px solid #991b1b;background:#fff;color:#991b1b;border-radius:14px;padding:1px 9px;cursor:pointer;">Reintentar</button>');
+  _estadoGuardado('error','❌ NO se guardó <button type="button" class="est-btn est-btn-rojo" data-nodirty onclick="reintentarGuardado()">Reintentar</button>');
   avisoErrorGuardado(detalle);
 }
 
@@ -8261,10 +8306,19 @@ function _avErrAbrir(modo, titulo, detalle, accion, textoSec, textoPrim, tono, s
      solo la salida «Seguir editando». Se repone en CADA apertura, igual que el rótulo de arriba: el cuadro es uno solo. */
   const _bp=$('avErrReint'); if(_bp){ _bp.hidden=!!soloSec; _bp.style.display=soloSec?'none':''; }
   o.classList.add('on');
-  setTimeout(()=>{ try{ (soloSec?$('avErrSec'):$('avErrReint')).focus(); }catch(_){} }, 60);
+  /* H25 · el foco va al botón principal… salvo que la persona esté ESCRIBIENDO: el cuadro de 45 s sale solo, y quitarle el cursor a quien
+     está en medio de un campo hacía que lo siguiente que tecleaba se perdiera y que una barra espaciadora (o Enter) apretara «Reintentar
+     ahora» sin querer. En ese caso el foco no se mueve (el gestor de modales tampoco: `Modal`, SIN_ROBAR_FOCO) y el cuadro se ANUNCIA
+     por una región `role="alert"`; con Tab se entra a él. */
+  const _an=$('avErrAnuncio'); if(_an) _an.textContent='';
+  setTimeout(()=>{ try{
+    const ya=document.activeElement;
+    if(_enCampoEditable(ya) && !o.contains(ya)){ if(_an) _an.textContent=titulo+(detalle?'. '+detalle:''); return; }
+    (soloSec?$('avErrSec'):$('avErrReint')).focus();
+  }catch(_){} }, 60);
 }
 
-function avErrCerrar(){ $('avErrOvl')?.classList.remove('on'); _avErrModo=null; }
+function avErrCerrar(){ $('avErrOvl')?.classList.remove('on'); _avErrModo=null; const _an=$('avErrAnuncio'); if(_an) _an.textContent=''; }
 
 function avErrReintentar(){
   const f=_avErrAccion; _avErrAccion=null;
@@ -10773,7 +10827,13 @@ function _guardadoIniciar(foto, id, tkey){
     const cambio=_formRev!==ctx.rev;     // se escribió algo mientras la llamada volaba
     const avisos=(r && Array.isArray(r.advertencias)) ? r.advertencias.filter(Boolean).map(String) : [];
     if(vig) _guardadoBotones(false,'✅ Guardado');
-    toast('✅ Evolución guardada correctamente');
+    /* H26 y H33a · una confirmación TARDÍA es ahora un camino normal (el ámbar que se corrige), y llega cuando la persona ya puede estar
+       en otra cama: «Evolución guardada correctamente» sobre la pantalla de la 4 se lee como que se guardó la 4. Si el panel ya no es el
+       de esta sesión se NOMBRA la cama (`falloFinal` ya lo hacía). Las advertencias viajan en ese mismo aviso: la franja es de la cama que
+       hay delante, no de ésta, y sin esto la instrucción de completar la medición se perdía. */
+    if(vig) toast('✅ Evolución guardada correctamente');
+    else if(avisos.length) toast('⚠ Evolución de la cama '+ctx.id+' guardada, pero: '+avisos.join(' · '), 9000);
+    else toast('✅ Evolución de la cama '+ctx.id+' guardada');
     /* 🔴 G14 · El formulario ya es del paciente al que se guardó: un ingreso nace sin episodio, y desde este
        primer guardado el siguiente ya viaja con el suyo (y queda protegido si la cama cambia de dueño).
        Solo si el panel SIGUE siendo este: la respuesta de un guardado lento puede llegar cuando ya se abrió otra

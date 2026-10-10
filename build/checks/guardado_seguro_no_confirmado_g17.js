@@ -52,6 +52,14 @@
 //       · la respuesta «repetida» a un movimiento de stock (efecto aditivo) dice «Ya estaba registrado», no «actualizado»;
 //       · gs() avisa en ámbar «No sabemos si se hizo… es seguro repetirlo» ante una escritura sin respuesta (también el «offline» de
 //         la app instalada, que antes callaba) o con INTERNO, y las puertas con aviso propio no lo repiten en rojo encima.
+//   J · REVISIÓN DE LA TANDA 2, PANTALLA EN EL CELULAR Y TEXTOS (H27, H31, H25, H26, H33). Cuatro defectos que se ven en la mano:
+//       · a 390 px (y 320) la franja de «No confirmado» / «NO se guardó» y su botón medían 112 x 16 px, y la franja `nowrap` empujaba el botón
+//         principal fuera de la pantalla (scrollWidth de pcontent 577 > 390): ahora el botón mide al menos 32 px, la barra se parte en filas
+//         y la franja ocupa una fila entera con su texto partido y role="status" / aria-live="polite";
+//       · el cuadro del centro que sale a los 45 s ya no le roba el foco a quien está escribiendo (se anuncia con role="alert", y con Tab se entra);
+//       · la confirmación tardía de otra cama dice «Evolución de la cama N guardada» y no «Evolución guardada correctamente»;
+//       · «Guardado con aviso» deja la instrucción a la vista en la franja, no solo en un toast de 9 s ni en un title.
+//       Las medidas del celular son el rojo (se miden con un Chromium de 390x844 y de 320x640 y se pueden capturar con RCE_CAPTURAS_DIR).
 //
 // 🪤 RELOJ CONGELADO. El vencimiento de 6 h depende de la hora: `Date` se congela en la página en un día inventado
 // (lunes 10-ago-2026, 11:00; ni Fiestas Patrias, ni cambio de turno, ni cierre de año) y se ADELANTA a mano con
@@ -61,6 +69,7 @@
 // Uso: node build/checks/guardado_seguro_no_confirmado_g17.js (requiere playwright-core)
 'use strict';
 const path = require('path');
+const fs = require('fs');
 const { chromium } = require('playwright-core');
 
 const IDX = path.resolve(__dirname, '..', '..', 'v2', 'index.html');
@@ -175,8 +184,8 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
 
   // Una página nueva por escenario, en un contexto propio: su localStorage no se mezcla con el de otro.
   async function abrir(opc) {
-    const o = Object.assign({ modo: 'gas', almacen: null, sinUUID: false, relojPW: false }, opc || {});
-    const ctx = await navegador.newContext({ viewport: { width: 1100, height: 900 } });
+    const o = Object.assign({ modo: 'gas', almacen: null, sinUUID: false, relojPW: false, viewport: { width: 1100, height: 900 } }, opc || {});
+    const ctx = await navegador.newContext({ viewport: o.viewport });
     const p = await ctx.newPage();
     p.on('pageerror', e => errores.push('[' + o.modo + (o.almacen ? '/' + o.almacen : '') + '] ' + e.message));
     if (o.relojPW) {
@@ -531,8 +540,8 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     await llenar(p);
   };
   // Una página nueva con el reloj de Playwright, el panel de la cama abierto y lleno. `p.t` = ms desde que se aprieta guardar.
-  async function abrirGuardar(cama, pid) {
-    const p = await abrir({ modo: 'gas', relojPW: true });
+  async function abrirGuardar(cama, pid, viewport) {
+    const p = await abrir(Object.assign({ modo: 'gas', relojPW: true }, viewport ? { viewport } : {}));
     await p.evaluate(() => {
       localStorage.clear();
       window.__toasts = []; window.toast = m => window.__toasts.push(String(m));
@@ -817,8 +826,11 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
     await apretar(p);
     await p.clock.runFor(20);
     const e = await pantalla(p);
-    eq('★ F10 · un guardado con advertencias dice «Guardado con aviso hh:mm»', [e.estado, /^✓ Guardado con aviso \d{2}:\d{2}$/.test(e.texto)], ['aviso', true]);
-    si('   …y las LISTA (en el aviso y en la franja)', e.toasts.some(t => t.indexOf(AV[0]) > -1) && e.titulo.indexOf(AV[0]) > -1, JSON.stringify([e.toasts, e.titulo]));
+    // La franja EMPIEZA con «✓ Guardado con aviso hh:mm». Antes era TODO su texto (`…$`) y la instrucción vivía solo en el toast y en el title;
+    // la revisión de la tanda 2 (H33b) la pasó a la franja, a la vista (sección J): por eso el patrón ya no cierra con `$`, y la sección J
+    // exige que la instrucción se LEA en ella. No es aflojar: la primera línea sigue siendo exactamente esa.
+    eq('★ F10 · un guardado con advertencias dice «Guardado con aviso hh:mm»', [e.estado, /^✓ Guardado con aviso \d{2}:\d{2}( |$)/.test(e.texto)], ['aviso', true]);
+    si('   …y las LISTA (en el aviso, en la franja y en su title)', e.toasts.some(t => t.indexOf(AV[0]) > -1) && e.titulo.indexOf(AV[0]) > -1 && e.texto.indexOf(AV[0]) > -1, JSON.stringify([e.toasts, e.titulo, e.texto]));
     eq('   …y el formulario ya está guardado', [e.dirty, e.borrador], [false, 0]);
     await p.cerrar();
   }
@@ -1636,6 +1648,196 @@ const PRELUDIO = ({ modo, t0, boot, exec, almacen, sinUUID, relojPW }) => {
       eq('I6 · (control) una LECTURA que falla dentro de Apps Script avisa como siempre («❌ …») y no inventa «No sabemos si se hizo»', [t.length, /boom-de-lectura/.test(t[0] || ''), t.some(x => SABER.test(x))], [1, true, false]);
       await p.cerrar();
     }
+  }
+
+  /* ══ J · REVISIÓN DE LA TANDA 2 (pantalla, celular y textos): H27/H31, H25, H26/H33a, H33b ═══════════════════════════
+     Cinco defectos que dejaron las revisiones: la franja ámbar y su botón diminutos y desbordando la barra a 390 px (H27, H31), el cuadro
+     del centro que le roba el foco a quien está escribiendo (H25), el aviso de éxito tardío que no nombra la cama (H26, H33a) y la
+     instrucción de «Guardado con aviso» que vivía solo en un toast de 9 s (H33b). Cada caso nació ROJO contra la pantalla del paso 16.
+     🪤 Las medidas del celular son el rojo: el reloj va pausado (`relojPW`) y las mediciones se toman con la franja ya puesta.
+     `RCE_CAPTURAS_DIR=/ruta node build/checks/guardado_seguro_no_confirmado_g17.js` guarda una captura de cada estado (fuera del repositorio). */
+  console.log('\nJ · Revisión de la tanda 2 (pantalla): la franja cabe en 390 px y se toca; el cuadro no roba el foco; el éxito tardío nombra la cama; el aviso queda a la vista');
+  const VP_MOVIL = { width: 390, height: 844 }, VP_ESCRITORIO = { width: 1100, height: 900 };
+  const CAPTURAS = process.env.RCE_CAPTURAS_DIR || '';
+  if (CAPTURAS) fs.mkdirSync(CAPTURAS, { recursive: true });
+  // 🪤 Las transiciones de CSS corren con el reloj real y no con el de Playwright: se espera un poco antes de la captura o el panel sale a medio abrir.
+  const capturar = async (p, nombre) => { if (!CAPTURAS) return; await p.waitForTimeout(700); await p.screenshot({ path: path.join(CAPTURAS, nombre + '-' + p.viewportSize().width + 'px.png') }); };
+  const AVISO_SERVIDOR = 'Las mediciones de este turno no quedaron completas en la serie. Vuelve a guardar el turno para completarlas.';
+  // Todo lo que hace falta para juzgar la barra de acciones del panel: dónde cae cada cosa y si algo se sale de la pantalla.
+  const medirBarra = p => p.evaluate(() => {
+    const rc = e => { const b = e.getBoundingClientRect(); return { izq: Math.round(b.left), der: Math.round(b.right), arr: Math.round(b.top), aba: Math.round(b.bottom), ancho: Math.round(b.width), alto: Math.round(b.height) }; };
+    const e = $('gEstadoGuardado'), barra = document.querySelector('#sp .act-bar'), pc = document.querySelector('#sp .pcontent');
+    const btn = e.querySelector('button');
+    const cs = getComputedStyle(e);
+    return {
+      ancho: innerWidth, alto: innerHeight, pcScroll: pc.scrollWidth, docScroll: document.documentElement.scrollWidth,
+      franja: rc(e), franjaTexto: e.innerText.replace(/\s+/g, ' ').trim(), franjaWS: cs.whiteSpace, rol: e.getAttribute('role'), vivo: e.getAttribute('aria-live'),
+      boton: btn ? Object.assign({ texto: btn.textContent.trim() }, rc(btn)) : null,
+      barra: rc(barra), avanza: rc($('pasoAvanza')),
+      hijos: [...barra.children].filter(x => x.getClientRects().length > 0).map(x => Object.assign({ id: x.id || x.tagName }, rc(x))),
+    };
+  });
+  // Lo que se le exige a la barra en un celular de 390 px (y, con otras cifras, en el escritorio).
+  const juzgarBarra = (cual, m, movil) => {
+    const fuera = m.hijos.filter(h => h.der > m.ancho || h.izq < 0);
+    si('★★ J1 · ' + cual + ': nada de la barra se sale de la pantalla (scrollWidth de pcontent ' + m.pcScroll + ' ≤ ' + m.ancho + '; página ' + m.docScroll + ')',
+      m.pcScroll <= m.ancho && m.docScroll <= m.ancho && fuera.length === 0, JSON.stringify({ pc: m.pcScroll, doc: m.docScroll, fuera: fuera.map(h => h.id + ':' + h.izq + '-' + h.der) }));
+    si('★★ J1 · ' + cual + ': el botón de la franja ("' + (m.boton && m.boton.texto) + '") mide al menos 32 px de alto (' + (m.boton && m.boton.alto) + ') y se toca entero dentro de la pantalla',
+      !!m.boton && m.boton.alto >= 32 && m.boton.izq >= 0 && m.boton.der <= m.ancho, JSON.stringify(m.boton));
+    si('★ J1 · ' + cual + ': el botón principal (pasoAvanza) queda a la vista, entero y a su altura de siempre', m.avanza.izq >= 0 && m.avanza.der <= m.ancho && m.avanza.alto >= 44 && m.barra.arr < m.alto, JSON.stringify(m.avanza));
+    si('★ J1 · ' + cual + ': la franja se anuncia sola a quien usa lector de pantalla (role="status" y aria-live="polite")', m.rol === 'status' && m.vivo === 'polite', JSON.stringify([m.rol, m.vivo]));
+    if (movil) {
+      si('★★ J1 · ' + cual + ': en el celular la franja ocupa UNA FILA COMPLETA de la barra (' + m.franja.ancho + ' px de ' + (m.barra.ancho - 20) + ' útiles) y su texto puede partirse',
+        m.franja.ancho >= m.ancho - 40 && m.franjaWS === 'normal', JSON.stringify({ ancho: m.franja.ancho, ws: m.franjaWS }));
+      si('   …y los botones no quedan montados sobre ella', m.hijos.filter(h => h.id !== 'gEstadoGuardado' && h.arr < m.franja.aba - 1 && h.aba > m.franja.arr + 1).length === 0,
+        JSON.stringify(m.hijos.map(h => h.id + '@' + h.arr + '-' + h.aba)));
+    } else {
+      si('   J1 · ' + cual + ': en el escritorio la franja sigue EN LA MISMA FILA que los botones (no se parte la barra)', m.franja.arr < m.avanza.aba && m.franja.aba > m.avanza.arr, JSON.stringify({ franja: m.franja, avanza: m.avanza }));
+    }
+  };
+  // Un estado de la franja, puesto en una página nueva con el panel en el paso 5 (el que guarda: «← Atrás» y el botón principal a la vista).
+  const ESTADOS_J = [
+    { id: 'ambar', n: 'ámbar «No confirmado · Reintentando…»',
+      poner: async p => { await regla(p, GUARDAR, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }, { tipo: 'falla' }); await apretar(p); await p.clock.runFor(2500); p.t += 2500; },
+      espera: e => e.estado === 'noconfirmado' && /Reintentando/.test(e.texto) },
+    { id: 'ambar-agotado', n: 'ámbar «No confirmado» (agotado, con el cuadro cerrado)',
+      poner: async p => { await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }); await apretar(p); await p.clock.runFor(2500); p.t += 2500; await irA(p, 45.5); await capturar(p, 'cuadro-ambar'); await p.evaluate(() => { avErrCerrar(); }); },
+      espera: e => e.estado === 'noconfirmado' && !/Reintentando/.test(e.texto) },
+    { id: 'rojo', n: 'rojo «NO se guardó · Reintentar»',
+      poner: async p => { await regla(p, GUARDAR, { tipo: 'rechazo', error: 'Falta la firma del turno.', codigo: 'VALIDACION' }); await apretar(p); await p.clock.runFor(2500); p.t += 2500; await capturar(p, 'cuadro-rojo'); await p.evaluate(() => { avErrCerrar(); }); },
+      espera: e => e.estado === 'error' && /NO se guardó/.test(e.texto) && e.botones.join('|') === 'Reintentar' },
+    { id: 'rojo-cama', n: 'rojo «NO se guardó · Cerrar la cama» (la cama cambió de paciente)',
+      poner: async p => { await regla(p, GUARDAR, { tipo: 'rechazo', error: 'La cama 2 cambió de paciente (o quedó libre) desde que abriste esta ventana, así que no se guardó nada.', codigo: 'VALIDACION' }); await apretar(p); await p.clock.runFor(2500); p.t += 2500; await p.evaluate(() => { avErrCerrar(); }); },
+      espera: e => e.estado === 'error' && e.botones.join('|') === 'Cerrar la cama' },
+    { id: 'aviso', n: 'amarillo «Guardado con aviso»',
+      poner: async p => { await regla(p, GUARDAR, { tipo: 'ok', data: Object.assign({}, OK_DATA, { advertencias: [AVISO_SERVIDOR] }) }); await apretar(p); await p.clock.runFor(2500); p.t += 2500; },
+      espera: e => e.estado === 'aviso' },
+  ];
+  for (const [vpNombre, vp, movil] of [['390 px', VP_MOVIL, true], ['320 px (celular chico)', { width: 320, height: 640 }, true], ['escritorio', VP_ESCRITORIO, false]]) {
+    for (const est of ESTADOS_J) {
+      const p = await abrirGuardar('2', 'p2', vp);
+      await p.evaluate(() => { pasoIr(5); });
+      await est.poner(p);
+      const e = await pantalla(p);
+      si('J1 · (control) ' + vpNombre + ' · ' + est.n + ': la franja está en ese estado', est.espera(e), JSON.stringify([e.estado, e.texto, e.botones]));
+      const m = await medirBarra(p);
+      await capturar(p, (movil ? 'movil' : 'escritorio') + '-' + est.id);
+      if (est.id !== 'aviso') juzgarBarra(vpNombre + ' · ' + est.n, m, movil);
+      else {
+        si('★★ J1 · ' + vpNombre + ' · ' + est.n + ': la barra tampoco se sale de la pantalla', m.pcScroll <= m.ancho && m.docScroll <= m.ancho && m.hijos.every(h => h.der <= m.ancho && h.izq >= 0), JSON.stringify({ pc: m.pcScroll, doc: m.docScroll }));
+        si('   …y la franja se anuncia sola (role="status", aria-live="polite")', m.rol === 'status' && m.vivo === 'polite', JSON.stringify([m.rol, m.vivo]));
+      }
+      await p.cerrar();
+    }
+  }
+
+  /* ── J2 · H25 · el cuadro del centro NO le roba el foco a quien está escribiendo ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    await p.evaluate(() => { pasoIr(5); });
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await p.clock.runFor(30); p.t += 30;
+    await p.focus('#fPlanes');
+    const antes = await p.evaluate(() => document.activeElement.id);
+    await irA(p, 45.5); await p.clock.runFor(300); p.t += 300;
+    const e = await pantalla(p);
+    const foco = await p.evaluate(() => ({ id: document.activeElement.id, anuncio: ($('avErrAnuncio') || {}).textContent || null, rol: ($('avErrAnuncio') || document.body).getAttribute('role') }));
+    eq('J2 · (control) la persona está escribiendo en «Planes» cuando salta el cuadro de «No confirmado»', [antes, e.modal, e.modalTit], ['fPlanes', true, 'No confirmado']);
+    eq('★★ J2 · el foco SIGUE en el campo (el cuadro no se lo lleva)', foco.id, 'fPlanes');
+    const antesN = (await llamadasG(p)).length;
+    await p.keyboard.type(' QQ');
+    const despues = await p.evaluate(() => $('fPlanes').value);
+    eq('★★ …lo que sigue escribiendo cae en el texto (no se pierde) y un espacio NO aprieta «Reintentar ahora»', [despues.endsWith(' QQ'), (await llamadasG(p)).length], [true, antesN]);
+    si('★ …y como no se mueve el foco, el cuadro se ANUNCIA a quien usa lector de pantalla (role="alert" con el título y el motivo)',
+      foco.rol === 'alert' && /No confirmado/.test(foco.anuncio || '') && /No sabemos si se guardó/.test(foco.anuncio || ''), JSON.stringify(foco));
+    await p.keyboard.press('Tab');
+    eq('   …y con Tab se ENTRA al cuadro (el gestor de modales manda el teclado a su primer botón)', await p.evaluate(() => document.activeElement.id), 'avErrReint');
+    await p.evaluate(() => { avErrCerrar(); });
+    eq('   …y al cerrar el cuadro el anuncio se vacía (el siguiente vuelve a leerse)', await p.evaluate(() => ($('avErrAnuncio') || {}).textContent), '');
+    await p.cerrar();
+  }
+  {
+    // control: si NO se está escribiendo, el cuadro sigue llevándose el foco a su botón principal (lo de siempre)
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await irA(p, 45.5); await p.clock.runFor(300); p.t += 300;
+    const f = await p.evaluate(() => ({ id: document.activeElement.id, anuncio: ($('avErrAnuncio') || {}).textContent || '' }));
+    eq('J2 · (control) sin escribir en ningún campo, el cuadro SÍ lleva el foco a «Reintentar ahora» (y no repite el anuncio)', [f.id, f.anuncio], ['avErrReint', '']);
+    await p.cerrar();
+  }
+  {
+    // un <select> también cuenta como «estar editando» (las flechas y las letras le cambian el valor)
+    const p = await abrirGuardar('2', 'p2');
+    await p.evaluate(() => { pasoIr(2); });
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await p.focus('#fHEst');
+    const antes = await p.evaluate(() => document.activeElement.id);
+    await irA(p, 45.5); await p.clock.runFor(300); p.t += 300;
+    eq('★ J2 · un <select> (con el foco puesto) también cuenta como «estar editando»: el cuadro no se lo lleva', [antes, await p.evaluate(() => document.activeElement.id)], ['fHEst', 'fHEst']);
+    await p.cerrar();
+  }
+
+  /* ── J3 · H26 / H33a · el éxito TARDÍO nombra la cama cuando el panel abierto ya no es el de la sesión ── */
+  for (const conAviso of [false, true]) {
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' }, { tipo: 'colgado' });
+    await apretar(p);
+    await p.clock.runFor(30);
+    // Se cierra el panel (el borrador queda) y se abre OTRA cama: la respuesta de la 2 llega con la 3 delante.
+    await p.evaluate(() => { _formDirty = false; cerrarPanel(true); });
+    await abrirCama(p, '3', 'p3');
+    await p.evaluate(() => { window.__toasts.length = 0; });
+    await contestar(p, 0, { tipo: 'ok', data: Object.assign({}, OK_DATA, conAviso ? { advertencias: [AVISO_SERVIDOR] } : {}) });
+    await p.clock.runFor(30);
+    const e = await pantalla(p);
+    const nombra = e.toasts.filter(t => /cama 2/.test(t));
+    const generico = e.toasts.filter(t => /Evolución guardada correctamente/.test(t));
+    eq('★★ J3 · ' + (conAviso ? 'con advertencias · ' : '') + 'la confirmación tardía de la cama 2, con la 3 delante, NOMBRA la cama 2 y no usa el aviso genérico',
+      [nombra.length >= 1, generico.length], [true, 0]);
+    si('   …dice «Evolución de la cama 2 guardada»', e.toasts.some(t => /Evolución de la cama 2 guardada/.test(t)), JSON.stringify(e.toasts));
+    if (conAviso) si('★ …y con advertencias la instrucción viaja en ese mismo aviso (no se pierde porque el panel ya no es el de la sesión)',
+      e.toasts.some(t => /cama 2/.test(t) && /Vuelve a guardar el turno/.test(t)), JSON.stringify(e.toasts));
+    eq('   …y la franja de la cama 3 NO dice «Guardado» (esa cama no se guardó)', e.estado === 'ok' || e.estado === 'aviso', false);
+    await p.cerrar();
+  }
+  {
+    // control: con el panel vigente el aviso de siempre
+    const p = await abrirGuardar('2', 'p2');
+    await regla(p, GUARDAR, { tipo: 'ok', data: OK_DATA });
+    await apretar(p); await p.clock.runFor(50);
+    const e = await pantalla(p);
+    eq('J3 · (control) con el panel vigente el aviso sigue siendo «Evolución guardada correctamente»', [exitos(e), e.estado], [1, 'ok']);
+    await p.cerrar();
+  }
+
+  /* ── J4 · H33b · «Guardado con aviso»: la instrucción queda VISIBLE en la franja, no solo en un toast de 9 s ni en un title ── */
+  for (const [vpNombre, vp] of [['390 px', VP_MOVIL], ['escritorio', VP_ESCRITORIO]]) {
+    const p = await abrirGuardar('2', 'p2', vp);
+    await p.evaluate(() => { pasoIr(5); });
+    await regla(p, GUARDAR, { tipo: 'ok', data: Object.assign({}, OK_DATA, { advertencias: [AVISO_SERVIDOR] }) });
+    await apretar(p); await p.clock.runFor(50);
+    await p.clock.runFor(12000);                       // el toast de 9 s ya se fue
+    const e = await pantalla(p);
+    const m = await medirBarra(p);
+    eq('J4 · (control) ' + vpNombre + ': el turno quedó guardado con aviso', [e.estado, /Guardado con aviso/.test(e.texto)], ['aviso', true]);
+    si('★★ J4 · ' + vpNombre + ': la franja MUESTRA la instrucción («Vuelve a guardar el turno…») a la vista, 12 s después y sin pasar el cursor por encima',
+      /Vuelve a guardar el turno para completarlas/.test(m.franjaTexto), m.franjaTexto);
+    si('   …y la franja la dice entera sin salirse de la pantalla (' + m.franja.der + ' ≤ ' + m.ancho + ')', m.franja.der <= m.ancho && m.franja.izq >= 0 && m.pcScroll <= m.ancho, JSON.stringify(m.franja));
+    await p.cerrar();
+  }
+
+  /* ── J4b · lo que el servidor escribe en la franja es texto de FUERA: se escapa, no se interpreta ── */
+  {
+    const p = await abrirGuardar('2', 'p2');
+    const HOSTIL = '<img src=x onerror="window.__xss=1">Vuelve a guardar el turno <b>ya</b>';
+    await regla(p, GUARDAR, { tipo: 'ok', data: Object.assign({}, OK_DATA, { advertencias: [HOSTIL] }) });
+    await apretar(p); await p.clock.runFor(50);
+    const r = await p.evaluate(() => ({ nodos: $('gEstadoGuardado').querySelectorAll('img,b').length, xss: window.__xss === 1, texto: $('gEstadoGuardado').textContent }));
+    eq('★ J4b · una advertencia con HTML se muestra como TEXTO (sin elementos nuevos y sin ejecutar nada)', [r.nodos, r.xss, r.texto.indexOf('<img src=x') > -1], [0, false, true]);
+    await p.cerrar();
   }
 
   eq('sin errores de JavaScript en ningún escenario', errores.filter(e => !/favicon/.test(e)), []);

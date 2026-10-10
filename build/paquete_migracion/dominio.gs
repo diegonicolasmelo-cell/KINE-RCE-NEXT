@@ -590,8 +590,10 @@ function validarTransicionVA(d, cama) {
 function _msgCambioDePaciente(idCama) {
   // 🪤 La pantalla reconoce este rechazo por la frase «cambió de paciente» (`_EP_CAMBIO_RE` en index.html): si se
   // reescribe, se reescribe en los dos lados — la guardia lo ata.
-  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste este formulario, ' +
-    'así que no se guardó nada. Cierra el formulario y vuelve a abrir la cama para ver cómo está ahora.';
+  // H34(2): dice «ventana» y no «formulario» porque lo leen también los diálogos SIN formulario (egreso, mover, intercambiar,
+  // anular un evento, escalas, gases): «Cierra el formulario» le hablaba a quien confirmaba un egreso de algo que no tenía delante.
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste esta ventana, ' +
+    'así que no se guardó nada. Cierra esta ventana y vuelve a abrir la cama para ver cómo está ahora.';
 }
 function _msgPantallaVieja() {
   // 🪤 SIN la frase «cambió de paciente»: la pantalla mostraría la salida del cambio de paciente («Cerrar la cama») y

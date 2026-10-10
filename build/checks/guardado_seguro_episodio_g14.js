@@ -211,6 +211,11 @@ if (tieneRegla) {
   si('   …nombra la cama', /\bcama 7\b/.test(CAMBIO));
   si('   …dice qué hacer (volver a abrir la cama) y que no se guardó nada', /vuelve a abrir la cama/i.test(CAMBIO) && /no se guard[oó] nada/i.test(CAMBIO));
   si('★★ …sin nombrar a nadie ni dar el identificador del otro paciente (Ley 19.628)', sinDatosAjenos(CAMBIO));
+  /* H34(2) (revisión de la tanda 2, 10-oct-2026). El mensaje es UNO para todas las puertas, y varias no abren un formulario sino un
+     DIÁLOGO (egreso, mover, intercambiar, anular, escalas, gases): «desde que abriste este formulario… Cierra el formulario» le hablaba a
+     quien confirmaba un egreso de algo que no tenía delante. Ahora vale para los dos: dice «ventana». */
+  no('★★ …NO habla de «formulario» (lo leen también los diálogos de egreso, mover, intercambiar, anular…, que no son un formulario)', /formulario/i.test(CAMBIO), CAMBIO);
+  si('★★ …y le dice lo que hay que hacer con palabras que valen para un diálogo y para un formulario: «Cierra esta ventana y vuelve a abrir la cama»', /Cierra esta ventana y vuelve a abrir la cama/.test(CAMBIO), CAMBIO);
   eq('   …el de la cama libre es el mismo texto (la pantalla no distingue)', vp(PID_A, '', false), CAMBIO);
   // El mensaje es UNO: el del guardado de la evolución (G14 original) y el de las demás puertas. Si se separan, el
   // usuario ve dos frases distintas para lo mismo y la pantalla (que reconoce la frase) sigue sirviendo a una sola.

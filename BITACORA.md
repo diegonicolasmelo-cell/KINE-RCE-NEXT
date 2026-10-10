@@ -3781,3 +3781,55 @@ rojos contra la pantalla del paso 15).
   de quién es el que ya está ahí.
 - **Queda del lado del servidor** (no es de este paso): rechazar un reintento rezagado cuyo momento de apertura es anterior al último
   guardado del turno (el complemento que propuso H22), para el aparato que se cayó y volvió, o para la llamada original que sigue en la red.
+
+## 10-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: la franja del guardado cabe y se toca en el celular, el cuadro no le roba el cursor a quien escribe y el aviso dice de qué cama habla
+
+**De dónde sale.** Paso «G pantalla: móvil y textos» de la revisión de la tanda 2: H27, H31, H25, H26, H33 y H34(2), en `v2/index.html`,
+`v2/dominio_validacion.gs` y `v2/svc_evoluciones.gs`. Todos reproducidos antes de tocar nada: la sección J de
+`guardado_seguro_no_confirmado_g17.js` nació con 48 fallos rojos contra la pantalla del paso 16, con las mismas cifras que dieron los
+revisores (botón de 112 x 16 px, `scrollWidth` de `pcontent` en 577 sobre 390).
+
+**Los defectos, en palabras.**
+- **H27 y H31 · la franja ámbar y su botón, en un celular de 390 px.** El botón «Reintentar ahora» medía 112 x 16 px (`padding:1px 9px`,
+  escrito a mano en cada `_marca…`) y la franja era `white-space:nowrap`: con «Reintentando…» medía 330 px y empujaba el botón principal hasta
+  x=581 de 390. El panel se deslizaba de lado, sin ninguna pista de que ahí había algo (`.pcontent` tiene `overflow-x:auto`). El desborde en
+  rojo ya existía (x=449), pero el ámbar es más ancho.
+  · **Arreglo.** El diseño de la franja y de sus botones vive ahora en CSS, en un solo lugar (`#gEstadoGuardado`, `.est-btn`): el botón mide
+  al menos 32 px (40 en el celular) y tiene letra de 12,8 px. En pantallas de 740 px o menos (el corte de la versión móvil, no 480: con 480 quedaba
+  un tramo de 481 a 740 donde seguía desbordando) la barra se PARTE en filas (`flex-wrap`), la franja ocupa una fila entera con su texto partido
+  si hace falta, y el botón principal deja de pedir el 100% (`flex:1 1 0`: con `wrap`, el `width:100%` del `.btn` lo mandaba solo a su
+  propia fila aun sin franja). La franja lleva `role="status"` y `aria-live="polite"`. Medido a 390 y a 320 px, en ámbar, ámbar agotado, rojo,
+  rojo con «Cerrar la cama» y «Guardado con aviso»: nada se sale, el botón mide ≥ 32 px, el principal queda a la vista. En escritorio la franja
+  sigue en la misma fila que los botones.
+- **H25 · el cuadro de «No confirmado» le robaba el cursor a quien escribía.** Sale solo a los 45 s y enfocaba su botón a los 60 ms (y antes,
+  a los 0 ms, el gestor de modales `Modal`): lo que la persona seguía tecleando se perdía y una barra espaciadora o un Enter apretaba
+  «Reintentar ahora» sin querer. Ahora, si el foco está en un campo donde las teclas hacen algo (texto, número, fecha, `<select>`,
+  `contenteditable`; no un botón ni una casilla), el foco NO se mueve —ni en `_avErrAbrir` ni en `Modal.alAbrir`, que lo declara en
+  `SIN_ROBAR_FOCO`— y el cuadro se anuncia con una región `role="alert"` (`#avErrAnuncio`, solo para lector de pantalla) que se vacía al cerrar.
+  Con Tab se entra al cuadro (la trampa de Tab del gestor ya lo hacía). Sin escribir en nada, todo sigue como antes: el foco va a «Reintentar ahora».
+- **H26 y H33(a) · el éxito tardío no decía de qué cama hablaba.** Si la confirmación de la cama 2 llega con la 3 delante, «✅ Evolución
+  guardada correctamente» se lee como que se guardó la 3. Con el panel que ya no es el de la sesión ahora dice «✅ Evolución de la cama 2
+  guardada» (`falloFinal` ya nombraba la cama). Hallazgo de paso: con ese panel ajeno las `advertencias` del servidor se perdían (solo la
+  franja de la cama vigente las mostraba): ahora viajan en ese mismo aviso («⚠ Evolución de la cama 2 guardada, pero: …»).
+- **H33(b) · «Guardado con aviso» dejaba la instrucción solo en un toast de 9 s.** La franja decía «✓ Guardado con aviso 11:00», y el detalle
+  («Vuelve a guardar el turno para completarlas») iba en un `title` que en una pantalla táctil no se ve. Ahora la franja se parte en dos líneas
+  y la instrucción SE LEE en ella (escapada con `escapeHtml`: es texto del servidor), mientras la franja siga ahí. No se tocó el resto de lo que
+  el revisor proponía (no avanzar solo al paso 6, o dejar `_formDirty` en true): es otra regla de uso y queda como estaba.
+- **H34(2) · el rechazo por cambio de paciente hablaba de «este formulario» en diálogos que no lo son.** Egreso, mover, intercambiar, anular,
+  escalas y gases abren diálogos sin formulario y leían «desde que abriste este formulario… Cierra el formulario». Ahora dice «desde que abriste
+  esta ventana… Cierra esta ventana y vuelve a abrir la cama para ver cómo está ahora», en `_msgCambioDePaciente` y en `validarEpisodioAbierto`
+  (el guardado de la evolución): el texto es UNO para todas las puertas y la guardia G14 exige que sean idénticos. Se conserva «cambió de
+  paciente», que es lo que reconoce `_EP_CAMBIO_RE` en la pantalla.
+
+**Las guardias.** Sección J de `guardado_seguro_no_confirmado_g17.js` (J1 las medidas, J2 el foco, J3 el éxito tardío, J4 el aviso a la vista);
+dos aserciones nuevas en `guardado_seguro_episodio_g14.js` para el texto. Una guardia vigente se ajustó con su razón escrita: F10 exigía que
+el texto de la franja fuera EXACTAMENTE «✓ Guardado con aviso hh:mm» (`…$`); la convención cambió a propósito (H33b) y ahora exige que EMPIECE
+así y que además traiga la instrucción. `RCE_CAPTURAS_DIR=/ruta node build/checks/guardado_seguro_no_confirmado_g17.js` guarda una captura de
+cada estado a 390, 320 y 1100 px (fuera del repositorio).
+- 🪤 **Las medidas del celular van con el reloj de Playwright pausado y la captura espera 0,7 s de reloj real:** las transiciones de CSS
+  corren con el reloj de pared, y sin esa espera el panel sale a medio abrir en la imagen.
+- 🪤 **`flex-wrap` sobre una barra cuyo botón principal trae `width:100%` lo manda solo a su fila**, aun sin la franja. Antes de partir una
+  barra de botones hay que mirar qué pide cada hijo como base.
+- 🪤 **Un `role="alertdialog"` dentro de un overlay que nunca sale del árbol (solo cambia su opacidad) no tiene ninguna «aparición» que el
+  navegador anuncie** (no se probó con un lector de pantalla real: es lo que se deduce del marcado). Sin mover el foco no se puede contar con
+  que se lea, y por eso lleva una región viva aparte.

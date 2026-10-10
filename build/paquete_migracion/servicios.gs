@@ -5852,8 +5852,9 @@ function confirmarDispositivos(datos, ctx, ep) {
  * es el comportamiento seguro por omisión —atribuir ese turno «a quien esté en la cama» es justo el error que esta
  * regla existe para impedir— y su costo es que esa corrección no se puede hacer desde la pantalla. Si la respuesta
  * es que sí, hace falta una operación aparte que nombre el episodio; NO se arregla aflojando esta comparación.
- * (La frase «desde que abriste este formulario» no es exacta en ese caso —el cambio fue antes de abrirlo—, pero es
- * el mensaje acordado y la pantalla lo reconoce por su texto: cambiarlo se hace en los dos lados.)
+ * (La frase «desde que abriste esta ventana» no es exacta en ese caso —el cambio fue antes de abrirla—, pero es
+ * el mensaje acordado y la pantalla lo reconoce por su texto: cambiarlo se hace en los dos lados. Dice «ventana» y no
+ * «formulario» porque es el MISMO texto de las demás puertas, y varias abren un diálogo sin formulario: H34(2).)
  *
  * Es PURA: no lee la cama, la recibe. Quien llama la lee DENTRO del lock y la compara ANTES de escribir nada.
  * El mensaje no nombra a nadie ni lleva el identificador del episodio (queda en AUDIT_LOG y en pantalla). La
@@ -5875,8 +5876,8 @@ function validarEpisodioAbierto(abierto, pidCama, idCama) {
   const ab = String(abierto).trim();
   if (!ab) return '';
   if (ab === String(pidCama === undefined || pidCama === null ? '' : pidCama).trim()) return '';
-  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste este formulario, ' +
-    'así que no se guardó nada. Cierra el formulario y vuelve a abrir la cama para ver cómo está ahora.';
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste esta ventana, ' +
+    'así que no se guardó nada. Cierra esta ventana y vuelve a abrir la cama para ver cómo está ahora.';
 }
 
 /**
