@@ -1985,6 +1985,23 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .act-bar{flex-wrap:wrap;gap:6px 8px;}
   .act-bar #pasoAvanza{width:auto;flex:1 1 0;}
   #gEstadoGuardado{flex:1 1 100%;white-space:normal;border-radius:14px;padding:6px 10px;margin-right:0;}
+  /* 🗂️ 10-oct-2026 · tanda 5, cambio 6 (act_bar_390.js). «⚠️ Sin guardar» aparece apenas se toca un campo, o sea que es la barra de TODO
+     el turno, y compartía la fila con «← Atrás» y el botón principal: entre los dos se llevaban 205 de los 354 px útiles y el principal
+     quedaba de 141 px. «Siguiente: evaluaciones →» y «…terapia física →» se partían en TRES líneas (55 px de texto en un botón de 52): el
+     texto sobresalía y la flecha caía sola abajo. Ahora la insignia ocupa SU fila entera, como ya hace la franja del guardado (las dos
+     dicen cómo va el guardado), y el principal vuelve a los 258 px de siempre. Es solo CSS del celular: el id, el texto, los estados
+     (`hidden`) y el temporizador de la insignia no se tocan, y en escritorio sigue en la fila de los botones. El principal conserva sus 52 px
+     y su 1,02rem (pedido de Diego del 15-ago): no se achica para que entre. `line-height` explícito para que dos líneas quepan igual con la
+     tipografía de Windows (más alta que la de aquí). `margin-right:0!important` porque el HTML de la insignia trae `margin-right:6px` en
+     línea (no se toca) y, sin esto, su borde derecho quedaba 6 px antes que el de la franja de abajo. */
+  #gSinGuardar{flex:1 1 100%;text-align:center;margin-right:0!important;}
+  .act-bar #pasoAvanza{line-height:1.15;}
+  /* La barra pegajosa le come el borde de abajo al panel y el navegador no lo sabe: un campo que ya «se ve» bajo ella no se desplaza al
+     enfocarlo (con Tab o con el dedo) y se escribe a ciegas. Medido: el relato del paso 6 (y «Sedación» y «Vigilia» del paso 2) quedaban
+     bajo la barra. `scroll-padding-bottom` le dice cuánto reservar: la barra con la insignia puesta (la altura de todo el turno) más un
+     respiro, y la zona segura de abajo de los iPhone. Con una franja de falla (más alta) puede quedar cubierto el borde de un campo:
+     es el estado raro y la franja no se toca aquí. */
+  #sp .pcontent{scroll-padding-bottom:calc(112px + env(safe-area-inset-bottom));}
   .est-btn{min-height:40px;padding:8px 16px;}
   /* Toques más generosos */
   .col input,.col select{height:42px;}
