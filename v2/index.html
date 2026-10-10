@@ -1318,8 +1318,14 @@ table.rhb2 .rl{width:128px;text-align:left;}
    si no, el botón que se aprieta todo el día quedaba más chico que el que
    ya nadie ve. */
 .act-bar #btnGuardar,.act-bar #pasoAvanza{height:52px;font-size:1.02rem;}
-#btnGuardar,#pasoAvanza{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
-#btnGuardar:hover,#pasoAvanza:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
+/* 🗂️ 10-oct-2026 · UN SOLO BOTÓN PRINCIPAL (tanda 5, cambio 6, parte 2; boton_principal_unico.js). Aquí vivían dos reglas con un degradado
+   ÍNDIGO (`#5856d6 → #4338ca`), sombra índigo y un `brightness(1.08)` al pasar el cursor, y más abajo la piel institucional les ponía encima
+   OTRO degradado (`#0058A0 → #04345E`) con sombra azul. Medido en pantalla: el índigo NO se veía nunca (lo pisaba la piel, que es la única),
+   pero el botón de la barra seguía siendo distinto de la tarjeta y de los `.btn-p`: degradado y sombra contra azul plano, y con el cursor encima
+   «Siguiente» se ACLARABA, «Guardar» usaba otro degradado y los demás se OSCURECÍAN. Ahora «Guardar» y «Siguiente» son `.btn-p` a secas: `--primary`
+   plano, `--pdark` con el cursor encima, sin sombra, degradado ni filtro. Conservan SU TAMAÑO (la regla de arriba: 52 px y 1,02rem, pedido de
+   Diego del 15-ago) y su radio de 12 px: se unifica el aspecto, no el tamaño. Revertir es devolver estas dos reglas y las dos de la piel
+   (más abajo) con el commit «un solo botón principal». */
 /* 🗂️ 10-oct-2026 · desactivado legible también aquí (tanda 5, cambio 2): era blanco sobre #94a3b8 (2,56:1). Hoy NO es lo que se ve —la piel
    institucional (más abajo) lo pisa con la misma receta—, pero dejarlo así era una trampa: quien algún día quite la piel recuperaba el rótulo ilegible. */
 #btnGuardar:disabled,#pasoAvanza:disabled{background:#e2e8f0;color:#475569;box-shadow:none;filter:none;}
@@ -2077,11 +2083,11 @@ html[data-piel="inst"] .tab{color:#cfe3f5;}
 html[data-piel="inst"] .tab:hover{color:#fff;}
 html[data-piel="inst"] .tab.on{color:#fff;border-bottom-color:#F0A000;}
 html[data-piel="inst"] .tbanner{display:none!important;}
-html[data-piel="inst"] #btnGuardar,html[data-piel="inst"] #pasoAvanza{background:linear-gradient(135deg,#0058A0,#04345E);box-shadow:0 5px 16px rgba(0,88,160,.32);}
-html[data-piel="inst"] #btnGuardar:hover{background:linear-gradient(135deg,#0d69b6,#0058A0);filter:none;}
+/* 🗂️ 10-oct-2026 · El degradado y la sombra de «Guardar» y «Siguiente» que ponía la piel aquí se quitaron: son `.btn-p` planos como los demás
+   (tanda 5, cambio 6, parte 2; el porqué está junto a `.act-bar #btnGuardar`, arriba). */
 /* 🗂️ 10-oct-2026 · BOTÓN PRINCIPAL DESACTIVADO LEGIBLE (tanda 5, cambio 2). Medido en pantalla, no calculado desde el CSS: la regla de
-   `#btnGuardar:disabled,#pasoAvanza:disabled` (gris #94a3b8) NUNCA ganaba, porque las dos reglas de arriba —el degradado azul de la piel— pesan
-   más (id + atributo + elemento contra id + pseudoclase). Lo que se veía era el degradado con la opacidad .55 que `prevAvanceUI` le pone en
+   `#btnGuardar:disabled,#pasoAvanza:disabled` (gris #94a3b8) NUNCA ganaba, porque las dos reglas de la piel que había justo antes —el degradado
+   azul, ya quitado en el paso 5.4— pesaban más (id + atributo + elemento contra id + pseudoclase). Lo que se veía era el degradado con la opacidad .55 que `prevAvanceUI` le pone en
    línea al «Siguiente» del paso 1: letra blanca sobre #73a3cb, 2,68:1, y el rótulo «Siguiente: el turno →» casi no se leía. Y mientras se
    guarda (`_guardadoBotones`) el botón se desactiva SIN opacidad y seguía igual de azul que uno activo. Ahora el desactivado es el mismo en los
    dos casos: gris claro, letra oscura (6,15:1), sin sombra y sin la opacidad en línea (`!important`, porque el `style` en línea la pone
