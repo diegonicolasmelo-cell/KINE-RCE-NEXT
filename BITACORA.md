@@ -4130,3 +4130,86 @@ la auditoría era cierta: el aviso quedaba vacío en los cinco escenarios medido
   de Hemodinamia no podrá decir «Requiere revisión» de forma honesta (cambio 4).
 - No se cambió el modo de unir las frases (« y »), ni `_vis`, ni la PVE, ni ningún id; sin migración de esquema. `entrega/`, `pwa/` y la `VERSION`
   quedan para el cierre (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
+
+## 10-oct-2026 · Tanda 3 · paso 3.3 · Las palabras de estado de cada bloque, calculadas de los datos y visibles en escritorio y celular (cambios 4 y 5)
+
+**El defecto.** El encabezado de cada tarjeta del celular decía «✓ / — / !» con `_mResumen`, un scrape genérico: copiaba hasta cuatro
+controles `<input>`/`<select>`/`<textarea>` a la vista y tiraba todo `'0'`. Lo que no es uno de esos tres controles no existía para él.
+Medido en Chromium a 390 px antes de tocar nada (paciente con tubo + VM): **responder la PVE «Sí»** dejaba «Eventos de vía aérea» en «— sin
+registrar» (la respuesta vive en `<input type=hidden id=fPVEval>` y en el style de un botón), **declarar una decanulación** también (la casilla
+«Ocurrió…» es `display:none`), y lo mismo el prono, la cantidad de secreciones (botones − + ++ +++ sobre un hidden), la fase clínica, los sedantes
+y los procedimientos agregados a mano. Un 0 tecleado (PEEP 0, PS 0, PAM 0) tampoco contaba, cuando la regla transversal del proyecto es que un 0 se
+guarda como 0 y vacío no es 0. Y en escritorio, donde hay MÁS bloques abiertos a la vez (6 tarjetas), el estado no existía: `.mst`/`.mres` eran
+`display:none` y `_mPintarSecciones` salía si `!esMovil()`. (Confirmada la hipótesis de la auditoría. Medido también contra el `index.html` del commit anterior: con una fase elegida, «Fase clínica» decía «— sin registrar»,
+y con la cantidad de secreciones puesta, «Manejo respiratorio» también.)
+
+**El cambio (solo `v2/index.html`; ni `guardar()`, ni el payload, ni ningún dato).**
+- **Cambio 4.** `estadoBloque(contenedor, faltaEls)` → `{ estado:'sin'|'reg'|'rev', resumen, falta }`, la UNICA función que usan escritorio y celular.
+  `'rev'` = hay un elemento de `_obligatoriosPendientes()` dentro del bloque (la misma regla del «!» de siempre y la misma lista del aviso «Falta:»).
+  `'reg'` = hay un control a la vista con valor —incluido el 0 de un `<input>`/`<textarea>`; el `'0'` de un `<select>` sigue sin contar (la KTR nace en 0
+  y no tiene opción en blanco: decisión 4 de Diego, abierta)—, una casilla marcada, o una **fuente declarada** en `data-fuentes`. `'sin'` = nada de eso.
+  El scrape de `_mResumen` pasó a `_mLeer` (conserva su rama de `#fcPrevNavm` y devuelve también si hay dato aunque el encabezado no tenga sitio).
+- **`data-fuentes`**: atributo en el HTML, sobre el bloque dueño de la fuente. Ids separados por espacio (un `<input type=hidden>` cuenta con su valor, una
+  casilla marcada) y `@nombre` para lo que se deduce (`ESTADO_FUENTES`: `fase`, `sedantes`, `prono`, `procs`). Declaradas: `#fcFase` (`@fase cAET`),
+  `#gSedFarmacos` (`@sedantes`), `#dPronoStrip` (`@prono`), `#dTqtSec` (`cTqtO`), `#dDecanSec` (`cDecanOcurrio`), `#dExtSec` (`fPVEval`), `#dReintubSec`
+  (`cReintubT`), `#dIntubSec` (`cIntubO`), `#dMue` (`fCultVal`), la columna de secreciones (`fSecrQty`) y la tarjeta Procedimientos (`@procs`). Se declara
+  sobre el bloque que SE CIERRA por su gate: `_mOculto` lo salta entero cuando no corresponde hoy y la fuente deja de contar con él (el gate, no el plegado).
+  Para los eventos de vía aérea se leen las mismas casillas que lee `_eventoVADeclarado()`, una por bloque (así la TQT cuenta en «Ventilación» y la decanulación
+  en «Eventos de vía aérea»), en vez de leer el style de los botones.
+- **Cambio 5.** Constante única `ESTADO_PALABRAS` = «Sin registrar» / «Registrado» / «Requiere revisión» (decisión 6). `_mPintarSecciones` deja de salir en
+  escritorio, pero SOLO pinta las tarjetas del Turno (la misma regla de dueño que `pasoIr`: sin `data-paso` = paso 2, así una tarjeta nueva del Turno recibe
+  su palabra sin tocar nada) y, en celular, también los tres sub-bloques de Respiratorio. Las tarjetas de otros pasos siguen sin palabra (en escritorio sin
+  estado a la vista; en celular con su «sin registrar» de siempre) hasta que les toque su tanda: no se mezclan dos vocabularios. Escritorio sigue SIN plegar nada
+  y SIN sub-bloques. El glifo ✓ — ! se conserva. El encabezado sale `[palabra] falta X — resumen`: lo que falta va PRIMERO porque el resumen se corta con
+  puntos suspensivos y al final se perdía justo eso. CSS: la palabra es `.mpal`; el estado en escritorio se activa con la clase `est-on` (en `@media (min-width:741px)`).
+- **Decisiones ya tomadas para este paso y respetadas:** lo heredado del turno anterior cuenta como «Registrado» (como hoy; el marcado de heredados queda como
+  decisión 2 de Diego); «Requiere revisión» es solo el obligatorio pendiente; un 0 tecleado es dato. NO se plegó nada por defecto en escritorio (cambio 7), NO se tocaron los
+  cascarones de TQT/Decanulación (cambio 6), la KTR nace en 0 como hoy.
+
+**Cuatro defectos viejos que aparecieron al medirlo, arreglados porque están en las mismas líneas (ninguno cambia lo que se guarda).**
+1. 🔴 **El resumen del encabezado se escribía con `innerHTML` sin escapar** en la rama sin «falta» (`(txt||'sin registrar')`; solo la rama «falta» pasaba por `_escSt`). Un valor
+   con `<etiquetas>` —que también trae la réplica del turno de otro colega— corría en la pantalla de quien abre. Medido: `<img src=x onerror=…>` tecleado en «Otro procedimiento»
+   ejecutaba el `onerror` a 390 px. Ahora todo texto que viene de un campo pasa por `_escSt` (= `escapeHtml`, el único escapador).
+2. **Un resumen largo ensanchaba la tarjeta.** `.sp-2col{grid-template-columns:1fr}` es `minmax(auto,1fr)`: el piso de la columna es el ancho mínimo de lo de adentro, y el
+   resumen es una línea sin partir. Medido a 390 px: con «VM · ACVC · Mucopurulentas con tinte hemático — falta declarar la PVE» la tarjeta Respiratorio pasaba de 374 a 400 px y el panel se
+   salía 18 px (ya pasaba ANTES, sin la palabra); con la palabra delante llegaba a 509. Ahora `minmax(0,1fr)` (en el `@media (max-width:820px)`) y el resumen se corta con puntos suspensivos.
+3. **Los botones no repintaban el estado.** `_rielDeb` solo escuchaba `input` y `change`; la PVE, el prono, las secreciones, los eventos, la fase y los sedantes se responden con botones, así que
+   tanto el aviso «Falta:» como la palabra quedaban viejos hasta el siguiente tecleo («Requiere revisión» seguía puesto después de responder lo que pedía). Se agregó un `click` delegado sobre `#kf button`
+   (mismo debounce de 250 ms), y `renderChips()` llama `_rielDeb()` (agregar un procedimiento con Enter no dispara ningún evento).
+4. **El cuerpo del posicionamiento plegado (`#dPosBody.hidden`) contaba como «no corresponde».** Es el cuarto plegado del celular, igual que el acordeón: un decúbito lateral marcado o un «otro
+   posicionamiento» escrito no contaban mientras estuviera cerrado. Se saltó en `_mOculto` junto con los otros tres.
+
+**Lo que ve distinto la kinesióloga.**
+- **Escritorio:** cada una de las 6 tarjetas del turno (7 con Neurología) lleva en su encabezado un ✓ — ! y la palabra («Sin registrar» gris, «Registrado» verde, «Requiere revisión» rojo), seguidas del resumen de lo
+  registrado y, si debe algo, de qué falta («Requiere revisión  falta la hemodinamia»). Antes el encabezado no decía nada.
+- **Celular:** las tres palabras reemplazan al «sin registrar» en minúscula en las tarjetas del turno y en los tres sub-bloques; y los falsos «—» desaparecen: «Eventos de vía aérea» pasa a «Registrado» al
+  responder la PVE o declarar un evento, «Manejo respiratorio» al marcar secreciones. Las tarjetas de otros pasos se ven como siempre.
+- **Los dos arreglos de arriba que se notan:** un texto con `<` ya no se ejecuta, y un resumen largo ya no empuja la pantalla hacia la derecha en el celular.
+- 🪤 Sedación nace «Registrado» (su opción «Sin sedación» ya viene elegida y no hay opción en blanco): igual que el ✓ de siempre. Si Diego quiere que nazca sin registrar es la misma decisión de heredados/predeterminados (2).
+
+**Las guardias.**
+- `build/checks/estado_del_bloque.js` (nueva, a 1200 y 390 px, reloj inventado lunes 10-ago-2026 11:00): existe la función y la constante; recién abierto el turno (hemodinamia en blanco → `rev` con `falta=fHEst`, Auscultación/Fase/
+  Procedimientos `sin`, Respiratorio `rev` por la PVE); hemodinamia llena → `reg` y con solo el estado → `rev`; cada fuente (PVE, prono arrastrado y de hoy, secreciones, KTR 0/2, posicionamiento plegado, decanulación, TQT, fase y AET, procedimientos,
+  sedantes) hace lo suyo; en 4b **cada fuente declarada se mide AISLADA** (se vacían los controles del bloque y se prende solo la fuente, para que un desplegable que nace puesto no la enmascare) y, con el bloque cerrado por su gate, no cuenta; un 0 de
+  `<input>`/`<textarea>` es dato y el de un `<select>` no; un campo deshabilitado o oculto por lógica no cuenta; un valor puesto por código cuenta (lo heredado); la función solo lee (foto de todos los controles antes/después); y la **cobertura estructural**:
+  todo `<input type=hidden>` y todo botón de las tarjetas del Turno está en un `data-fuentes` o en la lista de exentos de la guardia CON su motivo (y cada token apunta a algo que existe, y cada exento sigue existiendo). En celular también los glifos de
+  los sub-bloques. **Roja antes:** 130 fallos contra el `index.html` del commit anterior (la función no existía; el encabezado de «Eventos de vía aérea» decía «—» tras responder la PVE y tras declarar la decanulación y el de «Manejo respiratorio» tras las
+  secreciones; `fPVEval,fSecrQty,fCultVal` y 26 botones sin declarar). **Verde después.**
+- `build/checks/estado_visible_escritorio.js` (nueva, a 1200, 800 y 390 px): cada tarjeta del Turno que se ve tiene EXACTAMENTE una palabra, de las tres (comparación exacta), a la vista, dentro del encabezado y coincidente con `estadoBloque()` del mismo bloque, con su glifo
+  visible; Hemodinamia en blanco → «Requiere revisión» y nombra la hemodinamia, llena → «Registrado»; PEEP 0 tecleado → «Registrado» (en celular, en el sub-bloque «Ventilación» con los ejes vaciados; en escritorio lo mide `estado_del_bloque` sobre el módulo ventilatorio);
+  tocar un botón repinta (click real sobre «PVE sí»); las tarjetas de otros pasos no llevan palabra y en escritorio ni siquiera se pintan; un resumen largo no desborda el panel (a 800, a 1200 y a 390 px); una `<etiqueta>` tecleada no se ejecuta; y estático: `ESTADO_PALABRAS` se define una vez y las funciones
+  que pintan no escriben las palabras. **Roja antes:** 128 fallos en su primera versión (la palabra no existía; `window.__xss` se ejecutaba a 390 px). **Verde después.** Las secciones del desborde y de «no se pintan» se agregaron después de la primera corrida roja y se verificaron con mutantes.
+- **Mutantes (mueren donde les toca):** `1fr` en vez de `minmax(0,1fr)` → 2 fallos; sin el listener de click → 9; sin `fPVEval` en `#dExtSec` → 9; sin `cReintubT` / `cIntubO` / `fCultVal` / `@sedantes` / `fSecrQty` / `@prono` / `cTqtO` / `cDecanOcurrio` / `@fase` / `cAET` / `@procs` →
+  3, 3, 5, 3, 9, 5, 3, 7, 3, 3 y 5; el predicado de la fase roto → 3; la lista de faltantes ignorada → 12; la palabra escrita a mano en el pintado → 47; las tarjetas de otros pasos con palabra → 2; escritorio que pinta todas las tarjetas → 3 (había sobrevivido: se agregó la aserción «ni siquiera se pintan»); sin exentar `#dPosBody` → 3;
+  el 0 de un input ignorado → 9; el resumen sin escapar → 10.
+- **`movil_panel.js` reconciliada con su razón escrita** (en la guardia y acá). Cambian dos convenciones, solo en el Turno: **R2** fijaba el texto «sin registrar» en minúscula que escribía `_mPintarSecciones`; la convención que cambia de verdad es CUÁL es la palabra
+  (el plan y la decisión 6 piden las tres de `ESTADO_PALABRAS`), y lo que protegía —que la sección vacía diga solo eso, sin inventar un resumen— se conserva: ahora exige «Sin registrar» exacto. Se le sumó que una sección vacía de OTRO paso conserva su «sin registrar» y no lleva palabra. **R8** fijaba que ningún ✓ ni
+  resumen se ve en escritorio; ahora las tarjetas del Turno los muestran, y la mitad que sigue siendo cierta (las de otros pasos no) se conserva como aserción propia. Ninguna aserción se borró; el encabezado del archivo lo dice.
+- Batería completa con `-j 2` (230 guardias): **228 verdes y solo `paridad_entrega` y `pwa_paquete` en rojo**, que son la regeneración pendiente del cierre. `guardado_viajes` y `episodio_turno` (A/B del payload) verdes: lo que `guardar()` manda no cambió.
+
+**Lo que NO se hizo y queda dicho.**
+- **No se tomó la decisión 2** (marcar lo heredado y pedir revisión), ni la 4 (KTR en blanco y sin replicar), ni el cambio 6 (cascarones de TQT/Decanulación) ni el 7 (plegar por defecto en escritorio).
+- El estado se repinta con `input`, `change`, `click` sobre un botón y al cambiar de paso; **no con una tecla suelta que cambie una fuente declarada**: el único caso conocido (Enter en el campo de procedimientos) quedó cubierto con `renderChips()`; el Enter en el campo de «Resultado(s)» del cultivo (`fCultVal`) no repinta hasta el siguiente evento, pero ahí la casilla «Cultivo» ya cuenta.
+- `_mFaltaTxt` sigue siendo la tabla de nombres cortos por id (dice «un dato obligatorio» para los que no conoce: las razones de la PVE, el tipo de extubación sin PVE, la hora de la reintubación). Usar el `texto` de `_obligatoriosPendientes()` cambiaría frases que otras guardias fijan; queda para un paso aparte.
+- La decisión 5 de la auditoría (con TQT + VM la PVE no se pregunta, y por eso nunca puede decir «Sin registrar») no se tocó: el estado refleja lo que el sistema pregunta hoy.
+- Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).

@@ -962,7 +962,12 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .sp-2col{display:grid;grid-template-columns:2fr 3fr;gap:14px;align-items:start;}
 .sp-col{display:flex;flex-direction:column;gap:0;}
 @media(max-width:820px){
-  .sp-2col{grid-template-columns:1fr;}
+  /* 🪤 10-oct-2026 · `1fr` es `minmax(auto,1fr)`: el piso de la columna es el ancho mínimo de lo que lleva dentro, y el resumen del
+     encabezado de cada tarjeta es una línea SIN partir (`white-space:nowrap`). Un resumen largo —«VM · ACVC · Mucopurulentas con tinte
+     hemático — falta declarar la PVE»— ensanchaba la columna entera y la pantalla se salía por la derecha (medido a 390 px: la
+     tarjeta Respiratorio pasaba de 374 a 400 px y, con la palabra de estado delante, a 509). `minmax(0,1fr)` deja que el resumen se
+     corte con puntos suspensivos, que es lo que ya pedía su CSS. */
+  .sp-2col{grid-template-columns:minmax(0,1fr);}
   .fcard-body{padding:10px 13px 12px;}
   .sub-sec{padding:9px 13px;}
   .row{gap:6px;}
@@ -1057,6 +1062,28 @@ table.rhb2 .rl{width:128px;text-align:left;}
    dice lo mismo con más espacio. */
 #mPac{display:none;}
 .mst,.mres{display:none;}
+/* ── EL ESTADO DE CADA BLOQUE (tanda 3 · cambios 4 y 5, oct-2026) ─────────────────────────────────────────────
+   Las tarjetas del paso Turno dicen en su encabezado «Sin registrar» / «Registrado» / «Requiere revisión»
+   (ESTADO_PALABRAS) junto al ✓ / — / ! y al resumen. En el celular el encabezado ya lo dibuja el bloque de
+   @media (max-width:740px) de más abajo; en ESCRITORIO solo se ve en las tarjetas que lleva la clase `est-on`
+   (la pone _mPintarSecciones a las del Turno): las de otros pasos siguen sin estado a la vista hasta que les toque
+   su tanda, para no mezclar vocabularios. Los colores del glifo y del resumen son los mismos en los dos anchos. */
+.mst.ok{background:#dcfce7;color:#166534;}
+.mst.req{background:#fee2e2;color:#b91c1c;}
+.mst.no{background:#f1efe9;color:#a8a296;}
+.mres b{color:var(--danger);font-weight:700;}
+.mres.vacio{color:#b3ada2;font-style:italic;}
+.mpal{display:inline-block;font-size:.62rem;font-weight:800;letter-spacing:.03em;line-height:1.5;border-radius:10px;
+  padding:0 8px;margin-right:2px;white-space:nowrap;vertical-align:baseline;}
+.mpal.sin{background:#f1efe9;color:#6b665d;}
+.mpal.reg{background:#dcfce7;color:#166534;}
+.mpal.rev{background:#fee2e2;color:#b91c1c;}
+@media (min-width:741px){
+  .fcard.est-on>.fcard-hdr .mst{display:flex;width:18px;height:18px;border-radius:50%;flex-shrink:0;
+    align-items:center;justify-content:center;font-size:.62rem;font-weight:800;}
+  .fcard.est-on>.fcard-hdr .mres{display:block;flex:1 1 0;min-width:0;font-size:.74rem;line-height:1.4;
+    color:#6b665d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+}
 /* Etapa 2: mediciones heredadas de la réplica — ámbar hasta tocarlas o confirmar el módulo */
 .heredado{background:#fffbeb !important;border-color:#f5b942 !important;}
 .her-chip{margin-left:auto;background:#fffbeb;color:#b45309;border:1px solid #f59e0b;border-radius:14px;padding:2px 10px;font-size:.66rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;}
@@ -1872,14 +1899,10 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .fcard-hdr>.fcard-title::before{flex-shrink:0;}
   .mst{display:flex;width:18px;height:18px;border-radius:50%;flex-shrink:0;
     align-items:center;justify-content:center;font-size:.62rem;font-weight:800;}
-  .mst.ok{background:#dcfce7;color:#166534;}
-  .mst.req{background:#fee2e2;color:#b91c1c;}
-  .mst.no{background:#f1efe9;color:#a8a296;}
+  /* (los colores de .mst y de .mres b / .mres.vacio se mudaron arriba, junto a .mpal: valen en los dos anchos) */
   .mres{display:block;order:1;flex-basis:100%;font-size:.7rem;line-height:1.4;
     color:#6b665d;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mres:empty{display:none;}
-  .mres.vacio{color:#b3ada2;font-style:italic;}
-  .mres b{color:var(--danger);font-weight:700;}
   /* Sub-bloques de Respiratorio (opción B, elegida por Diego): la tarjeta
      abierta medía 1.325 px con 133 campos. Se AGRUPA sin mover nada de sitio
      — el orden clínico de la sábana es una decisión tomada, no un accidente. */
@@ -3399,8 +3422,14 @@ document.documentElement.setAttribute('data-piel', 'inst');
       </div>
 
       <div class="sp-2col"><div class="sp-col">
+        <!-- 🗂️ data-fuentes (oct-2026) · LO QUE EL ESTADO DE UN BLOQUE NO PUEDE VER SOLO. El encabezado de cada tarjeta del Turno dice
+             «Sin registrar» / «Registrado» / «Requiere revisión» calculándolo de los datos (estadoBloque). Un <input>, un <select> o
+             una casilla a la vista se leen solos; lo que vive en un <input type=hidden>, en una casilla con display:none o en un
+             botón NO, y sin declararlo el bloque decía «sin registrar» encima de datos que sí estaban. Cada bloque lista aquí, separadas
+             por espacios, sus fuentes: un id (hidden → su valor; casilla → marcada) o @nombre (una función de ESTADO_FUENTES). Un
+             widget nuevo que guarde un dato se declara acá; build/checks/estado_del_bloque.js cae si queda sin declarar. -->
         <!-- DIAGNÓSTICO -->
-        <div class="fcard fc-g" id="fcFase">
+        <div class="fcard fc-g" id="fcFase" data-fuentes="@fase cAET">
           <div class="fcard-hdr"><span class="fcard-title">🏷️ Fase clínica</span></div>
           <div class="fcard-body">
             <!-- 🗂️ LA TARJETA «GENERAL» SE DISOLVIÓ (Diego, 30-sep-2026). Cada cosa fue adonde se usa:
@@ -3514,7 +3543,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  controlar la agitación. Anotarlo como sedación contaba como
                  volver a sedación profunda y borraba la fecha de suspensión,
                  que es lo que marca el antes y el después del despertar. -->
-            <div id="gSedFarmacos" class="hidden" style="margin:2px 0 6px;">
+            <div id="gSedFarmacos" class="hidden" data-fuentes="@sedantes" style="margin:2px 0 6px;">
               <!-- 🗂️ 17-sep-2026 · SALIÓ la casilla «😌 Sedación vigil / control de
                    agitación». Era un campo que había que rellenar para decir algo
                    que los otros tres ya decían. Diego: «si un paciente está en
@@ -3863,7 +3892,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                  un evento aparte, no relacionado con TQT». Esto termina la
                  mudanza. Lo fija prono_arriba.js. -->
             <div class="sub-sec">
-<div id="dPronoStrip" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
+<div id="dPronoStrip" data-fuentes="@prono" style="margin:10px 0;padding:8px 11px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;">
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
                   <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#0e7490;letter-spacing:.04em;">🔃 Posición</span>
 
@@ -3995,7 +4024,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               <!-- TRAQUEOSTOMÍA — va ANTES del módulo ventilatorio: al marcarla, el
                    estado ventilatorio de este turno se anota en «Queda con» y el
                    módulo de abajo se oculta (no se llena dos veces). -->
-              <div id="dTqtSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
+              <div id="dTqtSec" class="hidden" data-fuentes="cTqtO" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#7c3aed;margin-bottom:7px;letter-spacing:.04em;">🔪 Traqueostomía</div>
                 <!-- 🔴 SEGUNDA PREGUNTA RETIRADA (16-sep-2026, Diego: «sácalo y deja
                      solo eventos»). El paso 1 ya abre con «¿Qué pasó hoy con la vía
@@ -4175,7 +4204,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
 
               <!-- DECANULACIÓN (solo si VA = TQT) -->
-              <div id="dDecanSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
+              <div id="dDecanSec" class="hidden" data-fuentes="cDecanOcurrio" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#7c3aed;margin-bottom:7px;letter-spacing:.04em;">✂️ Decanulación</div>
                 <!-- 🔴 SEGUNDA PREGUNTA RETIRADA (16-sep-2026, Diego: «sácalo y deja
                      solo eventos»). El paso 1 ya abre con «¿Qué pasó hoy con la vía
@@ -4239,7 +4268,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
               </div>
 
               <!-- EXTUBACIÓN / PVE (solo si VA = TOT) -->
-              <div id="dExtSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
+              <div id="dExtSec" class="hidden" data-fuentes="fPVEval" style="margin-top:10px;padding:10px 11px;background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#7c3aed;margin-bottom:8px;letter-spacing:.04em;">✂️ Extubación / PVE</div>
                 <div id="dExtBadge" class="hidden" style="margin-bottom:8px;"></div>
 
@@ -4510,7 +4539,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                    historial de VM (estuvo ventilado o se extubó hace poco).
                    Registro SIEMPRE manual; el caso "mismo turno tras extubación"
                    vive ANIDADO dentro del bloque PVE/Extubación de arriba. -->
-              <div id="dReintubSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;">
+              <div id="dReintubSec" class="hidden" data-fuentes="cReintubT" style="margin-top:10px;padding:10px 11px;background:#fff5f5;border:1px solid #fecaca;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#b91c1c;margin-bottom:7px;letter-spacing:.04em;">🔁 Reintubación</div>
                 <!-- 🔴 LA ÚLTIMA SEGUNDA PREGUNTA (21-sep-2026). La fila «¿Qué pasó
                      hoy con la vía aérea?» ya declara la reintubación y marca
@@ -4559,7 +4588,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
               <!-- INTUBACIÓN — aparece si VA es NO invasiva y el paciente NUNCA ha
                    estado en VM (historial = 0): primera intubación del episodio. -->
-              <div id="dIntubSec" class="hidden" style="margin-top:10px;padding:10px 11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+              <div id="dIntubSec" class="hidden" data-fuentes="cIntubO" style="margin-top:10px;padding:10px 11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
                 <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#1d4ed8;margin-bottom:7px;letter-spacing:.04em;">🫁 Intubación</div>
                 <!-- 🔴 LA SEGUNDA PREGUNTA SE VA (Diego, 21-sep-2026: «además tengo
                      que marcar ocurrió intubación este turno ¿o no?»). La fila
@@ -4700,7 +4729,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     </div>
                   </div>
                   <!-- Col derecha: Evaluación de secreciones -->
-                  <div style="padding:10px 12px;">
+                  <div data-fuentes="fSecrQty" style="padding:10px 12px;">
                     <div style="font-size:.67rem;font-weight:700;text-transform:uppercase;color:#0369a1;margin-bottom:8px;letter-spacing:.04em;">Secreciones</div>
                     <!-- Características PRIMERO: sin características = sin secreciones,
                          y la reología queda bloqueada (no tiene sentido sin secreción) -->
@@ -4755,7 +4784,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                   <div class="check wa" style="margin-bottom:4px;">
                     <input type="checkbox" id="cMue" onchange="hMue()"><label for="cMue">🧪 Cultivo</label>
                   </div>
-                  <div id="dMue" class="hidden fade" style="margin-top:6px;padding:7px 9px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;">
+                  <div id="dMue" class="hidden fade" data-fuentes="fCultVal" style="margin-top:6px;padding:7px 9px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;">
                     <div style="font-size:.68rem;font-weight:700;color:#7c3aed;margin-bottom:6px;">Técnica</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                       <div class="check wa"><input type="checkbox" name="mtest" value="CCAET" onchange="hCultTec(this)"><label title="Cultivo corriente aspirado endotraqueal">CCAET</label></div>
@@ -4831,7 +4860,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
              (única excepción acordada). -->
 
         <!-- PROCEDIMIENTOS -->
-        <div class="fcard fc-proc">
+        <div class="fcard fc-proc" data-fuentes="@procs">
           <div class="fcard-hdr"><span class="fcard-title">🔧 Procedimientos del Turno</span></div>
           <div class="fcard-body">
             <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#15803d;margin-bottom:6px;">✅ Se registran solos con la evolución</div>
@@ -7061,6 +7090,10 @@ function rielRender(){
 // módulos).
 document.addEventListener('input', e=>{ if(e.target && e.target.closest && e.target.closest('#kf')) _rielDeb(); });
 document.addEventListener('change', e=>{ if(e.target && e.target.closest && e.target.closest('#kf')) _rielDeb(); });
+/* 🪤 10-oct-2026 · UN BOTÓN NO DISPARA input NI change. La PVE (sí / no / no corresponde), el prono, las secreciones, los eventos de vía
+   aérea, la fase y los sedantes se responden con botones: sin esto el aviso «Falta:» y la palabra de estado de cada bloque quedaban
+   VIEJOS hasta el siguiente tecleo, o sea que «Requiere revisión» seguía puesto después de haber respondido lo que pedía. */
+document.addEventListener('click', e=>{ if(e.target && e.target.closest && e.target.closest('#kf button')) _rielDeb(); });
 
 // ── Dos rescates del SmartEvo (15-ago-2026, aprobados por Diego) ──
 // 1) FiO₂ escrita como fracción se convierte sola a porcentaje (0.4 → 40):
@@ -13052,6 +13085,9 @@ function quitarProc(i) { PROCS.splice(i,1); renderChips(); }
 function renderChips() {
   $('chips').innerHTML=PROCS.map((p,i)=>`
     <span class="chip">${p}<button type="button" onclick="quitarProc(${i})">×</button></span>`).join('');
+  // La lista de procedimientos es una FUENTE del estado de la tarjeta (data-fuentes="@procs"): agregar uno con Enter no dispara input ni
+  // change ni click, y sin esto el encabezado seguía diciendo lo de antes de agregarlo.
+  if(typeof _rielDeb==='function') _rielDeb();
 }
 // Listeners del panel: atados aparte porque repintar el panel por innerHTML repone
 // #sp vía innerHTML (los elementos se recrean y pierden sus listeners).
@@ -16185,24 +16221,21 @@ function _mEtiq(el){
 }
 
 /**
- * Resumen de una zona del formulario: los primeros valores REGISTRADOS.
- * Se deriva del propio formulario a propósito, en vez de escribir a mano un
- * texto por sección: un resumen escrito a mano se desactualiza en silencio en
- * cuanto alguien agrega un campo, y este proyecto ya pagó varias veces esa
- * clase de error. Lo que se ve es siempre lo que hay.
- */
-/**
  * ¿Este campo está oculto porque NO CORRESPONDE, o solo porque la sección está
  * plegada? La diferencia es todo el resumen: si se mira `offsetParent`, una
  * tarjeta cerrada parece vacía y el encabezado dice «sin registrar» encima de
- * datos que sí están. Por eso los tres mecanismos de PLEGADO se saltan y solo
+ * datos que sí están. Por eso los mecanismos de PLEGADO se saltan y solo
  * cuentan los gates de verdad (`.hidden` y `display:none` puestos a mano).
+ * 🪤 10-oct-2026 · El cuarto plegado es el cuerpo del posicionamiento (`#dPosBody`, que abre y cierra `hPosToggle` con la clase
+ * `hidden`): es la misma situación que el acordeón —la persona lo cerró para no verlo—, no un «esto no corresponde». Sin
+ * saltarlo, un decúbito lateral marcado o un «otro posicionamiento» escrito no contaban mientras el cuerpo estuviera cerrado,
+ * y «Manejo respiratorio» decía «sin registrar» encima de un dato.
  */
 function _mOculto(el, tope){
   for(let n=el; n && n!==tope; n=n.parentElement){
     const cl=n.classList;
     if(!cl) continue;
-    if(cl.contains('fcard-body')||cl.contains('msub-b')||cl.contains('pre-uci')) continue;
+    if(cl.contains('fcard-body')||cl.contains('msub-b')||cl.contains('pre-uci')||n.id==='dPosBody') continue;
     if(cl.contains('hidden')) return true;
     if(n.style && n.style.display==='none') return true;
   }
@@ -16211,7 +16244,72 @@ function _mOculto(el, tope){
 /** Cómo se lee cada marca del paso de prevención cuando la sección va plegada. */
 const _PV_LEE = { ok:'vigente', chg:'cambiado' };
 
-function _mResumen(cont){
+/* ══════════════════════════════════════════════════════════════════════════
+   EL ESTADO DE CADA BLOQUE (tanda 3 · cambios 4 y 5, oct-2026)
+
+   El plan pide que cada desplegable diga «Sin registrar» / «Registrado» / «Requiere revisión», calculado de los DATOS y no de
+   un texto. Hasta hoy el celular tenía un ✓ / — / ! que salía de `_mResumen`, un scrape genérico que solo leía <input>,
+   <select> y <textarea> a la vista y tiraba todo '0'. Medido en Chromium: responder la PVE «Sí», declarar una decanulación,
+   pronar, marcar secreciones, elegir una fase o agregar un procedimiento dejaban el bloque en «— sin registrar», y un 0 tecleado
+   (PEEP 0) tampoco contaba, cuando la regla transversal del proyecto es que un 0 se guarda como 0 y vacío no es 0.
+
+   UNA sola función, `estadoBloque(contenedor)`, la usan el escritorio y el celular, así no pueden calcular cosas distintas:
+     · 'rev' (Requiere revisión) = hay un elemento de `_obligatoriosPendientes()` DENTRO del bloque: la misma regla del «!» de
+       siempre y la misma lista que el aviso «Falta:» (cambio 2).
+     · 'reg' (Registrado) = hay un dato:
+         – un control a la vista con valor: <input>/<textarea> con texto o con un 0 TECLEADO; <select> con una opción elegida
+           (el '0' de un <select> no cuenta: la KTR nace en 0 y no tiene opción en blanco, decisión 4 de Diego, abierta);
+           casilla marcada;
+         – o una FUENTE que no es un control a la vista y que el bloque declara en `data-fuentes` (ver abajo).
+     · 'sin' (Sin registrar) = nada de lo anterior.
+   🔴 LO HEREDADO CUENTA COMO «Registrado», igual que hoy: lo que la réplica del turno anterior deja puesto no se distingue de lo
+   tecleado. Marcar lo heredado en ámbar y pedir revisión es la decisión 2 de Diego (PENDIENTES 4b); este cambio NO la toma.
+   🔴 Solo LEE. No cambia ningún valor ni el payload de guardar().
+
+   `data-fuentes` (en el HTML, sobre la tarjeta o el bloque dueño de la fuente): ids separados por espacio. Un id de <input
+   type=hidden> cuenta con su valor; un id de casilla, marcada. `@nombre` es una función de ESTADO_FUENTES, para lo que se
+   deduce (la fase, el prono, los sedantes, los procedimientos). Se declara sobre el bloque que SE CIERRA por un gate cuando la
+   fuente deja de corresponder (la TQT, la decanulación, la PVE): `_mOculto` lo salta entero y la fuente deja de contar con él.
+   El gate de verdad, no el plegado. Lo cuida build/checks/estado_del_bloque.js: cada <input type=hidden> y cada botón de las
+   tarjetas del Turno tiene que estar declarado o exento con su motivo.
+   ══════════════════════════════════════════════════════════════════════════ */
+/** LAS TRES PALABRAS, en un solo sitio (decisión 6 de Diego). Las demás tandas las reutilizan: nadie las escribe a mano. */
+const ESTADO_PALABRAS = Object.freeze({ sin:'Sin registrar', reg:'Registrado', rev:'Requiere revisión' });
+/** Fuentes que se DEDUCEN (no son un id): sobre lo que vive en un Set, en una lista o en varias casillas escondidas. */
+const ESTADO_FUENTES = {
+  fase:     ()=>FASES_SEL.size>0,
+  sedantes: ()=>_sedFarmLista().length>0,
+  // El prono, ARRASTRADO del turno anterior o declarado hoy: cualquier cosa que no sea «supino» es un estado puesto.
+  prono:    ()=>_pronoSituacion()!=='supino',
+  procs:    ()=>PROCS.length>0,
+};
+/** ¿Esta fuente declarada trae un dato ahora? */
+function _fuenteConDato(tok){
+  if(tok.charAt(0)==='@'){
+    const f=ESTADO_FUENTES[tok.slice(1)];
+    // Una fuente rota no puede tumbar el repintado del encabezado (es presentación): cuenta como vacía y la guardia la caza.
+    try{ return !!(f&&f()); }catch(e){ return false; }
+  }
+  const el=$(tok); if(!el) return false;
+  if(el.type==='checkbox'||el.type==='radio') return !!el.checked;
+  return String(el.value||'').trim()!=='';
+}
+/** ¿Alguna fuente declarada dentro del bloque (o en él) trae un dato, salvo las de un sub-bloque que no corresponde hoy? */
+function _hayFuenteConDato(cont){
+  const sec=[...cont.querySelectorAll('[data-fuentes]')];
+  if(cont.dataset && cont.dataset.fuentes) sec.unshift(cont);
+  return sec.some(s=>{
+    if(_mOculto(s,cont)) return false;          // el bloque no corresponde hoy (un gate lo cerró): su fuente tampoco
+    return String(s.dataset.fuentes).split(/\s+/).filter(Boolean).some(_fuenteConDato);
+  });
+}
+/**
+ * Lee los controles a la vista de un bloque: `{ txt, hay }` — `hay` = ¿alguno trae un dato?, `txt` = los primeros cuatro valores
+ * para el encabezado. Se deriva del propio formulario a propósito, en vez de escribir a mano un texto por sección: un resumen
+ * escrito a mano se desactualiza en silencio en cuanto alguien agrega un campo, y este proyecto ya pagó varias veces esa clase
+ * de error. Lo que se ve es siempre lo que hay.
+ */
+function _mLeer(cont){
   /* 🪤 El paso de prevención son BOTONES, no <input>: el resumen genérico de
      más abajo recorre los controles y en esta tarjeta no encontraba ninguno,
      así que el acordeón decía «sin registrar» aunque estuviera toda revisada.
@@ -16229,21 +16327,26 @@ function _mResumen(cont){
     if(cu) pv.push('cuff '+(cu==='rango'?'en rango':(cu==='ajuste'?'ajustado':'desinflado')));
     const rz=String(v('fPrevRazon')||'').trim();
     if(rz) pv.push('no se pudo cambiar');
-    return pv.join(' · ');
+    return { txt:pv.join(' · '), hay:pv.length>0 };
   }
-  const out=[];
+  const out=[]; let hay=false;
   const ctrls=cont.querySelectorAll('input:not([type=hidden]),select,textarea');
   for(const el of ctrls){
-    if(out.length>=4) break;
+    if(hay && out.length>=4) break;
     if(el.disabled||_mOculto(el,cont)) continue;
     if(el.type==='checkbox'||el.type==='radio'){
-      if(el.checked){ const e=_mEtiq(el); if(e) out.push(e); }
+      if(el.checked){ hay=true; if(out.length<4){ const e=_mEtiq(el); if(e) out.push(e); } }
       continue;
     }
     const val=String(el.value||'').trim();
-    // '0' y los guiones son el estado «sin elegir» de los desplegables: en un
-    // resumen son ruido, no dato.
-    if(!val||val==='--'||val==='-'||val==='0') continue;
+    // Los guiones son el estado «sin elegir» de los desplegables: en un resumen son ruido, no dato.
+    if(!val||val==='--'||val==='-') continue;
+    // 🔴 10-oct-2026 · '0' en un <select> sigue siendo «sin elegir» (la KTR nace en 0 y no tiene opción en blanco: decisión 4 de
+    // Diego, abierta). Pero un 0 TECLEADO en un <input> o <textarea> (PEEP 0, PS 0, PAM 0) es un dato: «un 0 se guarda como 0 y
+    // vacío no es 0». Antes se tiraba todo '0' y el bloque decía «sin registrar» encima de un valor puesto.
+    if(val==='0' && el.tagName==='SELECT') continue;
+    hay=true;
+    if(out.length>=4) continue;
     const lb=_mEtiq(el);
     // Una fecha cruda («2026-08-10») en un resumen no dice nada y se come el
     // ancho: va como dd-mm y SIEMPRE con su etiqueta, que es lo que la
@@ -16252,27 +16355,66 @@ function _mResumen(cont){
     const vv=esFecha ? val.slice(8,10)+'-'+val.slice(5,7) : val;
     out.push(lb && (esFecha || /^[\d.,:]+$/.test(vv)) ? lb+' '+vv : vv);
   }
-  return out.join(' · ');
+  return { txt:out.join(' · '), hay };
 }
 
-/** Pinta estado y resumen en los encabezados del acordeón (celular). */
+/**
+ * EL ESTADO DE UN BLOQUE: `{ estado:'sin'|'reg'|'rev', resumen, falta }`. `faltaEls` es la lista de elementos obligatorios
+ * pendientes (rielRender ya la tiene calculada y se la pasa a los 16 encabezados); sin ella se calcula acá. Ver el recuadro de arriba.
+ */
+function estadoBloque(cont, faltaEls){
+  const r={ estado:'sin', resumen:'', falta:null };
+  if(!cont) return r;
+  const fe=faltaEls || _obligatoriosPendientes().map(o=>o.el);
+  r.falta=fe.find(e=>e && cont.contains(e)) || null;
+  const l=_mLeer(cont);
+  r.resumen=l.txt;
+  r.estado = r.falta ? 'rev' : ((l.hay || _hayFuenteConDato(cont)) ? 'reg' : 'sin');
+  return r;
+}
+
+const _MST_CLS={ sin:'no', reg:'ok', rev:'req' }, _MST_GLIFO={ sin:'—', reg:'✓', rev:'!' };
+/**
+ * Pinta el encabezado de un bloque: el glifo (✓ — !), la palabra de estado y el resumen.
+ * `conPalabra`: las tarjetas del Turno y sus sub-bloques llevan la palabra de ESTADO_PALABRAS; las de otros pasos (solo en el celular)
+ * siguen con su «sin registrar» de siempre hasta que les toque su tanda, para no mezclar dos vocabularios en una pantalla.
+ * 🔴 Todo texto que viene de un campo pasa por `_escSt` (= escapeHtml): la rama sin «falta» lo escribía crudo y un valor con
+ * <etiquetas> —lo trae también la réplica del turno de otro colega— corría en la pantalla de quien abre.
+ */
+function _mPintarEstado(st, rs, e, conPalabra){
+  st.className='mst '+_MST_CLS[e.estado]; st.textContent=_MST_GLIFO[e.estado];
+  const res=e.resumen?_escSt(e.resumen):'';
+  const falta=e.falta?'<b>falta '+_escSt(_mFaltaTxt(e.falta))+'</b>':'';
+  if(conPalabra){
+    rs.className='mres';
+    // Lo que falta va PRIMERO: es lo accionable, y el resumen es una línea que se corta con puntos suspensivos —al final se perdía justo eso.
+    rs.innerHTML='<span class="mpal '+e.estado+'">'+_escSt(ESTADO_PALABRAS[e.estado])+'</span>'+(falta?' '+falta:'')+(res?(falta?' — ':' ')+res:'');
+  } else {
+    rs.className='mres'+(e.resumen?'':' vacio');
+    rs.innerHTML = falta ? (res?res+' — ':'')+falta : (res||'sin registrar');
+  }
+}
+
+/**
+ * Pinta estado y resumen en los encabezados: las tarjetas del TURNO en escritorio y en celular, y en el celular además las demás
+ * (con su formato de siempre) y los sub-bloques de Respiratorio.
+ * El dueño de una tarjeta se decide con la MISMA regla que `pasoIr`: sin `data-paso` es del Turno (paso 2). Una tarjeta nueva
+ * del Turno recibe su palabra sin que nadie se acuerde de tocar esta función.
+ */
 function _mPintarSecciones(faltaEls){
-  if(!esMovil()) return;
+  const movil=esMovil();
   document.querySelectorAll('#kf .fcard').forEach(c=>{
+    const turno=String(c.dataset.paso||'2')==='2';
+    c.classList.toggle('est-on', turno);          // en escritorio solo las del Turno muestran su estado (CSS)
+    if(!movil && !turno) return;
     const hdr=c.querySelector('.fcard-hdr'); if(!hdr) return;
     let st=hdr.querySelector('.mst');
     if(!st){ st=document.createElement('span'); st.className='mst'; hdr.insertBefore(st, hdr.firstChild); }
     let rs=hdr.querySelector('.mres');
     if(!rs){ rs=document.createElement('span'); rs.className='mres'; hdr.appendChild(rs); }
-    const falta=faltaEls.find(e=>e && c.contains(e));
-    const txt=_mResumen(c);
-    if(falta){ st.className='mst req'; st.textContent='!'; }
-    else if(txt){ st.className='mst ok'; st.textContent='✓'; }
-    else { st.className='mst no'; st.textContent='—'; }
-    rs.className='mres'+(txt?'':' vacio');
-    rs.innerHTML = falta ? (txt?_escSt(txt)+' — ':'')+'<b>falta '+_escSt(_mFaltaTxt(falta))+'</b>'
-                         : (txt||'sin registrar');
+    _mPintarEstado(st, rs, estadoBloque(c, faltaEls), turno);
   });
+  if(!movil) return;
   document.querySelectorAll('#kf .msub').forEach(sb=>{
     const h=sb.querySelector('.msub-h'), b=sb.querySelector('.msub-b');
     if(!h||!b) return;
@@ -16280,14 +16422,7 @@ function _mPintarSecciones(faltaEls){
     if(!rs){ rs=document.createElement('span'); rs.className='mres'; h.appendChild(rs); }
     let st=h.querySelector('.mst');
     if(!st){ st=document.createElement('span'); st.className='mst'; h.insertBefore(st,h.firstChild); }
-    const falta=faltaEls.find(e=>e && b.contains(e));
-    const txt=_mResumen(b);
-    if(falta){ st.className='mst req'; st.textContent='!'; }
-    else if(txt){ st.className='mst ok'; st.textContent='✓'; }
-    else { st.className='mst no'; st.textContent='—'; }
-    rs.className='mres'+(txt?'':' vacio');
-    rs.innerHTML = falta ? (txt?_escSt(txt)+' — ':'')+'<b>falta '+_escSt(_mFaltaTxt(falta))+'</b>'
-                         : (txt||'sin registrar');
+    _mPintarEstado(st, rs, estadoBloque(b, faltaEls), true);
   });
 }
 /** Nombre corto de lo que falta, para el chip rojo. */

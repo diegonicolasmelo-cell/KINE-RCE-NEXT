@@ -18,6 +18,12 @@
 //      El orden de la sábana es una decisión clínica tomada (la TQT antes del
 //      módulo ventilatorio, v5.1; el prono al inicio de la terapia, v5.44).
 //   5. Nada de esto existe en el escritorio, que tiene su riel lateral.
+//      🗂️ 10-oct-2026 · RECONCILIADO (tanda 3, cambios 4 y 5): esto ya no es cierto para las tarjetas del TURNO (paso 2). El
+//      escritorio muestra en cada una la palabra de estado («Sin registrar» / «Registrado» / «Requiere revisión»), su ✓ — ! y su
+//      resumen, porque es donde hay más bloques abiertos a la vez y no había forma de ver desde fuera qué estaba hecho. Siguen
+//      igual: la cabecera del paciente no existe en escritorio, no se arman sub-bloques, y las tarjetas de OTROS pasos no
+//      muestran estado en escritorio ni llevan la palabra en el celular (toman las palabras cuando les toque su tanda). Lo mide
+//      estado_visible_escritorio.js; acá se conserva todo lo que sigue siendo cierto.
 //
 // Uso: node build/checks/movil_panel.js
 const path = require('path');
@@ -128,7 +134,20 @@ const MONTAR = () => {
   eq('la sección con datos queda en ✓', R2.sed.st, '✓');
   eq('…y resume lo registrado', /Escalón 2/.test(R2.sed.res), true);
   eq('la sección vacía queda en —', R2.aus.st, '—');
-  eq('…y lo dice sin inventar', R2.aus.res, 'sin registrar');
+  // 🗂️ 10-oct-2026 · RECONCILIADO (tanda 3, cambio 5). Esta línea fijaba el texto «sin registrar» en minúscula, que escribía
+  // `_mPintarSecciones`. La convención que cambia de verdad es CUÁL es la palabra: el plan (y Diego, decisión 6) pide las tres
+  // de ESTADO_PALABRAS —«Sin registrar», «Registrado», «Requiere revisión»— en cada desplegable, una sola constante para que
+  // las demás tandas no tengan un vocabulario propio. Lo que la línea protegía sigue igual y se conserva: la sección vacía dice
+  // SOLO eso, sin inventar un resumen. La palabra ahora la mide estado_visible_escritorio.js contra la constante; acá se exige
+  // el texto exacto de la tarjeta del Turno y, aparte, que las tarjetas de OTROS pasos conserven su «sin registrar» de siempre
+  // (esta tanda solo toca el Turno: el resto toma las palabras cuando le toque su tanda).
+  eq('…y lo dice sin inventar (la palabra del plan, nada más)', R2.aus.res, 'Sin registrar');
+  const R2o = await m.evaluate(() => {
+    const c = document.getElementById('fcEval'), rs = c && c.querySelector('.fcard-hdr .mres');
+    return { res: rs ? rs.textContent : null, palabra: !!(c && c.querySelector('.mpal')) };
+  });
+  eq('una sección vacía de OTRO paso conserva su «sin registrar» de siempre', R2o.res, 'sin registrar');
+  eq('…y no lleva la palabra de estado (todavía no le toca)', R2o.palabra, false);
   eq('la que tiene un obligatorio pendiente queda en !', R2.plan.st, '!');
   eq('…y nombra lo que falta', /falta la firma/.test(R2.plan.res), true);
   // 🗂️ 17-sep-2026 · Antes acá se medía la tarjeta «Dispositivos» y sus tres
@@ -270,8 +289,17 @@ const MONTAR = () => {
   const R8 = await d.evaluate(() => ({
     pacOculto: $('mPac').offsetParent === null,
     sinSubs: document.querySelectorAll('#kf .msub').length,
-    stOculto: [...document.querySelectorAll('#kf .mst')].every(x => x.offsetParent === null),
-    resOculto: [...document.querySelectorAll('#kf .mres')].every(x => x.offsetParent === null),
+    // 🗂️ 10-oct-2026 · RECONCILIADO (tanda 3, cambio 5). Antes: «ningún ✓ ni resumen se ve en escritorio». Ahora las tarjetas
+    // del TURNO (paso 2, sin data-paso o con el 2) los muestran, con la palabra de estado; las de OTROS pasos siguen sin mostrar
+    // nada. Se parte la medición en esas dos mitades: la segunda es la que ya existía y sigue siendo cierta.
+    stOcultoOtros: [...document.querySelectorAll('#kf .fcard')].filter(c => String(c.dataset.paso || '2') !== '2')
+      .flatMap(c => [...c.querySelectorAll('.mst')]).every(x => x.offsetParent === null),
+    resOcultoOtros: [...document.querySelectorAll('#kf .fcard')].filter(c => String(c.dataset.paso || '2') !== '2')
+      .flatMap(c => [...c.querySelectorAll('.mres')]).every(x => x.offsetParent === null),
+    stVisibleTurno: [...document.querySelectorAll('#kf .fcard')].filter(c => String(c.dataset.paso || '2') === '2' && !c.classList.contains('hidden'))
+      .every(c => { const x = c.querySelector('.fcard-hdr .mst'); return !!x && x.offsetParent !== null; }),
+    resVisibleTurno: [...document.querySelectorAll('#kf .fcard')].filter(c => String(c.dataset.paso || '2') === '2' && !c.classList.contains('hidden'))
+      .every(c => { const x = c.querySelector('.fcard-hdr .mres'); return !!x && x.offsetParent !== null; }),
     // 🗂️ 17-sep-2026 · EL ÍNDICE LATERAL SALIÓ (Diego: «siento que la barra
     // lateral ya no aplicaría en la sección turno»). Existía porque el panel
     // era un muro de 225 campos; el camino de cuatro pasos lo partió y cada
@@ -284,8 +312,10 @@ const MONTAR = () => {
   }));
   eq('la cabecera móvil no se ve', R8.pacOculto, true);
   eq('no se arman sub-bloques', R8.sinSubs, 0);
-  eq('los ✓ del acordeón no se ven', R8.stOculto, true);
-  eq('los resúmenes tampoco', R8.resOculto, true);
+  eq('★ las tarjetas del Turno SÍ muestran su ✓ — ! en escritorio (cambió: ahora dicen su estado)', R8.stVisibleTurno, true);
+  eq('★ …y su resumen con la palabra de estado', R8.resVisibleTurno, true);
+  eq('los ✓ de las tarjetas de otros pasos siguen sin verse', R8.stOcultoOtros, true);
+  eq('los resúmenes de otros pasos tampoco', R8.resOcultoOtros, true);
   eq('en escritorio ya no hay riel, y los obligatorios siguen', R8.rielVive, true);
   eq('el módulo ventilatorio queda suelto, como siempre', R8.ventDirecto, true);
   await d.close();
