@@ -5144,3 +5144,99 @@ guardias nacieron rojas contra el código sin arreglar.
   `VERSION` quedan para el cierre.
 - `docs/PENDIENTES.md`: las decisiones 13 y 14 quedan marcadas como resueltas (la 7 de la sección 2e, abrir sola la tarjeta única de Planes, sigue siendo
   una decisión de producto aparte).
+
+## 10-oct-2026 · Terapia física (tanda 4), revisión adversarial · paso F3 «terapia física al reabrir»: la tarjeta de KTM parte en blanco en todos los caminos, lo automático se va con la casilla y una fila vieja no pierde sus sesiones
+
+**De dónde sale.** Los hallazgos R12, R16, R13, R19, R14, R17, R15 y R18 de la revisión de la tanda 4. **Se reprodujo todo antes de tocar** (Chromium con
+reloj congelado al miércoles 12-ago-2026 11:00 y el servidor real en memoria, `build/sim/sim_srv.js`) y las guardias nacieron rojas contra el código sin
+arreglar. Todo es del lado de la pantalla (`v2/index.html`): el servidor, `guardar()`, `api()`, `gs()`, `_guardadoBotones`, `#gEstadoGuardado` y los `avErr*` no se tocaron.
+Sin migración de esquema.
+
+**R12 y R16 · la tarjeta de KTM del paciente anterior se veía encendida en el siguiente.** Medido en cinco caminos de apertura (con réplica de día, con réplica
+de noche, sin turno previo, con el servidor sin contestar y en un ingreso), dejando antes la tarjeta como la dejaría el paciente anterior (dos sesiones en la
+lista, nivel 4 y asistencia «Moderada» encendidos):
+- En **los cinco** quedaba encendido el botón de **asistencia** («Moderada» del paciente anterior). El valor de abajo estaba vacío (el reset de los campos
+  ocultos lo vacía), así que la pantalla afirmaba una asistencia que no se guardaba ni se narraba. Además el **bloque de asistencia** quedaba abierto en los
+  caminos de día sin réplica (sin turno previo y servidor sin contestar); en los de noche y en el ingreso no se veía, porque el bloque vive dentro de «Realizada»
+  y esos arrancan sin estado o en «no realizada».
+- En los **tres sin réplica** (sin turno previo, servidor sin contestar, ingreso) quedaba también el botón de **nivel**, su descripción y la **lista de sesiones
+  ya pintada** (dos filas «Primera sesión…» encima de un campo de sesiones vacío, que al guardar daba una sola). El paso 4.1 había apagado el nivel pero solo
+  dentro de `fillFormReplica`, un camino de cinco.
+- Reabrir un turno ya guardado (`fillForm`) ya lo hacía bien: quedó como control de la guardia.
+
+El arreglo: una función, `_ktmTarjetaEnBlanco()`, que apaga los botones de nivel y de asistencia, cierra el bloque de asistencia, vacía la descripción del nivel y
+la lista de sesiones, y repinta la lista vacía. Se llama desde `abrirPanel`, justo después de poner el estado inicial de la KTM, porque `abrirPanel` es lo
+único que corre en **todos** los caminos; `fillForm` y `fillFormReplica` repintan después lo que sí corresponde. El nivel **oculto** que `fillCama` copia de la
+cama en los dos caminos sin réplica sigue sin medirse ni tocarse (decisión 12 de la sección 2e de `docs/PENDIENTES.md`).
+
+**R13 y R19 · desmarcar IMT, EMS o la educación no los sacaba de la lista de procedimientos.** `fillForm` cargaba `PROC_JSON` entero como procedimientos
+**manuales** (`PROCS`), pero ese JSON ya trae los automáticos que `_autoProcs()` deriva de las casillas. Desde 4.2 reabrir devuelve esas casillas marcadas,
+así que corregir un IMT puesto por error es desmarcarlo, y el chip «IMT×» seguía ahí. Medido: reabrir, desmarcar las tres y guardar dejaba `KTM_IMT`, `KTM_EMS` y
+`EDU_REALIZADA` en falso pero `PROC_JSON` con los tres nombres, `PROC_CANTIDAD` 4 en vez de 1 y las filas en `PROCEDIMIENTOS`; la estadística de procedimientos
+(que cuenta de `PROC_JSON`) los contaba sin que nadie los hubiera hecho. El REM no se inflaba (lee los indicadores, no la lista). El arreglo filtra de `PROCS`
+esos **tres** nombres al cargar; se vuelven a sumar solos al guardar si la casilla sigue marcada.
+🪤 **Por qué tres nombres y no «todo lo que `_autoProcs()` derive».** La sugerencia general (`PROCS.filter(p => !_autoProcs().includes(p))`) soltaría también
+los nombres de eventos (extubación, decanulación, intubación): esos vuelven por otro camino o ninguno, y el payload **no** manda sus claves cuando el evento no
+está activo (el servidor las conserva por silencio), así que quitar el nombre de `PROCS` dejaría un evento guardado sin su procedimiento. Los tres de ahora son
+casillas que `fillForm` restaura y que el payload manda **siempre** (`KTM_IMT`, `KTM_EMS`, `EDU_REALIZADA`): la fila y la lista quedan coherentes. Con el servidor,
+sacar el nombre de `PROC_JSON` borra también su fila de `PROCEDIMIENTOS` (se rehace por evolución).
+
+**R14 y R17 · una fila anterior a la lista de sesiones perdía una sesión al reabrir y guardar sin tocar nada.** Una fila con `KTM_REALIZADA`, `KTM_CANT` = 2 y **sin**
+`KTM_SESIONES_JSON` guarda la cantidad solo en `KTM_CANT` y los datos (nivel, asistencia, minutos) como la ficha de «la» sesión: así la lee el servidor
+(`ktmSesiones`) y así suma el REM (`svc_rem.gs`). La pantalla deriva la cantidad de la lista y sin lista contaba **una**: `ktmPintarSesiones()` pisaba
+el `fKtmCant` que `fillForm` acababa de escribir y `guardar()` mandaba `_ktmDeriva().cant` = 1. Medido de día y de noche: `KTM_CANT` 2 → 1 y, con él, una sesión
+menos en el REM del mes. Antes de 4.2 reabrir de día se rechazaba, así que no es una regresión de 4.2 sino algo que 4.2 dejó a la vista.
+**La elección, y por qué.** Había dos caminos: (a) reconstruir una lista con dos sesiones iguales, o (b) conservar la cantidad guardada. Se eligió **(b)**: (a)
+inventa sesiones que nadie escribió, **suma los minutos doble** (20 min × 2 = 40 en una fila cuyo servidor lee 20) y cambia el relato; (b) deja la fila **exactamente**
+como estaba. `fillForm` deja la cantidad guardada en un campo oculto nuevo (`fKtmCantGuardada`, solo si la KTM es «realizada», la cantidad es mayor que 1 y no
+hay lista) y `_ktmDeriva` —el espejo del cliente de `ktmSesiones`— manda el mayor entre ella y lo que dicen los campos **mientras nadie toque la lista**:
+agregar una sesión (`ktmAgregarSesion`) la borra y desde ahí manda la lista. Para todo lo demás el campo está vacío y la derivación es la de siempre
+(`ktm_sesiones.js` verde sin tocarlo). De paso el relato que se regenera al reabrir dice «Se realizan 2 sesiones de KTM nivel 3…», igual que lo narra el servidor
+con esa fila. **Lo que no se ve:** la cantidad vieja no tiene un número en pantalla (solo el relato la dice); quien quiera corregirla agrega las sesiones con
+«+ Agregar» y la lista manda.
+
+**R15 · la guardia no ataba dos cosas que el código dice cumplir.** (a) El comentario de `fillForm` promete «Borg 0 es un valor: se escribe tal cual», pero la
+guardia solo usaba Borg 4. (b) `show('dKTMasis')` junto a `setKTMasis` no tenía caso que lo exigiera, porque `setKTMniv` ya abre el bloque en todos los escenarios.
+Se agregaron a `terapia_fisica_vuelve_al_reabrir.js`: la sección 12 (Borg 0 de punta a punta, **y** con la fila que la hoja devolvería con el 0 como número) y la 13
+(una sesión en la lista más una asistencia suelta, sin nivel: el único caso en que solo esa línea abre el bloque).
+**Los dos mutantes** (copias del árbol fuera del repositorio): con la guardia de antes **sobreviven** los dos (salida 0, «TODO OK»); con la guardia nueva **mueren**
+los dos, y cada uno por **una** línea nueva y ninguna otra, también sobre el código ya arreglado: `fb.value = s.KTM_BORG ? String(s.KTM_BORG) : ''` muere en «Borg 0
+devuelto como NÚMERO por la hoja» (1 fallo), y quitar `show('dKTMasis')` muere en «el bloque de asistencia está A LA VISTA» (1 fallo).
+**Los mutantes de los arreglos de este paso** (también fuera del repositorio, cada uno con su guardia): sin la llamada a `_ktmTarjetaEnBlanco` en `abrirPanel` → 20 rojos; sin
+su `hide('dKTMasis')` → 2; sin su repintado de la lista → 4; sin el filtro de `PROCS` → 5; `_ktmDeriva` sin la cantidad guardada → 8; `ktmAgregarSesion` sin soltarla → 1 (el caso
+de agregar y quitar). Los ocho mueren.
+🪤 **El Borg 0 de punta a punta NO mata al primer mutante, y no es descuido:** `KTM_BORG` es una columna de **texto** (formato `@`), así que el servidor devuelve
+el `'0'` como cadena, y `'0'` es verdadero. Solo muere con el 0 numérico (una celda sin formato de texto, una fila importada); por eso la guardia le pasa a
+`fillForm` la fila real con `KTM_BORG: 0`.
+
+**R18 · documentación, el servidor no se cambia.** El encabezado de `ktm_nivel_no_se_cuela.js` decía que «el cambio es de la pantalla de registro, no del dato de
+la cama». Era falso, y se midió con el servidor real: de noche, «Realizada» sin elegir nivel manda el nivel vacío y la KTM de esa cama queda **sin nivel**
+(el tablero pierde el «KTM 3»); una cama cuya noche no tocó la KTM conserva el 3. Se corrigió el encabezado, la sección 6 de la guardia deja medido el efecto, y la
+decisión quedó para Diego como la **9b** de la sección 2e de `docs/PENDIENTES.md`, junto a «Realizada sin nivel».
+
+**Guardias.**
+- `ktm_nivel_no_se_cuela.js`: la sección 5 (los cinco caminos de apertura, más el control de reabrir) y la 6 (el efecto en la cama). **Rojo antes: 20 fallos** (todos de
+  la sección 5; la 6 mide lo que ya pasa). **Verde después.**
+- `terapia_fisica_vuelve_al_reabrir.js`: las secciones 10 (desmarcar tras reabrir, con un procedimiento manual que tiene que sobrevivir y la vuelta a marcar), 11 (fila vieja
+  de día y de noche, lo que pasa al agregar una sesión o agregarla y quitarla, y un control de una sola sesión), 12 y 13. **Rojo antes: 13 fallos** (5 de la 10 y 8 de la 11; la 12 y la
+  13 son de R15 y salen verdes de entrada, que es lo esperado: el código ya estaba bien y lo que faltaba era la red). **Verde después.**
+- Las camas de la guardia pasan de 3–12 a 1–12 (los escenarios nuevos usan la 1 y la 2).
+
+**Vecinas.** Con `-j 2`, en tres tandas (58 guardias): `convenciones`, `ktm_*`, `evento_vuelve_al_reabrir`, `regresion_ui`, `seis_pasos`, `cuatro_pasos`, `cierre_tres_bloques`,
+`panel_no_pisa_datos`, `borrador_local`, `validacion_entre_pasos`, `evaluaciones_de_noche`, `v42`, `eval_hoy_fecha_del_turno`, `movil_panel`, `estado_del_bloque`,
+`estado_visible_escritorio`, `nada_del_guardado_despues`, `paso_relato`, `guardado_viajes`, `tablero`, `act_bar_390`, `retro_camas`, `tarjeta_acciones`, y las que leen
+`PROC_JSON` (`anexo_anular`, `candado_mas`, `episodio_*`, `evento_paciente`, `eventos`, `hitos_unicos`, `memo_episodio`, `prono_desde_el_mas`, `timeline_*`, `transicion_*`,
+`via_aerea_previo`, `vm_por_horas`, `guardado_seguro_*`): todas verdes. Y, ya con todo escrito, la **batería completa** con `-j 2` (731 s): **238 verdes y 2 rojas**, las dos
+esperadas: `paridad_entrega` y `pwa_paquete` por la regeneración que queda para el cierre. `paquete.js` regeneró `build/paquete_migracion/index.html` (incluido en el commit).
+
+**Lo que ve distinto la kinesióloga.**
+- Al abrir la cama de otro paciente, la tarjeta de Rehabilitación aparece **realmente en blanco**: ningún nivel ni asistencia encendidos, ninguna descripción y ninguna
+  sesión del paciente anterior en la lista. Antes quedaban a la vista (y se perdían al guardar sin avisar).
+- Reabrir un turno y **desmarcar IMT, EMS o la educación** los saca de verdad: el chip «IMT×» ya no vuelve a aparecer como si fuera un procedimiento escrito a mano.
+- Reabrir un turno **viejo** de dos sesiones y guardarlo sin tocar nada **ya no lo rebaja a una**; el relato regenerado dice las dos.
+
+**Lo que NO se hizo y queda dicho.**
+- Los bloques de IMT y EMS (la tarjeta «IMT / EMS») **también** quedan abiertos con la casilla desmarcada del paciente anterior en los caminos sin réplica (medido con
+  una sonda fuera del repositorio; la réplica y reabrir los cierran). Es el mismo defecto en **otra tarjeta** que el paso no pedía: no se tocó, queda anotado.
+- El nivel **oculto** que `fillCama` copia en los caminos sin réplica (decisión 12) y la decisión 9b (la cama de noche) esperan a Diego.
+- Si la fila vieja tiene `KTM_CANT` mayor que 1 pero la KTM no está «realizada» no se conserva nada: el servidor ya la normaliza a vacío en ese caso.

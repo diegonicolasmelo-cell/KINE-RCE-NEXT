@@ -20,12 +20,25 @@
 //   · El nivel visible y el oculto salen de lo que de verdad se hereda (`_tf`). Si `_tf` no trae nivel, el formulario parte
 //     SIN nivel, aunque la cama recuerde uno.
 //   · 🔴 El flujo DÍA→DÍA no se toca: si la previa de día trae su nivel, se hereda (BUG 5 de regresion_ui.js).
-//   · La cama sigue mostrando su nivel en el tablero: el cambio es de la pantalla de registro, no del dato de la cama.
+//   · 🪤 El cambio es de la pantalla de registro, PERO TIENE UN EFECTO LATERAL EN EL DATO DE LA CAMA (lo mide la sección 6).
+//     Este encabezado decía «el cambio no toca el dato de la cama» y era falso: como de noche el formulario ya no manda el
+//     nivel de la cama, marcar «Realizada» SIN elegir nivel manda el nivel vacío, y el servidor deja entonces la KTM de
+//     esa cama sin nivel: el tablero pierde el «KTM 3» de esa cama esa noche. Antes de este cambio se inventaba el nivel
+//     del día en la fila y la cama lo conservaba. Una cama cuya noche NO tocó la KTM conserva su nivel, como siempre.
+//     El servidor NO se cambió; si la cama debe conservar su nivel cuando la noche marca «Realizada» sin elegirlo es una
+//     decisión de Diego (docs/PENDIENTES.md, sección 2e, la 9b), y la sección 6 es el lugar donde cambiaría el caso.
+//   · 🔴 La TARJETA ENTERA parte en blanco en TODOS los caminos de apertura (sección 5), no solo el botón de nivel: la
+//     asistencia encendida (y su bloque a la vista), la descripción del nivel y la lista de sesiones ya pintada eran del
+//     paciente anterior y la pantalla las afirmaba sin que viajaran (hallazgos R12 y R16 de la revisión de la tanda 4).
+//     El reinicio vive en `abrirPanel`, que corre en todos los caminos; `fillForm` y `fillFormReplica` repintan después lo
+//     que sí corresponde.
 //   · Dejar la KTM de DÍA en «Realizada» por defecto es otra decisión (ktmEstadoInicial) y NO se mide acá.
 //   · 🪤 Los dos caminos SIN réplica (paciente sin turno previo, o el servidor sin contestar al abrir) solo corren fillCama, que
-//     copia el nivel de la cama tal cual. NO se miden: no se alcanzan con datos reales, porque una cama que recuerda un nivel
-//     siempre tiene un turno previo del que abrir la réplica. Si algún día se quiere cerrar también esa puerta, es una
-//     condición en fillCama (de noche no copiar) y esta guardia es el lugar para agregar su caso.
+//     copia el nivel de la cama tal cual. El NIVEL OCULTO que copia ahí NO se mide: no se alcanza con datos reales, porque una
+//     cama que recuerda un nivel siempre tiene un turno previo del que abrir la réplica (docs/PENDIENTES.md, 2e, la 12). Si
+//     algún día se quiere cerrar también esa puerta, es una condición en fillCama (de noche no copiar) y esta guardia es el
+//     lugar para agregar su caso. Lo que SÍ se mide en esos caminos (sección 5) es lo que se VE: botones, bloque de asistencia,
+//     descripción y lista de sesiones, que no dependen de la cama.
 //
 // 🪤 La cama de prueba SÍ trae KTM_NIVEL: ktm_de_noche.js tenía una cama sin él y por eso no veía el defecto.
 // 🪤 Reloj congelado: la fecha se INVENTA (12-ago-2026 a las 11:00, lejos de las ventanas trampa) y el turno se fuerza en SHIFT.
@@ -34,6 +47,7 @@
 const path = require('path');
 const { chromium } = require('playwright-core');
 const V2 = path.join(__dirname, '..', '..', 'v2');
+const S = require('../sim/sim_srv.js');   // el servidor REAL en memoria: solo la sección 6 (el dato de la cama) lo necesita
 
 const fails = [];
 const eq = (l, g, w) => { const okk = String(g) === String(w);
@@ -58,10 +72,13 @@ const DIA_HECHO = Object.assign({}, NOCHE_HECHA, { TURNO_KEY: '2026-08-12-Dia', 
     const FIJA = new Date(2026, 7, 12, 11, 0, 0).getTime(), RD = Date;
     function FD(...a) { if (!new.target) return new RD(FIJA).toString(); return a.length ? new RD(...a) : new RD(FIJA); }
     FD.prototype = RD.prototype; FD.now = () => FIJA; FD.UTC = RD.UTC; FD.parse = RD.parse; window.Date = FD;
-    window._ll = []; window.__previa = null; window.__actual = null;
-    window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
+    window._ll = []; window.__previa = null; window.__actual = null; window.__falla = false;
+    window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler(f) { return {
       api(a, d) { window._ll.push({ a, d }); let data = null; if (a === 'GET_CONFIG_UI') data = { NUM_CAMAS: 12, BANNERS: {} };
-        else if (a === 'GET_EVO_TURNO') data = { actual: window.__actual, previa: window.__previa, pronoAbierto: '' };
+        else if (a === 'GET_EVO_TURNO') {
+          // El servidor que no contesta al abrir (sección 5): la pantalla cae al camino de solo fillCama.
+          if (window.__falla) { setTimeout(() => f({ message: 'sin red' }), 5); return; }
+          data = { actual: window.__actual, previa: window.__previa, pronoAbierto: '' }; }
         setTimeout(() => ok({ ok: true, data }), 5); } }; } }; } } } };
   });
   await p.goto('file://' + path.join(V2, 'index.html'));
@@ -71,7 +88,7 @@ const DIA_HECHO = Object.assign({}, NOCHE_HECHA, { TURNO_KEY: '2026-08-12-Dia', 
      Los botones de nivel parten APAGADOS (una pantalla recién cargada), salvo `o.arrastre`: el escenario en que quedó
      encendido el del paciente anterior, que ni el reset del formulario ni abrirPanel apagan. */
   const turno = (cual, o) => p.evaluate(async ([cual, o, nivelCama]) => {
-    window.__previa = o.previa || null; window.__actual = null;
+    window.__previa = o.previa || null; window.__actual = o.actual || null; window.__falla = !!o.falla;
     if (!o.arrastre) document.querySelectorAll('.ktm-niv-btn').forEach(b => b.classList.remove('on'));
     $('kf').reset(); $('gDate').value = '2026-08-12'; SHIFT = cual;
     window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
@@ -80,14 +97,18 @@ const DIA_HECHO = Object.assign({}, NOCHE_HECHA, { TURNO_KEY: '2026-08-12-Dia', 
       KTM_NIVEL: nivelCama, KTM_SUSP: 'FALSE' }];
     window.recargarSilencioso = () => {}; renderGrid();
     const grilla = document.body.innerText;
-    abrirPanel('3', false, false);
+    abrirPanel('3', !!o.ingreso, false);
     await new Promise(r => setTimeout(r, 800));
     const card = $('fcKtmCard'), dp = card.closest('[data-paso]'); pasoIr(Number(dp ? dp.dataset.paso : 2));
     await new Promise(r => setTimeout(r, 250));
     return { plan: v('fPlanes'), nivel: v('fKTMniv'), derivado: _ktmDeriva().nivel,
       botones: Array.from(document.querySelectorAll('.ktm-niv-btn.on')).map(x => x.dataset.niv).join(','),
       estado: Array.from(document.querySelectorAll('#fcKtmCard .ktm-state.on')).map(x => x.id).join(','),
-      desc: ($('ktmNivDesc') || {}).textContent || '', grilla: /KTM\s*3/.test(grilla) };
+      desc: ($('ktmNivDesc') || {}).textContent || '', grilla: /KTM\s*3/.test(grilla),
+      // La tarjeta ENTERA (sección 5): asistencia, su bloque y la lista de sesiones, lo que se VE.
+      asis: v('fKTMasis'), asisBotones: Array.from(document.querySelectorAll('.ktm-asis-btn.on')).map(x => x.dataset.asis).join(','),
+      verAsis: (() => { const e = $('dKTMasis'); return !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; })(),
+      sesiones: v('fKtmSesiones'), listaFilas: ($('ktmListaSes') || { children: [] }).children.length, lista: (($('ktmListaSes') || {}).innerText || '').trim() };
   }, [cual, o || {}, NIVEL_CAMA]);
 
   /* Guarda desde donde esté y devuelve lo que viajó (y el relato que la pantalla compone antes de guardar). */
@@ -163,6 +184,89 @@ const DIA_HECHO = Object.assign({}, NOCHE_HECHA, { TURNO_KEY: '2026-08-12-Dia', 
   await p.evaluate(() => setKTMniv('4'));
   T = await turno('Dia', { previa: DIA_HECHO, arrastre: true });
   eq('(control: de día con nivel que heredar, el botón es el HEREDADO (3), no el 4 que quedó)', T.botones + '|' + T.nivel, '3|3');
+
+  console.log('\n5 · 🔴 La TARJETA ENTERA parte en blanco en TODOS los caminos de apertura (R12 y R16 de la revisión de la tanda 4)');
+  // 4.1 apagó los botones de NIVEL, pero la asistencia encendida, su bloque a la vista, la descripción del nivel y la lista de
+  // sesiones ya pintada seguían siendo del paciente anterior. El valor oculto está vacío (el reset lo vacía), así que la pantalla
+  // AFIRMABA una asistencia («Máxima» en rojo) y unas sesiones que no viajaban: la kinesióloga no las vuelve a tocar y el dato
+  // se pierde sin aviso. Un camino con réplica apagaba el nivel (fillFormReplica) pero no la asistencia; los caminos sin réplica
+  // (sin turno previo, el servidor que no contesta, un ingreso) no apagaban NADA: abrirPanel es lo único que corre en todos.
+  /* Deja la tarjeta como la dejó el paciente ANTERIOR: dos sesiones pintadas en la lista y, en los campos sueltos, el nivel 4 y la
+     asistencia «Moderada» encendidos con su bloque a la vista (justo el estado de quien va a agregar una tercera sesión). */
+  const ensuciar = () => p.evaluate(() => {
+    setKTMstate('r'); setKTMniv('2'); setKTMasis('Máxima'); $('fKTMt').value = '20'; $('fBorg').value = '3'; ktmAgregarSesion();
+    setKTMniv('3'); setKTMasis('Total'); $('fKTMt').value = '15'; ktmAgregarSesion();
+    setKTMniv('4'); setKTMasis('Moderada'); });
+  /* Lo que la tarjeta tiene que mostrar al abrir OTRO paciente sin nada que heredar de la asistencia ni de las sesiones. */
+  const enBlanco = (etq, T, o) => {
+    eq('★★ ' + etq + ': ningún botón de asistencia queda encendido (el «Moderada» del paciente anterior)', T.asisBotones, '');
+    eq('★★ …y el valor de la asistencia, vacío (lo que se ve es lo que viaja)', T.asis, '');
+    eq('★★ …ni un botón de nivel encendido', T.botones, '');
+    eq('★★ …ni la descripción del nivel anterior', T.desc, '');
+    eq('★★ …ni sesiones del paciente anterior pintadas en la lista', T.listaFilas + '|' + T.lista, '0|');
+    eq('★★ …y la lista de sesiones, vacía por debajo', T.sesiones, '');
+    if (!o || o.bloqueCerrado !== false) eq('★★ …y el bloque de asistencia no queda a la vista (nadie eligió nivel)', T.verAsis, false);
+  };
+  await turno('Dia', { previa: DIA_HECHO });
+  await ensuciar();
+  let T5 = await turno('Dia', { previa: DIA_HECHO, arrastre: true });
+  eq('(control: la réplica de DÍA sí corrió)', T5.plan, 'PLAN-DIA');
+  eq('★★ réplica de DÍA: ningún botón de asistencia encendido', T5.asisBotones, '');
+  eq('★★ …y el valor de la asistencia, vacío', T5.asis, '');
+  eq('★★ …ni sesiones del paciente anterior pintadas', T5.listaFilas + '|' + T5.lista, '0|');
+  eq('(control: el nivel HEREDADO (3) sí queda encendido, y con él su bloque de asistencia a la vista)', T5.botones + '|' + T5.verAsis, '3|true');
+  await ensuciar();
+  T5 = await turno('Noche', { previa: DIA_HECHO, arrastre: true });
+  eq('(control: la réplica de NOCHE sí corrió)', T5.plan, 'PLAN-DIA');
+  enBlanco('réplica de NOCHE', T5);
+  await ensuciar();
+  T5 = await turno('Dia', { previa: null, arrastre: true });
+  enBlanco('SIN turno previo (solo fillCama)', T5);
+  await ensuciar();
+  T5 = await turno('Noche', { previa: null, arrastre: true });
+  enBlanco('SIN turno previo, de noche', T5);
+  await ensuciar();
+  T5 = await turno('Dia', { falla: true, arrastre: true });
+  enBlanco('el servidor sin contestar al abrir', T5);
+  await ensuciar();
+  T5 = await turno('Dia', { ingreso: true, arrastre: true });
+  enBlanco('un INGRESO', T5);
+  // Reabrir un turno ya guardado (fillForm) ya lo hacía bien: control para que nadie «arregle» abrirPanel y rompa el que andaba.
+  await ensuciar();
+  T5 = await turno('Dia', { actual: Object.assign({}, DIA_HECHO, { KTM_ASISTENCIA: '', KTM_NIVEL_KTR: '' }), arrastre: true });
+  eq('(control: reabrir un turno guardado sin asistencia ni sesiones: sin botón de asistencia)', T5.asisBotones + '|' + T5.asis, '|');
+  eq('(control: …y sin sesiones del paciente anterior)', T5.listaFilas + '|' + T5.sesiones, '0|');
+  // Y lo que SÍ trae el turno que se reabre sigue pintándose: abrirPanel limpia ANTES de que llegue la fila, no después.
+  await ensuciar();
+  T5 = await turno('Dia', { actual: Object.assign({}, DIA_HECHO, { KTM_ASISTENCIA: 'Mínima', KTM_NIVEL_KTR: '3',
+    KTM_SESIONES_JSON: JSON.stringify([{ niv: '2', asis: 'Mínima', min: 10, borg: '' }, { niv: '3', asis: 'Total', min: 12, borg: '' }]) }), arrastre: true });
+  eq('(control: el turno reabierto con dos sesiones las pinta, las suyas y no las del paciente anterior)', T5.listaFilas + '|' + /nivel 2/.test(T5.lista) + '|' + /Máxima/.test(T5.lista), '2|true|false');
+  eq('(control: …y su asistencia suelta queda encendida con su bloque a la vista)', T5.asisBotones + '|' + T5.verAsis, 'Mínima|true');
+
+  console.log('\n6 · 🪤 EFECTO LATERAL DOCUMENTADO (R18): de noche «Realizada» sin nivel deja la KTM de la cama sin nivel');
+  // El servidor REAL en memoria. Esto NO es un defecto que se arregle acá: es lo que pasa hoy, y qué debe pasar es una decisión de
+  // Diego (docs/PENDIENTES.md, 2e, la 9b). Está medido para que ningún encabezado vuelva a decir que el dato de la cama no cambia, y
+  // para que, si Diego decide que la cama conserve su nivel, el cambio del servidor (svc_evoluciones.gs, el `KTM_NIVEL:` de la fila
+  // de la cama) obligue a venir a cambiar este caso a propósito. La sección 1 mide que la pantalla manda ese nivel VACÍO.
+  { const { api, SIM } = S;
+    SIM.fecha = '2026-08-12'; SIM.hora = '11:00:00';
+    [3, 4, 5].forEach(id => { const r = api('INGRESAR_PACIENTE', { idCama: String(id), nombre: 'Paciente Ficticio ' + id, edad: 61, sexo: 'M', diagnostico: 'NAC grave',
+      fechaIngreso: '2026-08-07', viaAerea: 'TOT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV' }, null);
+      if (!r.ok) throw new Error('no se pudo ingresar la cama ' + id + ': ' + r.error); });
+    const base = { VENT_VIA_AEREA: 'TOT', VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC', VENT_VT: 450, VENT_FR: 16, VENT_PEEP: 8, VENT_FIO2: 40,
+      HEMO_ESTADO: 'Estable', HEMO_DVA: 'Sin requerimientos', PLAN_FIRMA_KINE: 'DMV' };
+    const nivelCama = id => String((api('GET_TODAS_CAMAS', {}, null).data.find(c => String(c.ID_CAMA) === String(id)) || {}).KTM_NIVEL);
+    const guardaServ = (id, turno, extra) => api('GUARDAR_EVOLUCION', Object.assign({}, base, { idCama: String(id), turnoKey: '2026-08-12-' + turno }, extra), null);
+    [3, 4, 5].forEach(id => eq('(control: el día de la cama ' + id + ' se guardó con KTM nivel 3)', guardaServ(id, 'Dia', { KTM_REALIZADA: true, KTM_NIVEL_KTR: '3', KTM_CANT: '1' }).ok, true));
+    eq('(control: las tres camas recuerdan el nivel 3 tras el día)', [3, 4, 5].map(nivelCama).join(','), '3,3,3');
+    SIM.hora = '21:00:00';
+    eq('(control: el servidor acepta la noche de la cama 3: «Realizada» sin nivel)', guardaServ(3, 'Noche', { KTM_REALIZADA: true, KTM_NIVEL_KTR: '', KTM_CANT: '1', KTM_NO_REALIZADA: '' }).ok, true);
+    eq('★★ …y la cama 3 queda SIN nivel (el tablero pierde el «KTM 3»: el efecto lateral)', nivelCama(3), '');
+    eq('(control: la noche de la cama 4 no tocó la KTM)', guardaServ(4, 'Noche', { KTM_NO_REALIZADA: '' }).ok, true);
+    eq('★★ …y la cama 4 CONSERVA su nivel 3 (el servidor no lo borra si la noche no declaró KTM)', nivelCama(4), '3');
+    eq('(control: la noche de la cama 5 eligió el nivel 2)', guardaServ(5, 'Noche', { KTM_REALIZADA: true, KTM_NIVEL_KTR: '2', KTM_CANT: '1', KTM_NO_REALIZADA: '' }).ok, true);
+    eq('(control: …y la cama 5 pasa a recordar el 2)', nivelCama(5), '2');
+  }
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();

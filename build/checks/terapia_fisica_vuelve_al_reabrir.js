@@ -89,7 +89,7 @@ const ingresar = (id) => {
     fechaIngreso: '2026-08-07', viaAerea: 'TQT', soporte: 'VM', modo: 'ACVC', firmaKine: 'DMV' }, null);
   if (!r.ok) throw new Error('no se pudo ingresar la cama ' + id + ': ' + r.error);
 };
-[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(ingresar);
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(ingresar);
 
 const filaDe = (id, tk) => DB.EVOLUCIONES.find(e => String(e.ID_EVOLUCION) === 'CAMA_' + id + '_' + tk) || {};
 
@@ -350,6 +350,147 @@ const filaDe = (id, tk) => DB.EVOLUCIONES.find(e => String(e.ID_EVOLUCION) === '
   eq('★★ ningún estado de KTM queda elegido (ni «realizada» ni «no realizada» inventadas)', pl.estado, '');
   no('★★ …y ningún bloque de estado abierto', pl.verR || pl.verS || pl.verN);
   eq('★★ …ni nivel, ni IMT, ni EMS, ni válvula inventados', [pl.niv, pl.imt, pl.ems, pl.vfon].join('|'), '|false|false|false');
+
+  /* ══ 10 · Desmarcar IMT / EMS / educación tras reabrir ═══════════════════════ */
+  console.log('\n10 · 🔴 Reabrir, DESMARCAR IMT / EMS / educación y guardar: se van de la lista de procedimientos (R13 y R19 de la revisión)');
+  // El PROC_JSON guardado trae también los procedimientos AUTOMÁTICOS (IMT, EMS, EDUCACIÓN A USUARIO/FAMILIA), y fillForm lo cargaba
+  // entero como procedimientos MANUALES (PROCS). Desde 4.2 reabrir devuelve esas tres casillas marcadas, así que el camino natural
+  // de corregir un IMT marcado por error es desmarcarlo… y el chip «IMT×» seguía ahí: la fila quedaba con KTM_IMT falso pero
+  // PROC_JSON ["IMT"], PROC_CANTIDAD 1 y una fila IMT en PROCEDIMIENTOS, y la estadística de procedimientos (que cuenta de PROC_JSON)
+  // contaba un IMT que nadie hizo. Lo manual de verdad (lo que se escribió a mano) tiene que seguir ahí.
+  const NOMBRES_AUTO = ['IMT', 'EMS', 'EDUCACIÓN A USUARIO/FAMILIA'];
+  const procs = j => { try { return JSON.parse(j || '[]').slice().sort(); } catch (e) { return ['(JSON ilegible)']; } };
+  const chipsManuales = () => p.evaluate(() => Array.from(document.querySelectorAll('#chips .chip')).map(c => c.firstChild.textContent.trim()).join('|'));
+  const REC_PROC = `() => {
+    $('bKTMr').click(); $('cEduReal').click();
+    $('cIMT').click(); $('fIMTfreq').value = '3'; $('fIMTint').value = '30';
+    $('cEMS').click(); $('fEMSfreq').value = '50'; $('fEMSint').value = '60';
+    $('inProc').value = 'ASPIRACIÓN BRONQUIAL'; addProc();
+  }`;
+  const REC_DESMARCAR = `() => { if ($('cIMT').checked) $('cIMT').click(); if ($('cEMS').checked) $('cEMS').click(); if ($('cEduReal').checked) $('cEduReal').click(); }`;
+  const fechaProc = '2026-08-12', tkProc = fechaProc + '-Dia';
+  await abrir(1, 'Dia', fechaProc);
+  await llenar(REC_PROC);
+  let gp1 = await guardar();
+  const fp1 = Object.assign({}, filaDe(1, tkProc));
+  eq('(control: el primer guardado lleva los tres automáticos una vez, y el manual)', procs(fp1.PROC_JSON).join('|'),
+    ['ASPIRACIÓN BRONQUIAL'].concat(NOMBRES_AUTO).sort().join('|'));
+  // Reabrir SIN tocar nada: lo automático sigue ahí (una sola vez) y no vuelve como chip manual.
+  await abrir(1, 'Dia', fechaProc);
+  eq('★★ al reabrir, los chips manuales son SOLO lo manual (no «IMT×», «EMS×», «EDUCACIÓN…×»)', await chipsManuales(), 'ASPIRACIÓN BRONQUIAL');
+  si('(control: …y las tres casillas vuelven marcadas)', await p.evaluate(() => $('cIMT').checked && $('cEMS').checked && $('cEduReal').checked));
+  let gp2 = await guardar();
+  eq('★★ reabrir y guardar SIN tocar: la lista de procedimientos queda igual (nada se pierde ni se duplica)', procs(D(gp2).PROC_JSON).join('|'), procs(fp1.PROC_JSON).join('|'));
+  eq('★★ …y la cantidad', D(gp2).PROC_CANTIDAD + '/' + filaDe(1, tkProc).PROC_CANTIDAD, '4/4');
+  // Reabrir, desmarcar las tres y guardar: la lista se queda con lo manual.
+  await abrir(1, 'Dia', fechaProc);
+  await llenar(REC_DESMARCAR);
+  let gp3 = await guardar();
+  const fp3 = Object.assign({}, filaDe(1, tkProc));
+  si('(control: el guardado tras desmarcar llegó al servidor y lo aceptó)', gp3.d && gp3.ok);
+  eq('(control: la pantalla mandó las tres casillas apagadas)', [D(gp3).KTM_IMT, D(gp3).KTM_EMS, D(gp3).EDU_REALIZADA].map(norm).join('|'), '||');
+  eq('★★ PROC_JSON que viaja: sin IMT, EMS ni educación (quedó solo lo manual)', procs(D(gp3).PROC_JSON).join('|'), 'ASPIRACIÓN BRONQUIAL');
+  eq('★★ …y la fila del servidor igual', procs(fp3.PROC_JSON).join('|'), 'ASPIRACIÓN BRONQUIAL');
+  eq('★★ …con su cantidad y su resumen', fp3.PROC_CANTIDAD + '|' + fp3.PROC_RESUMEN, '1|ASPIRACIÓN BRONQUIAL');
+  eq('(control: la fila tampoco conserva las casillas)', [fp3.KTM_IMT, fp3.KTM_EMS, fp3.EDU_REALIZADA].map(norm).join('|'), '||');
+  // Y volver a marcarlas las suma otra vez (se regeneran solas, no hay que apuntarlas a mano).
+  await abrir(1, 'Dia', fechaProc);
+  await llenar(`() => { $('cIMT').click(); $('cEduReal').click(); }`);
+  let gp4 = await guardar();
+  eq('★★ marcar otra vez IMT y la educación las vuelve a sumar (se derivan solas de la casilla)', procs(D(gp4).PROC_JSON).join('|'),
+    ['ASPIRACIÓN BRONQUIAL', 'IMT', 'EDUCACIÓN A USUARIO/FAMILIA'].sort().join('|'));
+
+  /* ══ 11 · Una fila del modelo viejo (KTM_CANT > 1 y SIN lista de sesiones) ═════ */
+  console.log('\n11 · 🔴 Una fila ANTERIOR a la lista de sesiones (KTM_CANT = 2, sin lista): reabrir y guardar sin tocar NO rebaja la cantidad (R14 y R17)');
+  // Antes del modelo de lista, la cantidad vivía solo en KTM_CANT y los datos (nivel, asistencia, minutos) eran de «la» sesión. El
+  // servidor sigue leyéndolas así (`ktmSesiones`: cantidad = KTM_CANT, una sola ficha), y el REM suma KTM_CANT. La pantalla, en cambio,
+  // deriva la cantidad de la lista y sin lista contaba UNA: reabrir y guardar sin tocar nada bajaba el 2 a 1 en silencio, y con él las
+  // sesiones del REM del mes. 🔴 No se inventan sesiones ni minutos: la solución no puede ser fabricar dos sesiones iguales (los minutos
+  // se sumarían doble y el relato narraría dos sesiones que nadie escribió). Se conserva la cantidad guardada mientras nadie toque la lista.
+  const semilla = (id, turno, extra) => api('GUARDAR_EVOLUCION', Object.assign({ idCama: String(id), turnoKey: '2026-08-12-' + turno, PLAN_FIRMA_KINE: 'DMV',
+    VENT_VIA_AEREA: 'TQT', VENT_SOPORTE: 'VM', VENT_MODO: 'ACVC', VENT_VT: 450, VENT_FR: 16, VENT_PEEP: 8, VENT_FIO2: 40,
+    HEMO_ESTADO: 'Estable', HEMO_DVA: 'Sin requerimientos' }, extra), null);
+  const remKTM = f => (String(f.KTM_REALIZADA) === 'true' || f.KTM_REALIZADA === true) ? Math.min(9, Math.max(1, parseInt(f.KTM_CANT) || 1)) : 0;   // lo que suma svc_rem.gs
+  const VIEJA = { KTM_REALIZADA: true, KTM_NIVEL_KTR: '3', KTM_CANT: 2, KTM_ASISTENCIA: 'Mínima', KTM_TIEMPO_MIN: 20 };
+  for (const [id, turno, etq] of [[2, 'Dia', 'de día'], [3, 'Noche', 'de noche']]) {
+    const tkv = '2026-08-12-' + turno;
+    const rs = semilla(id, turno, turno === 'Noche' ? Object.assign({ KTM_NO_REALIZADA: '' }, VIEJA) : VIEJA);
+    eq('(control: la fila vieja ' + etq + ' se sembró)', rs.ok, true);
+    const f0 = Object.assign({}, filaDe(id, tkv));
+    eq('(control: la fila vieja ' + etq + ' no trae lista y dice 2 sesiones)', (f0.KTM_SESIONES_JSON || '') + '|' + f0.KTM_CANT, '|2');
+    await abrir(id, turno, '2026-08-12');
+    const pv = await pantalla();
+    const relatoV = await p.evaluate(() => genTexto());
+    eq('(control: reabrir devuelve el estado, el nivel, la asistencia y los minutos de siempre)', [pv.estado, pv.niv, pv.asis, pv.min].join('|'), 'r|3|Mínima|20');
+    eq('★★ ' + etq + ': la pantalla NO inventa sesiones (la lista queda vacía)', pv.filasSesion + '|' + pv.sesiones, '0|');
+    si('★ ' + etq + ': …y el relato que se regenera dice las 2 sesiones, como las narra el servidor con esta fila', /Se realizan 2 sesiones de KTM nivel 3/.test(relatoV));
+    const gv = await guardar();
+    si('(control: volver a guardar ' + etq + ' llegó al servidor y lo aceptó)', gv.d && gv.ok);
+    const f1 = Object.assign({}, filaDe(id, tkv));
+    eq('★★ ' + etq + ': volver a guardar SIN tocar manda la cantidad guardada (2), no 1', String(D(gv).KTM_CANT), '2');
+    eq('★★ ' + etq + ': …y la fila del servidor sigue en 2', String(f1.KTM_CANT), '2');
+    eq('★★ ' + etq + ': …así que las sesiones que suma el REM no cambian', remKTM(f1), remKTM(f0));
+    eq('★★ ' + etq + ': …sin inventar una lista de sesiones', (D(gv).KTM_SESIONES_JSON || '') + '|' + (f1.KTM_SESIONES_JSON || ''), '|');
+    eq('★★ ' + etq + ': …ni minutos (siguen siendo los 20 de la única ficha)', String(D(gv).KTM_TIEMPO_MIN) + '|' + f1.KTM_TIEMPO_MIN, '20|20');
+    eq('★★ ' + etq + ': …y el nivel y la asistencia no se tocan', f1.KTM_NIVEL_KTR + '|' + f1.KTM_ASISTENCIA, '3|Mínima');
+  }
+  // Si la persona EDITA la lista de sesiones, la cantidad pasa a salir de la lista (ya no hay nada «viejo» que conservar).
+  await abrir(2, 'Dia', '2026-08-12');
+  await llenar(`() => { $('btnKtmSesion').click(); }`);
+  const pAgr = await pantalla();
+  eq('(la lista editada manda: una sesión agregada = una fila)', pAgr.filasSesion + '|' + pAgr.derivado, '1|3/1');
+  const gAgr = await guardar();
+  eq('★★ …y al guardar la cantidad es la de la lista (1), ya no la vieja', String(D(gAgr).KTM_CANT) + '|' + filaDe(2, '2026-08-12-Dia').KTM_CANT, '1|1');
+  // Y si después la persona QUITA esa sesión, la cantidad vieja no «resucita»: tocar la lista la soltó para siempre en este turno.
+  // (Otra fila vieja, de noche: la de día ya se reescribió con su lista.)
+  eq('(control: otra fila vieja de 2 sesiones, de noche, se sembró)', semilla(2, 'Noche', Object.assign({ KTM_NO_REALIZADA: '' }, VIEJA)).ok, true);
+  await abrir(2, 'Noche', '2026-08-12');
+  await llenar(`() => { $('btnKtmSesion').click(); ktmQuitarSesion(0); }`);
+  const pQui = await pantalla();
+  eq('(agregar pasó el nivel a la lista y quitar la dejó vacía: ni lista ni nivel suelto)', pQui.filasSesion + '|' + pQui.sesiones + '|' + pQui.niv, '0||');
+  const gQui = await guardar();
+  eq('★★ …y la cantidad que viaja es 1, no el 2 viejo que ya se soltó', String(D(gQui).KTM_CANT), '1');
+  // Una fila vieja de 1 sesión sigue igual (el caso que ya andaba).
+  eq('(control: una fila de una sola sesión sin lista sigue mandando 1)', await (async () => {
+    const r = semilla(9, 'Noche', { KTM_NO_REALIZADA: '', KTM_REALIZADA: true, KTM_NIVEL_KTR: '2', KTM_CANT: 1, KTM_TIEMPO_MIN: 15 });
+    if (!r.ok) return 'no se sembró: ' + r.error;
+    await abrir(9, 'Noche', '2026-08-12'); const g = await guardar(); return String(D(g).KTM_CANT); })(), '1');
+
+  /* ══ 12 · Borg 0 ═════════════════════════════════════════════════════════════ */
+  console.log('\n12 · 🔴 Un Borg de 0 es un valor: vuelve como 0 y no se confunde con «vacío» (R15)');
+  // «Esfuerzo percibido 0» (reposo) es un dato clínico. El comentario de fillForm lo promete («se escribe tal cual»), pero la guardia
+  // solo usaba Borg 4: una versión «simplificada» (`s.KTM_BORG ? String(s.KTM_BORG) : ''`) lo habría descartado y la batería seguía verde.
+  const REC_BORG0 = `() => { $('bKTMr').click(); document.querySelector('.ktm-niv-btn[data-niv="2"]').click(); $('fKTMt').value = '20'; $('fBorg').value = '0'; }`;
+  c = await ciclo(4, 'Noche', '2026-08-12', REC_BORG0);
+  eq('(control: el primer guardado mandó el Borg 0)', String(D(c.g1).KTM_BORG), '0');
+  eq('★★ Borg 0: la pantalla lo devuelve como «0», no como vacío', c.pant.borg, '0');
+  mismoPayload('Borg 0', c);
+  eq('★★ Borg 0: la fila del servidor lo conserva tras reabrir y guardar', String(c.fila2.KTM_BORG), '0');
+  // La hoja puede devolver ese 0 como NÚMERO (una celda sin formato de texto, una fila importada): es el valor que más fácil se pierde
+  // con un `if (valor)`. Se le da a fillForm la fila real con el Borg como número 0.
+  await abrir(4, 'Noche', '2026-08-12');
+  const filaB = Object.assign({}, filaDe(4, '2026-08-12-Noche'), { KTM_BORG: 0 });
+  eq('★★ Borg 0 devuelto como NÚMERO por la hoja: también vuelve como «0»', await p.evaluate(f => { fillForm(f); return v('fBorg'); }, filaB), '0');
+  // …y un Borg vacío sigue vacío (el 0 no se inventa).
+  eq('(control: un Borg vacío sigue vacío)', await p.evaluate(f => { fillForm(Object.assign({}, f, { KTM_BORG: '' })); return v('fBorg'); }, filaB), '');
+
+  /* ══ 13 · Asistencia suelta con una lista de sesiones ═══════════════════════ */
+  console.log('\n13 · 🔴 Una sesión en la lista MÁS una asistencia suelta (sin nivel): la asistencia vuelve a la vista (R15)');
+  // Con una lista de sesiones, el nivel NO vuelve a los campos sueltos (se deriva de la lista) y por eso `setKTMniv` no corre y no
+  // abre el bloque de asistencia: quien lo abre es la línea propia de la asistencia en fillForm. Con el nivel también restaurado, esa
+  // línea quedaba tapada (setKTMniv ya muestra el bloque) y quitarla no fallaba nunca. Éste es el caso en que SOLO ella lo abre.
+  const REC_LISTA_ASIS = `() => {
+    $('bKTMr').click(); document.querySelector('.ktm-niv-btn[data-niv="2"]').click(); document.querySelector('.ktm-asis-btn[data-asis="Moderada"]').click();
+    $('fKTMt').value = '15'; $('fBorg').value = '3'; $('btnKtmSesion').click();
+    document.querySelector('.ktm-asis-btn[data-asis="Mínima"]').click();
+  }`;
+  c = await ciclo(7, 'Noche', '2026-08-12', REC_LISTA_ASIS);
+  eq('(control: el primer guardado mandó una sesión en la lista y la asistencia suelta)', [D(c.g1).KTM_SESIONES_JSON ? JSON.parse(D(c.g1).KTM_SESIONES_JSON).length : 0, D(c.g1).KTM_ASISTENCIA].join('|'), '1|Mínima');
+  eq('★★ la lista vuelve con su sesión', c.pant.filasSesion, 1);
+  eq('★★ …y el nivel suelto NO se inventa (sale de la lista)', c.pant.niv + '|' + c.pant.nivBoton, '|');
+  eq('★★ …la asistencia suelta vuelve, con su botón encendido', c.pant.asis + '|' + c.pant.asisBoton, 'Mínima|Mínima');
+  si('★★ …y el bloque de asistencia está A LA VISTA (si no, la asistencia viajaría sin que nadie la vea)', c.pant.verAsis);
+  mismoPayload('lista + asistencia suelta', c);
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();

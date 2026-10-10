@@ -20,8 +20,8 @@
 > Traqueostomía y Decanulación; plegar el Turno en escritorio) esperan tus
 > respuestas a las 7, 8 y 12.
 >
-> 🟠 **La sección 2e es de la tanda 4**: tres decisiones ya implementadas (✅) y once
-> por decidir. Ninguna toca los tres bloques de Planes; la parte de texto de la 10
+> 🟠 **La sección 2e es de la tanda 4**: tres decisiones ya implementadas (✅) y doce
+> por decidir (la 9b es nueva, de la revisión). Ninguna toca los tres bloques de Planes; la parte de texto de la 10
 > (el cuadro «¿Quién midió?») ya la cerró la tanda 5.
 >
 > 🟠 **La sección 2f es de la tanda 5**: nueve decisiones de pantalla ya implementadas (✅)
@@ -379,6 +379,11 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    sección 2d (lo heredado como «Requiere revisión»), para no cambiar el significado dos veces.
 9. **«Realizada» sin nivel (1 a 5): hoy no avisa.** ¿Debe avisar en ámbar, sin bloquear? *Recomendado: sí, solo ámbar* («Realizada sin nivel»), para no estorbar a quien no alcanzó a elegirlo. Quedó honesto después del paso 1
    de esta tanda: ahora un nivel vacío es de verdad un nivel que nadie eligió, no el de la cama.
+9b. **De noche, «Realizada» sin elegir nivel deja a esa cama sin nivel en el tablero.** Es un efecto de lo que cerró el punto 1 de esta sección, y salió en la revisión. Hoy, si en el turno de
+    noche alguien marca la KTM como «Realizada» y no elige el nivel (1 a 5), la tarjeta de esa cama deja de mostrar su «KTM 3» hasta que alguien registre un nivel; si la noche no toca la KTM, la cama
+    conserva su nivel como siempre. Antes del punto 1 el sistema le ponía a esa noche el nivel del día, sin que nadie lo eligiera, y la cama lo conservaba. ¿Prefieres que la cama conserve su nivel
+    del día cuando la noche marca «Realizada» sin elegirlo? *Recomendado: dejarlo como está:* una KTM sin nivel no puede mostrar uno, y con el aviso en ámbar de la 9 casi nadie la dejaría sin nivel.
+    No se tocó el servidor. Si dices que sí, es una condición en la fila de la cama (de noche, sin nivel nuevo, que conserve el anterior) y se cambia a la vez el caso que la guardia deja medido.
 10. **Textos y atajos de Planes.** El modal que se abre al dejar un pendiente dice «¿Quién midió?» (texto de medición, equivocado para un pendiente); los 18 chips fijos siguen siempre a la vista; las sugerencias «Medir X» salen sin mirar
     si el paciente coopera. *Recomendado:* cambiar el título a «¿Quién deja el pendiente?» y limpiar chips y sugerencias dentro de la tanda 5; no cambia los tres bloques y es solo texto.
     ✅ **El título del cuadro ya se cambió en la tanda 5** (ver la 8 de la sección 2f); los 18 chips y las sugerencias «Medir X» siguen sin tocar.

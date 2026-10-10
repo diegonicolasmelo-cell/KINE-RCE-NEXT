@@ -5413,6 +5413,9 @@ document.documentElement.setAttribute('data-piel', 'inst');
                         title="Agrega lo escrito arriba como una sesión y deja los campos listos para la siguiente">+ Agregar</button>
                       <input type="hidden" id="fKtmCant" value="1">
                       <input type="hidden" id="fKtmSesiones">
+                      <!-- La cantidad que traía una fila ANTERIOR a la lista de sesiones (solo KTM_CANT, sin lista): fillForm la deja
+                           acá y `_ktmDeriva` la respeta mientras nadie toque la lista. Vacío en todo lo demás. -->
+                      <input type="hidden" id="fKtmCantGuardada">
                     </div>
                     
                   </div>
@@ -8130,6 +8133,7 @@ function abrirPanel(id, esIng, verFicha) {
   if(typeof setKTMstate==='function') setKTMstate(ktmEstadoInicial(false));
   // v2: al ingreso, Terapia Física parte "No realizada: Motivo ingreso" (override manual permitido). De noche, neutra.
   if(ktmEstadoInicial(esIng)==='n'){ setKTMstate('n'); const _mr=$('fKTMnoRaz'); if(_mr) _mr.value='Motivo ingreso'; }
+  _ktmTarjetaEnBlanco();   // lo que SE VE de la KTM del paciente anterior (asistencia, descripción, lista de sesiones) se apaga en todos los caminos
   // Fecha y hora de ingreso: al INGRESAR se sugiere el momento actual (Diego,
   // 11-sep-2026: «la sugerencia es la fecha actual, no la del turno») y queda
   // editable; en una evolución posterior se muestra lo guardado, bloqueado.
@@ -9292,6 +9296,10 @@ function fillForm(s) {
   // no la trae, y ahí no se pinta nada: sus datos siguen en los campos de
   // siempre y se leen por ellos, que es como se han leído hasta hoy.
   set('fKtmSesiones', s.KTM_SESIONES_JSON||'');
+  /* 🔴 R14 y R17 · una fila anterior a la lista (KTM realizada, KTM_CANT mayor que 1 y SIN sesiones) conserva su cantidad: ver
+     `_ktmDeriva`. Se escribe SIEMPRE (vacío si no aplica), porque `set` se salta los vacíos. */
+  { const _g=$('fKtmCantGuardada'), _c=parseInt(s.KTM_CANT,10)||0;
+    if(_g) _g.value=((s.KTM_REALIZADA===true||s.KTM_REALIZADA==='TRUE'||s.KTM_REALIZADA==='true') && !_ktmLista().length && _c>1) ? String(_c) : ''; }
   if(typeof ktmPintarSesiones==='function') ktmPintarSesiones();
   set('fKTMct',s.KTM_CONTRA_TIPO); set('fKTMcat',s.KTM_CONTRA_CAT); set('fKTMraz',s.KTM_CONTRA_RAZON); set('fKTMman',s.KTM_CONTRA_MANUAL);
   _ktmContraSel(s.KTM_CONTRA_RAZON);
@@ -9457,7 +9465,18 @@ function fillForm(s) {
     const inb=$('cIntubO'); if(inb) inb.checked=false; hide('dIntubDet');
   })();
 
-  if(s.PROC_JSON){try{PROCS=JSON.parse(s.PROC_JSON)||[];}catch(e){} renderChips();}
+  /* 🔴 10-oct-2026 (revisión de la tanda 4, R13 y R19) · LO AUTOMÁTICO NO ES «MANUAL». El PROC_JSON guardado trae también los
+     procedimientos que `_autoProcs()` deriva de las casillas del turno (IMT, EMS, EDUCACIÓN A USUARIO/FAMILIA), y se cargaba entero
+     como manuales (PROCS). Desde 4.2 reabrir devuelve esas tres casillas marcadas, así que corregir un IMT puesto por error es
+     DESMARCARLO… y el chip «IMT×» seguía ahí: la fila quedaba con KTM_IMT falso pero PROC_JSON ["IMT"], PROC_CANTIDAD 1 y una fila
+     IMT en PROCEDIMIENTOS, y la estadística de procedimientos (que cuenta de PROC_JSON) contaba un IMT que nadie hizo. Esas tres se
+     vuelven a sumar solas al guardar SI la casilla sigue marcada, así que no hace falta cargarlas como manuales. Solo estas tres, a
+     propósito: son casillas que `fillForm` restaura Y que el payload manda siempre (KTM_IMT, KTM_EMS, EDU_REALIZADA); otros nombres
+     automáticos (extubación, decanulación, intubación…) vuelven por otro camino o ninguno, y soltarlos de PROCS los perdería.
+     Lo cuida terapia_fisica_vuelve_al_reabrir.js (sección 10). */
+  if(s.PROC_JSON){try{PROCS=JSON.parse(s.PROC_JSON)||[];}catch(e){}
+    const _autoDeCasilla=['IMT','EMS','EDUCACIÓN A USUARIO/FAMILIA'];
+    PROCS=PROCS.filter(p=>!_autoDeCasilla.includes(p)); renderChips();}
   // Cultivo — casilla desmarcada (procedimiento diario); resultado previo sí persiste
   const e_mue=$('cMue'); if(e_mue) e_mue.checked=false; hMue();
   // Resetear estado de cultivo del turno anterior (histórico se carga vía _loadCultFechas)
@@ -17909,14 +17928,24 @@ function _ktmLista(){
  */
 function _ktmDeriva(){
   let lista=_ktmLista();
-  if(!lista.length){
+  /* 🔴 10-oct-2026 (revisión de la tanda 4, R14 y R17) · LA CANTIDAD DEL MODELO VIEJO. Una fila anterior a la lista de sesiones
+     guardó la cantidad solo en KTM_CANT (todas las sesiones comparten la ficha de nivel, asistencia y minutos), y así la lee el
+     servidor (`ktmSesiones`: cantidad = KTM_CANT, una sola ficha) y así suma el REM. Aquí, sin lista, la cantidad salía de los
+     campos sueltos y daba 1: reabrir esa fila y guardar sin tocar nada rebajaba el 2 a 1 en silencio, y con él las sesiones del
+     REM del mes. `fillForm` deja la cantidad guardada en `fKtmCantGuardada` y mientras NADIE toque la lista (agregar una sesión la
+     borra) manda el mayor entre ella y lo que dicen los campos. NO se reconstruye una lista de sesiones iguales: se inventarían
+     sesiones y los minutos se sumarían doble. Sin ese campo (todo lo demás) vale 0 y la derivación es la de siempre. */
+  let cant;
+  if(lista.length){ cant=lista.length; }
+  else {
     const a=_ktmSesionActual();
     if(a.niv||a.min||a.asis) lista=[a];
+    cant=Math.max(lista.length, parseInt(v('fKtmCantGuardada'),10)||0);
   }
   const niveles=lista.map(x=>parseInt(x&&x.niv,10)).filter(n=>!isNaN(n));
   return {
     lista:lista,
-    cant:lista.length,
+    cant:cant,
     nivel:niveles.length?String(Math.max.apply(null,niveles)):'',
     minutos:lista.reduce((a,x)=>a+(parseInt(x&&x.min,10)||0),0)
   };
@@ -17927,6 +17956,7 @@ function ktmAgregarSesion(){
   const lista=_ktmLista(); lista.push(a);
   if(lista.length>9){ toast('⚠️ Son demasiadas sesiones para un turno.'); return; }
   const e=$('fKtmSesiones'); if(e) e.value=JSON.stringify(lista);
+  { const g=$('fKtmCantGuardada'); if(g) g.value=''; }   // la lista ya manda: la cantidad de una fila vieja deja de valer (ver `_ktmDeriva`)
   // Los campos quedan listos para la siguiente: se limpia lo que cambia de una
   // sesión a otra, no el estado de la KTM.
   if(typeof setKTMniv==='function') setKTMniv('');
@@ -17968,6 +17998,22 @@ function ktmPintarSesiones(){
 function setKTMasis(a){
   document.querySelectorAll('.ktm-asis-btn').forEach(b=>b.classList.toggle('on', b.dataset.asis===a));
   const h=$('fKTMasis'); if(h) h.value=a;
+}
+/** 🔴 10-oct-2026 (revisión de la tanda 4, R12 y R16) · LA TARJETA DE KTM PARTE EN BLANCO EN CADA APERTURA, EN TODOS LOS CAMINOS.
+ *  `$('kf').reset()` y `_resetHiddenYEventos` vacían los VALORES (los campos ocultos incluidos), pero no tocan lo que SE VE: los
+ *  botones de nivel y de asistencia encendidos (clase `.on`), el bloque de asistencia abierto, la descripción del nivel y la lista de
+ *  sesiones ya pintada. Todo eso era del paciente anterior, y la pantalla lo afirmaba mientras el valor de abajo estaba vacío: una
+ *  asistencia «Máxima» encendida que nunca viajaba, y dos sesiones en la lista que se guardaban como una. El paso 4.1 apagó los
+ *  botones de NIVEL, pero dentro de `fillFormReplica` (un solo camino de cinco) y sin mirar nada más; reabrir un turno guardado
+ *  (`fillForm`) ya lo hacía bien. `abrirPanel` es lo único que corre en TODOS los caminos —con réplica, con un turno guardado,
+ *  sin turno previo, con el servidor sin contestar y en un ingreso—, así que el reinicio vive acá y `fillForm`/`fillFormReplica`
+ *  repintan después lo que sí corresponde. Lo cuida ktm_nivel_no_se_cuela.js (sección 5). */
+function _ktmTarjetaEnBlanco(){
+  document.querySelectorAll('.ktm-niv-btn, .ktm-asis-btn').forEach(b=>b.classList.remove('on'));
+  hide('dKTMasis');
+  const nd=$('ktmNivDesc'); if(nd) nd.textContent='';
+  ['fKTMniv','fKTMasis','fKtmSesiones','fKtmCantGuardada'].forEach(id=>{ const e=$(id); if(e) e.value=''; });
+  ktmPintarSesiones();   // con la lista vacía: borra las filas pintadas y deja la cantidad en 1
 }
 
 // Razones de suspensión KTM por señal de alerta durante sesión (protocolo Tabla 3)
