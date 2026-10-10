@@ -210,6 +210,18 @@ const VISTAS = [
     return { menor, nTextos: vistos.length, bajoDoce: porSel };
   };
 
+  /** Líneas REALES que ocupa el texto de un botón, por los rectángulos del propio texto. 🪤 Antes se estimaban dividiendo el alto del botón (menos el relleno)
+      por el interlineado, y un botón de 52 px de UNA línea daba «2 líneas» siempre (52 − 20 = 32 ÷ 18,8 ≈ 1,7 → 2): el número no medía nada y las
+      capturas del paso 5.1 lo repetían. Se corrigió en el paso 5.4, cuando la barra se midió con una guardia de verdad (act_bar_390.js). */
+  const LINEAS_DE = b => {
+    const rg = document.createRange(); rg.selectNodeContents(b);
+    const rs = [...rg.getClientRects()].filter(r => r.width > 0 && r.height > 0).sort((x, y) => x.top - y.top);
+    if (!rs.length) return 0;
+    let n = 1, fondo = rs[0].bottom;
+    for (const r of rs.slice(1)) { if (r.top >= fondo - 1) { n++; fondo = r.bottom; } else fondo = Math.max(fondo, r.bottom); }
+    return n;
+  };
+
   /** Los botones del pie de cada tarjeta de cama: alto, ancho y líneas del texto. */
   const MEDIR_PIES = () => [...document.querySelectorAll('#bedGrid .bcard')].map(card => {
     const pie = card.querySelector('.bfoot'); if (!pie) return null;
@@ -218,9 +230,9 @@ const VISTAS = [
       cama: (card.querySelector('.bnum') || {}).textContent, ocupada: card.classList.contains('occ'),
       anchoPie: Math.round(pr.width),
       botones: [...pie.children].map(b => {
-        const r = b.getBoundingClientRect(), lh = parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.2;
+        const r = b.getBoundingClientRect();
         return { clase: b.className, texto: b.textContent.trim().slice(0, 24), ancho: Math.round(r.width), alto: Math.round(r.height),
-          pctDelPie: Math.round(100 * r.width / pr.width), lineas: Math.max(1, Math.round((r.height - 2 * parseFloat(getComputedStyle(b).paddingTop)) / lh)) };
+          pctDelPie: Math.round(100 * r.width / pr.width), lineas: window.__lineasDe(b) };
       }),
     };
   }).filter(Boolean);
@@ -246,6 +258,7 @@ const VISTAS = [
     const base = { width: ancho, height: movil ? 844 : 950 };
     console.log('\nREGISTRO ' + ancho + ' px');
     const pag = await sesion('registro-' + ancho, base, { movil, escala: movil ? 2 : 1, sinMascota: true });
+    await pag.evaluate(src => { window.__lineasDe = (new Function('return ' + src))(); }, LINEAS_DE.toString());   // lo usan MEDIR_PIES y la barra
     medidas[ancho] = { tablero: {}, pasos: {} };
 
     /* Tablero: la unidad con lo más cargado que hay (ventilador, equipos del paciente, prono, KTM suspendida,
@@ -318,8 +331,9 @@ const VISTAS = [
         await fotoCompleta(pag, pre + '-paso' + n + '.png', 'Paso ' + n, base, true);
         medidas[ancho].pasos[n] = {
           letra: await pag.evaluate(MEDIR_LETRA, '#sp'),
-          barra: await pag.evaluate(() => { const b = document.getElementById('pasoAvanza'); if (!b) return null; const r = b.getBoundingClientRect(), lh = parseFloat(getComputedStyle(b).lineHeight) || parseFloat(getComputedStyle(b).fontSize) * 1.2;
-            return { texto: b.textContent.trim(), ancho: Math.round(r.width), alto: Math.round(r.height), lineas: Math.max(1, Math.round((r.height - 2 * parseFloat(getComputedStyle(b).paddingTop)) / lh)), desactivado: b.disabled }; }),
+          barra: await pag.evaluate(() => { const b = document.getElementById('pasoAvanza'); if (!b) return null; const r = b.getBoundingClientRect(), sin = document.getElementById('gSinGuardar');
+            return { texto: b.textContent.trim(), ancho: Math.round(r.width), alto: Math.round(r.height), lineas: window.__lineasDe(b), desactivado: b.disabled,
+              barraAlto: Math.round(document.querySelector('#sp .act-bar').getBoundingClientRect().height), insigniaVisible: !!sin && !sin.classList.contains('hidden') }; }),
         };
       } catch (e) { errores.push('paso ' + n + ' a ' + ancho + ': ' + e.message); }
     }
