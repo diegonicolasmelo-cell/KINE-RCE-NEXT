@@ -3998,7 +3998,124 @@ cada estado a 390, 320 y 1100 px (fuera del repositorio).
   navegador anuncie** (no se probó con un lector de pantalla real: es lo que se deduce del marcado). Sin mover el foco no se puede contar con
   que se lea, y por eso lleva una región viva aparte.
 
-## 10-oct-2026 · Tanda 3 · paso 3.1 · «El error lleva al campo» también cuando el campo está plegado (cubre además el cambio 3 de la tanda 4)
+## 10-oct-2026 · Tanda 3 · Turno respiratorio: el aviso lleva al campo aunque esté plegado, una sola lista de lo que falta y las palabras de estado de cada bloque
+
+**De dónde sale.** Después de las tandas 1 (integridad) y 2 (guardado seguro), el plan de limpieza del registro de evolución seguía con el
+paso Turno y, dentro de él, Respiratorio. Una auditoría de solo lectura de las tandas 3, 4 y 5 dejó un diseño de siete cambios mínimos para
+la tanda 3. Se construyeron los cambios 1 a 5 en tres pasos (3.1, 3.2 y 3.3; un commit cada uno, cada guardia vista ROJA antes del arreglo);
+esta entrada es el cierre: junta lo que se hizo, deja la batería y la entrega. **Sin migración de esquema.** Las entradas de cada paso se
+conservan enteras más abajo, bajo «El detalle, paso a paso».
+
+**Los tres defectos que había** (los tres con el mismo origen: lo que la pantalla dice del estado del turno no salía de los datos ni de la
+misma regla que usa `guardar()`).
+1. **El aviso «falta esto» mandaba a un campo que no se veía.** A 390 px el panel es un acordeón: todas las tarjetas nacen plegadas y
+   Respiratorio además tiene dos sub-bloques cerrados. `_irAlCampo` solo cambiaba de paso, así que la PVE, la hemodinamia o las razones de
+   KTM quedaban dentro de un `display:none` y el foco caía en el vacío: un mensaje sin nada que tocar. (De paso: «Extubación» scrolleaba a
+   un id que no existe y a un input escondido, o sea a nada, desde que se renombró el bloque.)
+2. **Lo que falta para guardar vivía en tres listas** (dos paralelas dentro de `rielRender` y una en `guardar()`), y se habían desajustado:
+   `guardar()` frenaba por la hemodinamia y por la razón de «PVE superada sin extubar», pero el aviso «Falta:» no las nombraba. Descubría
+   la falta recién al apretar Guardar, justo lo que el aviso existe para evitar.
+3. **El estado de cada bloque era un scrape genérico** de cuatro controles (`_mResumen`) que solo existía en el celular: no veía lo que se
+   responde con botones (PVE, prono, secreciones, eventos de vía aérea, fase, sedantes, procedimientos) ni un 0 tecleado, así que decía
+   «— sin registrar» sobre bloques ya respondidos. En escritorio, donde hay MÁS bloques abiertos a la vez, el estado no existía.
+
+### Lo que cerró cada pieza
+
+| Paso (commit) | Cambios del plan | Defecto que cerraba | Cómo queda | Guardias (rojas antes, verdes después) |
+|---|---|---|---|---|
+| **3.1** (b281cdd) | 1 (cubre además el 3 de la tanda 4) | El aviso lleva a un campo plegado e invisible | `_abrirHastaCampo(el)`, contraparte de `_vis`: sube por los ancestros y abre SOLO lo que lo esconde por presentación (tarjeta, sub-bloque, `<details>`); la llaman `_irAlCampo` y el `scrollA` de `setEventoVA`. «Extubación» scrollea a `dExtSec` | `abrir_hasta_el_campo.js` (39 fallos antes, a 390 y 1200 px) |
+| **3.2** (64eaf3c) | 2 y 3 | Tres listas de obligatorios; el aviso callaba la hemodinamia y la razón de no extubar | `_obligatoriosPendientes()` devuelve `[{el, texto}]` en el orden de `guardar()`; `rielRender` la consume para la línea de `#gFalta` y para el «!» del celular | `obligatorios_una_sola_lista.js` (36 antes), `aviso_igual_que_guardar.js` (68 antes); `panel_ux.js` reconciliada con su razón |
+| **3.3** (5d5e1ce) | 4 y 5 | Estado por scrape, solo en celular, ciego a botones y a ceros | `estadoBloque()` calcula `sin / reg / rev` de los datos (la lista de 3.2, controles con valor y fuentes declaradas en `data-fuentes`); `ESTADO_PALABRAS` es la única constante de las tres palabras; se pinta en las tarjetas del Turno en escritorio y celular y en los tres sub-bloques de Respiratorio | `estado_del_bloque.js` (130 antes), `estado_visible_escritorio.js` (128 antes); `movil_panel.js` (R2 y R8) reconciliada con su razón |
+
+Los cuatro defectos viejos que aparecieron en las mismas líneas del paso 3.3 y se arreglaron con él: el resumen del encabezado se escribía
+con `innerHTML` **sin escapar** (un texto con `<img onerror>` tecleado en «Otro procedimiento» se ejecutaba), un resumen largo ensanchaba
+la tarjeta y empujaba el panel 18 px hacia la derecha, los botones no repintaban el estado ni el aviso «Falta:», y el posicionamiento
+plegado contaba como «no corresponde». Ninguno cambia lo que se guarda.
+
+### Lo que ve distinto la kinesióloga
+
+- **El aviso «falta esto» siempre deja el campo a la vista.** En el celular, si le falta la PVE, la hemodinamia o la razón de KTM, la tarjeta
+  o el sub-bloque que lo tapaba se despliega y el campo queda en pantalla y enfocado (las demás tarjetas siguen plegadas). Un «Otro
+  procedimiento» plegado también se abre.
+- **«Extubación» lleva a la PVE:** en escritorio y celular, al apretar el evento la pantalla se desliza al bloque «Extubación / PVE» y lo
+  contornea de azul 2,5 s, igual que ya hacían los otros cuatro eventos. Antes no pasaba nada a la vista.
+- **La línea «Falta:» nombra la hemodinamia:** una evolución en blanco pasa de «Falta: firma y vía aérea» a «Falta: firma y hemodinamia y vía
+  aérea» (con tubo: «…firma y hemodinamia y PVE sí / no / no corresponde»). Si la hemodinamia ya está puesta, que es lo común porque se copia
+  del turno anterior, no cambia nada. Si marca «PVE superada» y «no se extubó» sin decir por qué, lo pide antes de apretar Guardar.
+- **Tres palabras en cada tarjeta del turno** (6, o 7 con Neurología), en escritorio y celular: gris «Sin registrar», verde «Registrado»,
+  rojo «Requiere revisión», con lo que falta («falta la hemodinamia») y el resumen. En el celular reemplazan al «sin registrar» en
+  minúscula, también en los tres sub-bloques de Respiratorio, y desaparecen los falsos «—»: «Eventos de vía aérea» pasa a «Registrado» al
+  responder la PVE o declarar un evento, «Manejo respiratorio» al marcar secreciones. Un 0 tecleado (PEEP 0, PS 0, PAM 0) cuenta como dato.
+- El aviso «Falta:» también se actualiza al tocar botones (antes quedaba viejo hasta el siguiente tecleo). Un texto con `<` ya no se
+  ejecuta en el encabezado y un resumen largo ya no empuja la pantalla en el celular.
+- Las tarjetas de los otros pasos se ven como siempre: cada paso recibe las palabras cuando le toque su tanda, para no mezclar dos vocabularios.
+
+### Lo que NO cambió
+
+`guardar()`, `api()`, `gs()`, la franja `#gEstadoGuardado` y los `avErr*` no se tocaron (las guardias miden `guardar()` solo desde afuera);
+lo que se manda al servidor es idéntico (`guardado_viajes` y `episodio_turno`, las guardias A/B del payload, siguen verdes). Los eventos de
+vía aérea se siguen registrando a mano y la PVE, la KTR, el modelo de tres ejes y el lugar de cada bloque quedan donde estaban. No hay hoja ni
+columna nueva.
+
+### Lo que queda abierto a propósito
+
+- 🔴 **Los cambios 6 y 7 del plan NO se ejecutaron.** El 6 (quitar los cascarones vacíos de Traqueostomía y Decanulación) espera la decisión
+  sobre cómo se anota una TQT al ingresar con tubo (H3, confirmado en pantalla: hoy el bloque muestra solo su título y ningún control
+  visible). El 7 (plegar por defecto en escritorio) espera las decisiones sobre lo heredado y sobre qué plegar. Los dos viven en
+  `docs/PENDIENTES.md`, sección 2d.
+- **Ya implementado con la opción recomendada y esperando su confirmación** (2d, las marcadas con ✅): el aviso que nombra la hemodinamia, las
+  tres palabras de estado, que «Extubación» lleve a la PVE, el orden de la frase del encabezado y el aviso que se actualiza al tocar botones.
+  Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`.
+- **Decisiones de Diego sin ejecutar** (las de la auditoría que no se tomaron y las que dejaron los pasos): lo heredado del turno anterior,
+  plegar en escritorio, la KTR en blanco, la PVE con TQT + VM, los textos fijos, la TQT al ingresar, la firma en el celular y los chips de
+  Evaluaciones con el mismo defecto de plegado. Cada una con su recomendación en 2d.
+- **Dos listas que siguen paralelas por orden de la tanda:** `guardar()` conserva la suya (con sus toasts); un obligatorio nuevo hay que sumarlo
+  en los dos sitios y `aviso_igual_que_guardar.js` avisa si se olvida uno. Y `_mFaltaTxt` sigue siendo una tabla de nombres cortos que dice «un
+  dato obligatorio» para los que no conoce.
+- **No se midió en un aparato real:** todo se probó en el Chromium de Playwright con un `google.script.run` simulado y el reloj inventado, no en
+  el Chrome de Windows 10 del hospital. La orientación y el teclado virtual de un celular de verdad (que pueden tapar el campo centrado) no
+  se midieron.
+
+### Cierre de la tanda
+
+- **Sello `NEXT-5.7-turno-respiratorio`** en `build/empaquetar_cohete.js` y en los dos sitios del fuente (`<meta name="rce-version">` y el
+  texto de «La app no pudo iniciar»). `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados.
+- **Batería completa (`-j 2`): 230 verdes, 0 rojas** (546 s). Eran 225 al cierre de la tanda 2; se suman las cinco guardias de esta
+  (`abrir_hasta_el_campo`, `obligatorios_una_sola_lista`, `aviso_igual_que_guardar`, `estado_del_bloque`, `estado_visible_escritorio`).
+  `paridad_entrega` y `pwa_paquete`, que durante los pasos estaban rojas por la regeneración pendiente, quedan verdes.
+- **`node build/medir_guardado.js`** (viajes a hojas por acción): abrir 3, reabrir 3, turno nuevo **13**, re-guardar **17**, ingreso **13**,
+  decanulación **13**, reintubación **14**. Los techos (14, 18, 14, 14, 15) no subieron: idénticos a la tanda 2, como corresponde a una tanda
+  que no toca lo que `guardar()` manda ni el servidor.
+- **Qué pegar** en el editor de Apps Script, desde `entrega/`: **solo `index.html`** (el cohete). Ningún `.gs` cambió desde el cierre de la
+  tanda 2 (`node build/que_pegar.js 1d70aa0` lo confirma: 1 archivo). Si la planilla se quedó en 5.6 o antes, ver la lista de la tanda 2.
+  Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes.
+- **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian; no hay hoja ni columna nueva.
+- **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app instalada
+  para que el sello de versión renueve su caché. El sello `NEXT-5.7-turno-respiratorio` debe aparecer en «Cargando…»; si no aparece, lo pegado
+  no es lo nuevo. Recordatorio de la tanda 2: la prueba con DOS aparatos sigue pendiente antes de pegar en NEXT.
+- **Cómo revertir:** cada paso es un commit (b281cdd, 64eaf3c, 5d5e1ce) y el cierre es otro; `git revert` deshace lo que se quiera. Ninguna
+  columna cambió, así que no hay datos que migrar de vuelta.
+
+### Para no olvidar (de toda la tanda)
+
+- 🪤 **Lo que un aviso nombra y lo que el guardado exige tienen que salir de la misma lista.** Dos listas paralelas se desajustan en silencio
+  (pasó con la hemodinamia). Mientras `guardar()` conserve la suya, `aviso_igual_que_guardar.js` es la red: mide `guardar()` desde afuera.
+- 🪤 **«Oculto por presentación» no es «oculto por lógica».** `_vis` quita el plegado a propósito para preguntar si el campo corresponde; para
+  preguntar si SE VE hay que medir la geometría real (rectángulo con tamaño, ningún ancestro `display:none`, ningún `<details>` cerrado), o la
+  guardia da verde justo donde el campo no se ve.
+- 🪤 **Un estado calculado de los datos tiene que declarar sus fuentes.** Un `<input type=hidden>` o un botón no aparecen en un scrape de controles;
+  `data-fuentes` los nombra y la guardia exige que cada hidden y cada botón de las tarjetas esté declarado o exento con su motivo.
+- 🪤 **Un 0 tecleado es dato; el 0 de un `<select>` sin opción en blanco no lo es** (la KTR nace en 0: decisión abierta).
+- 🪤 **Los sub-bloques de Respiratorio se arman UNA vez por página** y conservan lo que abrió el escenario anterior; una guardia que los use los
+  devuelve a su estado de nacimiento antes de cada escenario.
+- 🪤 **`.sp-2col{grid-template-columns:1fr}` es `minmax(auto,1fr)`:** un texto sin partir ensancha la columna. Con `minmax(0,1fr)` y puntos
+  suspensivos no desborda.
+
+### El detalle, paso a paso
+
+Las tres entradas que siguen son las que se escribieron durante la tanda, sin cambios de contenido (solo bajaron un nivel de título).
+
+### 10-oct-2026 · Tanda 3 · paso 3.1 · «El error lleva al campo» también cuando el campo está plegado (cubre además el cambio 3 de la tanda 4)
 
 **El defecto.** `_irAlCampo` (la que llaman los avisos de «falta esto» de `guardar()` y las validaciones del ingreso) solo cambiaba de
 PASO. Pero a 390 px el panel es un acordeón: `mAcordeonInit` pliega TODAS las tarjetas (`mcol`) y Respiratorio, además, nace con dos
@@ -4058,7 +4175,7 @@ que `regresion_ui` llama «anotable» (solo mira que el cascarón no tenga la cl
 
 **Sin migración de esquema.** `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
 
-## 10-oct-2026 · Tanda 3 · paso 3.2 · Una sola lista de obligatorios, y el aviso «Falta:» nombra la hemodinamia y la razón de no extubar (cambios 2 y 3)
+### 10-oct-2026 · Tanda 3 · paso 3.2 · Una sola lista de obligatorios, y el aviso «Falta:» nombra la hemodinamia y la razón de no extubar (cambios 2 y 3)
 
 **El defecto.** Lo que falta para poder guardar existía en TRES listas: dos paralelas dentro de `rielRender` (una de textos para la línea
 «Falta:» de `#gFalta` y otra de elementos para el «!» de los encabezados del celular) y una tercera, con sus toasts, en `guardar()`.
@@ -4131,7 +4248,7 @@ la auditoría era cierta: el aviso quedaba vacío en los cinco escenarios medido
 - No se cambió el modo de unir las frases (« y »), ni `_vis`, ni la PVE, ni ningún id; sin migración de esquema. `entrega/`, `pwa/` y la `VERSION`
   quedan para el cierre (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
 
-## 10-oct-2026 · Tanda 3 · paso 3.3 · Las palabras de estado de cada bloque, calculadas de los datos y visibles en escritorio y celular (cambios 4 y 5)
+### 10-oct-2026 · Tanda 3 · paso 3.3 · Las palabras de estado de cada bloque, calculadas de los datos y visibles en escritorio y celular (cambios 4 y 5)
 
 **El defecto.** El encabezado de cada tarjeta del celular decía «✓ / — / !» con `_mResumen`, un scrape genérico: copiaba hasta cuatro
 controles `<input>`/`<select>`/`<textarea>` a la vista y tiraba todo `'0'`. Lo que no es uno de esos tres controles no existía para él.

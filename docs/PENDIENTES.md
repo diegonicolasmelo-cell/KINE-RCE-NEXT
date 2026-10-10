@@ -1,17 +1,23 @@
-# Pendientes — al 10-oct-2026 (con la tanda 2 de guardado seguro)
+# Pendientes — al 10-oct-2026 (con la tanda 3 del turno respiratorio)
 
 > Lo que está **decidido** vive en `docs/ACUERDOS_REDISENO.md`, con las palabras
 > de Diego. Esto es la otra mitad: lo que **falta probar**, lo que **falta
 > decidir** y lo que **se encontró y no se arregló**.
 >
 > 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G), y la **tanda 1
-> (integridad) y la tanda 2 (guardado seguro)** también: hoy son **225 guardias en
-> verde**. Lo que no existe todavía es **la prueba en la planilla de NEXT**: nada
-> de esto se ha pegado ni visto en un navegador del hospital.
+> (integridad), la tanda 2 (guardado seguro) y la tanda 3 (turno respiratorio,
+> cambios 1 a 5)** también: hoy son **230 guardias en verde**. Lo que no existe
+> todavía es **la prueba en la planilla de NEXT**: nada de esto se ha pegado ni
+> visto en un navegador del hospital.
 >
 > 🔴 **Lo más urgente ahora es la sección 2c**: la tanda 2 dejó varias decisiones
 > ya implementadas con la opción recomendada, esperando tu confirmación, y una
 > prueba con dos aparatos que hay que hacer **antes** de pegar.
+>
+> 🟠 **La sección 2d es de la tanda 3**: cinco decisiones ya implementadas (✅) y
+> nueve por decidir. Los cambios 6 y 7 de esa tanda (cascarones vacíos de
+> Traqueostomía y Decanulación; plegar el Turno en escritorio) esperan tus
+> respuestas a las 7, 8 y 12.
 
 ---
 
@@ -241,6 +247,80 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     se repinta (cerca de un segundo), un clic en esa ventana toma al paciente nuevo mientras la pantalla muestra al anterior. La misma
     ventana existía al abrir el panel. *Recomendado: tanda aparte* (se cierra llevando el paciente en la tarjeta misma).
 
+## 2d · Decisiones de la tanda 3 (turno respiratorio, 10-oct)
+
+> 🟢 **Las ✅ de la parte A (de la 1 a la 5) YA ESTÁN HECHAS con la opción que recomiendo** y esperan que las confirmes o las cambies. Si dices que
+> no, cada una se revierte con una línea; ninguna toca el esquema de la planilla ni lo que se guarda.
+>
+> 🟠 **Los cambios 6 y 7 del plan de la tanda 3 NO se hicieron**, a propósito: dependen de las decisiones 7, 8 y 12 de abajo. El 6 quita
+> los cascarones vacíos de Traqueostomía y Decanulación; el 7 pliega por defecto el Turno en escritorio. Con tus respuestas se hacen.
+>
+> ✍️ **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escriben con tus palabras cuando respondas. Dilas por número.
+
+**A · Ya implementadas, esperan confirmación**
+
+1. **El aviso «Falta:» nombra la hemodinamia y la razón de «PVE superada sin extubar».** ✅ Hasta ahora la línea de arriba decía solo
+   «firma y vía aérea», pero al guardar el sistema también te frena si falta la hemodinamia (lo pediste el 20-sep: «como la firma») o la
+   razón de no extubar. *Lo que ves:* una evolución en blanco dice «Falta: firma y hemodinamia y vía aérea»; si la hemodinamia ya está
+   puesta (lo común, porque se copia del turno anterior) no cambia nada. *Recomendado: sí.* Si dices que no, se revierte una línea y dos frases
+   de una guardia, pero entonces el bloque de Hemodinamia no podría decir «Requiere revisión» de forma honesta.
+2. **Tres palabras de estado en cada tarjeta del turno.** ✅ «Sin registrar» (gris), «Registrado» (verde) y «Requiere revisión» (rojo), en
+   escritorio y celular, calculadas de los datos; «Requiere revisión» es **solo** un obligatorio pendiente (la misma lista del aviso
+   «Falta:»). Por ahora solo en el paso Turno: cada paso las recibe cuando le toque su tanda, para no mezclar dos vocabularios.
+   *Recomendado: sí.*
+3. **«Extubación» ahora lleva a la PVE.** ✅ Antes el botón declaraba el evento y no movía la pantalla (apuntaba a un bloque que ya no existe);
+   ahora la desliza al bloque «Extubación / PVE» y lo contornea de azul 2,5 s, igual que los otros cuatro eventos. *Recomendado: dejarlo.* Si
+   no lo quieres, se revierte esa sola palabra.
+4. **Orden de la frase del encabezado:** «palabra · lo que falta · resumen». ✅ Se puso así porque el resumen se corta con puntos suspensivos y
+   al final se perdía justo lo accionable. La alternativa es «resumen — falta X» como antes. *Recomendado: dejarlo.*
+5. **El aviso «Falta:» se actualiza también al tocar botones.** ✅ Antes quedaba viejo hasta el siguiente tecleo (respondías la PVE y seguía
+   diciendo que faltaba). Es un cambio de comportamiento menor y visible. *Recomendado: dejarlo.*
+6. **Comas en vez de « y » cuando faltan tres o más cosas.** (No hecha.) Hoy lee «firma y hemodinamia y vía aérea»; con comas sería «firma, hemodinamia y vía
+   aérea». Es una línea, pero cambia frases que otras guardias fijan, así que va en un paso aparte con ellas. *Recomendado: comas, sin
+   apuro (es de lectura, no de seguridad).*
+
+**B · Falta decidir (no están hechas)**
+
+7. **Lo heredado del turno anterior, ¿«Requiere revisión»?** Hoy lo que se copia del turno anterior (sedación, parámetros, hemodinamia, KTR)
+   cuenta como «Registrado» aunque nadie lo haya mirado, y el marcado en ámbar de lo heredado no funciona en el flujo por pasos (es la
+   sección 4b). Incluye lo que nace puesto: «Sin sedación» ya viene elegida y Sedación nace «Registrado». *Recomendado: sí, pero como palabra
+   y color ámbar en el encabezado del bloque («Requiere revisión: heredado del turno anterior»), NO como aviso nuevo al guardar, para que no
+   aparezca un cartel en cada guardado; el sistema solo marca, nunca decide por ti.* **Debe resolverse antes de la 8**, porque plegar lo
+   «Registrado» sin esto esconde justo lo que nadie confirmó.
+8. **¿Que algunas tarjetas del turno partan plegadas en escritorio?** Hoy las 6 están abiertas a la vez. Ojo con tu diagnóstico del 7.9: «lo
+   que no se ve, no se llena». *Recomendado: sí, con una regla corta que puedas explicar:* parten abiertas las que NO están registradas o
+   requieren revisión, y siempre abiertas Fase clínica y Respiratorio; se pliegan solo las que ya tienen su dato confirmado. Solo tarjetas, no
+   sub-bloques, en esta primera vuelta. Si prefieres todo abierto, el cambio 7 se descarta.
+9. **La KTR (sesiones de kinesiterapia respiratoria), ¿nace en blanco y no se copia del turno anterior?** Hoy nace en 0 sin opción en blanco y se
+   copia, así que no se distingue «no lo anoté» de «hice 0 sesiones» y puede contar atenciones que nadie hizo en este turno. Mientras tanto,
+   «Manejo respiratorio» puede decir «Sin registrar» con la KTR en 0. *Recomendado: sí* (las sesiones son un acto de ese turno, no un estado que
+   arrastra; la regla «un 0 se guarda como 0 y vacío no es 0» lo pide). Toca el dato de las atenciones y el REM, y está unida a la 3 de la
+   sección 2b (el CSV exporta 0 donde nadie anotó). No cambia su lugar ni su nombre.
+10. **PVE con traqueostomía + ventilación mecánica** (es la 10 de la sección 2, ahora con una consecuencia nueva): con tubo la PVE se pregunta
+    siempre; con TQT + VM, nunca, así que el estado del bloque jamás puede decir «Sin registrar» para ella. *Recomendado: decidir después de esta
+    tanda y antes de la tanda de Evaluaciones,* para no cambiar dos veces el significado del bloque.
+11. **Textos fijos del paso.** Quedan pocos: «Si hoy no pasó nada con la vía aérea, no toques nada», y en Procedimientos «Se registran solos con
+    la evolución» y «Eventos del turno (no derivables)» (jerga). ¿Se quitan, se reescriben o van a una ayuda que se abre al tocar?
+    *Recomendado: no inventar un botón de ayuda todavía* (en el celular no existe el «pasar el mouse» y no pediste más botones); mantener la
+    frase de la vía aérea (evita declarar eventos por reflejo) y reescribir «no derivables» como «Eventos que marcas tú». La ayuda bajo demanda
+    sería un diseño aparte, con opciones antes de tocar código.
+12. **Traqueostomía al ingresar con tubo (H3, confirmado en pantalla a 1200 y 390 px).** Al ingresar un paciente con TOT la fila «¿Qué pasó hoy
+    con la vía aérea?» está oculta (por diseño: «al ingresar no hay "venía con"») y el bloque «Traqueostomía» muestra solo su título, sin ningún
+    control. Elegir «TQT» como vía aérea de llegada la trata como estado de llegada, no como evento: no registra hora, técnica ni cánula.
+    Tres caminos: (1) que el ingreso con TOT muestre los botones de evento, (2) que el bloque muestre su propia casilla visible solo en
+    ingreso, (3) dejarlo así porque en un ingreso la TQT se anota como llegada. Es decisión clínica. *Recomendado: mirarlo juntos en la
+    planilla de NEXT antes de hacer el cambio 6; mi inclinación es la 1* (reutiliza el camino de eventos que ya existe y deja hora, técnica y
+    cánula), salvo que en la unidad una TQT al ingreso siempre sea «llegó con TQT», caso en que la 3 es válida.
+13. **La firma sin elegir, en el celular.** Si aprietas Guardar sin firma estando en Planes, el aviso dice «Debes seleccionar la firma» pero la
+    firma no se ve (la tarjeta «Cerrar el turno» nace plegada): `guardar()` hace un `focus()` directo que no abre nada. Dos caminos,
+    combinables: (a) autorizar tocar UNA línea de `guardar()` (usar `_irAlCampo('fFirma')` en vez de ese `focus()`), o (b) dejar abierta la
+    tarjeta única de Planes al entrar en celular (decisión 4 de la tanda 4). *Recomendado: (a)* —`guardar()` está cerrado desde la tanda 2, por
+    eso espera tu visto bueno—; la guardia pasa sola y su línea «conocido» se vuelve una aserción.
+14. **Los chips de Evaluaciones y `transOfIr` con el mismo defecto de tarjeta plegada.** A 390 px, con las tarjetas plegadas como las deja el
+    acordeón al abrir, los 7 chips que «llevan al campo» sin abrir un modal (PIM, dinamometría, PEM, FEmáx, IMS, ecografía, deglución) dejan su campo
+    invisible; `transOfIr` tiene el mismo patrón y no se midió. La corrección es llamar `_abrirHastaCampo(el)` antes de su `scrollIntoView`.
+    *Recomendado: sí,* una línea por sitio; es la misma clase de defecto que la tanda 3 ya corrigió para los avisos, y va con la tanda de Evaluaciones.
+
 ## 3 · Pendientes viejos, de antes del rediseño
 
 - Sacarle el **estado previo a la TQT** — Diego dijo que ahí es irrelevante.
@@ -260,6 +340,9 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 | ✅ **`_evalHoy` mira la fecha en UTC** — ARREGLADO 4-oct (tanda 1) | `fillForm` | Ahora se compara con la fecha del turno que se reabre. Guardia `eval_hoy_fecha_del_turno.js`. |
 | 🟠 **`_camaPanel` está definida dos veces** | `index.html` | Las dos hacen lo mismo hoy; si una cambia, gana la de más abajo sin avisar. |
 | 🟠 **El P0.1 no entra en la «evaluación intermedia» ni en el REM** | informes | Se guarda y se narra, pero los conteos de evaluaciones no lo miran. |
+| 🟠 **`guardar()` y el aviso «Falta:» siguen con listas propias** (tanda 3) | `guardar()`, `_obligatoriosPendientes()` | `guardar()` está cerrado desde la tanda 2 y conserva su lista con sus toasts. Un obligatorio nuevo hay que sumarlo en los DOS sitios; `aviso_igual_que_guardar.js` avisa si se olvida uno. |
+| 🟠 **`_mFaltaTxt` dice «un dato obligatorio» para lo que no conoce** (tanda 3) | `index.html` | Las razones de la PVE, el tipo de extubación sin PVE y la hora de la reintubación salen genéricas en el encabezado del celular. Usar el texto de `_obligatoriosPendientes()` cambiaría frases que otras guardias fijan. |
+| 🟠 **Una tecla suelta no repinta el estado de un bloque** (tanda 3) | `index.html` | Se repinta con `input`, `change`, `click` sobre un botón y al cambiar de paso. El Enter en «Resultado(s)» del cultivo no repinta hasta el siguiente evento (la casilla «Cultivo» ya cuenta). |
 
 Los que figuraban aquí el 1-oct —el FEM narrado en L/min, el BDT con las dos
 casillas, los índices de esfuerzo sin relato, el «no corresponde» sin razón—
@@ -297,14 +380,16 @@ línea, pero haría aparecer un aviso nuevo en cada guardado de cada turno con d
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.6-guardado-seguro`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.7-turno-respiratorio`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 📦 **Archivos a pegar en el editor** (de la carpeta `entrega/`): `api.gs`,
   `dominio.gs`, `infra.gs`, `servicios.gs`, `webapp.gs` y el `index.html` (el
   cohete). Compáralos con `cmp`, no a ojo: el portapapeles corrompe los acentos en
   los archivos grandes. Son los mismos seis si tu planilla se quedó en la versión
   5.4: traen también la tanda 1.
-- ✅ **La tanda 1 y la tanda 2 NO cambian el esquema**: no hay hoja ni columna
+  **La tanda 3 solo cambia `index.html`**: si la planilla ya está en 5.6, es el
+  único archivo que hay que pegar.
+- ✅ **La tanda 1, la tanda 2 y la tanda 3 NO cambian el esquema**: no hay hoja ni columna
   nueva, así que **no hace falta correr `crearORepararEstructura()` por ellas**
   (la corrida de arriba es solo para una planilla que viene de antes del
   rediseño de septiembre). `CONTRATO_ESTRICTO` no necesita fila en la hoja CONFIG:

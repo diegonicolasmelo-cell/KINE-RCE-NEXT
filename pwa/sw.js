@@ -29,7 +29,7 @@
  * el código nuevo SÍ está.
  */
 const PREFIJO = 'rce-armazon-';
-const CACHE = PREFIJO + 'NEXT-5.6-guardado-seguro';
+const CACHE = PREFIJO + 'NEXT-5.7-turno-respiratorio';
 const ARMAZON = ['.', 'index.html', 'manifest.webmanifest',
   'iconos/icono-192.png', 'iconos/icono-512.png', 'iconos/icono-apple-180.png'];
 // La misma lista, ya resuelta contra el scope: es contra ESTAS direcciones, y no
