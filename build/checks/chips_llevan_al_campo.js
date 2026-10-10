@@ -16,6 +16,12 @@
 //     (con FSS-ICU y CPAx, como dice el rótulo de su cajón), NO dentro de la tarjeta de KTM. Así no
 //     depende del estado de la KTM ni de que la tarjeta esté a la vista (AET IIIC, BNM).
 //
+// 🔴 (F2, 10-oct-2026) TAMBIÉN A 390 px. La guardia medía a un solo ancho (1200) y por eso no veía que, en el celular,
+// el acordeón nace con TODAS las tarjetas plegadas (`mcol`): `pasoEvalMedir` abría el cajón de la familia pero no la
+// tarjeta «Evaluaciones» (`fcEval`), y los siete chips que no abren un modal (PIM, dinamometría, PEM, FEmáx, IMS,
+// ecografía, deglución) dejaban su campo invisible. Ahora la guardia corre a los dos anchos, parte de la tarjeta plegada
+// (lo exige) y pide, además del campo a la vista, que su tarjeta quede abierta.
+//
 // 🪤 «Cada cosa se mide donde vive»; reloj congelado (fecha inventada, turno forzado).
 //
 // Uso: node build/checks/chips_llevan_al_campo.js
@@ -32,8 +38,12 @@ const no = (l, g) => eq(l, !!g, 'false');
 
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium' });
-  const p = await b.newPage({ viewport: { width: 1200, height: 1500 }, locale: 'es-CL' });
-  const errs = []; p.on('pageerror', e => errs.push(e.message));
+  const errs = [];
+  for (const ancho of [1200, 390]) {
+  const movil = ancho === 390;
+  console.log('\n══════ pantalla de ' + ancho + ' px ══════');
+  const p = await b.newPage({ viewport: { width: ancho, height: movil ? 844 : 1500 }, locale: 'es-CL', isMobile: movil, hasTouch: movil });
+  p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => {
     window._ll = [];
     window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
@@ -55,6 +65,9 @@ const no = (l, g) => eq(l, !!g, 'false');
     if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
     pasoIr(3); await new Promise(r => setTimeout(r, 150));
   }, { turno });
+  /* ¿La tarjeta que contiene el campo sigue plegada (mcol)? Solo existe en el celular. */
+  const plegada = id => p.evaluate(i => { const e = document.getElementById(i), c = e && e.closest('.fcard'); return !!(c && c.classList.contains('mcol')); }, id);
+  const plegar = id => p.evaluate(i => { const e = document.getElementById(i), c = e && e.closest('.fcard'); if (c) c.classList.add('mcol'); }, id);
   const vis = id => p.evaluate(i => { const e = document.getElementById(i); if (!e) return false;
     const cs = getComputedStyle(e), r = e.getBoundingClientRect();
     for (let a = e; a && a !== document.body; a = a.parentElement) { if (getComputedStyle(a).display === 'none') return false; }
@@ -69,8 +82,12 @@ const no = (l, g) => eq(l, !!g, 'false');
     const lista = await chips();
     si('(hay chips sin modal que probar)', lista.length >= 6);
     for (const c of lista) {
+      /* A 390 px la tarjeta de Evaluaciones nace plegada y, una vez abierta por un chip, los demás ya no medirían nada:
+         se vuelve a plegar (es el estado en que la deja el acordeón al abrir el panel) y se exige que parta plegada. */
+      if (movil) { await plegar(c.campo); si('★ (390 px) de partida la tarjeta de «' + c.k + '» está plegada', await plegada(c.campo)); no('★ (390 px) …y su campo NO se ve', await vis(c.campo)); }
       await tocar(c.k);
       si('★★ «' + c.k + '» deja a la vista su campo (' + c.campo + ')', await vis(c.campo));
+      if (movil) no('★★ (390 px) …y su tarjeta ya no está plegada', await plegada(c.campo));
     }
   }
 
@@ -88,6 +105,7 @@ const no = (l, g) => eq(l, !!g, 'false');
     ['con AET grupo IIIC (la tarjeta de KTM se esconde)', "() => { $('cAET').checked = true; $('fAETnivel').value = 'IIIC'; hAET(); aplicarGatesEval(); }"]]) {
     await abrir('Noche');
     await p.evaluate(fn => new Function('return (' + fn + ')')()(), armar);
+    if (movil) await plegar('imsBtn');
     await tocar('ims');
     si('★★ ' + etq + ': el IMS se alcanza', await vis('imsBtn'));
   }
@@ -99,6 +117,9 @@ const no = (l, g) => eq(l, !!g, 'false');
     const c = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
     return c ? { ims: c.d.EVAL_IMS, ktm: c.d.KTM_REALIZADA } : null; });
   eq('★★ el IMS medido de noche, con la KTM neutra, viaja al guardado y no inventa una KTM', viaja && (viaja.ims + '|' + viaja.ktm), '7|false');
+
+  await p.close();
+  }
 
   eq('sin errores de JavaScript', errs.join(' | ') || '(ninguno)', '(ninguno)');
   await b.close();

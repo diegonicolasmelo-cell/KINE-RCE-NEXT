@@ -7953,6 +7953,10 @@ function pasoEvalMedir(kind){
       const dE = $('dEgr'), ya = dE && !dE.classList.contains('hidden') && dE.getAttribute('data-fam') === fam.dataset.fam;
       if(!ya) evFamAbrir(fam.dataset.fam);     // tocar la abierta la CERRARÍA: por eso solo si no está abierta
     }
+    /* 🔴 F2 (10-oct-2026) · Y LA TARJETA PLEGADA DEL CELULAR. A 390 px el acordeón nace con TODAS las tarjetas plegadas
+       (`mcol`): el chip abría el cajón y la familia, pero «Evaluaciones» seguía con `display:none` y el campo quedaba
+       invisible (PIM, dinamometría, PEM, FEmáx, IMS, ecografía, deglución). Medido en chips_llevan_al_campo.js a 390 px. */
+    _abrirHastaCampo(el);
     el.scrollIntoView({ block:'center' }); el.focus();
   }
 }
@@ -10068,15 +10072,18 @@ function transOfAbrir(ev){
   $('trOfHora_'+ev)?.focus();
 }
 
-/** Cierra el modal y lleva al bloque donde el evento se anota a mano. */
+/** Cierra el modal y lleva al bloque donde el evento se anota a mano.
+    🔴 F2 (10-oct-2026) · Antes apuntaba a `cf.ancla` con un scroll directo, y eso no llevaba a ninguna parte en NINGÚN
+    ancho: el aviso sale al apretar Guardar (paso 5) y esto ni cambiaba de paso; además `fPVEval` es un <input
+    type=hidden> y `cIntubO`/`cDecanOcurrio` son casillas que el módulo del evento (21-sep) dejó escondidas (el evento se
+    declara con los botones de «Eventos de vía aérea»). Ahora va al BOTÓN del evento, que es donde se declara, por el mismo
+    camino de todos los avisos (`_irAlCampo`: cambia de paso, abre la tarjeta y el sub-bloque plegados, enfoca y contornea).
+    El ancla vieja queda de respaldo por si la fila no está (no debería: el aviso solo sale con «venía con»). */
 function transOfIr(ev){
   const cf=_TRANS_EVENTOS[ev]; if(!cf) return;
   transAvisoCerrar();
-  const el=$(cf.ancla); if(!el) return;
-  el.scrollIntoView({behavior:'smooth',block:'center'});
-  el.style.outline='2px solid var(--danger)';
-  setTimeout(()=>{ el.style.outline=''; },2800);
-  try{ el.focus({preventScroll:true}); }catch(e){}
+  const el=document.querySelector('#evVAfila .ev-va[data-ev="'+ev+'"]') || $(cf.ancla); if(!el) return;
+  _irAlCampo(el);
 }
 
 /**
@@ -10163,15 +10170,19 @@ function transAvisoGuardar(){
 
 // H4: espejo cliente de los rangos de dominio_validacion.gs (servidor sigue
 // validando igual — esto solo ahorra el round-trip al dedazo evidente)
+/* 🔴 F2 (10-oct-2026) · Devuelve {msg, id}, no solo el texto: el id es el campo que está mal, para que guardar() pueda
+   LLEVAR a la persona hasta él con `_irAlCampo`. Antes devolvía solo el mensaje y el aviso quedaba en un toast: con un
+   FiO₂ de 5 escrito en Respiratorio y el colega parado en Planes (en el celular, con la tarjeta plegada) leía «FiO₂ (%)
+   fuera de rango (21-100): 5» sin ver dónde corregirlo. El mensaje no cambia. */
 function _validarRangosCliente(){
   const errs=[];
   const r=(id,lbl,min,max)=>{ const s=v(id); if(s==='') return;
-    const x=parseFloat(s); if(isNaN(x)||x<min||x>max) errs.push(`${lbl} fuera de rango (${min}-${max}): ${s}`); };
+    const x=parseFloat(s); if(isNaN(x)||x<min||x>max) errs.push({ msg:`${lbl} fuera de rango (${min}-${max}): ${s}`, id }); };
   r('fEdad','Edad',15,110); r('fTalla','Talla (cm)',100,230);
   r('r_fio2','FiO₂ (%)',21,100); r('r_spo2','SpO₂ (%)',0,100);
   r('r_vt','VT (ml)',50,1500); r('r_fr','FR (rpm)',4,60);
   const pp=parseFloat(v('r_peep'));
-  if(v('r_peep')!=='' && !isNaN(pp) && pp>30) errs.push('PEEP > 30 cmH₂O — verificar: '+v('r_peep'));
+  if(v('r_peep')!=='' && !isNaN(pp) && pp>30) errs.push({ msg:'PEEP > 30 cmH₂O — verificar: '+v('r_peep'), id:'r_peep' });
   return errs;
 }
 
@@ -10388,7 +10399,12 @@ function _vis(el){
    quedaban a la vista. Esta es la contraparte de `_vis`: abre SOLO la cadena que esconde al campo (la tarjeta, el
    sub-bloque y los <details> que lo contienen; las demás tarjetas siguen plegadas) y devuelve true si abrió algo.
    No toca datos ni ninguna ruta de guardado; en escritorio no hay `mcol` ni `msub` y solo puede abrir un <details>.
-   Lo cuida abrir_hasta_el_campo.js. */
+   Lo cuida abrir_hasta_el_campo.js.
+   🔴 F2 (10-oct-2026) · Dos pliegues más, los de los campos que `guardar()` valida y que se esconden por presentación:
+   la FICHA del episodio (`#fcId`: edad y talla; fuera del ingreso nace oculta y se destapa a pedido, `fichaAplicar`) y la
+   FAMILIA de Evaluaciones (`.evFam`: el APACHE vive en «Preingreso» y el cajón compartido muestra una sola familia a la
+   vez, `evFamAbrir`). Sin ellas, un APACHE o una edad fuera de rango avisaban y mandaban a un lugar vacío. Se abren con las
+   mismas funciones que usa quien las toca a mano, no con una copia de su lógica. */
 function _abrirHastaCampo(el){
   let abrio=false;
   for(let a=el; a && a!==document.body; a=a.parentElement){
@@ -10397,6 +10413,13 @@ function _abrirHastaCampo(el){
     else if(cl && cl.contains('msub-b') && pa && pa.classList.contains('cerrado')){ pa.classList.remove('cerrado'); abrio=true; }
     // el <summary> de un <details> cerrado SÍ se ve cerrado: no hay que abrirlo para llegar a él
     else if(a.tagName==='DETAILS' && !a.open && !(el.closest && el.closest('summary') && el.closest('summary').parentElement===a)){ a.open=true; abrio=true; }
+    // la ficha plegada (edad, talla...): fichaAplicar(true) es lo que hace el chip de la ficha
+    else if(a.id==='fcId' && cl && cl.contains('hidden') && typeof fichaAplicar==='function'){ fichaAplicar(true); abrio=true; }
+    // la familia de Evaluaciones que el cajón compartido no está mostrando (tocar la abierta la CERRARÍA: por eso solo si no lo está)
+    else if(cl && cl.contains('evFam') && typeof evFamAbrir==='function'){
+      const dE=$('dEgr');
+      if(!(dE && !dE.classList.contains('hidden') && dE.getAttribute('data-fam')===a.dataset.fam)){ evFamAbrir(a.dataset.fam); abrio=true; }
+    }
   }
   return abrio;
 }
@@ -10404,8 +10427,13 @@ function _abrirHastaCampo(el){
 function _irAlCampo(id){
   const e=(typeof id==='string')?$(id):id; if(!e) return;
   const due=e.closest('[data-paso]');
-  const paso=due?parseInt(due.dataset.paso||'2',10):2;
-  if(typeof pasoIr==='function' && paso && paso!==PASO_ACTUAL) pasoIr(paso);
+  let paso=due?parseInt(due.dataset.paso||'2',10):2;
+  if(isNaN(paso)) paso=2;
+  /* 🔴 F2 (10-oct-2026) · La identificación (`#fcId`: nombre, RUT, edad, talla) es del paso 0, y ese paso solo existe
+     mientras se ingresa (pasoIr lo recorta a 1). Fuera del ingreso la ficha se destapa dentro del Turno (2): con el 0 el
+     viejo `paso &&` daba falso y un aviso de edad o talla fuera de rango se quedaba donde estaba, sin ir a ningún lado. */
+  if(paso===0 && v('cIng')!=='true') paso=2;
+  if(typeof pasoIr==='function' && paso!==PASO_ACTUAL) pasoIr(paso);
   setTimeout(function(){
     try{ _abrirHastaCampo(e); e.scrollIntoView({block:'center'}); e.focus(); }catch(x){}
     e.style.outline='2px solid var(--danger)';
@@ -10430,8 +10458,11 @@ function guardar() {
   // ★ Firma OBLIGATORIA — no se puede guardar sin firma del kinesiólogo ★
   if(!v('fFirma') || !String(v('fFirma')).trim()){
     toast('⚠️ Debes seleccionar la firma del kinesiólogo antes de guardar');
-    const sel=$('fFirma');
-    if(sel){ sel.focus(); sel.style.outline='2px solid var(--danger)'; setTimeout(()=>{sel.style.outline='';},2500); }
+    /* 🔴 F2 (10-oct-2026) · Esto era un `focus()` directo sobre la firma. La firma vive en «Cerrar el turno», una tarjeta
+       que en el celular nace PLEGADA (`display:none`): el aviso decía «Debes seleccionar la firma» y el foco caía en el
+       vacío (medido a 390 px, parado en Planes). `_irAlCampo` abre la tarjeta, enfoca y contornea en rojo, igual que
+       todos los demás avisos de «falta esto». */
+    _irAlCampo('fFirma');
     return;
   }
   /* ★ HEMODINAMIA OBLIGATORIA (Diego, 20-sep-2026: «HDN pedir antes de
@@ -10554,15 +10585,17 @@ function guardar() {
   const _apv=v('fApache');
   if(_apv!=='' && (!/^\d+$/.test(String(_apv).trim()) || +_apv>71)){
     toast('⚠️ APACHE II fuera de rango: entero entre 0 y 71 (o déjalo vacío)');
-    const ap=$('fApache');
-    if(ap){ ap.focus(); ap.style.outline='2px solid var(--danger)'; setTimeout(()=>{ap.style.outline='';},2500); }
+    /* 🔴 F2 · El `focus()` directo no hacía nada si el APACHE estaba en otro paso, en una tarjeta plegada o en la familia
+       «Preingreso» de Evaluaciones ya cerrada por otra: `_irAlCampo` cambia de paso y abre lo que lo esconde. */
+    _irAlCampo('fApache');
     return;
   }
   // ★ H4: rangos fisiológicos en el CLIENTE (misma tabla que el servidor,
   //   dominio_validacion.gs) — el dedazo se detecta al instante, sin round-trip ★
   const _errsR=_validarRangosCliente();
   if(_errsR.length){
-    toast('⚠️ '+_errsR[0]);
+    toast('⚠️ '+_errsR[0].msg);
+    _irAlCampo(_errsR[0].id);   // 🔴 F2: el mismo campo del mensaje, a la vista y con el foco (antes: solo el toast)
     return;
   }
   // ★ Etapa 1(b) + 2: avisos NO bloqueantes antes de guardar — cambio de

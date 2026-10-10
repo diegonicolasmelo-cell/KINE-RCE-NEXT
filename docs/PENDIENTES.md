@@ -321,12 +321,14 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     ingreso, (3) dejarlo así porque en un ingreso la TQT se anota como llegada. Es decisión clínica. *Recomendado: mirarlo juntos en la
     planilla de NEXT antes de hacer el cambio 6; mi inclinación es la 1* (reutiliza el camino de eventos que ya existe y deja hora, técnica y
     cánula), salvo que en la unidad una TQT al ingreso siempre sea «llegó con TQT», caso en que la 3 es válida.
-13. **La firma sin elegir, en el celular.** Si aprietas Guardar sin firma estando en Planes, el aviso dice «Debes seleccionar la firma» pero la
+13. ✅ **RESUELTA el 10-oct-2026 (paso F2): `guardar()` usa `_irAlCampo('fFirma')`; la guardia `abrir_hasta_el_campo.js` pasó de «conocido» a aserción.**
+    **La firma sin elegir, en el celular.** Si aprietas Guardar sin firma estando en Planes, el aviso dice «Debes seleccionar la firma» pero la
     firma no se ve (la tarjeta «Cerrar el turno» nace plegada): `guardar()` hace un `focus()` directo que no abre nada. Dos caminos,
     combinables: (a) autorizar tocar UNA línea de `guardar()` (usar `_irAlCampo('fFirma')` en vez de ese `focus()`), o (b) dejar abierta la
     tarjeta única de Planes al entrar en celular (decisión 4 de la tanda 4). *Recomendado: (a)* —`guardar()` está cerrado desde la tanda 2, por
     eso espera tu visto bueno—; la guardia pasa sola y su línea «conocido» se vuelve una aserción.
-14. **Los chips de Evaluaciones y `transOfIr` con el mismo defecto de tarjeta plegada.** A 390 px, con las tarjetas plegadas como las deja el
+14. ✅ **RESUELTA el 10-oct-2026 (paso F2): `pasoEvalMedir` abre la tarjeta plegada; `transOfIr`, medido, tenía un defecto más hondo (no cambiaba de paso y apuntaba a controles escondidos) y ahora lleva al botón del evento. Ver la entrada de la bitácora «paso F2».**
+    **Los chips de Evaluaciones y `transOfIr` con el mismo defecto de tarjeta plegada.** A 390 px, con las tarjetas plegadas como las deja el
     acordeón al abrir, los 7 chips que «llevan al campo» sin abrir un modal (PIM, dinamometría, PEM, FEmáx, IMS, ecografía, deglución) dejan su campo
     invisible; `transOfIr` tiene el mismo patrón y no se midió. La corrección es llamar `_abrirHastaCampo(el)` antes de su `scrollIntoView`.
     *Recomendado: sí,* una línea por sitio; es la misma clase de defecto que la tanda 3 ya corrigió para los avisos, y va con la tanda de Evaluaciones.

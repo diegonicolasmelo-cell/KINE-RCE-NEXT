@@ -5061,3 +5061,86 @@ paquete instalable queda por regenerar en el cierre). `guardado_viajes` y `episo
   `pwa/` y la `VERSION` quedan para el cierre; `build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js` y va en el commit.
 - En `docs/PENDIENTES.md` la fila «`_mFaltaTxt` dice "un dato obligatorio" para lo que no conoce» queda **resuelta** con este paso (no se editó ese
   archivo aquí).
+
+## 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F2 «el error lleva al campo»: la firma, los rangos fisiológicos, el APACHE, los chips de Evaluaciones y «Ir al bloque de…» ya llevan hasta lo que hay que corregir
+
+**De dónde sale.** El hallazgo R11 de la revisión y los dos cabos sueltos que dejó el paso 3.1 (decisiones 13 y 14 de `docs/PENDIENTES.md`): `guardar()`
+estaba cerrado desde la tanda 2 y por eso lo que quedaba de «el error lleva al campo» esperaba. Terminado el trabajo de `guardar()`, este paso lo toca
+**solo para esto**. **Se reprodujo todo antes de tocar** (Chromium con reloj congelado al lunes 10-ago-2026 11:00, `google.script.run` simulado) y las
+guardias nacieron rojas contra el código sin arreglar.
+
+**Lo medido, rama por rama (todas con el mismo mensaje de siempre; solo cambia adónde lleva).**
+- **Firma.** A 390 px, parado en Planes, «⚠️ Debes seleccionar la firma…» y el foco caía en «Cerrar el turno», plegada (`display:none`): `guardar()`
+  hacía `sel.focus()` directo. En escritorio ya funcionaba (la firma está en el paso que guarda).
+- **Rangos fisiológicos (FiO₂, VT, FR, SpO₂, PEEP, edad, talla).** Toast y nada más, **en los dos anchos**: `PASO_ACTUAL` seguía en 5, el campo vive en el
+  paso 2, `activeElement` vacío. R11 lo describía a 390 px; **a 1200 también** falla, porque el campo no está en el paso en que se guarda.
+- **APACHE.** `focus()` directo: no hacía nada si el APACHE estaba en otro paso (vive en Evaluaciones, paso 3), en la tarjeta plegada o en la familia
+  «Preingreso» del cajón de Evaluaciones, que se cierra al abrir otra familia (medir una Pimáx después de escribir el APACHE bastaba).
+- **Los siete chips de Evaluaciones** (Pimáx, dinamometría, PEmáx, FEmáx, IMS, ecografía, protección de vía aérea). A 390 px la tarjeta de
+  Evaluaciones nace plegada: el chip abría el cajón y la familia pero no la tarjeta, y el campo quedaba invisible. `chips_llevan_al_campo.js` no lo
+  veía porque medía a un solo ancho.
+- **`transOfIr` («Ir al bloque de extubación / intubación / decanulación →» del aviso de transición).** La auditoría decía «el mismo patrón, no se midió».
+  Medido (paso 5, TOT→Natural sin extubación, Guardar, tocar el botón): **es peor que un pliegue, y en cualquier ancho**. El modal se cerraba y nada más:
+  no cambiaba de paso (el aviso sale al guardar, en el 5) y su `ancla` apuntaba a controles que no se pueden alcanzar: `fPVEval` es un `<input
+  type=hidden>` y `cIntubO` / `cDecanOcurrio` son casillas que el módulo del evento (21-sep) dejó escondidas, porque el evento se declara con los
+  botones de «Eventos de vía aérea». Con solo `_abrirHastaCampo(el)` antes del scroll, como se había propuesto, la tarjeta se abría y el control seguía
+  invisible.
+
+**Los cambios (solo `v2/index.html`).**
+1. `guardar()`: la rama de firma, la de APACHE y la de rangos llaman `_irAlCampo(...)` después del toast. Los mensajes no cambian.
+2. `_validarRangosCliente()` devuelve `{msg, id}` en vez de solo el texto (su único consumidor es `guardar()`); el id es el del campo del primer error,
+   el mismo del toast.
+3. `_abrirHastaCampo(el)` abre dos pliegues más, con las mismas funciones que usa quien los toca a mano (no una copia de su lógica): la **ficha del
+   episodio** (`#fcId`, que fuera del ingreso nace oculta: `fichaAplicar(true)`) y la **familia de Evaluaciones** que el cajón compartido no está mostrando
+   (`evFamAbrir`, y solo si no es la abierta, porque tocar la abierta la CERRARÍA).
+4. `_irAlCampo`: la identificación (`#fcId`) es del **paso 0**, que solo existe mientras se ingresa (`pasoIr` lo recorta a 1). El viejo `paso && …` daba
+   falso con el 0 y un aviso de edad o talla no iba a ningún lado. Fuera del ingreso la ficha se destapa en el Turno, así que el destino pasa a ser el 2;
+   en el ingreso se vuelve al 0.
+5. `pasoEvalMedir` llama `_abrirHastaCampo(el)` antes del `scrollIntoView` (la línea que ya se había propuesto).
+6. `transOfIr` va por `_irAlCampo` al **botón del evento** (`#evVAfila .ev-va[data-ev=…]`), que es donde se declara; `cf.ancla` queda de respaldo.
+   Lo que se pierde: el scroll suave y los 2,8 s de contorno (ahora 2,5 s, como en todos los avisos).
+
+**Guardias.**
+- `abrir_hasta_el_campo.js` (a 390 y a 1200 px; el toast se ESPÍA y se exige idéntico). **6** pasó de «conocido» a aserción (firma por `guardar()`).
+  **7** (nueva): FiO₂, VT, FR, SpO₂, PEEP, edad y talla con la ficha abierta y con la ficha **cerrada**, y la edad en un **ingreso** (parado en el 5, tiene
+  que volver al 0). **8** (nueva): APACHE sin abrir la familia, con «Preingreso» cerrada por otra, y con un decimal. **9** (nueva): el aviso real de
+  transición (Guardar desde el 5) con extubación, intubación y decanulación: modal cerrado, paso 2, botón del evento visible, con foco, dentro de la
+  pantalla, y a 390 px su tarjeta y su sub-bloque abiertos. Cada escenario exige primero que de partida el campo NO se vea.
+- `chips_llevan_al_campo.js` corre ahora a **1200 y a 390 px**: a 390 px cada chip parte con su tarjeta plegada (se vuelve a plegar entre chips; si no, el
+  primero abre la de todos) y se pide el campo a la vista **y** la tarjeta abierta; también el IMS en sus cuatro variantes de KTM.
+- **Rojo antes** (guardias finales contra el `index.html` del commit anterior): `abrir_hasta_el_campo` **145 fallos** (390 px: firma 4, rangos 48,
+  APACHE 15, transición 15; 1200 px: rangos 39, APACHE 12, transición 12), `chips_llevan_al_campo` **32** (todos a 390 px; los de 1200 siguen verdes:
+  el control). **Verde después**: 400 y 92 líneas ✅ (las dos guardias salen con código 0).
+- **Mutantes** (copias fuera del repositorio): sin la rama de la ficha → 13 rojos; sin la de la familia → 19; sin el paso 0→2 → 33; chip sin
+  `_abrirHastaCampo` → 33; `transOfIr` como antes → 25; firma con `focus()` directo → 5; rangos sin `_irAlCampo` → 88; APACHE sin `_irAlCampo` → 28. Los
+  ocho mueren.
+- 🪤 Un control de la propia guardia salió mal al principio: «de partida la firma NO se ve» es cierto a 390 px y falso a 1200 (la firma está en el paso que
+  guarda). Ahora es solo del celular, y en escritorio se mide que conserve el foco.
+- 🪤 `abrir()` deja `_transAvisoOk=true` para que `guardar()` no abra el modal en los demás bloques; el bloque 9 lo necesita abierto y lo apaga en su
+  `armar`, que corre después. Sin eso, el rojo del bloque 9 era un rojo de arnés y no del código.
+
+**Vecinas.** Con `-j 2`, en tres tandas (100 guardias): `convenciones`, `nada_del_guardado_despues`, `apache`, `fio2_venturi`, `ficha_y_antes`,
+`ingreso_*`, `transicion_ofrece_evento`, `eventos_ui`, `extubacion_una_ruta`, `intubacion_modulo_evento`, `intubar_desde_natural`, `aviso_*`, `estado_*`,
+`obligatorios_*`, `validacion_entre_pasos`, `paso_*`, `evaluaciones_*`, `esfuerzo_en_evaluaciones`, `movil*`, `seis_pasos`, `cuatro_pasos`, `panel_ux`,
+`panel_no_pisa_datos`, `guardado_*`, `fallo_guardado_visible`, `sin_guardar`, `escapado_unico`, `tutorial`, `eco_pulmonar`, `pve_*`, `ktm_*`,
+`general_disuelta`, `rut_minimo`, `sin_riel`, `retro_camas`, `act_bar_390`, `tarjeta_acciones`, `piso_letra_celular`, `confirma_guardado`,
+`borrador_local`, `episodio_*`, `ceros_*`, `cierre_*`, `prono_arriba`, `mover_camas`, `relato*`, `prevencion*`, `dias_*` y `paquete` (que regeneró
+`build/paquete_migracion/index.html`, incluido en el commit): todas verdes. Única roja: `pwa_paquete` (regeneración del cierre).
+
+**Lo que ve distinto la kinesióloga.**
+- En el celular, **«Debes seleccionar la firma»** abre la tarjeta «Cerrar el turno» y deja el selector a la vista con el borde rojo.
+- Un **valor fuera de rango** (FiO₂ de 5, VT de 5000, edad de 5…) ya no deja solo el cartel: **lleva al paso y a la tarjeta donde está el campo**, lo
+  abre si estaba plegado (incluida la ficha) y lo enfoca. Lo mismo con el **APACHE** fuera de rango, aunque haya abierto otra evaluación después.
+- Tocar el chip de **Pimáx, dinamometría, PEmáx, FEmáx, IMS, ecografía o protección de vía aérea** en el celular abre la tarjeta de Evaluaciones y deja el
+  campo a la vista.
+- El botón **«Ir al bloque de extubación / intubación / decanulación →»** ahora **hace algo**: cierra el aviso, vuelve al Turno, abre «Eventos de vía aérea»
+  y deja marcado el botón del evento (Extubación, Intubación o Decanulación) para tocarlo. Antes no pasaba nada en ninguna pantalla.
+
+**Lo que NO se hizo y queda dicho.**
+- Los mensajes y las reglas de validación no se tocaron: solo adónde lleva cada aviso.
+- `transOfIr` ya no hace scroll suave ni lo contornea 2,8 s, y apunta al botón del evento y no a un «bloque» propiamente. Es una decisión de comportamiento
+  (el rótulo dice «bloque»; el sub-bloque se llama «Eventos de vía aérea»): si Diego prefiere llevar a otro lugar, es cambiar una línea.
+- No se tocaron `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`. Sin migración de esquema. `entrega/`, `pwa/` y la
+  `VERSION` quedan para el cierre.
+- `docs/PENDIENTES.md`: las decisiones 13 y 14 quedan marcadas como resueltas (la 7 de la sección 2e, abrir sola la tarjeta única de Planes, sigue siendo
+  una decisión de producto aparte).
