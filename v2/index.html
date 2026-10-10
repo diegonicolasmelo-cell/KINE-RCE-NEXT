@@ -7189,7 +7189,9 @@ function pasoIr(n){
     t.setAttribute('aria-selected', p === n ? 'true' : 'false');
     t.classList.toggle('paso-hecho', p < n);
   });
-  const at = $('pasoAtras'); if(at) at.style.display = (n <= (_hayCero ? 0 : 1)) ? 'none' : '';
+  /* 🔴 «← Atrás» se ofrece solo si hay un paso anterior EN LA BARRA (_pasoAnterior). Con la pestaña 1 oculta el Turno es el
+     primero del camino y un botón que no lleva a ningún lado confunde más que no estar. */
+  const at = $('pasoAtras'); if(at) at.style.display = (_pasoAnterior(n) === null) ? 'none' : '';
   // La pestaña del ingreso solo aparece cuando se está ingresando.
   const t0 = $('pasoTab0'); if(t0) t0.classList.toggle('hidden', !_hayCero);
   const av = $('pasoAvanza'); if(av) av.textContent = _PASO_TXT[n];
@@ -7551,6 +7553,31 @@ function prevGateTab(){
   if (t) t.classList.toggle('paso-oculto', !prevAplicaAlgo());
 }
 
+/** ¿La pestaña 1 está a la vista en la barra? Es lo que ve quien navega, y por eso es lo que manda para «Atrás». */
+function _prevTabVisible(){
+  const t = document.querySelector('#spPasos [data-p="1"]');
+  return !!t && !t.classList.contains('paso-oculto');
+}
+
+/**
+ * A qué paso lleva «← Atrás» desde el n, o null si n ya es el primero del camino.
+ *
+ * 🔴 Sigue a la BARRA, igual que «Siguiente»: pasoAvanzar salta la Prevención hacia adelante, y pasoRetroceder hacía
+ * pasoIr(PASO_ACTUAL-1) a ciegas. Con un paciente sin dispositivos de vía aérea la pestaña 1 está oculta (prevGateTab) y
+ * «Atrás» desde el Turno caía igual en esa pantalla, con el cartel «Sin dispositivos de vía aérea en este paciente.» que la
+ * barra ni ofrece (auditoría de la tanda 4, hallazgo F). La ida y la vuelta tienen que ser el mismo camino.
+ * 🪤 Se mira la pestaña y no prevAplicaAlgo(): éste lee el formulario (fVA, fSop) y puede cambiar después de abrir, mientras
+ * que la barra se arma UNA vez al abrir la cama; si «Atrás» siguiera al formulario podría caer en un paso sin pestaña.
+ * Con el ingreso (0) y la pestaña 1 oculta se vuelve al 0; sin ingreso, el Turno es el primero y no hay a dónde volver.
+ * La numeración de las pestañas no cambia. Lo fija seis_pasos.js (sección 8b).
+ */
+function _pasoAnterior(n){
+  const hayCero = v('cIng') === 'true';
+  let a = Number(n) - 1;
+  if (a === 1 && !_prevTabVisible()) a = 0;
+  return a < (hayCero ? 0 : 1) ? null : a;
+}
+
 function prevAvisar(){
   const faltan = prevFilas(_prevCtx()).filter(f => f.pide && !_PREV[f.k]).map(f => f.nombre);
   if (!faltan.length) return;
@@ -7561,7 +7588,8 @@ function prevAvisar(){
 function pasoRetroceder(){
   // Desde el relato, volver puede costar el retoque a mano: se avisa.
   if(PASO_ACTUAL === 6){ pasoAtrasDesdeRelato(); return; }
-  pasoIr(PASO_ACTUAL - 1);
+  const a = _pasoAnterior(PASO_ACTUAL);   // salta la Prevención si su pestaña está oculta (igual que pasoAvanzar)
+  if(a !== null) pasoIr(a);
 }
 
 /* ── 📄 PASO 3 · el relato, el plan y lo que queda encargado ──────────────

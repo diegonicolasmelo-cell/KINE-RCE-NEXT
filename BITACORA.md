@@ -4424,3 +4424,36 @@ guardia `paquete.js`).
   solo las 12 h del propio turno si la válvula está marcada —que ahora sí lo está—. Es la regla de decanulación (clínica) y queda para la decisión 16 de PENDIENTES; este paso no la cambia.
 - El estado de la KTM por defecto de DÍA («Realizada») sigue como estaba: aplica a un turno NUEVO, no a reabrir. Es la decisión de producto abierta de la auditoría.
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
+
+### 10-oct-2026 · Tanda 4 · paso 4.3 · «← Atrás» salta la pestaña 1 oculta, igual que «Siguiente» (cambio 4)
+
+**El defecto.** Con un paciente SIN vía aérea artificial ni ventilación no hay nada que prevenir, así que la pestaña 1 (Prevención) se esconde al abrir la cama (`prevGateTab`) y el camino
+arranca en el 2. «Siguiente» ya respetaba eso, pero `pasoRetroceder` hacía `pasoIr(PASO_ACTUAL - 1)` a ciegas: desde el Turno llevaba a una pantalla que la barra ni ofrece, con el cartel
+«Sin dispositivos de vía aérea en este paciente.» (`prevPintar`). **Confirmada la hipótesis de la auditoría (hallazgo F), medida en pantalla real:** `pasoRetroceder` desde el 2 terminaba en el 1, con la
+tarjeta de prevención y el cartel vacío a la vista, y la ida (2→3→4→5) y la vuelta (5→4→3→2→1) no eran el mismo camino. Con el ingreso (pestaña 1 también oculta) pasaba lo mismo: desde el 2 volvía a un 1
+que la barra no muestra, en vez de al 0.
+
+**El cambio (solo `v2/index.html`; la numeración de las pestañas no se toca).** Dos funciones nuevas junto a `prevGateTab` y dos líneas tocadas:
+- `_prevTabVisible()`: ¿la pestaña 1 está a la vista en la barra?
+- `_pasoAnterior(n)`: a qué paso lleva «Atrás» desde el n, o `null` si n ya es el primero del camino. Salta la Prevención si su pestaña está oculta: con ingreso vuelve al 0; sin ingreso, el Turno es el primero.
+- `pasoRetroceder` usa `_pasoAnterior` (si es `null` no hace nada), y `pasoIr` esconde el botón «← Atrás» cuando no hay paso anterior. Esto último sale del mismo cambio: dejar el botón a la vista sin que lleve a
+  ningún lado sería peor que el defecto. Es la misma regla que ya tenía el primer paso («atrás» no se ofrece en el primero; `cuatro_pasos.js`), ahora medida sobre la barra y no sobre el número 1.
+- 🪤 **Manda la pestaña, no `prevAplicaAlgo()`.** `prevAplicaAlgo()` lee el formulario (`fVA`, `fSop`) y puede cambiar DESPUÉS de abrir (la vía aérea se elige en el turno), mientras que la barra se arma una sola vez
+  al abrir la cama. Si «Atrás» siguiera al formulario, podría caer en un paso sin pestaña: el mismo defecto con otra puerta. La guardia lo fija con ese caso exacto.
+- Con la prevención visible nada cambia: desde el 2 «Atrás» SÍ va al 1 y lo ofrece. Desde el relato (6) sigue su propio camino (`pasoAtrasDesdeRelato`, con el aviso del retoque).
+
+**Lo que ve distinto la kinesióloga.** En un paciente sin dispositivos (sin TOT, TQT ni VM), el turno es el primer paso y ya no aparece «← Atrás» ahí; antes el botón la llevaba a una pantalla vacía. En un paciente
+con prevención, el recorrido es idéntico al de siempre. En un ingreso, desde el Turno «← Atrás» vuelve a la identificación (paso 0).
+
+**La guardia (`build/checks/seis_pasos.js`, ampliada con la sección 8b).** Tres escenarios con la pantalla real y el reloj fuera de juego (la fecha del turno se inventa en `gDate`; el resultado no depende de la hora):
+(a) sin dispositivos: «Atrás» no se ofrece en el 2, `pasoRetroceder` se queda en el 2 sin cartel vacío ni tarjeta de prevención, la ida pasa por 3, 4, 5 y la vuelta por 4, 3, 2, 2, y la barra manda aunque el
+formulario cambie después a TOT + VM; (b) con prevención: «Atrás» se ofrece en el 2 y vuelve al 1; (c) ingreso: desde el 2 vuelve al 0. `abrir()` aprendió un cuarto parámetro para el paciente sin dispositivos.
+**Roja antes: 10 fallos contra el `index.html` anterior** (llegaba al 1 con el cartel vacío, ofrecía el botón, en el ingreso caía en el 1 y no en el 0); **verde después**. Los controles de la prevención visible
+salían verdes antes y deben seguir así. Vecinas (convenciones, `cuatro_pasos`, `paso_*`, `prevencion_navm`, `ingreso_*`, `movil*`, `validacion_entre_pasos`, `ktm_*`, `tutorial` y otras vecinas, 48 en total): todas verdes con `-j 2`;
+`paridad_entrega` y `pwa_paquete` siguen rojas por la regeneración pendiente del cierre (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
+
+**Lo que NO se hizo y queda dicho.**
+- La pestaña 1 se decide una sola vez, al abrir la cama (así era). Si en el turno se elige una vía aérea o un soporte en un paciente que no tenía, la Prevención sigue sin aparecer hasta reabrir la cama; este paso
+  no lo cambia (sería abrir un paso que el flujo acordó saltar) y lo deja fijado en la guardia como «la barra manda».
+- Con ingreso y la pestaña 1 VISIBLE (caso raro: la cama ya traía dispositivos), «Atrás» desde el 2 sigue yendo al 1, como hasta hoy; «Siguiente» desde el 0 va derecho al 2. No se unificó para no mover lo acordado.
+- Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
