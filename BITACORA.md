@@ -4331,6 +4331,92 @@ y con la cantidad de secreciones puesta, «Manejo respiratorio» también.)
 - La decisión 5 de la auditoría (con TQT + VM la PVE no se pregunta, y por eso nunca puede decir «Sin registrar») no se tocó: el estado refleja lo que el sistema pregunta hoy.
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
 
+## 10-oct-2026 · Tanda 4 · Terapia física y Planes: el nivel de la cama no se cuela, reabrir devuelve lo guardado y «Atrás» no cae en una pantalla vacía
+
+**De dónde sale.** La auditoría de solo lectura de las tandas 3, 4 y 5 revisó el paso 4 (Terapia física) y el paso 5 (Planes) contra los acuerdos 8.6 y 8.7 y
+concluyó que la estructura ya cumple —seis pasos, cada tarjeta en su paso, los tres bloques de Planes, el guardado solo al salir de Planes, el relato
+que no abre antes de guardar— y que lo que fallaba eran **cuatro brechas del recorrido**, todas medibles. Se construyeron tres en tres pasos (4.1, 4.2 y 4.3;
+un commit cada uno, cada guardia vista ROJA antes del arreglo); **la cuarta (el error que no abre la tarjeta plegada en el celular) ya la había cerrado el paso 3.1
+de la tanda 3**, que es genérico para todos los pasos (`_abrirHastaCampo`), y no hizo falta repetirla. **Sin migración de esquema.** Las entradas de cada paso se
+conservan enteras más abajo, bajo «El detalle, paso a paso». **Los tres bloques de Planes no se tocaron**: ni sus títulos, ni su orden, ni la firma al final.
+
+**Los tres defectos que había.**
+1. **Un nivel de KTM que nadie eligió se colaba en el formulario.** `fillCama` copia el nivel que la cama recuerda a un campo oculto, y la réplica del turno anterior
+   solo lo reponía si había algo que heredar. De noche (y el primer día tras una noche) no hay nada que heredar, pero la cama SÍ recuerda el nivel de la noche: quedaba
+   metido en el campo oculto, sin ningún botón de nivel encendido que lo delatara. Marcar «Realizada» sin elegir nivel mandaba el nivel de la cama y el relato decía «nivel 3».
+   Contradice 8.6 («parte en blanco») y 8.7 («no hereda tampoco hacia el día»), y esa KTM entra al REM.
+2. **Reabrir un turno guardado dejaba en blanco la terapia física**, y eso hacía dos daños distintos. **De día**, un turno con la KTM «realizada» (el más común) no se podía volver
+   a guardar: la pantalla mandaba «no realizada» sin razón, el servidor lo rechazaba y la razón estaba en un campo oculto, sin dónde apuntar. **De noche** se guardaba, pero
+   perdía el IMT, la EMS, la válvula, el Borg y los minutos: la pantalla los mandaba como claves presentes en blanco y la fusión del servidor solo repone las ausentes.
+3. **«← Atrás» caía en una pantalla vacía.** Con un paciente sin vía aérea artificial ni ventilación la pestaña 1 (Prevención) se esconde y el camino arranca en el 2; «Siguiente»
+   lo respetaba, pero «Atrás» restaba uno a ciegas y desde el Turno llevaba al cartel «Sin dispositivos de vía aérea en este paciente.».
+
+### Lo que cerró cada pieza
+
+| Paso (commit) | Cambio del plan | Defecto que cerraba | Cómo queda | Guardia (roja antes, verde después) |
+|---|---|---|---|---|
+| **4.1** (e7b0390) | 1 | El nivel de la cama se colaba de noche y en el primer día tras una noche | `fillFormReplica`: si `_tf` (lo heredable) no trae `KTM_NIVEL_KTR`, el formulario parte sin nivel (oculto vacío, botones apagados, descripción en blanco). Atado a `_tf`: DÍA→DÍA sigue heredando | `ktm_nivel_no_se_cuela.js` (nueva, 11 antes; 2 mutantes muertos) |
+| **4.2** (fbb4dc6) | 2 | Reabrir vaciaba la terapia física; el turno de día quedaba imposible de guardar | `fillForm` restaura el estado de la KTM, nivel (solo si es una sesión), asistencia, minutos, Borg, IMT y EMS con sus parámetros, válvula con minutos/tolerancia/detalle y `fKTMcat`; repinta el rótulo de «Otro» | `terapia_fisica_vuelve_al_reabrir.js` (nueva, 78 antes; 12 de 12 mutantes muertos) |
+| **4.3** (016f358) | 4 | «Atrás» caía en la pestaña 1 oculta | `_prevTabVisible()` y `_pasoAnterior(n)`: manda la barra; `pasoRetroceder` los usa y `pasoIr` esconde «← Atrás» donde no hay paso anterior | `seis_pasos.js` ampliada (sección 8b, 10 antes) |
+| 3.1 (b281cdd, tanda 3) | 3 | El error no abría la tarjeta plegada del celular | Ya cerrado en la tanda 3 (`abrir_hasta_el_campo.js`); no se repitió | — |
+
+### Lo que ve distinto la kinesióloga
+
+- **De noche, la terapia física parte de verdad en blanco.** Si marca «Realizada» sin elegir nivel, la sesión no lleva el nivel de la cama y el relato no dice «nivel 3». El primer turno de
+  día tras una noche tampoco arranca con el nivel de la noche. De día, tras otro turno de día, nada cambia: el nivel se hereda y se ve encendido. Y ya no queda iluminado el nivel del
+  paciente que acababa de mirar.
+- **Al reabrir una evolución guardada ve la terapia física tal como la dejó**: la KTM con su estado (realizada, contraindicada o no realizada), nivel, asistencia, minutos y Borg; IMT, EMS y
+  válvula marcadas con todos sus datos. Un turno de día con KTM realizada que antes no se podía volver a guardar ahora se guarda; de noche ya no se borran IMT, EMS, válvula, Borg ni minutos al reabrir
+  para corregir otra cosa. El relato que se regenera al reabrir narra la KTM, el IMT, la EMS y la válvula. Igual en turnos de otros días.
+- **«← Atrás» ya no lleva a una pantalla vacía.** En un paciente sin TOT, TQT ni VM, el Turno es el primer paso y ahí no aparece «← Atrás»; en un ingreso, desde el Turno vuelve a la identificación (paso 0). Con un
+  paciente que sí tiene prevención todo queda igual.
+
+### Lo que NO cambió
+
+`guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` y los `avErr*` no se tocaron; tampoco el servidor, `fillCama` ni `fillFormReplica` más allá de la línea del nivel. Lo que se manda al servidor es idéntico
+(`guardado_viajes` y `episodio_turno`, las guardias A/B del payload, siguen verdes, y los viajes a hojas no subieron). Los eventos de vía aérea se siguen registrando a mano; la PVE, la KTR, el modelo de tres ejes y el lugar
+de cada bloque quedan donde estaban. Los tres bloques de Planes, sus títulos y la firma, tampoco. No hay hoja ni columna nueva.
+
+### Lo que queda abierto a propósito
+
+- **Nada de Planes se limpió**: el plan que se hereda en silencio, el modal «¿Quién midió?» al dejar un pendiente, los 18 chips fijos y las sugerencias «Medir X» quedan para la tanda 5 (limpieza visual) y para las respuestas de Diego.
+- **Decisiones de Diego sin ejecutar** (las de la auditoría y las que dejaron los pasos), en `docs/PENDIENTES.md`, sección 2e: cada una con su recomendación. Las más visibles: si la educación y la válvula de fonación deben seguir
+  visibles con AET IIIC o BNM (hoy se esconde toda la tarjeta), si la KTM de día debe seguir partiendo «Realizada», si en el celular se abre sola la tarjeta única de Planes y si el plan heredado se ve en ámbar.
+- **Ya implementado con la opción recomendada y esperando su confirmación** (2e, las marcadas con ✅): el nivel que no se cuela, reabrir que devuelve lo guardado y el «← Atrás» escondido en el primer paso. Ninguna está escrita todavía
+  en `docs/ACUERDOS_REDISENO.md`.
+- **Tres puertas conocidas que no se cerraron**: los dos caminos de `fillCama` sin réplica (paciente sin turno previo; servidor sin contestar) que aún copian el nivel de la cama de noche —no se alcanzan con datos reales—; un turno de
+  DÍA que nunca declaró estado de KTM (fila anterior al trío o guardada por API) que se reabre sin estado y que `guardar()` rechazaría; y la racha de válvula para la decanulación (`_VFON_HORAS`), que no viaja en la fila del turno reabierto.
+- **No se midió en un aparato real**: todo se probó en el Chromium de Playwright con un `google.script.run` simulado (y, en la guardia de reabrir, el servidor real en memoria) y el reloj inventado, no en el Chrome de Windows 10 del hospital.
+
+### Cierre de la tanda
+
+- **Sello `NEXT-5.8-terapia-y-planes`** en `build/empaquetar_cohete.js` y en los dos sitios del fuente (`<meta name="rce-version">` y el texto de «La app no pudo iniciar»). `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados.
+- **Batería completa (`-j 2`): 232 verdes, 0 rojas** (580 s). Eran 230 al cierre de la tanda 3; se suman las dos guardias nuevas (`ktm_nivel_no_se_cuela`, `terapia_fisica_vuelve_al_reabrir`); `seis_pasos` se amplió en su lugar.
+  `paridad_entrega` y `pwa_paquete`, que durante los pasos estaban rojas por la regeneración pendiente, quedan verdes.
+- **`node build/medir_guardado.js`** (viajes a hojas por acción): abrir 3, reabrir 3, turno nuevo **13**, re-guardar **17**, ingreso **13**, decanulación **13**, reintubación **14**. Los techos (14, 18, 14, 14, 15) no subieron: idénticos al cierre
+  de la tanda 3, como corresponde a una tanda que no toca lo que `guardar()` manda ni el servidor.
+- **Qué pegar** en el editor de Apps Script, desde `entrega/`: **solo `index.html`** (el cohete). Ningún `.gs` cambió desde el cierre de la tanda 3 (`node build/que_pegar.js 923f962` lo confirma: 1 archivo). Si la planilla se quedó en 5.6
+  también basta ese archivo (trae lo de la tanda 3); si venía de 5.5 o antes, ver la lista de la tanda 2. Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes.
+- **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian; no hay hoja ni columna nueva.
+- **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app instalada para que el sello de versión renueve su caché. El sello `NEXT-5.8-terapia-y-planes` debe aparecer
+  en «Cargando…»; si no aparece, lo pegado no es lo nuevo. Recordatorio de la tanda 2: la prueba con DOS aparatos sigue pendiente antes de pegar en NEXT.
+- **Cómo revertir:** cada paso es un commit (e7b0390, fbb4dc6, 016f358) y el cierre es otro; `git revert` deshace lo que se quiera. Ninguna columna cambió, así que no hay datos que migrar de vuelta.
+
+### Para no olvidar (de toda la tanda)
+
+- 🪤 **Reabrir no es abrir uno nuevo.** `fillFormReplica` hereda con reglas (de noche no hereda, no hereda hacia el día); `fillForm` es el MISMO turno y tiene que devolver todo lo que se guardó. Confundirlos fue el origen del defecto de
+  reabrir: la tarjeta heredó el «parte en blanco» de un turno nuevo.
+- 🪤 **Declarar el estado de la KTM hace que el payload sobrescriba todos sus satélites.** Mientras el estado va en silencio, el servidor conserva lo que ya estaba; en cuanto se declara, toma TODO del payload. Por eso, al reabrir, no basta
+  restaurar el estado: hay que restaurar también nivel, minutos, Borg, IMT, EMS, válvula y la categoría de la contraindicación, o se vacían en la fila al volver a guardar sin tocar nada.
+- 🪤 **Una limpieza que sigue a lo que se hereda se ata a ESO, no se hace a ciegas.** El nivel se borra cuando la réplica no trae nivel; un mutante que lo borra siempre rompe el DÍA→DÍA.
+- 🪤 **Manda la barra, no el formulario.** La pestaña 1 se decide una sola vez, al abrir la cama; `prevAplicaAlgo()` lee el formulario y puede cambiar después. «Atrás» sigue a la barra o cae en un paso sin pestaña.
+- 🪤 **Una guardia que modela la pantalla a mano esconde el defecto.** `ktm_no_se_pierde.js` imaginaba la pantalla de día mandando `''` y por eso no veía el rechazo; `ktm_de_noche.js` tenía una cama de prueba sin nivel y por eso no veía el
+  nivel que se colaba. La guardia nueva de reabrir habla con la pantalla REAL y el servidor REAL en memoria.
+
+### El detalle, paso a paso
+
+Las tres entradas que siguen son las que se escribieron durante la tanda, sin cambios de contenido.
+
 ### 10-oct-2026 · Tanda 4 · paso 4.1 · El nivel de KTM que la cama recuerda no se cuela de noche ni en el primer día tras una noche (cambio 1)
 
 **El defecto.** Al abrir un turno nuevo corren dos llenados en fila: `fillCama` copia `cama.KTM_NIVEL` al campo oculto `fKTMniv`, y después

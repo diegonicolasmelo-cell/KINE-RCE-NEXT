@@ -1,12 +1,13 @@
-# Pendientes — al 10-oct-2026 (con la tanda 3 del turno respiratorio)
+# Pendientes — al 10-oct-2026 (con la tanda 4 de terapia física y Planes)
 
 > Lo que está **decidido** vive en `docs/ACUERDOS_REDISENO.md`, con las palabras
 > de Diego. Esto es la otra mitad: lo que **falta probar**, lo que **falta
 > decidir** y lo que **se encontró y no se arregló**.
 >
 > 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G), y la **tanda 1
-> (integridad), la tanda 2 (guardado seguro) y la tanda 3 (turno respiratorio,
-> cambios 1 a 5)** también: hoy son **230 guardias en verde**. Lo que no existe
+> (integridad), la tanda 2 (guardado seguro), la tanda 3 (turno respiratorio,
+> cambios 1 a 5) y la tanda 4 (terapia física y Planes, cambios 1, 2 y 4)** también:
+> hoy son **232 guardias en verde**. Lo que no existe
 > todavía es **la prueba en la planilla de NEXT**: nada de esto se ha pegado ni
 > visto en un navegador del hospital.
 >
@@ -18,6 +19,10 @@
 > nueve por decidir. Los cambios 6 y 7 de esa tanda (cascarones vacíos de
 > Traqueostomía y Decanulación; plegar el Turno en escritorio) esperan tus
 > respuestas a las 7, 8 y 12.
+>
+> 🟠 **La sección 2e es de la tanda 4**: tres decisiones ya implementadas (✅) y once
+> por decidir. Ninguna toca los tres bloques de Planes; las de limpieza de Planes
+> (la 8 y la 10) van con la tanda 5.
 
 ---
 
@@ -321,6 +326,64 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     invisible; `transOfIr` tiene el mismo patrón y no se midió. La corrección es llamar `_abrirHastaCampo(el)` antes de su `scrollIntoView`.
     *Recomendado: sí,* una línea por sitio; es la misma clase de defecto que la tanda 3 ya corrigió para los avisos, y va con la tanda de Evaluaciones.
 
+## 2e · Decisiones de la tanda 4 (terapia física y Planes, 10-oct)
+
+> 🟢 **Las ✅ de la parte A (de la 1 a la 3) YA ESTÁN HECHAS con la opción que recomiendo** y esperan que las confirmes o las cambies. Si dices que
+> no, cada una se revierte con poco; ninguna toca el esquema de la planilla ni lo que se guarda en una evolución nueva.
+>
+> 🟠 **Las de la parte B (de la 4 a la 14) NO se hicieron**, a propósito: unas son clínicas (de la 4 a la 6), otras cambian el flujo diario de todo el equipo
+> (la 7 y la 8) y otras son limpieza de Planes que va con la tanda 5 (la 9 a la 11). Las tres últimas son puertas conocidas que dejaron los pasos. Con tus respuestas se hacen.
+>
+> 🧩 **El cambio 3 del plan de esta tanda (que el error abra la tarjeta plegada en el celular) ya lo cerró el paso 3.1 de la tanda 3** y no se repitió; lo único que
+> queda de él es la decisión 7. **Los tres bloques de Planes no se tocaron.**
+>
+> ✍️ **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escriben con tus palabras cuando respondas. Dilas por número.
+
+**A · Ya implementadas, esperan confirmación**
+
+1. **El nivel de KTM que la cama recuerda ya no se cuela de noche ni en el primer día tras una noche.** ✅ Hasta ahora, de noche el formulario podía llevar escondido el nivel
+   de la noche anterior (sin ningún botón encendido que lo delatara): si marcabas «Realizada» sin elegir nivel, la sesión salía con ese nivel y el relato decía «nivel 3». Ahora el
+   formulario parte sin nivel cuando no hay nada que heredar. *Lo que ves:* de noche la terapia física parte de verdad en blanco; el primer turno de día tras una noche abre sin
+   nivel; de día tras otro día, el nivel se hereda y se ve encendido, como siempre. *Recomendado: dejarlo* (es lo que dicen 8.6 y 8.7). Si dices que no, se revierte una línea de `fillFormReplica`.
+2. **Reabrir una evolución guardada devuelve la terapia física tal como se guardó.** ✅ Antes, reabrir dejaba la tarjeta en blanco: de día, un turno con la KTM realizada no se podía volver a
+   guardar («indica la razón por la que NO se realizó», con el campo escondido); de noche se borraban IMT, EMS, válvula, Borg y minutos. Ahora vuelven el estado de la KTM, el nivel, la asistencia,
+   los minutos, el Borg, el IMT y la EMS con sus datos, y la válvula con sus minutos y tolerancia, y el relato que se regenera los narra. Nada se inventa: un turno que nunca declaró estado se reabre sin estado.
+   *Recomendado: dejarlo.* No hay una versión intermedia que sirva: sin esto, el que reabre para corregir otra cosa pierde lo anotado sin darse cuenta.
+3. **«← Atrás» salta la pestaña de Prevención cuando está oculta, y no aparece en el primer paso.** ✅ En un paciente sin TOT, TQT ni VM, «Atrás» desde el Turno llevaba a una pantalla vacía
+   («Sin dispositivos de vía aérea en este paciente»); en un ingreso caía ahí en vez de volver a la identificación. Ahora el Turno es el primer paso y el botón no se ofrece; en un ingreso vuelve al paso 0.
+   Con un paciente que sí tiene prevención nada cambia. *Recomendado: esconderlo,* igual que ya pasa en el primer paso con prevención. Si prefieres que el botón siga visible sin hacer nada, es una línea en `pasoIr`.
+
+**B · Falta decidir (no están hechas)**
+
+4. **Con adecuación del esfuerzo terapéutico IIIC (confort) o BNM, hoy se esconde TODA la tarjeta de Rehabilitación**, incluida la válvula de fonación y «Educación a usuario/cuidador/familia»
+   (la que cuenta en el REM B.6), aunque el comentario del código dice que la educación es «visible siempre». ¿Esas dos cosas deben seguir visibles aunque la KTM se bloquee?
+   *Recomendado: sí:* sacar la educación (y la válvula, si hay TQT) del bloqueo y bloquear solo la KTM; en confort, la educación a la familia es de lo más plausible. Es un cambio pequeño y aparte.
+5. **La válvula de fonación de noche suma 12 horas para la decanulación aunque nadie la haya declarado** (es la 16 de la sección 2), **y la racha no viaja al reabrir.** Al reabrir un turno, la
+   frase de decanulación cuenta solo las 12 h del propio turno, sin las rachas de turnos anteriores (`_VFON_HORAS` es un transitorio de la previa que la fila del turno no trae). Es regla clínica de decanulación;
+   no se toca sin tu respuesta. *Recomendado:* sumar solo si ese turno quedó con la válvula declarada (`VFON_USADA` verdadero), y que reabrir conserve la racha.
+6. **La KTM de DÍA parte ya marcada «Realizada»; de noche parte en blanco.** El sistema decide por defecto en un caso y no en el otro. Tras una noche, el primer día abre «Realizada» pero ahora sin nivel (paso 1
+   de esta tanda). *Recomendado: que el sistema no decida por ti:* de día que parta neutra, en ámbar («falta elegir»), y se confirme con un toque. No se cambió porque altera el flujo diario de todo el equipo y
+   puede mover el REM (hoy una KTM de día que nadie eligió cuenta como realizada).
+7. **En el celular los pasos 4 y 5 abren con sus tarjetas plegadas.** Cuando el paso tiene una sola tarjeta importante, ¿se abre sola al entrar? *Recomendado: sí para Planes* (una sola tarjeta, y es donde se
+   firma y se guarda) y, en Terapia física, abrir solo la primera (Rehabilitación). Es la «decisión 4 de la tanda 4» que cita la 13 de la sección 2d (la firma sin elegir, en el celular). El error ya abre la tarjeta
+   por su cuenta (tanda 3, paso 3.1); esto es solo cómo parte la pantalla.
+8. **El Plan para el próximo turno se hereda SIEMPRE del turno anterior, en silencio**, y nada avisa que viene heredado (el aviso en ámbar de la sección 4b está muerto en el flujo por pasos). ¿Lo quieres visible?
+   *Recomendado:* mostrarlo en ámbar solo en Planes, con el texto «viene del turno anterior, confírmalo o cámbialo», sin el aviso global de la 4b que saldría en cada guardado. Va con la tanda 5, y con la 7 de la
+   sección 2d (lo heredado como «Requiere revisión»), para no cambiar el significado dos veces.
+9. **«Realizada» sin nivel (1 a 5): hoy no avisa.** ¿Debe avisar en ámbar, sin bloquear? *Recomendado: sí, solo ámbar* («Realizada sin nivel»), para no estorbar a quien no alcanzó a elegirlo. Quedó honesto después del paso 1
+   de esta tanda: ahora un nivel vacío es de verdad un nivel que nadie eligió, no el de la cama.
+10. **Textos y atajos de Planes.** El modal que se abre al dejar un pendiente dice «¿Quién midió?» (texto de medición, equivocado para un pendiente); los 18 chips fijos siguen siempre a la vista; las sugerencias «Medir X» salen sin mirar
+    si el paciente coopera. *Recomendado:* cambiar el título a «¿Quién deja el pendiente?» y limpiar chips y sugerencias dentro de la tanda 5; no cambia los tres bloques y es solo texto.
+11. **Números de las pestañas.** Cuando no hay nada que prevenir (pestaña 1 oculta), la primera visible es la «2». ¿Se dejan los números fijos (Turno siempre 2, Terapia física siempre 4, Planes siempre 5) o se renumeran por lo que
+    se ve? *Recomendado: fijos:* es lo que ya hay, lo que usan las guardias y el equipo, y «paso 4» significa siempre lo mismo. Solo se corrigió que «Atrás» no caiga en el paso oculto (la 3).
+12. **Los dos caminos de `fillCama` sin réplica siguen copiando el nivel de la cama de noche.** Un paciente sin turno previo y el servidor que no contesta al abrir. No se alcanzan con datos reales, porque una cama que recuerda un
+    nivel siempre tiene turno previo; por eso no se cerraron. *Recomendado: sí, sin apuro:* una condición (de noche no copiar) cuando se toque `fillCama` por otra razón, con su caso en la guardia.
+13. **Un turno de DÍA que nunca declaró estado de KTM** (una fila anterior al trío de estados, o guardada por la API sin pasar por la pantalla) **se reabre sin estado elegido**, y al volver a guardarlo `guardar()` manda
+    «no realizada» sin razón y el servidor lo rechaza. La pantalla actual no produce ese caso. ¿Debe quedar así (la kinesióloga elige) o partir «Realizada» como un turno de día nuevo? *Recomendado: dejarlo sin estado:*
+    «Realizada» por defecto puede inflar el REM, y «no realizada» sin razón entra al denominador de la estadística; ninguna de las dos se inventa.
+14. **La Prevención no aparece si la vía aérea o el soporte se eligen DENTRO del turno.** La pestaña 1 se decide una sola vez, al abrir la cama; si un paciente sin dispositivos recibe uno durante el turno, la Prevención no
+    aparece hasta reabrir la cama, y «Atrás» sigue a la barra. ¿Debe aparecer sola? *Recomendado: no por ahora* (sería abrir un paso que el flujo acordó saltar); si lo quieres, es otra pieza, con su guardia.
+
 ## 3 · Pendientes viejos, de antes del rediseño
 
 - Sacarle el **estado previo a la TQT** — Diego dijo que ahí es irrelevante.
@@ -380,16 +443,16 @@ línea, pero haría aparecer un aviso nuevo en cada guardado de cada turno con d
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.7-turno-respiratorio`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.8-terapia-y-planes`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 📦 **Archivos a pegar en el editor** (de la carpeta `entrega/`): `api.gs`,
   `dominio.gs`, `infra.gs`, `servicios.gs`, `webapp.gs` y el `index.html` (el
   cohete). Compáralos con `cmp`, no a ojo: el portapapeles corrompe los acentos en
   los archivos grandes. Son los mismos seis si tu planilla se quedó en la versión
   5.4: traen también la tanda 1.
-  **La tanda 3 solo cambia `index.html`**: si la planilla ya está en 5.6, es el
-  único archivo que hay que pegar.
-- ✅ **La tanda 1, la tanda 2 y la tanda 3 NO cambian el esquema**: no hay hoja ni columna
+  **Las tandas 3 y 4 solo cambian `index.html`**: si la planilla ya está en 5.6 o
+  en 5.7, es el único archivo que hay que pegar.
+- ✅ **La tanda 1, la tanda 2, la tanda 3 y la tanda 4 NO cambian el esquema**: no hay hoja ni columna
   nueva, así que **no hace falta correr `crearORepararEstructura()` por ellas**
   (la corrida de arriba es solo para una planilla que viene de antes del
   rediseño de septiembre). `CONTRATO_ESTRICTO` no necesita fila en la hoja CONFIG:
