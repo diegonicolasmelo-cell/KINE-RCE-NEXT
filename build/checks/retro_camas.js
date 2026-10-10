@@ -2,6 +2,13 @@
 // BUG reportado por Diego (ago-2026): al viajar a una fecha pasada las tarjetas
 // seguían mostrando al paciente que ocupa la cama HOY. En un registro clínico
 // eso es información falsa. Ahora se reconstruyen con lo registrado ese día.
+//
+// 🗂️ 10-oct-2026 · RECONCILIADA con la tanda 5, cambio 5 (tarjeta de cama): el rótulo del egreso pasó de «🏠 Egr.» a «🏠 Egreso»
+// (la tarjeta lo escribe completo porque ahora comparte fila con solo dos botones más). Esta guardia detectaba el egreso buscando el
+// TEXTO «Egr.» en la grilla, así que con el rótulo nuevo «hoy: se ofrece egresar» se habría puesto roja y, peor, «en el pasado no se
+// ofrece egresar» habría pasado en el vacío (el texto viejo ya no existe en ningún lado). Ahora el egreso se detecta por el botón
+// (`#bedGrid .balt`, la clase que no cambió) O por cualquiera de los dos rótulos. No se borró ni aflojó ninguna aserción: las seis
+// preguntas son las mismas.
 // Uso: node build/checks/retro_camas.js
 const path = require('path');
 const { chromium } = require('playwright-core');
@@ -33,7 +40,7 @@ const { chromium } = require('playwright-core');
 
   const HOY = await p.evaluate(() => ({
     caamano: $('bedGrid').textContent.indexOf('Quiroz') > -1,
-    egreso: $('bedGrid').textContent.indexOf('Egr.') > -1,
+    egreso: !!document.querySelector('#bedGrid .balt') || /Egr(eso|\.)/.test($('bedGrid').textContent),
     mover: !!document.querySelector('#bedGrid .bmov:not(.hidden)'),
   }));
   eq('hoy: la cama muestra a su ocupante actual', HOY.caamano, true);
@@ -55,7 +62,7 @@ const { chromium } = require('playwright-core');
       dxDeEseDia: txt.indexOf('SDRA') > -1,
       sinRegistro: (txt.match(/Sin registro ese día/g) || []).length,
       botones: [...cards[0].querySelectorAll('.bfoot button')].map(x => x.textContent.trim()),
-      egreso: txt.indexOf('Egr.') > -1,
+      egreso: !!document.querySelector('#bedGrid .balt') || /Egr(eso|\.)/.test(txt),
       eventoPosterior: txt.indexOf('➕') > -1,
       mover: !!document.querySelector('#bedGrid .bmov:not(.hidden)'),
       sinEvoDeshabilitado: !!cards[1].querySelector('button[disabled]'),
@@ -76,7 +83,7 @@ const { chromium } = require('playwright-core');
     volverAHoy();
     await new Promise(r => setTimeout(r, 420));
     const txt = $('bedGrid').textContent;
-    return { caamano: txt.indexOf('Quiroz') > -1, egreso: txt.indexOf('Egr.') > -1,
+    return { caamano: txt.indexOf('Quiroz') > -1, egreso: !!document.querySelector('#bedGrid .balt') || /Egr(eso|\.)/.test(txt),
       sinRegistro: txt.indexOf('Sin registro ese día') > -1 };
   });
   eq('al volver a hoy reaparece el ocupante actual', VUELTA.caamano, true);

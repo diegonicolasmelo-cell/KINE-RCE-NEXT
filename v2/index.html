@@ -947,11 +947,28 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .a-pend{background:var(--n-orange-bg);color:var(--n-orange);}
 .a-eval{background:var(--n-blue-bg);color:var(--n-blue);}
 .bfoot{position:relative;z-index:2;padding:9px 13px;background:#f0e2b6;border:1px solid #d6bf84;border-top:1px dashed #e2d09c;border-radius:0 0 12px 12px;box-shadow:0 3px 10px rgba(120,90,20,.12);display:flex;gap:6px;flex-wrap:wrap;transition:box-shadow .18s;}
-.bevo{flex-grow:1;background:var(--primary);color:#fff;border:none;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
+/* 🗂️ 10-oct-2026 · TARJETA DE CAMA: LA ACCIÓN DE TODOS LOS TURNOS, PRIMERO Y SOLA; LAS OTRAS TRES, DEBAJO Y IGUALES (tanda 5, cambio 5).
+   El pie tenía cuatro botones del mismo peso en una sola fila (`flex-grow:1` y envoltura libre): «Evolución» —la acción de todas las camas
+   en todos los turnos— medía el 31 % del pie y se leía igual que «Egr.», la acción MENOS frecuente y la MÁS difícil de deshacer, que
+   encima iba en verde (el color de «lo bueno») y pegada al ➕ de evento, un icono solo y estrecho. Ahora:
+   · `.bevo` ocupa su fila entera (`flex:1 1 100%`): sale primero —ya lo era en el DOM— y nadie más cabe a su lado. También sirve a los
+     botones del traslado (`_movPie`: Intercambiar / Cancelar / Mover aquí), que son `.bevo`: cada uno queda en su propia fila. Su
+     relleno vertical sube de 7 a 9 px: antes la fila lo estiraba hasta la altura de los demás (31 px), y solo en su fila medía 29, o
+     sea MÁS BAJO que los secundarios de abajo (31 con el borde); la acción principal no puede ser la más baja.
+   · `.btl` (Historial y evento ➕) y `.balt` (Egreso) comparten UNA sola fila y UN solo aspecto neutro (`flex:1 1 0`, tres tercios):
+     el egreso se distingue por su rótulo completo, «Egreso», no por el color. El rótulo no envuelve (`nowrap`) y las celdas pueden
+     encogerse (`min-width:0`); el relleno lateral baja a 4 px porque «🏠 Egreso» a 12,8 px en la tarjeta más angosta de la grilla (290 px)
+     deja 83 px por celda.
+   🪤 NO se renombra ninguna clase ni se mueve nada del DOM: `#bedGrid .bcard .btl` es el ancla del recorrido guiado, y retro_camas,
+   mover_camas y tutorial dependen del orden. 🪤 El candado del evento (`.ev-cand.ev-lock`, ámbar, más abajo) SIGUE ganando: es
+   información («corregir el pasado pide clave»), no decoración. Guardia: tarjeta_acciones.js. */
+.bevo{flex:1 1 100%;background:var(--primary);color:#fff;border:none;padding:9px 7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
 .bevo:hover{background:var(--pdark);}
-.btl,.balt{flex-grow:1;background:#fff;border:1px solid #cbd5e1;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
-/* 🗂️ 10-oct-2026 · «Egr.»: el texto #0F8A5F daba 4,36:1 sobre blanco; #0b7a52 da 5,36. El borde sigue en el verde de `--ok`. */
-.balt{color:#0b7a52;border-color:var(--ok);}
+.btl,.balt{flex:1 1 0;min-width:0;background:#fff;border:1px solid #cbd5e1;color:#334155;padding:7px 4px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;white-space:nowrap;}
+/* Cama libre: el gris que vivía en el atributo `style` del botón. En línea nunca se oscurecía al pasar el cursor porque el `style`
+   ganaba siempre; con clase, `.bevo:hover` (azul oscuro, 0-2-0) le gana a una clase sola (0-1-0) y dejaría la letra gris sobre azul. Por
+   eso va como `.bevo.bevo-libre` y se repite en `:hover`: así no depende de qué regla se escribió después. */
+.bevo.bevo-libre,.bevo.bevo-libre:hover{background:#e2e8f0;color:#475569;}
 /* 🗂️ 10-oct-2026 · el icono de traslado era #94a3b8 sobre la pestaña manila: 1,84:1, casi invisible. #475569 da 5,43 (tanda 5, cambio 2). */
 .bmov{background:transparent;border:none;color:#475569;cursor:pointer;padding:3px;border-radius:5px;display:flex;align-items:center;}
 .bmov:hover{background:#e2e8f0;color:#3b82f6;}
@@ -1972,7 +1989,11 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   /* Toques más generosos */
   .col input,.col select{height:42px;}
   .ktm-state,.ktm-niv-btn,.ktm-asis-btn{min-height:38px;}
-  .bevo{min-height:38px;}
+  .bevo,.btl,.balt{min-height:38px;}
+  /* 🗂️ 10-oct-2026 · tanda 5, cambio 5: en una fila propia los secundarios (Historial, evento, Egreso) ya no heredan los 38 px del
+     `.bevo` de al lado —el estiramiento de la fila lo hacía de rebote— y medían 31; y el lápiz de la ficha tocaba 24×15 px. Los dos
+     llegan a 36 px o más. El lápiz agranda su ÁREA de toque sin agrandar la fila del nombre: el margen negativo se come lo que le sobra. */
+  .pname-lap{min-width:36px;min-height:36px;margin:-9px -6px;}
   /* ── PISO DE LETRA EN EL CELULAR: NADA BAJO .7rem (11,2 px) (tanda 5, cambio 3, 10-oct-2026) ───────────────────────────────────────
      Medido en un navegador de verdad a 390 px (build/pantallazos.js --solo-registro): la letra más chica que se veía era de 9,3 px.
      Bajo 11 px quedaban la barra de abajo (.58rem), los chips de ventilador y de equipos (.62 / .6), los de evaluaciones y pendientes
@@ -7042,14 +7063,14 @@ function renderGrid() {
           <button class="bevo" onclick="abrirPanel('${c.ID_CAMA}',false)">${btn}</button>
           <button class="btl" onclick="abrirTL('${c.ID_CAMA}')">⏱️ Hist.</button>
           ${_evBotonHTML(c.ID_CAMA, c.PATIENT_ID||'', 'btl')}
-          <button class="balt" onclick="egreso('${c.ID_CAMA}')">🏠 Egr.</button>
+          <button class="balt" onclick="egreso('${c.ID_CAMA}')">🏠 Egreso</button>
         `}</div>`;
     } else {
       const _vmtL=c.VM_TAG?`<span class="vmtag${/falla/i.test(c.VM_TAG_ESTADO||'')?' falla':(/manten/i.test(c.VM_TAG_ESTADO||'')?' mant':'')}" onclick="setTab('V')" title="Ventilador en esta cama${c.VM_TAG_ESTADO?' · '+c.VM_TAG_ESTADO:''} — clic para ir a Ventiladores">🔧 ${c.VM_TAG}</span>`:'';
       el.innerHTML=`${_vmtL}
         <div class="bhdr"><span class="bnum" style="color:var(--muted);"><div class="bdot d-empty"></div>Cama ${c.ID_CAMA}</span></div>
         <div class="bbody"><div class="empty-txt">Disponible</div></div>
-        <div class="bfoot">${_movPie(c, false)}<button class="bevo" style="background:#e2e8f0;color:#475569;" onclick="abrirPanel('${c.ID_CAMA}',true)">+ Ingresar Paciente</button></div>`;
+        <div class="bfoot">${_movPie(c, false)}<button class="bevo bevo-libre" onclick="abrirPanel('${c.ID_CAMA}',true)">+ Ingresar Paciente</button></div>`;
     }
     if(window.Turnos) Turnos.decorateCard(el, c);
     frag.appendChild(el);

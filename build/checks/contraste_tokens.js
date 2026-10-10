@@ -197,6 +197,13 @@ const resumen = (lista, max = 8) => {
     });
     await pag.goto('file://' + compilado);
     await pag.waitForTimeout(1500);
+    /* 🪤 EL SALUDO «¿Primera vez por acá?» (#tutHola) aparece a los 1,8 s del arranque con un fundido de .35 s (`tutPop`). Medir su × justo
+       ahí lo pillaba a MEDIO APARECER —la opacidad compuesta daba 1,38:1— y la guardia se ponía roja SOLO bajo carga (la batería con
+       `-j 2`) y verde corrida sola: otra guardia que depende de CUÁNDO se mide. No se esconde el saludo (su × también es texto en
+       `--muted` y tiene que seguir midiéndose): se espera a que esté visible con su animación terminada; si no sale en 6 s (porque ya
+       se vio y quedó la bandera), se sigue sin él. */
+    await pag.waitForFunction(() => { const h = document.getElementById('tutHola'); return !!h && !h.classList.contains('hidden') && h.getAnimations().every(a => a.playState === 'finished'); },
+      null, { timeout: 6000, polling: 50 }).catch(() => {});
     await pag.evaluate(src => { window.__C = (new Function('return ' + src))()(); }, EN_PAGINA.toString());
     return pag;
   }
@@ -290,7 +297,7 @@ const resumen = (lista, max = 8) => {
     ['el título de cada tarjeta del panel (.fcard-title, un color por dominio)', titulos, 10],
     ['el diagnóstico de la tarjeta de cama (.bdx)', bd, 1],
     ['el icono de traslado (.bmov)', bm, 1],
-    ['«Egr.» de la tarjeta de cama (.balt)', ba, 1],
+    ['«Egreso» de la tarjeta de cama (.balt; antes «Egr.», en verde)', ba, 1],
     ['la línea «Falta:» (#gFalta)', falta, 1],
     ['el botón principal DESACTIVADO (#pasoAvanza, #btnGuardar, .btn-p)', desact, 3],
   ];

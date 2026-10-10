@@ -4684,3 +4684,75 @@ con el color de su dominio y su punto. En Planes, los tres bloques conservan su 
 - **Decisión 6 de la auditoría («¿Subimos el título de cada tarjeta un escalón?»)**: el cambio 4 la lleva adentro (sin el escalón de T1 no hay tres niveles), así que se aplicó la recomendación («sí»); revertir es `.fcard-title{font-size:.72rem}`, y entonces la guardia pide reconciliar la escalera (T1 = T2).
 - **Quitar el color de dominio de los títulos de sub-bloque y de los tres de Planes** es parte de «una sola tupla» según el diseño de la auditoría; si Diego quiere conservarlo en alguna familia, se acepta como excepción escrita en la guardia, no con una segunda regla.
 - Sin tocar los emojis posteriores a 2019, los dos botones primarios, la palabra «Evolución»/«Editar», ni los 18 chips y las sugerencias «Medir X» de Planes (el resto del punto 10 de PENDIENTES: queda para Diego). Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
+
+---
+
+## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.3: la tarjeta de cama dice cuál es la acción de todos los turnos
+
+**De dónde sale.** Cambio 5 del plan de la tanda 5 (auditoría de solo lectura): «Evolución primero y sola; Historial, evento y Egreso en una segunda fila, todos secundarios». Es **CSS más tres líneas de HTML** en `v2/index.html`: no se renombra ninguna clase ni id, no se cambia ningún `onclick`, no se mueve nada en el DOM, no se toca `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`, y no hay migración de esquema.
+
+### El defecto, medido (no calculado)
+
+El pie de la tarjeta (`.bfoot`) llevaba **cuatro botones con el mismo peso en una sola fila** (`flex-grow:1` y envoltura libre). Con el tablero en Chromium a 390 y a 1400 px:
+- **«📝 Evolución» —la acción de todas las camas en todos los turnos— medía el 31 % del pie** (26 % «Editar»), y se leía igual que **«🏠 Egr.»** (21 %), que es la acción **menos frecuente y la más difícil de deshacer**, y encima iba **en verde**, el color de «lo bueno».
+- El botón de evento **➕ era un icono solo, de 51 px (celular) y 40 px (escritorio)**: el más difícil de acertar con el pulgar, y quedaba pegado al de egreso.
+- En el modo traslado los cinco botones se repartían la fila a anchos distintos (el ➕ medía 90 a 157 px según la cama) y los tres secundarios medían **31 px de alto** contra los 38 del `.bevo`.
+- El lápiz de la ficha (`.pname-lap`) tocaba **24 × 15 px** en el celular.
+- (La hipótesis de la auditoría de que el ➕ «no llega a 36 px» **no se confirmó** en la fila normal del celular: medía 51 × 38; solo se veía corta en escritorio, y el mínimo de 36 px es del celular. Sí se confirmó en el lápiz y en los secundarios del traslado.)
+
+### El cambio
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| `.bevo` («Evolución» / «Editar» / «Ver / editar» y los botones del traslado) | `flex-grow:1`, compartía fila | `flex:1 1 100%`: **fila propia a todo el ancho**; relleno vertical 7 → 9 px (al quedar solo ya no lo estira la fila de al lado y medía 29 px contra los 31 de los secundarios: **la acción principal no puede ser la más baja**) |
+| `.btl` (Historial y evento) y `.balt` (Egreso) | cada uno a su aire; `.balt` verde con borde verde; `.btl` con la letra negra del navegador | **una sola fila, tres tercios iguales** (`flex:1 1 0; min-width:0`), **un solo aspecto**: fondo blanco, borde `#cbd5e1`, letra `#334155`, sin envoltura (`nowrap`) |
+| Rótulo del egreso | «🏠 Egr.» | **«🏠 Egreso»** (decisión 3 de la auditoría: cabe en el tercio de la fila; el egreso se distingue por la palabra, no por el color) |
+| Celular: alto de `.btl` y `.balt` | 31 px en las filas propias (los 38 de antes eran del estiramiento de la fila) | `min-height:38px`, como `.bevo` |
+| Celular: lápiz de la ficha | 24 × 15 px | **36 × 36 px**, con **margen negativo** (`-9px -6px`) para que la fila del nombre no crezca (mide 18 px antes y después) |
+| Cama libre: «+ Ingresar Paciente» | gris en el atributo `style` | clase `.bevo.bevo-libre`, **mismos colores** (`#e2e8f0` / `#475569`); se repite en `:hover` porque `.bevo:hover` (azul oscuro) le gana a una clase sola y dejaba la letra gris sobre azul (en línea nunca pasaba: el `style` ganaba siempre) |
+
+- 🪤 **El candado del evento (`.ev-cand.ev-lock`, 🔒 ámbar) NO se unifica con los otros dos**: es información («corregir el pasado pide clave de coordinación»), no decoración. Gana por especificidad (2 clases contra 1) y la guardia lo mide.
+- **El ➕ sigue siendo un icono solo, sin texto.** Ponerle rótulo («Evento») es cambiar una palabra de la interfaz y no está en lo que se pidió; pasó de 51 px a 110 px de ancho en el celular (un tercio de la fila), que es lo que arregla el toque. En el celular no hay *tooltip*, así que quien no sabe qué hace el ➕ no tiene cómo enterarse: queda anotado para Diego.
+- **Qué NO cambia:** la palabra «Evolución» / «Editar» (decisión 2 de la auditoría: es de la unidad); «Hist.» sigue diciendo «Hist.» (el texto del tutorial lo nombra así, y `retro_camas.js` lo exige); el orden del DOM (Evolución, Historial, evento, Egreso); `egreso()`, `mover()`, `abrirPanel()`, `abrirTL()`; el verde de «Mover aquí» y el rojo de «Cancelar movimiento» del traslado (son estilos en línea de `_movPie`).
+- **Lo que cuesta, medido:** la tarjeta ocupada crece **una fila: de 265 a 309 px en el celular (+44) y de 281 a 320 en escritorio (+39)**. El tablero de 12 camas con 9 ocupadas pasa de **3.414 a 3.810 px de largo a 390 px** (+396) y de 1.069 a 1.186 a 1.400 px (+117). En modo traslado, a 390 px: 3.747 → 4.338. La vista retrospectiva a 390 px: 2.601 → 2.645.
+- **El modo traslado queda ordenado pero largo:** en una cama ocupada ahora hay **dos botones azules a ancho completo** («⇄ Intercambiar con esta cama» y «📝 Evolución»), uno sobre otro, más la fila de secundarios. Antes eran los dos azules en la misma fila con anchos distintos. El riesgo de tocar «Evolución» queriendo «Intercambiar» **existía igual** (los dos eran azules); no se cambió porque `_movPie` es lo acordado. Si Diego lo quiere distinto durante un traslado (por ejemplo, esconder «Evolución» mientras dura), es una decisión de él.
+
+### Guardia nueva `build/checks/tarjeta_acciones.js`
+
+Chromium a **390 y 1400 px**, reloj congelado (martes 10-mar-2026 10:00, fecha inventada fuera de las ventanas trampa), datos ficticios, la tarjeta de verdad del tablero. Mide las **cuatro tarjetas** (ocupada sin evolucionar, ya evolucionada, libre, vista retrospectiva) y el **modo traslado** (otra cama ocupada, la de origen, una libre):
+- A. `.bevo` es el primer botón del pie, ocupa **todo el ancho útil** (no «el 90 %»: 100 %) y **ningún otro botón comparte su fila**; Historial, evento y Egreso van **debajo**; y la acción principal no es más baja que los secundarios.
+- B. Los tres secundarios están en la **misma fila**, son **tres tercios iguales** y tienen el **mismo fondo, borde, color y letra**; el orden es Historial → evento → Egreso y `.btl` sigue siendo el primer secundario (ancla del tutorial: `#bedGrid .bcard .btl`).
+- C. El egreso dice «Egreso» (no «Egr.»), en una línea y sin cortarse; ningún botón del pie envuelve su rótulo ni se corta.
+- D. En el celular ningún botón del pie, ni en el tablero, ni en el traslado, ni en la retrospectiva, mide menos de 36 px; el lápiz mide al menos 36 × 36 y **no hace crecer la fila del nombre**.
+- E. Cama libre: `.bevo.bevo-libre`, el gris ya no va en `style`, mismos colores, ancho completo, y **con el cursor encima no cambia de color**.
+- F. Retrospectiva: «Ver / editar» primero y solo; Historial debajo; sin egreso, sin evento y sin traslado.
+- G. Traslado: cada `.bevo` en **su propia fila** a todo el ancho y los secundarios juntos al final con el mismo aspecto.
+- H. **Peor caso de ancho:** una tarjeta de 290 px (el mínimo de la grilla; 83 px por celda) y un celular de 320 px: nada se corta ni envuelve.
+- I. El candado del evento sigue ámbar. J. Exige haber VISTO las diez tarjetas (cinco por ancho) para no medir en el vacío.
+
+**Roja antes contra el código sin arreglar: 43 fallan** (de 97 aserciones): `.bevo` al 31–34 % del pie y compartiendo su fila en las dos camas y en los dos anchos; el egreso verde frente a los otros dos; «Egr.»; el lápiz de 24 × 15; el botón de la cama libre en `style`; en el traslado cada `.bevo` sin fila propia y los secundarios de 31 px; la retrospectiva con «Ver / editar» y Historial en la misma fila; y a 320 px el ➕ de 33 px. **Verde después (106 aserciones).**
+**14 de 14 mutantes mueren, cada uno por su razón:** `.bevo` con `flex-grow:1` (46 aserciones), el egreso otra vez verde (8), el rótulo «Egr.», los secundarios sin `min-height` en el celular, sin área táctil del lápiz, el lápiz con área pero sin margen negativo (la fila del nombre crece de 18 a 36 px), la cama libre otra vez en línea, la cama libre con una clase sola (**el `:hover` azul le gana: este mutante empezó vivo** porque yo había escrito en el comentario que el `:hover` repetido era imprescindible y, con `.bevo.bevo-libre`, el empate de especificidad lo resolvía el orden de las reglas; el comentario se corrigió y la guardia ahora mide el cursor encima), el relleno de 7 px del botón principal (29 contra 31), el egreso antes que el evento en el DOM, los secundarios con `!important` que aplastan el candado ámbar, solo el borde del egreso en verde, los secundarios sin `flex-basis:0` y el Historial sin la clase `.btl`.
+
+### Reconciliaciones de guardias (la convención que cambió es justamente el rótulo)
+
+- **`retro_camas.js`** detectaba el egreso buscando el **texto «Egr.»** en la grilla. Con el rótulo nuevo «hoy: se ofrece egresar» se habría puesto roja y —peor— «en el pasado no se ofrece egresar» habría pasado **en el vacío**. Ahora detecta el egreso por el botón (`#bedGrid .balt`, la clase que no cambió) o por cualquiera de los dos rótulos. Las seis preguntas son las mismas; no se borró ni se aflojó ninguna aserción.
+- **`contraste_tokens.js`**: el nombre del par en la lista cerrada (`«Egreso» … antes «Egr.», en verde`); el umbral (4,5:1) y la medición no cambian, el egreso ahora es `#334155` sobre blanco (10,36:1). Y **una carrera que ya traía del paso 5.1 y que esta batería sacó a la luz** (abajo).
+
+### 🪤 Una guardia del paso 5.1 que se ponía roja SOLA bajo carga: `contraste_tokens.js`
+
+Al repetir las guardias de la zona con `-j 2`, `contraste_tokens.js` salió roja **2 veces de unas 8** y **verde cada vez que se corrió sola** (y verde en la batería completa). La salida decía `1400 tablero · button.th-x sobre #ffffff → 1.379:1 («×»)`: el **×** del saludo «¿Primera vez por acá?» (`#tutHola`). Ese globo sale **1,8 s después del arranque** con un fundido de .35 s (`tutPop`), y la guardia lo medía justo ahí, **a medio aparecer**: la medición compone la opacidad (es lo correcto) y un ×
+a medio fundido da 1,38:1. Bajo carga el arranque se corre y la medición cae en esa ventana; sola, cae antes o después. Es la misma familia de las tres veces que ya se pagó con el reloj: **una guardia que depende de CUÁNDO se mide**. (La guardia quitaba `.tut-hola`, pero el globo es `#tutHola`, un id: ese borrado nunca hizo nada.)
+**Arreglo (en el código de la guardia, sin aflojar nada):** `abrir()` espera a que `#tutHola` esté visible **con su animación terminada** (`getAnimations()` todas `finished`; 6 s de tope por si ya hay bandera de «lo vi») antes de medir. **No se esconde el saludo:** su × sigue midiéndose, a opacidad completa (se comprobó que `button.th-x` entra en el barrido). **10 corridas de 10 verdes** con `-j 2` junto a `tarjeta_acciones`, `retro_camas` y `convenciones`. La guardia nueva `tarjeta_acciones.js` nace sin esa carrera: no mide el saludo, y lo oculta por CSS (un globo fijo en la esquina podría tapar el botón que se prueba con el cursor).
+
+### Vecinas y capturas
+
+Batería completa con `-j 2` (237 guardias, 620 s): **235 verdes y 2 rojas, `paridad_entrega` y `pwa_paquete`**, por la regeneración pendiente del cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró `paquete.js`). Entre las verdes, las de la zona: `legibilidad`, `tutorial`, `retro_camas`, `mover_camas`, `ficha_y_antes`, `episodio_al_guardar`, `confirma_guardado`, `prono_arriba`, `contraste_tokens`, `piso_letra_celular`, `titulos_tres_niveles`, `movil*`, `piel`, `convenciones`, `tokens_existen`, `escapado_unico`, `seis_pasos`, `cuatro_pasos`, `sin_riel` y `general_disuelta`.
+Capturas del antes y el después del tablero (fuera del repositorio, carpeta de trabajo de la sesión: `capturas/antes_53` y `capturas/despues_53`, con las tarjetas de cerca en `tarjetas/`) a 390 y 1400 px: tablero, tablero en traslado y vista retrospectiva, y de cerca la ocupada sin evolucionar, la ya evolucionada, la libre, la retrospectiva, y las tres del traslado.
+
+**Lo que ve distinto la kinesióloga.** En cada cama ocupada, **«Evolución» (o «Editar») es ahora un botón azul grande a todo el ancho**, solo en su fila, y debajo, en una segunda fila, tres botones blancos iguales: **Hist.**, **➕** (evento) y **Egreso**. El egreso ya no es verde ni dice «Egr.»: dice «Egreso» y se parece a los otros dos. En el celular los tres botones de abajo son más grandes (110 × 38 px el ➕, que era de 51), y el lápiz de la ficha se acierta mejor sin mover el nombre. La cama libre se ve igual. La tarjeta es una fila más alta (unos 40 px), así que en el celular hay que desplazarse algo más para recorrer las doce camas.
+
+**Lo que NO se hizo y queda dicho.**
+- **La palabra «Evolución» / «Editar»** (decisión 2) y **«Hist.»** no se tocaron: son rótulos de la unidad y el tutorial los nombra.
+- **El ➕ sigue sin texto** y en el celular no hay *tooltip*; si Diego quiere «Evento» en el rótulo, es una decisión suya (y cambia el ancho que cabe).
+- **Dos botones azules a ancho completo durante un traslado** («Intercambiar» y «Evolución»): ver arriba; decisión suya.
+- Sin tocar los emojis posteriores a 2019 que ya viven en producción, ni los dos botones primarios de colores distintos (el índigo de la barra de abajo), ni `#btnCerrarPost`. Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
