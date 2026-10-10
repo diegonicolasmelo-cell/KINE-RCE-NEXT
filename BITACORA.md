@@ -4543,3 +4543,83 @@ salían verdes antes y deben seguir así. Vecinas (convenciones, `cuatro_pasos`,
   no lo cambia (sería abrir un paso que el flujo acordó saltar) y lo deja fijado en la guardia como «la barra manda».
 - Con ingreso y la pestaña 1 VISIBLE (caso raro: la cama ya traía dispositivos), «Atrás» desde el 2 sigue yendo al 1, como hasta hoy; «Siguiente» desde el 0 va derecho al 2. No se unificó para no mover lo acordado.
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
+
+---
+
+## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.1: ver el antes, contraste y piso de letra en el celular
+
+**De dónde sale.** La auditoría de solo lectura de las tandas 3, 4 y 5 dejó, para la limpieza visual, siete cambios de diseño. Los tres primeros (este paso) son los que se pueden **medir**: cómo se ve hoy,
+qué texto no llega a contraste AA (4,5:1) y qué texto se lee bajo 11 px en el celular. La auditoría fue estática —calculó los contrastes desde el CSS y supuso las envolturas— y avisó que sus hipótesis había que mirarlas
+en pantalla. **Sin migración de esquema, sin tocar HTML ni JS de la app**: todo es CSS en `v2/index.html`, más la herramienta de capturas y dos guardias nuevas.
+
+### Cambio 1 · Las capturas del antes (`build/pantallazos.js`, herramienta, no guardia)
+
+`node build/pantallazos.js [carpeta] --solo-registro` saca **los seis pasos del panel y el tablero** (normal, en modo traslado y en vista retrospectiva) a **390 px y a 1400 px**, con el arnés simulado y datos
+ficticios, y vuelca `medidas.json` (la letra más chica que se ve en cada pantalla, y alto/ancho de los botones del pie de cada tarjeta y de la barra). Tres cuidados que costaron una vuelta:
+- 🪤 **El reloj va congelado** en el martes 10-mar-2026 10:00 (`clock.setFixedTime`, que deja correr los temporizadores; fecha inventada, fuera de las ventanas trampa). Con el reloj de pared el antes y el después se tomaban en
+  días distintos —otra cuenta de días de estadía, otra mascota— y no se podían comparar.
+- 🪤 **El panel se fotografía a alto completo** (la ventana se agranda hasta que el contenido entra: el panel es una caja con su propio desplazamiento) y con **todas las tarjetas y sub-bloques desplegados**, porque en el celular el
+  acordeón los trae plegados. La mascota flotante se oculta (tapaba una esquina de cada foto del tablero).
+- 🪤 **«⚠️ Sin guardar» lo prende un temporizador de 2 s** (`_tickSinGuardar`): según la fase en que cayera la foto, el antes salía sin la insignia y el después con ella, y el botón principal medía 354 px en una y 236 en la otra
+  sin que nada hubiera cambiado. Se llama al tick a mano antes de cada foto de paso.
+Las capturas del antes y el después viven **fuera del repositorio** (carpeta de trabajo de la sesión, `capturas/antes` y `capturas/despues`) para enseñárselas a Diego en tema claro.
+
+**Lo que se vio en el antes (medido, no calculado).**
+- **A 390 px la letra más chica era de 9,3 px**, y no un caso suelto: la barra de abajo (`.mnav button`, .58rem), los chips de ventilador y de equipos de la cama (`.vmtag` 9,9 y `.eqtag` 9,6), los chips de evaluaciones y pendientes (`.abadge` 10,7), las **tres palabras de
+  estado** de cada tarjeta del Turno (`.mpal`, 9,9: la tanda 3 las puso para leerlas de un vistazo y quedaron en el tamaño menos legible), las etiquetas de casi todos los campos (`.col label`, 10,6) y los títulos de sub-bloque (10,9). Por pantalla: tablero 9,3 · paso 1 9,9 · paso 2 9,3 ·
+  paso 3 9,9 · paso 4 9,9 · paso 5 9,3 · paso 6 10,7.
+- **A 1400 px la letra más chica es de 9,3 a 10,7 px** según la pantalla (el tablero 9,6; el paso 2 baja a 9,3 por textos con tamaño en línea como «GCS», y el paso 5 a 9,3 por `.cg-r`, «va al relato de hoy»). El escritorio **no se toca en este paso**: el piso de 11 px es del celular y unificar los títulos es el cambio 4 de la tanda.
+- Dos hallazgos que la auditoría no tenía. **(1)** La regla del botón principal desactivado (`#btnGuardar:disabled,#pasoAvanza:disabled`, gris `#94a3b8`) **nunca ganaba**: el degradado azul de la piel institucional pesa más (id + atributo + elemento contra id + pseudoclase). Lo que se veía era el degradado con la
+  opacidad .55 que `prevAvanceUI` le pone en línea al «Siguiente» del paso 1: letra blanca sobre `#73a3cb`, **2,68:1**; y mientras se guarda (`_guardadoBotones` lo desactiva SIN opacidad) seguía igual de azul que uno activo. **(2)** La etiqueta «Fijación · cm de arcada dental» (columna de 104 px)
+  pasa de dos líneas a **tres** si las etiquetas suben a .72rem, y estira la fila entera: justo el defecto por el que existe `legibilidad.js`, que mide a 1400 px y no lo ve.
+
+### Cambio 2 · Contraste: oscurecer lo que no llegaba a AA, sin cambiar la paleta (solo tema claro)
+
+| Qué | Antes (medido sobre el fondo real) | Después |
+|---|---|---|
+| `--muted` (piel institucional) `#5B7793` → `#4A6580`, el gris azulado de TODO el texto secundario | sobre el fondo de la app 4,18 · sobre el manila de la cama 3,69 · sobre la cama libre 4,12 · sobre la pestaña de cama 3,93 | 5,43 · 4,80 · 5,35 · 5,11 · el peor par de toda la app mide **4,80** |
+| Título de tarjeta: `--fc-t` solo en `.fc-h` (`#a8403a`), `.fc-k` (`#8f5400`) y `.fc-imt` (`#0369a1`); `.fcard-title` lo usa con respaldo (`var(--fc-t,var(--fc,…))`). El punto y el borde superior siguen con `--fc`: el dominio no pierde su color | Hemodinamia 4,42 · Rehabilitación 4,20 · IMT 4,10 | 6,07 · 6,11 · 5,93 |
+| `.bdx` (diagnóstico de la tarjeta) `#64748b` → `#475569` | 3,77 | 6,00 |
+| `.bmov` (icono de traslado) `#94a3b8` → `#475569` | **1,84** sobre la pestaña manila: casi invisible | 5,43 |
+| `.balt` («Egr.») texto `#0F8A5F` → `#0b7a52` (el borde sigue en `--ok`) | 4,36 | 5,36 |
+| Botón principal DESACTIVADO (`.btn-p:disabled` y `#btnGuardar/#pasoAvanza:disabled`, en la piel y en la regla base): gris `#e2e8f0` con letra `#475569`, sin sombra, y **sin la opacidad en línea** (`!important`; también pisa el `:hover`) | 2,56 (muestra suelta) y **2,68** (el «Siguiente» real del paso 1) | 6,15, y el desactivado es el MISMO se desactive por falta de datos o por estar guardando |
+
+- 🪤 **`#gFalta` NO se tocó.** La auditoría proponía oscurecerlo (`#b45309` → `#92400e`) porque «en el borde» daba 4,50. **Medido sobre el fondo real da 4,501:1: pasa AA**, así que la hipótesis no se confirmó y no se cambia (es además el ámbar de la barra, color con significado). Queda de candado en la guardia, que mide a tres decimales.
+- **No se tocó el ámbar ni el rojo con significado clínico** (heredado/pendiente, VM prolongada, alertas, «Falta:»), ni `#gEstadoGuardado`, `[data-estado]`, `_guardadoBotones`, `guardar()`, `api()` ni los `avErr*`. Solo grises, títulos y el desactivado. Sin `color-mix` ni nada nuevo para el Chrome de Windows 10, y ningún bloque oscuro.
+- Es el cambio global que Diego tiene que mirar (decisión 7 de la auditoría): el texto secundario de toda la app se ve **algo más hondo, el mismo azul grisáceo**. Se aplicó la recomendación de la auditoría; revertir es una línea (`--muted` de la piel).
+
+### Cambio 3 · Piso de letra de 11 px (.7rem = 11,2 px) en el celular
+
+Todo **dentro del `@media (max-width:740px)` que ya existía**, al final del bloque; en escritorio no cambia nada (lo mide la guardia y lo confirman las capturas: las nueve pantallas de 1400 px miden lo mismo al píxel, antes y después, y la letra más chica de cada una es la misma).
+- Clases: `.mnav button` .58 → .7rem; `#mPac .ch` .65 → .7; `.mst` .62 → .7; `.vmtag, .eqtag, .abadge, .mpal` → .7rem; `.sub-sec-title, .pe2-t, .msub-t, .cg-r, .pv-sep span, #fcId .bloqueT, #aetTurno .aetT-tit` → .7rem.
+- **Etiquetas de campo `.col label` a .7rem con el espaciado en `.03em` (antes `.05em`) y NO a .72rem**: con .72rem «Fijación · cm de arcada dental» pasaba a tres líneas (hallazgo 2 de arriba); a .7rem y .03em cabe en dos a 104 px. Lo mide la guardia en el celular.
+- Los **títulos en línea** (`font-weight:800` + `text-transform:uppercase`) que una regla global aplasta a .62rem con `!important` se la ganan en el celular con la misma especificidad y un número mayor: `#sp [style*="font-weight:800"][style*="text-transform:uppercase"]{font-size:.7rem!important}`.
+- Los tamaños **en línea de .5 a .69rem** dentro de `#sp`, `#bedGrid` y `.htitle` suben a .7rem con selector de atributo (`[style*="font-size:.6"]` y parientes, con y sin espacio) —la misma técnica que ya usaba la regla de los títulos—, **sin reescribir ninguno de los ~1.750 estilos en línea**.
+- Quedan fuera los iconos (`.mnav .mi`, 20 px) y los números grandes. El texto corrido ya estaba sobre 12 px: se levanta el piso, no se cambia la jerarquía.
+- **Medido en las capturas del después, a 390 px: la letra más chica de cada pantalla pasa a 11,2 px** (tablero, los seis pasos). **Nada se rompe**: ningún chip se pisa ni se sale de la tarjeta, las etiquetas siguen en dos líneas, la barra inferior cabe («Estadíst.» entra), la botonera no se mueve. El tablero mide **el mismo alto** que antes (3.414 px de pantalla); el panel
+  crece 16 px en el paso 2, 6 en el paso 5 y 1 en el paso 4, y los pasos 1, 3 y 6 no cambian. Sin chip que corregir, así que no hizo falta darle espacio a ninguno ni bajar el piso.
+
+### Las dos guardias nuevas (cada una vista ROJA antes del arreglo, VERDE después)
+
+**`build/checks/contraste_tokens.js`.** Abre el tablero y los seis pasos del panel (más el ingreso) en Chromium a 1400 y a 390 px, con el reloj congelado y datos ficticios, y mide con `getComputedStyle` sobre **el fondo real que pinta el navegador** (capas, degradados y opacidad compuestos; con un degradado mide la peor parada) —a diferencia de
+`piel.js`, cuyos pares son hex escritos en la guardia y no lee el CSS—. (A) **Barrido de `--muted`**: todo texto visible cuyo color computado ES `--muted` mide ≥ 4,5:1 (se miden 331 textos y se exige haber VISTO etiqueta de campo, texto de la cama libre y edad/sexo de la tarjeta; no es una lista de selectores: un `color:var(--muted)` nuevo sobre un
+fondo oscuro lo ve). (B) **Lista cerrada** de pares que no son `--muted`: título de cada tarjeta (24 medidos), `.bdx`, `.bmov`, `.balt`, `#gFalta` y el botón principal desactivado (el «Siguiente» real del paso 1, `#btnGuardar` forzado y una muestra de `.btn-p`); agregar un par es una decisión consciente. (D) Sin bloque oscuro.
+**Roja antes contra el `index.html` del commit anterior: 6 fallan** (el barrido de `--muted`, con 3,69 como peor par; los títulos, 4,10; `.bdx`, 3,77; `.bmov`, 1,84; `.balt`, 4,36; el desactivado, 2,56); `#gFalta` ya salía verde (4,501) y la sección C se ve verde. **Verde después.**
+
+**`build/checks/piso_letra_celular.js`.** Chromium a 390×844 táctil, reloj congelado en el 10-mar-2026 10:00: tablero con el máximo de chips (ventilador, equipos del paciente, prono, KTM suspendida, evaluaciones envejecidas y pendientes), modo traslado y vista retrospectiva; los seis pasos del panel y el ingreso con TODO desplegado, y una segunda pasada con las ramas ocultas
+destapadas (PVE, extubación, TQT, AET, procedimientos), porque un texto chico podía esconderse en una rama que la corrida no abrió. Falla si **cualquier texto visible** mide menos de 11 px (lista cerrada de excepciones: solo `<sub>`/`<sup>`, que el navegador reduce a propósito). Además mide **lo que cuesta subir la letra**: etiquetas en tres líneas o más, texto cortado sin
+elipsis, chips de ventilador/equipos que se pisan, insignias fuera de la tarjeta y pantalla que se sale por la derecha; y que **el escritorio sigue en su tamaño de siempre** (`.abadge` 10,7 px y etiquetas 10,9 px a 1400 px). **Roja antes: 16 fallan** (la barra de abajo 9,3 px, `.eqtag` 9,6, `.vmtag` 9,9, `.mpal` 9,9, los títulos en línea 9,9, las etiquetas 10,6, etc., en tablero, traslado, retrospectiva, los seis pasos, las ramas ocultas y el ingreso);
+las comprobaciones de «nada se rompe» salían verdes antes y deben seguir así. **Verde después.**
+**Mutantes (9 de 9 mueren, cada uno por la razón que corresponde):** volver la barra de abajo a .58rem; quitar la regla de los tamaños en línea; sacar `.abadge` del piso; etiquetas a .72rem (cae por «etiqueta en 3 líneas» y por ninguna otra); escribir el piso fuera del `@media` (cae por «escritorio no cambia»); `--muted` de vuelta; sin `--fc-t` en Hemodinamia; sin la regla del desactivado de la piel (el degradado azul gana y la letra oscura sobre azul mide 1,03:1); `.bmov` de vuelta.
+
+**Vecinas.** Batería completa con `-j 2`: **232 verdes de 234**; las 2 rojas son `paridad_entrega` y `pwa_paquete`, por la regeneración pendiente del cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`). Tras tocar la regla base del desactivado, repetidas las guardias de la zona con `-j 2` (contraste, piso, `piel`, `convenciones`,
+`legibilidad`, `movil*`, `tokens_existen`, `escapado_unico`, `seis_pasos`, `guardado*`, `confirma*`, `tutorial`, `fallo_guardado`, `aviso_error*`, `estado_*`, `paquete`): 27 verdes de 28, la roja es `pwa_paquete`.
+
+**Lo que ve distinto la kinesióloga (en el celular).** Todo lo pequeño crece a un mínimo de 11 px: la barra de abajo, los chips de ventilador y equipos, las insignias de evaluaciones y pendientes, las tres palabras de estado de cada bloque, las etiquetas de los campos y los títulos de sub-bloque. En ningún sitio se pierde información ni se mueve un botón. En escritorio no cambia el tamaño de nada. En los dos:
+el texto gris secundario se lee más firme; los títulos de Hemodinamia, Rehabilitación e IMT son un poco más oscuros (el color del dominio sigue en el punto y el borde); el diagnóstico de la cama y «Egr.» se leen mejor; **el icono de traslado deja de ser casi invisible**; y el botón «Siguiente» sin poder avanzar pasa de azul pálido con letra blanca a gris claro con letra oscura, que se lee y se entiende como «todavía no».
+
+**Lo que NO se hizo y queda dicho.**
+- **`.mres.vacio`** («sin registrar» en cursiva gris en la cabecera de cada bloque del celular, `#b3ada2`) mide **2,23:1**. No estaba en la auditoría y es una decisión de diseño de la tanda 3 (el «vacío» apagado a propósito, junto a la palabra de estado); no se tocó. Queda anotado por si Diego quiere que también se lea.
+- **El escritorio sigue con letra de 9,3 a 10,7 px** en los títulos en línea y en los chips; el piso de 11 px es solo del celular, como acordó la auditoría. Unificar los tres niveles de título (cambio 4) y el pie de la tarjeta (cambio 5) son otros pasos.
+- Sin tocar los emojis posteriores a 2019 que ya viven en producción (decisión 4 de la auditoría, para Diego), ni los dos botones primarios de colores distintos (decisión 1), ni la palabra «Evolución»/«Editar» (decisión 2).
+- Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.

@@ -929,8 +929,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* El nombre trunca; el ✏️ NO — sin esta separación un nombre largo se comía
    el botón con la elipsis y la ficha quedaba otra vez inalcanzable. */
 .pname>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-/* Diagnóstico en la tarjeta de cama (reemplaza al código de paciente) */
-.bdx{font-size:.72rem;color:#64748b;font-style:italic;line-height:1.3;margin-top:2px;
+/* Diagnóstico en la tarjeta de cama (reemplaza al código de paciente)
+   🗂️ 10-oct-2026 · color #64748b → #475569: sobre el manila daba 3,77:1 y ahora 6,00 (tanda 5, cambio 2). */
+.bdx{font-size:.72rem;color:#475569;font-style:italic;line-height:1.3;margin-top:2px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .empty-txt{color:var(--muted);font-style:italic;text-align:center;padding:14px 0;}
 .pill{display:inline-flex;align-items:center;font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--n-gray-bg);border:1px solid transparent;color:var(--n-gray);}
@@ -949,8 +950,10 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bevo{flex-grow:1;background:var(--primary);color:#fff;border:none;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
 .bevo:hover{background:var(--pdark);}
 .btl,.balt{flex-grow:1;background:#fff;border:1px solid #cbd5e1;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
-.balt{color:var(--ok);border-color:var(--ok);}
-.bmov{background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:3px;border-radius:5px;display:flex;align-items:center;}
+/* 🗂️ 10-oct-2026 · «Egr.»: el texto #0F8A5F daba 4,36:1 sobre blanco; #0b7a52 da 5,36. El borde sigue en el verde de `--ok`. */
+.balt{color:#0b7a52;border-color:var(--ok);}
+/* 🗂️ 10-oct-2026 · el icono de traslado era #94a3b8 sobre la pestaña manila: 1,84:1, casi invisible. #475569 da 5,43 (tanda 5, cambio 2). */
+.bmov{background:transparent;border:none;color:#475569;cursor:pointer;padding:3px;border-radius:5px;display:flex;align-items:center;}
 .bmov:hover{background:#e2e8f0;color:#3b82f6;}
 
 /* OVERLAY + PANEL */
@@ -1028,7 +1031,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* ── FCARD — tarjeta blanca con barra superior de color (estética prototipo) ── */
 .fcard{background:var(--card);margin-bottom:14px;border-radius:13px;border:1px solid var(--border);border-top:4px solid var(--fc,#94a3b8);box-shadow:0 1px 3px rgba(15,23,42,.06);overflow:visible;}
 .fcard-hdr{padding:12px 16px 10px;background:transparent;border-bottom:1px solid #eef2f6;display:flex;align-items:center;gap:8px;}
-.fcard-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc,#64748b);display:flex;align-items:center;gap:7px;}
+.fcard-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc-t,var(--fc,#64748b));display:flex;align-items:center;gap:7px;}
 .fcard-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--fc,#94a3b8);flex-shrink:0;}
 /* ── Ficha del episodio plegada (ago-2026, pedido de Diego) ────────────────
    `display:contents` deja los campos como hijos directos de la fila, así la
@@ -1089,21 +1092,27 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .her-chip{margin-left:auto;background:#fffbeb;color:#b45309;border:1px solid #f59e0b;border-radius:14px;padding:2px 10px;font-size:.66rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .her-chip:hover{background:#fef3c7;}
 .fcard-body{padding:12px 16px 14px;}
-/* Un solo acento por dominio clínico */
+/* Un solo acento por dominio clínico.
+   🗂️ 10-oct-2026 · `--fc-t` es el color del TEXTO del título cuando el del dominio no llega a 4,5:1 sobre blanco (tanda 5, cambio 2):
+   hemodinamia 4,42 → 6,07, terapia física 4,20 → 6,11 e IMT 4,10 → 5,93. El punto y el borde superior siguen con `--fc`, así que el
+   dominio no pierde su color: solo el rótulo se lee mejor. `.fcard-title` lo usa SIEMPRE con respaldo (`var(--fc-t,var(--fc,…))`). */
 .fc-id{--fc:var(--primary);}
 .fc-g{--fc:#64748b;}
 .fc-n{--fc:var(--neuro);}
-.fc-h{--fc:var(--hemo);}
+.fc-h{--fc:var(--hemo);--fc-t:#a8403a;}
 .fc-r{--fc:var(--resp);}
-.fc-k{--fc:var(--kine);}
+.fc-k{--fc:var(--kine);--fc-t:#8f5400;}
 .fc-upot{--fc:#be123c;}
-.fc-imt{--fc:#0284c7;}
+.fc-imt{--fc:#0284c7;--fc-t:#0369a1;}
 .fc-proc{--fc:#4338ca;}
 
 /* BOTONES */
 .btn{width:100%;padding:10px 14px;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .18s;}
 .btn-p{background:var(--primary);color:#fff;}.btn-p:hover{background:var(--pdark);}
-.btn-p:disabled{background:#94a3b8;cursor:not-allowed;}
+.btn-p:disabled{background:#e2e8f0;color:#475569;cursor:not-allowed;}
+/* 🗂️ 10-oct-2026 · el desactivado era BLANCO sobre #94a3b8 (2,56:1): el rótulo se perdía justo cuando se quiere saber por qué no se
+   puede avanzar. Ahora es gris claro con letra oscura (6,15:1) y se entiende solo; el color institucional queda para lo que SÍ se puede
+   apretar. (Tanda 5, cambio 2; el del botón de la barra va más abajo, junto a la piel institucional, que es la que lo pisaba.) */
 .btn-r{background:#fff;color:#334155;border:1px solid #cbd5e1;}.btn-r:hover{background:#f8fafc;}
 .btn-c{background:var(--ok);color:#fff;}
 .act-bar{display:flex;gap:10px;align-items:center;padding:12px 2px 14px;position:sticky;bottom:0;z-index:5;background:linear-gradient(to top,var(--bg) 72%,rgba(244,246,248,0));}
@@ -1260,6 +1269,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* 🪤 Solo el BANNER manda: la línea de la ficha que ahora comparte caja puede estar oculta sin llevarse el banner. */
 #epBannerCaja:empty,#epBannerCaja:has(> #epBanner.hidden){display:none;}
 #epBannerCaja{padding:10px 14px 0;background:var(--card);}
+/* 🗂️ 10-oct-2026 · #b45309 sobre el fondo de la app mide 4,501:1: pasa AA por un pelo. Se MIDIÓ antes de oscurecerlo (la auditoría lo
+   daba por «en el borde») y no hace falta tocarlo; contraste_tokens.js lo deja de candado. */
 #gFalta{text-align:right;font-size:.75rem;font-weight:800;color:#b45309;min-height:15px;padding:0 4px;}
 .act-bar .btn{height:46px;border-radius:12px;}
 /* El botón de guardar GRANDE (Diego, 15-ago-2026): es la acción del panel. */
@@ -1271,7 +1282,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .act-bar #btnGuardar,.act-bar #pasoAvanza{height:52px;font-size:1.02rem;}
 #btnGuardar,#pasoAvanza{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
 #btnGuardar:hover,#pasoAvanza:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
-#btnGuardar:disabled,#pasoAvanza:disabled{background:#94a3b8;box-shadow:none;filter:none;}
+/* 🗂️ 10-oct-2026 · desactivado legible también aquí (tanda 5, cambio 2): era blanco sobre #94a3b8 (2,56:1). Hoy NO es lo que se ve —la piel
+   institucional (más abajo) lo pisa con la misma receta—, pero dejarlo así era una trampa: quien algún día quite la piel recuperaba el rótulo ilegible. */
+#btnGuardar:disabled,#pasoAvanza:disabled{background:#e2e8f0;color:#475569;box-shadow:none;filter:none;}
 /* 🔴 LA FRANJA DEL ÚLTIMO GUARDADO Y SUS BOTONES (revisión de la tanda 2, H27 y H31, 10-oct-2026). Antes el diseño de la franja vivía
    escrito a mano en el HTML (`white-space:nowrap`) y el de sus botones en cada `_marca…` (`padding:1px 9px`): en un celular de 390 px
    el «Reintentar ahora» medía 112 x 16 px —no se podía tocar— y la franja ámbar, de 330 px sin partirse, empujaba el botón principal
@@ -1865,7 +1878,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   body{padding-bottom:64px;}
   .grid{padding:10px 10px 84px;gap:10px 10px;}
   .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;background:#fff;border-top:1px solid var(--border);padding:6px 2px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(15,23,42,.06);}
-  .mnav button{flex:1;background:none;border:none;font-size:.58rem;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;}
+  .mnav button{flex:1;background:none;border:none;font-size:.7rem;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;}
   .mnav button .mi{font-size:20px;line-height:1.1;}
   .mnav button.on{color:var(--primary);}
   .mvelo{display:block;position:fixed;inset:0;background:rgba(20,20,18,.45);z-index:94;}
@@ -1888,7 +1901,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   #mPac .nom{font-weight:800;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;min-width:0;}
   #mPac .l2{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
-  #mPac .ch{font-size:.65rem;background:#f1efe9;border:1px solid var(--border);
+  #mPac .ch{font-size:.7rem;background:#f1efe9;border:1px solid var(--border);
     border-radius:10px;padding:1px 7px;color:#5f5a51;}
   #mPac .ch.vm{background:#eef4fa;border-color:#c9dcef;color:var(--pdark);font-weight:700;}
   .fcard-hdr{flex-wrap:wrap;}
@@ -1898,7 +1911,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .fcard-hdr>.fcard-title{flex:1 1 0;min-width:0;flex-wrap:nowrap;}
   .fcard-hdr>.fcard-title::before{flex-shrink:0;}
   .mst{display:flex;width:18px;height:18px;border-radius:50%;flex-shrink:0;
-    align-items:center;justify-content:center;font-size:.62rem;font-weight:800;}
+    align-items:center;justify-content:center;font-size:.7rem;font-weight:800;}
   /* (los colores de .mst y de .mres b / .mres.vacio se mudaron arriba, junto a .mpal: valen en los dos anchos) */
   .mres{display:block;order:1;flex-basis:100%;font-size:.7rem;line-height:1.4;
     color:#6b665d;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1937,6 +1950,32 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .col input,.col select{height:42px;}
   .ktm-state,.ktm-niv-btn,.ktm-asis-btn{min-height:38px;}
   .bevo{min-height:38px;}
+  /* ── PISO DE LETRA EN EL CELULAR: NADA BAJO .7rem (11,2 px) (tanda 5, cambio 3, 10-oct-2026) ───────────────────────────────────────
+     Medido en un navegador de verdad a 390 px (build/pantallazos.js --solo-registro): la letra más chica que se veía era de 9,3 px.
+     Bajo 11 px quedaban la barra de abajo (.58rem), los chips de ventilador y de equipos (.62 / .6), los de evaluaciones y pendientes
+     (.67), las TRES PALABRAS DE ESTADO de cada tarjeta (.62: la tanda 3 las puso para leerlas de un vistazo y quedaron en el tamaño
+     menos legible), las etiquetas de casi todos los campos (.66 a .68) y los títulos de sub-bloque (.68). El kinesiólogo lee de pie, con
+     una mano y luz de sala. El texto corrido ya estaba sobre 12 px: solo se levanta el piso, no se cambia la jerarquía.
+     🪤 UN PISO POR CSS, NO 217 ESTILOS EN LÍNEA REESCRITOS: hay ~1.750 atributos `style` sin un patrón y cada uno puede cambiar la
+     apariencia. Los de .5 a .69rem se levantan con selector de atributo —la misma técnica que ya usa la regla de los títulos en línea
+     (`[style*="text-transform:uppercase"]`)— solo dentro del panel `#sp`, la grilla `#bedGrid` y el título de la cabecera, no en las
+     demás pestañas. `!important` porque el tamaño está EN LÍNEA y esto es solo aspecto.
+     🔒 Solo dentro de este @media: en escritorio no cambia nada (lo mide piso_letra_celular.js, sección 4). Si algún chip desborda con la
+     letra más grande, se le da espacio a ESE chip (max-width, envoltura), no se baja el piso. Los iconos de la barra (.mi, 20 px) y los
+     números grandes quedan como estaban. Lo fija piso_letra_celular.js. */
+  .vmtag,.eqtag,.abadge,.mpal{font-size:.7rem;}
+  /* Las etiquetas de campo van a .7rem —el piso— y NO a .72rem, y con el espaciado un poco más apretado (.03em en vez de .05em): con .72rem
+     «Fijación · cm de arcada dental» (columna de 104 px) pasaba de dos líneas a TRES y estiraba la fila entera, que es justo el defecto por
+     el que existe legibilidad.js (que mide a 1400 px y no lo vio). Medido en la pantalla: a .7rem con .03em cabe en dos líneas a 104 px. */
+  .col label{font-size:.7rem;letter-spacing:.03em;}
+  .sub-sec-title,.pe2-t,.msub-t,.cg-r,.pv-sep span,#fcId .bloqueT,#aetTurno .aetT-tit{font-size:.7rem;}
+  /* Los títulos escritos en línea con mayúsculas y peso 800 los aplasta una regla global a .62rem (9,9 px) con `!important` (arriba, junto a
+     «ti-wrap»); acá se la gana, solo en el celular, con la MISMA especificidad y un número mayor. En escritorio sigue en .62rem: unificar ese
+     nivel de título es la tanda 5, cambio 4, y no es de este paso. */
+  #sp [style*="font-weight:800"][style*="text-transform:uppercase"]{font-size:.7rem!important;}
+  #sp [style*="font-size:.5"],#sp [style*="font-size:.6"],#sp [style*="font-size: .5"],#sp [style*="font-size: .6"],
+  #bedGrid [style*="font-size:.5"],#bedGrid [style*="font-size:.6"],#bedGrid [style*="font-size: .5"],#bedGrid [style*="font-size: .6"],
+  .htitle [style*="font-size:.6"]{font-size:.7rem!important;}
 }
 
 /* ── PIEL INSTITUCIONAL «San Pablo» (conmutable) ─────────────────────────────
@@ -1946,7 +1985,11 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
    superficie: filete del cromo, pestaña activa, foco y estados pendientes.
    Los pares de texto cumplen contraste AA (guardia: build/checks/piel.js). */
 html[data-piel="inst"]{
-  --bg:#EEF3F9;--card:#fff;--txt:#0D2B4E;--muted:#5B7793;--border:#D7E3F1;
+  /* 🗂️ 10-oct-2026 · `--muted` #5B7793 → #4A6580 (tanda 5, cambio 2). Es el gris azulado de TODO el texto secundario, y medido sobre
+     el fondo real daba 4,18:1 sobre el de la app, 3,69:1 sobre el manila de la carpeta de cama y 4,11:1 sobre la cama libre; el
+     mínimo AA para texto pequeño es 4,5:1. Es el mismo azul grisáceo, solo más hondo (5,43 / 4,80 / 5,35), y vale para toda la app
+     de una vez: sin parches por pantalla. Lo mide contraste_tokens.js leyendo el token y no un hex escrito. */
+  --bg:#EEF3F9;--card:#fff;--txt:#0D2B4E;--muted:#4A6580;--border:#D7E3F1;
   --primary:#0058A0;--pdark:#04345E;--ok:#0F8A5F;--danger:#C62828;--warn:#C47A09;
   --pcard:#fef7e6;
   --n-gray-bg:#eef2f7;--n-gray:#446180;
@@ -1975,6 +2018,16 @@ html[data-piel="inst"] .tab.on{color:#fff;border-bottom-color:#F0A000;}
 html[data-piel="inst"] .tbanner{display:none!important;}
 html[data-piel="inst"] #btnGuardar,html[data-piel="inst"] #pasoAvanza{background:linear-gradient(135deg,#0058A0,#04345E);box-shadow:0 5px 16px rgba(0,88,160,.32);}
 html[data-piel="inst"] #btnGuardar:hover{background:linear-gradient(135deg,#0d69b6,#0058A0);filter:none;}
+/* 🗂️ 10-oct-2026 · BOTÓN PRINCIPAL DESACTIVADO LEGIBLE (tanda 5, cambio 2). Medido en pantalla, no calculado desde el CSS: la regla de
+   `#btnGuardar:disabled,#pasoAvanza:disabled` (gris #94a3b8) NUNCA ganaba, porque las dos reglas de arriba —el degradado azul de la piel— pesan
+   más (id + atributo + elemento contra id + pseudoclase). Lo que se veía era el degradado con la opacidad .55 que `prevAvanceUI` le pone en
+   línea al «Siguiente» del paso 1: letra blanca sobre #73a3cb, 2,68:1, y el rótulo «Siguiente: el turno →» casi no se leía. Y mientras se
+   guarda (`_guardadoBotones`) el botón se desactiva SIN opacidad y seguía igual de azul que uno activo. Ahora el desactivado es el mismo en los
+   dos casos: gris claro, letra oscura (6,15:1), sin sombra y sin la opacidad en línea (`!important`, porque el `style` en línea la pone
+   desde JS y esto es solo aspecto). Se pisa también el `:hover`, que le devolvía el degradado. Solo CSS: ni el HTML ni `_guardadoBotones`
+   ni la franja `#gEstadoGuardado` se tocan. */
+html[data-piel="inst"] #btnGuardar:disabled,html[data-piel="inst"] #pasoAvanza:disabled,
+html[data-piel="inst"] #btnGuardar:disabled:hover,html[data-piel="inst"] #pasoAvanza:disabled:hover{background:#e2e8f0;color:#475569;box-shadow:none;filter:none;opacity:1!important;cursor:not-allowed;}
 html[data-piel="inst"] .col input:focus,html[data-piel="inst"] .col select:focus{border-color:#0058A0;box-shadow:0 0 0 3px #f0a00055;}
 html[data-piel="inst"] .mnav button.on{color:#0058A0;}
 html[data-piel="inst"] .fase-chip.her{background:#fdf3df;border-color:#F0A000;color:#8a5c00;}
