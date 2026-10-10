@@ -4623,3 +4623,64 @@ el texto gris secundario se lee más firme; los títulos de Hemodinamia, Rehabil
 - **El escritorio sigue con letra de 9,3 a 10,7 px** en los títulos en línea y en los chips; el piso de 11 px es solo del celular, como acordó la auditoría. Unificar los tres niveles de título (cambio 4) y el pie de la tarjeta (cambio 5) son otros pasos.
 - Sin tocar los emojis posteriores a 2019 que ya viven en producción (decisión 4 de la auditoría, para Diego), ni los dos botones primarios de colores distintos (decisión 1), ni la palabra «Evolución»/«Editar» (decisión 2).
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
+
+---
+
+## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.2: tres niveles de título y el cuadro de firma de los pendientes
+
+**De dónde sale.** Cambio 4 del plan de la tanda 5 (auditoría de solo lectura): un solo estilo de título de bloque, en tres niveles que se distingan. Más un arreglo de texto chico que estaba anotado desde la tanda 4 (punto 10 de `docs/PENDIENTES.md`): el cuadro que se abre al dejar
+un pendiente preguntaba «¿Quién midió?». **Sin migración de esquema, sin tocar `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`.** Todo es CSS y dos textos en `v2/index.html`, más dos guardias nuevas.
+
+### Cambio 4 · Tres niveles de título, UNA tupla por nivel (solo CSS y cinco atributos `style`)
+
+**El defecto, medido (no calculado).** Con el panel abierto en Chromium, los seis pasos desplegados y las ramas ocultas destapadas, el título de un sub-bloque salía en **11 combinaciones** de tamaño, peso, espaciado y color (69 mediciones a 1400 px, 75 a 390 px):
+`.sub-sec-title` (10,9 px, azul de Respiratorio, ámbar de Rehabilitación o turquesa de Evaluaciones puestos en línea), `.pe2-t` (10,9 px, `.08em`), `.pv-sep span` (10,6 px), `#fcId .bloqueT` (peso 700, gris de otro token), `#aetTurno .aetT-tit` (peso 700, morado),
+los **29 títulos escritos en línea** con peso 800 y mayúsculas —«GCS», «Nivel de cooperación y delirium», «Traqueostomía», «Permeabilización de vía aérea», los seis `<summary>` plegables…— que una regla global aplastaba a **.62rem = 9,9 px** con `!important`, `.msub-t` (azul, solo celular) y los
+tres bloques de Planes (`.cg-t`: 12,8 px, sin mayúsculas, un color por bloque). Consecuencia: **el título de un sub-bloque (9,9 px) era más chico que la etiqueta de cualquiera de sus campos (10,9 px)**, y en el celular, con el piso de 11 px del paso 5.1, T2 y T3 quedaron **idénticos** (11,2 px). El título no mandaba.
+
+**La regla (la escalera de a un escalón; el dominio sigue marcándose con el punto y el borde de la tarjeta):**
+
+| Nivel | Qué es | Antes | Ahora |
+|---|---|---|---|
+| T1 | título de tarjeta (`.fcard-title`) | .72rem · 800 · mayúsculas · .08em · color de dominio | **.78rem** (12,5 px), lo demás igual |
+| T2 | título de sub-bloque | 11 combinaciones, de 9,9 a 12,8 px | **UNA: .72rem (11,5 px) · 800 · mayúsculas · .06em · `--muted`**, en escritorio y en celular |
+| T3 | etiqueta de campo (`.col label`) | .68rem (10,9 px); .7rem en celular | **sin cambio** |
+
+- La tupla de T2 se escribe **una sola vez**, junto a `.fcard-title`, para siete selectores (`.sub-sec-title, .pe2-t, .msub-t, .pv-sep span, #fcId .bloqueT, #aetTurno .aetT-tit, .cg-t`); en la regla de cada familia queda solo lo de caja (márgenes, flex). Los títulos escritos en línea los iguala la misma regla global de siempre (línea «Títulos de sub-sección inline»), que solo cambia de número:
+  `.62rem → .72rem`, `.05em → .06em`; no se agregó ningún selector. Esa regla ya forzaba `--muted` sobre su color propio con `!important`, así que el criterio «el título de sub-bloque es gris» **ya existía**; los cinco `.sub-sec-title` con color en línea solo se habían escapado porque su `style` no traía `font-weight`.
+- 🪤 **El piso móvil del paso 5.1 se llevaba los títulos a .7rem** (una regla más tardía dentro del `@media`, con la misma especificidad, gana a la base). Se sacaron esos selectores de la lista (queda solo `.cg-r`) y se borró la segunda regla de títulos en línea de ese bloque: T2 vale .72rem en los dos anchos, que ya está sobre el piso, y una sola tupla no admite una segunda regla por ancho.
+- **Planes (`.cg-t`).** Los tres títulos de bloque («Qué pasó hoy», «Plan para el próximo turno», «Lo que queda pendiente») tenían forma propia y eran **más grandes que el título de su propia tarjeta** («Cerrar el turno»); además el ámbar de «Lo que queda pendiente» medía 3,07:1 sobre su fondo. Pasan a T2. **El color de cada bloque no se pierde:** lo siguen llevando el borde izquierdo y el fondo (`.cg-narra/.cg-plan/.cg-pend`), y el reloj va en `.cg-r`. Los textos no se tocaron (la mayúscula es de CSS; `cierre_tres_bloques.js` los compara sin distinguir mayúsculas).
+- **Los colores de dominio salen de los títulos de sub-bloque** (Respiratorio azul, Rehabilitación ámbar —4,20:1 sobre blanco, bajo AA—, Evaluaciones turquesa, AET morado, `.msub-t` azul): quedan en el punto y el borde de la tarjeta, que es lo que dice a qué dominio se pertenece. Cinco `style="color:var(--…)"` salieron del HTML (`Terapia ventilatoria`, `Manejo Respiratorio`, `Evaluaciones`, `Válvula de fonación`, `KTM`); es lo único que se tocó del marcado, y ningún texto, clase, id ni `data-paso`.
+- **No se tocó**: `.col label` (T3), los rótulos de columna en línea con peso 700 de la tarjeta de Permeabilización («Técnica», «Secreciones»: nivel de etiqueta), `.cg-r`, `.mpal`, ni el resto de inline con tamaño propio. Sin emojis nuevos, sin tema oscuro.
+
+**Guardia nueva `build/checks/titulos_tres_niveles.js`** (Chromium a 1400 y a 390 px, reloj congelado 10-mar-2026 10:00, datos ficticios; los seis pasos con todo desplegado y las ramas ocultas destapadas, más el ingreso de un paciente nuevo): una sola tupla (tamaño, peso, mayúsculas, espaciado, color) para T2 y su color es el token `--muted`;
+una sola tupla para T1 salvo el color de dominio; T3 una sola por ancho; la escalera T1 > T2 > T3 con los **extremos** de cada nivel y un escalón mínimo (0,8 px de T1 a T2, 0,3 px de T2 a T3); el título de un sub-bloque nunca es más chico que la etiqueta normal de sus campos; ningún título de tarjeta pasa de dos líneas ni queda cortado a 390 px;
+y un **barrido** de cualquier otro texto en mayúsculas y peso ≥ 700 del panel que no esté clasificado (lista cerrada de excepciones con su motivo), para que un quinto estilo no entre sin que nadie lo decida. Exige haber VISTO cada familia (`.msub-t` solo en celular, `.bloqueT` solo en el ingreso).
+**Roja antes contra el código anterior: 11 fallan** (6 a 1400 px y 5 a 390 px: una sola tupla con 11 distintas, color, peso/mayúsculas, escalera con T2 = 9,9 px bajo T3 = 10,9 px a 1400 y T2 = T3 a 390, escalón); verde después. **12 de 12 mutantes mueren, cada uno por su razón:** `.pe2-t` con su tamaño de antes, la regla en línea a .62rem, `.cg-t` con su .8rem, `.cg-t` con el color del bloque, T1 a .72rem,
+`.aetT-tit` morado, `.msub-t` azul en el celular, el piso móvil volviendo a listar los títulos, un quinto estilo (`.cg-s` en mayúsculas y 800), un `.sub-sec-title` con color en línea, T2 = T3 y un título de tarjeta de 1,6rem que pasa de dos líneas.
+
+### Arreglo de texto · «¿Quién midió?» al dejar un pendiente
+
+`_pedirFirma()` abre un cuadro con el título «¿Quién midió?» y el mensaje «La firma viaja con la medición: dice de dónde salió el dato». Está bien para quien registra una evaluación, pero la **misma función** la usan los pendientes (dejar uno desde el campo libre o un atajo, y cerrarlo desde la cama), y ahí preguntaba quién midió algo que nadie midió.
+Como la firma del formulario es lo primero que mira, el cuadro solo sale cuando todavía no se eligió firma —justo el caso de quien llega a Planes y deja un pendiente antes de firmar—, y por eso se veía poco. Ahora `_pedirFirma(txt)` acepta `{titulo, mensaje}` y sin argumentos queda igual que antes (las evaluaciones no cambian):
+- **Dejar un pendiente** → «¿Quién deja el pendiente?» / «La firma queda con el pendiente: dice quién lo dejó para el turno que viene.» (pedido por la tarea).
+- **Cerrar un pendiente** desde la cama → «¿Quién cierra el pendiente?» / «La firma queda con el cierre: dice quién lo dio por resuelto.» (**extensión mía**: es el mismo cuadro con el mismo texto equivocado, un argumento más en el otro llamador; si Diego prefiere el cierre como estaba, es una línea: `pendEpiCerrar` vuelve a llamar sin argumentos).
+
+**Guardia nueva `build/checks/firma_texto_por_flujo.js`** (Chromium, reloj congelado, el cuadro de verdad —no una función sustituida—): dejar por el campo libre y por un atajo; cerrar desde la cama; las evaluaciones siguen diciendo «¿Quién midió?» (por el camino real de ECF desde la tarjeta y por la llamada sin argumentos); y que los flujos sigan andando (elegir firma y confirmar deja y cierra el pendiente en el servidor
+simulado; cancelar no manda nada). **Roja antes: 5 fallan** (los tres textos de «dejar» y los dos de «cerrar»; las evaluaciones y el e2e ya salían verdes); verde después; **5 de 5 mutantes mueren** (dejar sin su texto, cerrar sin su texto, la función ignora el texto, el texto por defecto de las evaluaciones cambia, el mensaje de «dejar» vuelve a hablar de medición).
+🪤 Para que el e2e escriba hubo que completar el simulador con `infra_lock.gs` (el sello `_huellaPayload`), igual que `acceso_pantalla.js` y `terapia_fisica_vuelve_al_reabrir.js`, devolviendo su `conLock` de juguete.
+
+### Vecinas y capturas
+
+Con `-j 2`: convenciones, legibilidad, piel, movil*, seis_pasos, cuatro_pasos, ingreso*, cierre_tres_bloques, sin_riel, general_disuelta, tutorial, tokens_existen, escapado_unico, contraste_tokens, piso_letra_celular, estado_*, aviso_*, obligatorios, v42, guardado_seguro*, episodio_turno, texto_*, evaluaciones_celular, retro_camas, mover_camas, ficha_y_antes, episodio_al_guardar,
+confirma_guardado, prono_arriba y paquete: **52 verdes de 53; la roja es `pwa_paquete`**, por la regeneración pendiente del cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró `paquete.js`). Capturas del después (fuera del repositorio, carpeta de trabajo `capturas/despues`): los seis pasos a 390 y 1400 px y el cuadro de firma, comparables con las de `antes`
+(la versión anterior de los doce pasos quedó en `despues_antes_de_5.2`).
+
+**Lo que ve distinto la kinesióloga.** Los títulos de cada bloque dentro de una tarjeta («Terapia ventilatoria», «GCS», «Lo que este episodio lleva medido», «Antes de la terapia», «Se registran solos con la evolución»…) pasan de 9,9–10,9 px a **11,5 px, siempre en el mismo gris, en negrita y mayúsculas**: ahora se leen **antes** que las etiquetas de sus campos (10,9 px). El título de cada tarjeta («Respiratorio», «Hemodinamia», «Cerrar el turno»…) sube de 11,5 a 12,5 px y sigue
+con el color de su dominio y su punto. En Planes, los tres bloques conservan su color de fondo y de borde, pero su título pasa de azul/verde/ámbar en minúscula grande a gris en mayúsculas, y en el celular el rótulo del reloj («va al relato de hoy») baja a su propia línea en los tres. Al dejar un pendiente sin haber elegido firma, el cuadro dice «¿Quién deja el pendiente?» y, al cerrarlo, «¿Quién cierra el pendiente?».
+
+**Lo que NO se hizo y queda dicho.**
+- **El escalón T2 → T3 en el celular es de 0,3 px** (11,5 contra 11,2): el piso de 11 px deja la etiqueta de campo en .7rem y no se puede bajar. Los separan el peso (800 contra 700), el espaciado (.06em contra .03em), el gris de T2 sobre un bloque propio y la posición (el título abre el grupo). Si en la pantalla real no alcanza, el paso siguiente es subir los dos niveles superiores juntos (T2 .74rem, T1 .8rem), no bajar T3.
+- **Decisión 6 de la auditoría («¿Subimos el título de cada tarjeta un escalón?»)**: el cambio 4 la lleva adentro (sin el escalón de T1 no hay tres niveles), así que se aplicó la recomendación («sí»); revertir es `.fcard-title{font-size:.72rem}`, y entonces la guardia pide reconciliar la escalera (T1 = T2).
+- **Quitar el color de dominio de los títulos de sub-bloque y de los tres de Planes** es parte de «una sola tupla» según el diseño de la auditoría; si Diego quiere conservarlo en alguna familia, se acepta como excepción escrita en la guardia, no con una segunda regla.
+- Sin tocar los emojis posteriores a 2019, los dos botones primarios, la palabra «Evolución»/«Editar», ni los 18 chips y las sugerencias «Medir X» de Planes (el resto del punto 10 de PENDIENTES: queda para Diego). Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.

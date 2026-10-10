@@ -1031,8 +1031,27 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* ── FCARD — tarjeta blanca con barra superior de color (estética prototipo) ── */
 .fcard{background:var(--card);margin-bottom:14px;border-radius:13px;border:1px solid var(--border);border-top:4px solid var(--fc,#94a3b8);box-shadow:0 1px 3px rgba(15,23,42,.06);overflow:visible;}
 .fcard-hdr{padding:12px 16px 10px;background:transparent;border-bottom:1px solid #eef2f6;display:flex;align-items:center;gap:8px;}
-.fcard-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc-t,var(--fc,#64748b));display:flex;align-items:center;gap:7px;}
+/* ── TRES NIVELES DE TÍTULO, UN SOLO ESTILO POR NIVEL (tanda 5, cambio 4, 10-oct-2026) ─────────────────────────────────────────────
+   Medido en un navegador de verdad (titulos_tres_niveles.js): el título de un sub-bloque salía en SEIS combinaciones de tamaño,
+   peso, espaciado y color —`.sub-sec-title`, `.pe2-t`, `.pv-sep span`, `.bloqueT`, `.aetT-tit`, los escritos en línea y, en el
+   celular, `.msub-t`— y los tres bloques de Planes (`.cg-t`) tenían su propia forma, MÁS GRANDES que el título de su tarjeta. El
+   resultado era que el título de un sub-bloque (9,9 px) quedaba más chico que la etiqueta de cualquiera de sus campos (10,9 px):
+   el título no mandaba y el ojo no encontraba el bloque antes que el campo.
+     T1 · título de TARJETA   .fcard-title  .78rem · 800 · mayúsculas · .08em · color de dominio + punto (el dominio sigue marcándose
+                              acá y en el borde superior de la tarjeta).
+     T2 · título de SUB-BLOQUE  UNA sola tupla (abajo): .72rem · 800 · mayúsculas · .06em · `--muted`.
+     T3 · etiqueta de CAMPO    `.col label`  .68rem · 700 · mayúsculas · .05em · `--muted`   (no se tocó; en el celular .7rem por el piso).
+   🔴 UNA SOLA TUPLA DE T2: cada familia deja aquí su tamaño, peso, mayúsculas, espaciado y color, y en su propia regla queda solo lo
+   de caja (márgenes, flex). Una familia nueva de título se agrega a ESTA lista, no con su propio tamaño. Los títulos escritos en línea
+   (peso 800 + mayúsculas) los iguala la regla de «Títulos de sub-sección inline» más abajo, con el mismo número. En el celular rige
+   la misma tupla: .72rem ya está sobre el piso de 11 px, así que ahí no hay segunda regla.
+   🪤 El color de T2 es `--muted` AUNQUE el bloque tenga color de dominio: lo que dice a qué dominio pertenece es el punto y el borde
+   de la tarjeta, no cada título (los de Respiratorio iban en azul, los de Rehabilitación en ámbar sobre blanco, 4,20:1, bajo AA).
+   Lo fija titulos_tres_niveles.js (una sola tupla, escalera T1 > T2 > T3, barrido de un quinto estilo). */
+.fcard-title{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc-t,var(--fc,#64748b));display:flex;align-items:center;gap:7px;}
 .fcard-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--fc,#94a3b8);flex-shrink:0;}
+.sub-sec-title,.pe2-t,.msub-t,.pv-sep span,#fcId .bloqueT,#aetTurno .aetT-tit,.cg-t{
+  font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 /* ── Ficha del episodio plegada (ago-2026, pedido de Diego) ────────────────
    `display:contents` deja los campos como hijos directos de la fila, así la
    maqueta es idéntica a antes de envolverlos; plegado pasa a `display:none`
@@ -1196,7 +1215,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
   color:#5f5c58;font-family:inherit;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pv-seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 2px rgba(15,23,42,.14);}
 .pv-sep{display:flex;align-items:center;gap:10px;margin:15px 0 9px;}
-.pv-sep span{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+/* (el rótulo de `.pv-sep span` toma su estilo de la tupla de T2, arriba) */
 .pv-sep i{flex-grow:1;height:1px;background:var(--border);}
 .pv-razon{border:1.5px solid var(--danger);border-radius:12px;padding:12px 14px;background:#fff;margin-top:4px;}
 .pv-razon label{display:block;font-size:.78rem;font-weight:700;color:#b3261e;margin-bottom:7px;}
@@ -1243,8 +1262,11 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .cierre-g.cg-narra{border-left:3px solid #1d4ed8;background:#eff6ff;}
 .cierre-g.cg-plan{border-left:3px solid #0e7a5f;background:#e9f6f1;}
 .cierre-g.cg-pend{border-left:3px solid #c97a12;background:#fdf4e5;}
-.cg-t{font-size:.8rem;font-weight:800;margin:0 0 3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
-.cg-narra .cg-t{color:#1d4ed8;} .cg-plan .cg-t{color:#0e7a5f;} .cg-pend .cg-t{color:#c97a12;}
+/* 🗂️ 10-oct-2026 (tanda 5, cambio 4) · el título de cada bloque toma la tupla de T2 (arriba): antes iba en .8rem, sin mayúsculas y en el
+   color del bloque —más grande que el título de su propia tarjeta («Cerrar el turno»)—, y el ámbar de «Lo que queda pendiente» medía
+   3,07:1 sobre su fondo. Cada bloque SIGUE teniendo su color: lo marcan el borde izquierdo y el fondo de arriba, y la palabra del reloj
+   va en `.cg-r`. Acá solo queda la caja. */
+.cg-t{margin:0 0 3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
 .cg-r{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:600;
       letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:4px;
       background:rgba(255,255,255,.8);border:1px solid var(--border);color:var(--muted);}
@@ -1252,8 +1274,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 
 /* Paso 2 · los chips del episodio y la salida barata */
 #pasoEvalChips{margin-bottom:14px;}
-.pe2-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--muted);margin:0 0 7px;}
+.pe2-t{margin:0 0 7px;}
 .pe2-fila{display:flex;gap:6px;flex-wrap:wrap;}
 .pe2-fila .abadge{font-size:.8rem;padding:5px 11px;}
 /* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
@@ -1461,7 +1482,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .sedf-btn.on{background:#8b5cf6;border-color:#8b5cf6;color:#fff;}
 .sub-sec{padding:10px 16px;border-bottom:1px solid #eef2f6;}
 .sub-sec:last-child{border-bottom:none;}
-.sub-sec-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;color:var(--muted);}
+.sub-sec-title{margin-bottom:7px;}
 .mega-card .fcard-body{padding:0;}
 /* ── Override estilos inline sobrecargados dentro del panel ──── */
 #sp [style*="background:#f0f9ff"],
@@ -1490,9 +1511,12 @@ table.rhb2 .rl{width:128px;text-align:left;}
   height:34px!important;font-size:.84rem!important;
   border-color:#dbe2ea!important;background:#fff!important;border-radius:8px!important;
 }
-/* Títulos de sub-sección inline */
+/* Títulos de sub-sección inline: peso 800 + mayúsculas escritos EN LÍNEA (sin clase). Igualan a la tupla de T2 de arriba, con el mismo
+   número (.72rem · .06em · `--muted`): antes se aplastaban a .62rem (9,9 px), más chicos que la etiqueta de sus propios campos
+   (tanda 5, cambio 4). `!important` porque el tamaño y el color vienen en línea. Rige también en el celular: .72rem está sobre el
+   piso de 11 px. */
 #sp [style*="font-weight:800"][style*="text-transform:uppercase"]{
-  font-size:.62rem!important;color:var(--muted)!important;letter-spacing:.05em!important;
+  font-size:.72rem!important;color:var(--muted)!important;letter-spacing:.06em!important;
 }
 /* ti-wrap: fondo neutro */
 .ti-wrap.sky{background:#fff!important;border-color:#cbd5e1!important;}
@@ -1510,7 +1534,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
 /* Paso 0: cuatro bloques, cada uno una pregunta (1-oct-2026, Diego). */
 #fcId .bloque + .bloque{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;}
-#fcId .bloqueT{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;}
+#fcId .bloqueT{margin-bottom:8px;}
 #fcId .bloqueNota{margin-top:9px;padding:8px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.76rem;color:#14532d;}
 #fcId .oblig{color:#b91c1c;font-weight:700;text-transform:none;letter-spacing:0;}
 .ingSop{height:40px;padding:0 16px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
@@ -1520,7 +1544,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .aetB[aria-pressed="true"]{background:#6d28d9;border-color:#6d28d9;color:#fff;}
 #aetTurno{margin:6px 0 10px;padding:10px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;}
 #aetTurno .aetT-fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-#aetTurno .aetT-tit{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6d28d9;}
+/* (el título «⚖️ Adecuación del esfuerzo terapéutico», `.aetT-tit`, toma la tupla de T2, arriba: antes iba en peso 700 y morado) */
 #aetTurno .aetT-vig{font-size:.86rem;color:#1e293b;}
 #aetTurno .aetT-ch{height:34px;padding:0 12px;border-radius:8px;border:1px solid #c4b5fd;background:#fff;color:#5b21b6;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;}
 #aetTurnoAviso{font-size:.8rem;color:#5b21b6;margin-top:8px;}
@@ -1923,8 +1947,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
     background:var(--card);}
   .msub-h{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;
     background:#f7f5f1;border-bottom:1px solid var(--border);flex-wrap:wrap;}
-  .msub-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
-    color:var(--resp);min-width:0;}
+  .msub-t{min-width:0;}   /* el estilo del título es la tupla de T2 (arriba): antes .68rem y azul en el celular */
   .msub-h::after{content:'▾';margin-left:auto;color:#b7b3a9;font-size:.75rem;}
   .msub.cerrado .msub-h{border-bottom:none;}
   .msub.cerrado .msub-h::after{content:'▸';}
@@ -1968,11 +1991,11 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
      «Fijación · cm de arcada dental» (columna de 104 px) pasaba de dos líneas a TRES y estiraba la fila entera, que es justo el defecto por
      el que existe legibilidad.js (que mide a 1400 px y no lo vio). Medido en la pantalla: a .7rem con .03em cabe en dos líneas a 104 px. */
   .col label{font-size:.7rem;letter-spacing:.03em;}
-  .sub-sec-title,.pe2-t,.msub-t,.cg-r,.pv-sep span,#fcId .bloqueT,#aetTurno .aetT-tit{font-size:.7rem;}
-  /* Los títulos escritos en línea con mayúsculas y peso 800 los aplasta una regla global a .62rem (9,9 px) con `!important` (arriba, junto a
-     «ti-wrap»); acá se la gana, solo en el celular, con la MISMA especificidad y un número mayor. En escritorio sigue en .62rem: unificar ese
-     nivel de título es la tanda 5, cambio 4, y no es de este paso. */
-  #sp [style*="font-weight:800"][style*="text-transform:uppercase"]{font-size:.7rem!important;}
+  .cg-r{font-size:.7rem;}
+  /* 🗂️ 10-oct-2026 (tanda 5, cambio 4) · los TÍTULOS DE SUB-BLOQUE ya no se levantan acá: tienen una sola tupla de .72rem en los dos
+     anchos (`.sub-sec-title`, `.pe2-t`, `.msub-t`, `.pv-sep span`, `.bloqueT`, `.aetT-tit`, `.cg-t` arriba, y los escritos en línea con
+     la regla de «Títulos de sub-sección inline»), que ya está sobre el piso de 11 px. 🪤 No se vuelven a listar en este @media: una regla
+     de acá, más tardía, les pondría .7rem en el celular y rompería la escalera T1 > T2 > T3. */
   #sp [style*="font-size:.5"],#sp [style*="font-size:.6"],#sp [style*="font-size: .5"],#sp [style*="font-size: .6"],
   #bedGrid [style*="font-size:.5"],#bedGrid [style*="font-size:.6"],#bedGrid [style*="font-size: .5"],#bedGrid [style*="font-size: .6"],
   .htitle [style*="font-size:.6"]{font-size:.7rem!important;}
@@ -4144,7 +4167,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
               <div id="dVentBloque">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
-                <div class="sub-sec-title" style="color:var(--resp);margin:0;">💨 Terapia ventilatoria</div>
+                <div class="sub-sec-title" style="margin:0;">💨 Terapia ventilatoria</div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                   <div style="display:flex;align-items:center;gap:5px;">
                     <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--muted);">Soporte</label>
@@ -4746,7 +4769,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
             <!-- Manejo respiratorio -->
             <div class="sub-sec">
-              <div class="sub-sec-title" style="color:var(--resp);margin-bottom:8px;">🫁 Manejo Respiratorio</div>
+              <div class="sub-sec-title" style="margin-bottom:8px;">🫁 Manejo Respiratorio</div>
 
               <!-- KTR + Sin requerimientos -->
               <div class="row" style="align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
@@ -4971,7 +4994,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <div class="fcard-body">
         <!-- EVALUACIONES FUNCIONALES (unificadas) -->
         <div class="sub-sec" id="fcEgrCard">
-          <div class="sub-sec-title" style="color:var(--fisico);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+          <div class="sub-sec-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
             <span>📏 Evaluaciones</span>
             <!-- 1-oct-2026 · La casilla «Registrar evaluación este turno» ya no estorba: los
                  cajones de abajo son la puerta (Diego: «como los iconos del celular»). Sigue
@@ -5260,7 +5283,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <!-- VÁLVULA DE FONACIÓN — uso del turno (solo TQT). El modo ventilatorio
                  se elige arriba; aquí se registra el USO como intervención de rehabilitación. -->
             <div id="dVfonSec" class="sub-sec hidden">
-              <div class="sub-sec-title" style="color:var(--kine);">🗣️ Válvula de fonación</div>
+              <div class="sub-sec-title">🗣️ Válvula de fonación</div>
               <div class="check wa" style="margin-bottom:7px;">
                 <input type="checkbox" id="cVfon" onchange="hVfon()">
                 <label for="cVfon" style="font-weight:700;">Se usa válvula de fonación en este turno</label>
@@ -5288,7 +5311,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
             <!-- KTM Estado (3-way) -->
             <div class="sub-sec">
-              <div class="sub-sec-title" style="color:var(--kine);">Kinesiterapia motora (KTM)</div>
+              <div class="sub-sec-title">Kinesiterapia motora (KTM)</div>
               <div style="display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:7px;width:fit-content;margin-bottom:9px;">
                 <button type="button" id="bKTMr" class="ktm-state on" onclick="setKTMstate('r')">✅ Realizada</button>
                 <button type="button" id="bKTMs" class="ktm-state"     onclick="setKTMstate('s')">🚫 Contraindicada</button>
@@ -7694,7 +7717,7 @@ function pasoPendDejar(texto){
     const i = $('pasoPendTxt'); if(i) i.value = '';
     return;
   }
-  _pedirFirma().then(firma => {
+  _pedirFirma(_FIRMA_PEND_DEJAR).then(firma => {
     if(firma === null) return;
     api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
@@ -7957,7 +7980,7 @@ function pendEpiPintar(){
 function pendEpiCerrar(id){
   const idCama = v('cBed'); if(!idCama || !id) return;
   const ep = _episodioAbierto;   // 🔴 G14 · el episodio con que se abrió este panel, tomado al clic (ver pasoPendDejar)
-  _pedirFirma().then(firma => {
+  _pedirFirma(_FIRMA_PEND_CERRAR).then(firma => {
     if(firma === null) return;
     api('PEND_CERRAR', { idCama: String(idCama), id: String(id), firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
@@ -21685,9 +21708,17 @@ function _evalAplicarTarjeta(kind){
       .catch(e=>toastError(e));
   });
 }
-/** Quién mide. Sin login, es la firma DECLARADA (la del formulario si está
- *  abierto, si no la última usada en este navegador, si no se pregunta). */
-function _pedirFirma(){
+/** Quién firma. Sin login, es la firma DECLARADA (la del formulario si está
+ *  abierto, si no la última usada en este navegador, si no se pregunta).
+ *
+ *  🗂️ 10-oct-2026 (tanda 5, cambio 4) · EL CUADRO DICE LO QUE PASA. Por defecto pregunta «¿Quién midió?» y habla de la medición,
+ *  que es lo correcto para las evaluaciones; pero los pendientes usan la MISMA función y ahí preguntaba quién midió algo que nadie
+ *  midió. `txt` = { titulo, mensaje } para los flujos que NO son una medición: `_FIRMA_PEND_DEJAR` y `_FIRMA_PEND_CERRAR`, abajo.
+ *  Sin argumentos nada cambia para las evaluaciones. Lo fija firma_texto_por_flujo.js. */
+const _FIRMA_PEND_DEJAR = { titulo:'¿Quién deja el pendiente?', mensaje:'La firma queda con el pendiente: dice quién lo dejó para el turno que viene.' };
+const _FIRMA_PEND_CERRAR = { titulo:'¿Quién cierra el pendiente?', mensaje:'La firma queda con el cierre: dice quién lo dio por resuelto.' };
+function _pedirFirma(txt){
+  txt=txt||{};
   const enForm=v('fFirma');
   if(enForm) return Promise.resolve(enForm);
   let ult=''; try{ ult=localStorage.getItem('rce_firma_tarjeta')||''; }catch(e){}
@@ -21695,7 +21726,7 @@ function _pedirFirma(){
     const opts=[]; try{ const tmp=document.createElement('select'); fillFirmaSelect(tmp); tmp.querySelectorAll('option').forEach(o=>{ if(o.value) opts.push(o.value); }); }catch(e){}
     const sel='<select id="epFirmaSel" style="width:100%;height:36px;margin-top:6px;"><option value="">— firma —</option>'+
       opts.map(o=>`<option value="${o}"${o===ult?' selected':''}>${o}</option>`).join('')+'</select>';
-    uiConfirm({ icono:'✍️', titulo:'¿Quién midió?', mensaje:'La firma viaja con la medición: dice de dónde salió el dato.', detalle:sel, confirmar:'Guardar' })
+    uiConfirm({ icono:'✍️', titulo:txt.titulo||'¿Quién midió?', mensaje:txt.mensaje||'La firma viaja con la medición: dice de dónde salió el dato.', detalle:sel, confirmar:'Guardar' })
       .then(ok=>{ if(!ok){ res(null); return; } const f=String(v('epFirmaSel')||'').trim(); if(!f){ toast('⚠️ Elige tu firma'); res(null); return; }
         try{ localStorage.setItem('rce_firma_tarjeta',f); }catch(e){} res(f); });
   });
