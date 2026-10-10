@@ -4374,3 +4374,53 @@ por la regeneración pendiente del cierre.
 - Un botón de nivel encendido que queda del paciente anterior en el camino de INGRESO o sin réplica sigue sin apagarse (el reset de `abrirPanel` no lo cubre); se cubrió en la réplica, que es el camino
   de todo turno con historia.
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
+
+### 10-oct-2026 · Tanda 4 · paso 4.2 · Reabrir un turno guardado devuelve la terapia física tal como se guardó (cambio 2)
+
+**El defecto.** `fillForm` es el camino que carga un turno YA GUARDADO para re-editarlo, y de la terapia física dejaba la tarjeta entera en blanco: apagaba el estado de la
+KTM (`setKTMstate(null)`), vaciaba nivel, asistencia y minutos, desmarcaba IMT, EMS y válvula de fonación, y el Borg ni lo miraba. Era una herencia de cuando «la KTM es acción
+diaria y cada apertura parte en blanco»; pero reabrir es el MISMO turno, no uno nuevo (lo que no se hereda es `fillFormReplica`, y ése no se tocó). **Confirmada la hipótesis de la
+auditoría, medida de punta a punta (pantalla real + servidor real en memoria, reloj inventado):** hacía dos daños distintos según el turno.
+- **De DÍA, el turno quedaba imposible de volver a guardar.** La pantalla manda `KTM_NO_REALIZADA: true` cuando no hay «realizada» ni «suspendida» apuntadas (así se infiere), SIN razón,
+  y el servidor contestaba «Validación: KTM: indica la razón por la que NO se realizó.» con la razón en un campo oculto y el error sin dónde apuntar. Le pasaba a **todo** turno de día con
+  la KTM «realizada», incluido el más común (la KTM por defecto y nada más).
+- **De NOCHE, el turno se guardaba… pero perdía cosas.** `KTM_NO_REALIZADA:''` el servidor lo toma por silencio y conserva el trío de estados y sus satélites (la regla de Manuel del 20-ago),
+  pero NO el IMT, la EMS, la válvula, el Borg ni las sesiones: la pantalla los mandaba en `false`/`''` como claves PRESENTES y la fusión solo repone las AUSENTES. Medido: reabrir una noche con
+  IMT, EMS y válvula y volver a guardar sin tocar nada dejaba `KTM_IMT=false`, `KTM_EMS=false`, `VFON_USADA=false`, y vaciaba minutos, Borg y todos los parámetros. Es justo lo que 8.6 dice que no
+  debe pasar («lo que se llene de noche se guarda y entra al REM») y lo que Diego contó el 21-sep («que lo que anote pueda seguir registrando después»).
+
+**El cambio (solo `fillForm` en `v2/index.html`; ni `guardar()`, ni el servidor, ni `fillFormReplica`).** Reabrir restaura lo guardado: el estado de la KTM (realizada / contraindicada / no
+realizada) con su bloque abierto; el nivel, la asistencia, los minutos y el Borg; IMT y EMS con sus parámetros; la válvula de fonación con sus minutos, tolerancia y detalle. Tres cuidados que
+la medición obligó a tener:
+- 🪤 **Al dejar de ser «silencio», el payload sobrescribe.** Declarar el estado hace que el servidor tome del payload TODOS los satélites, así que no basta con restaurar el estado: también hay
+  que restaurar todo lo demás o se vacía en la fila al volver a guardar sin tocar nada. Apareció así un faltante vecino: **la categoría de la contraindicación (`fKTMcat`) nunca se había restaurado**
+  (hasta hoy no se notaba porque el trío nunca se declaraba al reabrir); ahora vuelve.
+- **El nivel vuelve al campo solo si el turno es de UNA sesión.** Con lista de sesiones el nivel guardado es el más alto de la lista (se deriva) y los campos sueltos son «la siguiente sesión»:
+  escribirlo ahí la dejaría con un nivel que nadie eligió y un «Agregar» sumaría una sesión fantasma.
+- **El rótulo del fundamento de «No realizada · Otro»** se pintaba con el comentario todavía vacío (`_ktmNoRazonSel` corre antes de que vuelva el comentario) y quedaba en rojo «obligatorio» con el
+  texto ya escrito. Era invisible mientras ese bloque estaba oculto al reabrir; al volver a mostrarse, se repinta.
+- Sigue sin inventarse nada: un turno que NUNCA declaró estado (una noche sin tocar la tarjeta, o una fila de día anterior al trío) se reabre SIN estado elegido —ni «no realizada», que entra al
+  denominador de la estadística, ni «realizada», que infla el REM—. Con AET grupo IIIC el gate de `aplicarGatesEval` sigue ganando (corre después): la tarjeta sigue escondida y la KTM «contraindicada»
+  sola, igual que al guardar.
+
+**Lo que ve distinto la kinesióloga.** Al reabrir un turno suyo ve la terapia física tal como la dejó: la KTM con su estado, nivel, asistencia, minutos y Borg; IMT, EMS y válvula marcadas con sus
+datos. Un turno de día con KTM realizada que antes «no se podía volver a guardar» ahora se guarda. Y si regenera el relato, la KTM, el IMT, la EMS y la válvula salen narrados (antes el relato regenerado de un
+turno reabierto no los traía, porque la pantalla los tenía en blanco). Sirve igual para un turno de otro día.
+
+**La guardia (`build/checks/terapia_fisica_vuelve_al_reabrir.js`, nueva).** Habla con el servidor REAL en memoria (`sim_srv`, con `infra_lock.gs` para el sello de operación) y la pantalla REAL, `Date`
+fijo en el 12-ago-2026 a las 11:00. Cada escenario llena la tarjeta con los controles de verdad, guarda, REABRE desde el servidor, mide lo que muestra la pantalla y vuelve a guardar SIN tocar nada:
+exige que el servidor lo acepte, que el payload sea idéntico en 37 claves (34 de terapia física más PROC_JSON/RESUMEN/CANTIDAD, para que los procedimientos automáticos no se sumen dos veces) y que la fila
+quede igual. Escenarios: (1) día completo (KTM + nivel + asistencia + minutos + Borg + educación + IMT + EMS + válvula) y el relato regenerado; (2) dos sesiones; (3) noche completa; (4) noche sin KTM,
+solo IMT: no declara KTM; (5) contraindicada y no realizada («Otro» con fundamento); (6) día con la KTM por defecto y nada más; (7) turno pasado; (8) control AET IIIC; (9) control de la fila de día
+sin estado. **Roja antes: 78 fallos contra el `index.html` anterior** (secciones 1 a 7; las 8 y 9 son controles que ya salían verdes y no deben dejar de serlo); **verde después**. Mutantes: 12 de 12
+mueren (sin `fKTMcat`, sin repintar el rótulo, nivel escrito con lista de sesiones, IMT/EMS/válvula/Borg/asistencia sin volver, inventar «no realizada» o «realizada» cuando nada se declaró, restaurar solo de día).
+Vecinas: **batería completa con `-j 2`: 230 verdes de 232**; las 2 rojas son `paridad_entrega` y `pwa_paquete`, por la regeneración pendiente del cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la
+guardia `paquete.js`).
+
+**Lo que NO se hizo y queda dicho.**
+- Un turno de DÍA que nunca declaró estado alguno (fila anterior al trío, o guardada por API sin pasar por la pantalla) se reabre sin estado elegido, **como hasta hoy**, y al volver a guardarlo `guardar()` manda
+  «no realizada» sin razón y el servidor lo rechaza. Esa pantalla no puede producir ese caso, y arreglarlo sería inventar «realizada» (infla el REM) o tocar `guardar()` (zona del otro flujo). Queda anotado.
+- La racha de válvula para la decanulación (`_VFON_HORAS`) se carga al reabrir desde la fila del turno, que no la trae (es un transitorio de la previa): la frase de decanulación de un turno reabierto sigue contando
+  solo las 12 h del propio turno si la válvula está marcada —que ahora sí lo está—. Es la regla de decanulación (clínica) y queda para la decisión 16 de PENDIENTES; este paso no la cambia.
+- El estado de la KTM por defecto de DÍA («Realizada») sigue como estaba: aplica a un turno NUEVO, no a reabrir. Es la decisión de producto abierta de la auditoría.
+- Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
