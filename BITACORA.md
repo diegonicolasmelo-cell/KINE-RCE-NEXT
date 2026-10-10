@@ -4950,7 +4950,89 @@ Con `-j 2`: `convenciones`, `escapado_unico`, `tokens_existen`, `docs`, `paquete
 - **CLAUDE.md no se editó.** Su regla de emojis podría terminar con «Lo fija `checks/emojis_nuevos.js`», como las demás; queda a elección de Diego.
 - **Límites conocidos:** de las banderas solo se conoce como nueva la de Sark (las demás son de antes de 2020; Windows de todos modos no las dibuja); `pwa/`, `entrega/` y `build/paquete_migracion/` no se miran porque se generan desde `v2/`; el lector es un mínimo para separar comentario de pantalla, no un analizador completo de JavaScript (por eso la prueba de compilación); un `</script` escrito dentro de un comentario `//` rompería el lector igual que rompería el navegador.
 
-## 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F1 «estado del bloque»: las columnas no se ensanchan, un clic sobre una fase repinta, el texto sin agregar no cuenta y el encabezado dice QUÉ falta
+## 10-oct-2026 · Revisión independiente de las tandas 3 a 5 y cierre final: 27 hallazgos corregidos en cuatro pasos, sello NEXT-6.0-registro-evolucion
+
+**De dónde sale.** Con las tandas 1 a 5 construidas, una revisión independiente y adversarial de las tandas 3, 4 y 5 (de solo lectura, cada hallazgo con su demostración)
+dejó **27 hallazgos, R1 a R27**. Se repartieron en cuatro pasos de arreglo, F1 a F4 (un commit cada uno), y en los cuatro se hizo lo mismo: **se reprodujo cada hallazgo en Chromium antes de
+tocar nada** (reloj congelado, datos ficticios), se escribió o extendió la guardia y se la vio **ROJA** contra el código sin arreglar, y recién ahí se arregló y se la vio verde. Donde la guardia
+nueva salió verde de entrada (R15), se dijo y no se cambió código. Este cierre sube el sello, regenera la entrega, corre la batería completa y deja escrito qué se cerró y qué le toca decidir a Diego.
+**Sin migración de esquema. No se tocaron `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`**; `guardar()` solo cambió en el paso F2, y únicamente para llamar a `_irAlCampo` después de
+tres avisos que ya existían (la firma, los rangos fisiológicos y el APACHE): sus mensajes y sus reglas son los mismos. Las entradas de cada paso se conservan enteras más abajo, bajo «El detalle, paso a paso».
+
+### Los cuatro pasos
+
+| Paso (commit) | Hallazgos | De qué trata | Guardia (roja antes, verde después) |
+|---|---|---|---|
+| **F1** (0f9cb42) | R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R24 | El estado de cada bloque del Turno en escritorio: columnas, repintado, texto sin agregar, qué falta, HTML | `estado_visible_escritorio` (78 rojas), `estado_del_bloque` (22), `aviso_igual_que_guardar` (60) |
+| **F2** (9f300d0) | R11 y los dos cabos sueltos que dejó el paso 3.1 | El error lleva al campo: firma, rangos, APACHE, chips de Evaluaciones y «Ir al bloque de…» | `abrir_hasta_el_campo` (145 rojas), `chips_llevan_al_campo` (32) |
+| **F3** (bb4aadb) | R12, R13, R14, R15, R16, R17, R18, R19 | Terapia física al abrir otra cama y al reabrir un turno | `ktm_nivel_no_se_cuela` (20), `terapia_fisica_vuelve_al_reabrir` (13) |
+| **F4** (b2c7a29) | R20, R21, R22, R23, R25, R26, R27 | Candado de emojis, icono de traslado, piso de 11 px y documentos | `emojis_nuevos` (22), `piso_letra_celular` (7), `tarjeta_acciones` (2), `contraste_tokens` (1) |
+
+### Lo que cerró cada hallazgo, y qué ve distinto la kinesióloga
+
+- **El panel de escritorio (R1, R6, R24).** *R1 y R6:* la grilla `2fr 3fr` equivale a `minmax(auto,…)`, así que el piso de la columna era lo que medía lo de adentro: tres opciones corrientes de Auscultación llevaban la columna angosta de 391 a
+  659 px y, a 1024 px, el panel quedaba con 156 px de scroll lateral. Ahora `minmax(0,2fr) minmax(0,3fr)`: las columnas guardan 2:3 pase lo que pase adentro. *R24:* el resumen del encabezado de Respiratorio («Requiere revisión falta declarar la PVE — VM · ACVC», 302 px)
+  se cortaba entre 1100 y 1280 px porque tomaba solo el espacio que dejaba el título; el cambio de la grilla **no** lo resolvía (se midió), así que el encabezado puede envolver y el resumen pasa a una segunda línea cuando no cabe.
+  **Ve:** de 900 a 1366 px una auscultación con varias opciones ya no empuja la tarjeta de Respiratorio ni deja el panel con scroll de lado, y el resumen del encabezado de Respiratorio ya no se corta.
+- **El encabezado de cada bloque dice la verdad (R2/R7, R3/R8, R4/R10).** *R2 y R7:* tocar un chip de «Fase clínica» no repintaba el estado, porque `renderFases()` reescribe los botones con `innerHTML` y cuando el clic llegaba al documento el botón ya no estaba en el árbol; ahora el
+  listener va en captura y `renderFases()` pide el repintado. *R3 y R8:* el texto escrito en «Escribir procedimiento…» (o en la nueva fase, el cultivo, los hechos y los pendientes) sin apretar «+ Agregar» contaba como dato, así que el encabezado decía «Registrado» y `guardar()` mandaba la lista
+  vacía; ahora esos seis cuadros llevan `data-sin-dato` y `_mLeer` los salta. *R4 y R10:* el nombre corto del encabezado vivía en una segunda tabla (`_mFaltaTxt`) que no conocía cinco obligatorios y decía «falta un dato obligatorio»; ahora cada entrada de
+  `_obligatoriosPendientes()` trae su `corto`, la segunda tabla se borró y ningún encabezado dice «un dato obligatorio». **Ve:** elegir o quitar una fase cambia al toque la palabra del encabezado; un texto escrito y no agregado ya no hace decir «Registrado»;
+  el encabezado dice qué falta («falta la razón de la PVE», «falta el tipo de la extubación sin PVE», «falta la hora de la reintubación», «falta el motivo de la «Otra» razón de la PVE»).
+- **Texto que se interpretaba como HTML (R5, R9).** `renderChips` escribía el procedimiento crudo y `renderFases` el nombre de la fase (y, con un reemplazo de comillas a medias, su `data-f`) dentro de `innerHTML`; una `<img onerror>` en cualquiera de los dos corría, y el texto viaja de un colega a otro con el turno
+  anterior. Ahora `escapeHtml` en las tres posiciones. **Ve:** un procedimiento o una fase con signos como `<` o `&` se ve tal cual se escribió.
+- **El error lleva al campo (R11).** Los avisos de la firma, de los rangos fisiológicos (FiO₂, VT, FR, SpO₂, PEEP, edad, talla) y del APACHE solo mostraban el cartel: el campo estaba en otro paso, en una tarjeta plegada o en la ficha cerrada. Ahora van por `_irAlCampo`, que cambia de paso, abre lo plegado (también la ficha
+  del episodio y la familia de Evaluaciones) y enfoca; los siete chips de Evaluaciones abren la tarjeta plegada del celular; y «Ir al bloque de extubación / intubación / decanulación →», que **no hacía nada en ningún ancho**, lleva al botón del evento en «Eventos de vía aérea». Los mensajes y las reglas de validación no cambiaron.
+  **Ve:** «Debes seleccionar la firma» abre «Cerrar el turno» en el celular; un valor fuera de rango lleva a su paso y su tarjeta; el botón del aviso de transición vuelve al Turno y deja marcado el botón del evento (que sigue declarándose a mano).
+- **Terapia física al abrir y al reabrir (R12/R16, R13/R19, R14/R17).** *R12 y R16:* en los cinco caminos de apertura quedaba encendida la asistencia del paciente anterior y, en los tres sin turno previo, también su nivel, su descripción y su lista de sesiones;
+  una función, `_ktmTarjetaEnBlanco()`, corre en `abrirPanel`, el único lugar por donde pasan todos los caminos. *R13 y R19:* reabrir devolvía las casillas de IMT, EMS y educación **y además** sus nombres como procedimientos «manuales», así que desmarcarlas no los sacaba de `PROC_JSON` ni de la estadística;
+  `fillForm` filtra esos tres nombres (no «todo lo automático», que se llevaría los eventos de vía aérea). *R14 y R17:* una fila anterior a la lista de sesiones («2 sesiones» solo como número) se rebajaba a una al reabrirla y guardarla sin tocar nada, y el REM del mes perdía una sesión;
+  se conserva la cantidad guardada (campo oculto `fKtmCantGuardada`) mientras nadie edite la lista, en vez de inventar sesiones iguales que sumarían los minutos doble. **Ve:** al abrir otra cama la tarjeta de Rehabilitación aparece de verdad en blanco; desmarcar IMT, EMS o la educación los saca de verdad;
+  un turno viejo de dos sesiones guardado sin tocar sigue diciendo dos.
+- **Una guardia y una documentación sobre lo que ya estaba bien (R15, R18).** *R15:* el código ya hacía lo que su comentario prometía (Borg 0 se escribe tal cual; `show('dKTMasis')` abre el bloque de asistencia), pero la guardia no lo ataba: se agregaron las secciones 12 y 13 y, con **mutantes**, los dos sobrevivían a la guardia de antes y mueren con la nueva.
+  *R18:* el encabezado de `ktm_nivel_no_se_cuela.js` decía que el cambio no tocaba el dato de la cama, y era falso (de noche, «Realizada» sin nivel deja a esa cama sin «KTM 3» en el tablero); se corrigió, se dejó medido y la decisión quedó para Diego (2e, la 9b). **Ve:** nada nuevo en pantalla.
+- **El candado de emojis (R21, R26).** `emojis_nuevos.js` dejaba pasar tres formas con las que un emoji de 2020 en adelante sí se dibuja: el escape de CSS (`content:"\1FA7B"`), `String.fromCodePoint`/`fromCharCode` con números a la vista y las entidades numéricas sin punto y coma. Se armó una copia con cada forma y el candado dijo «0 problemas» en las tres; ahora las caza (seis mutantes, uno por variante, sobreviven a la guardia de antes y mueren con la nueva),
+  sin falsos positivos (los cinco emojis de producción y los escapes que no son emojis siguen pasando). **Ve:** nada; es un candado para la próxima persona que programe.
+- **El celular y el icono de traslado (R22, R23).** *R22:* el botón de traslado de la tarjeta medía 21×21 px y con el cursor encima pasaba a un azul pálido de 2,98:1, peor que en reposo; ahora mide 24×24 (sin agrandar la pestaña de la cama) y el hover usa el azul hondo (10,3:1).
+  *R23:* el piso de 11 px de la tanda 5 solo cubría el tablero y el panel; no llegaba al popup del ➕, el Historial (con su Hoja UCI, que bajaba a 8,5 px), el Egreso (que ya estaba en regla) ni la pestaña Registro. **Ve:** el icono de traslado es un poco más grande y se lee con el cursor encima;
+  en el celular el popup del ➕, el Historial y el Registro suben a 11 px, sin moverse nada de lugar.
+- **Los documentos (R20, R25, R27).** *R25:* la nota de la tanda 5 decía que `git revert 392ba34` deshace el botón único; medido en un clon descartable, el revert choca; la bitácora dice ahora los pasos reales. *R27:* «el peor par de toda la app mide 4,80:1» solo valía para los textos con `--muted`; se midieron de nuevo los pares con color a mano
+  y salieron como las decisiones 21 y 22 de la sección 2f de `docs/PENDIENTES.md`. *R20:* las decisiones de las secciones 2c a 2f hablaban con nombres internos de funciones y archivos; se reescribieron en lenguaje de la unidad (número y sentido, sin cambios). **Ve:** nada en pantalla; Diego lee las decisiones sin glosario.
+
+### Lo que quedó como decisión de Diego
+
+Todo está en `docs/PENDIENTES.md`, con su recomendación, y arriba hay un índice corto, «Lo que tienes que decidir primero», con las diez que más pesan (valor clínico, lo que ve la kinesióloga, seguridad del guardado). Ninguna se escribió en `docs/ACUERDOS_REDISENO.md`: se escriben con sus palabras cuando responda.
+- **De esta revisión, nuevas:** a dónde lleva «Ir al bloque de…» (2d, la 15, ya hecha con la opción recomendada); qué hace «Guardar» con el texto escrito y sin agregar (2d, la 16); la cama de noche sin nivel (2e, la 9b); conservar la cantidad de una fila vieja de KTM (2e, la 15, ya hecha);
+  la tarjeta «IMT / EMS» que queda abierta al abrir otra cama (2e, la 16); los pares de color a mano, de los que el ámbar de la evaluación vieja y el naranja de «Volver a hoy» son suyos (2f, la 21); y las pestañas Estadísticas, Entrega y Ventiladores y la barra de botones del Registro (2f, la 22).
+- **Un defecto sin arreglar que no es decisión:** `tiRender` (microorganismos del cultivo) y `renderAislTags` (aislamiento) escriben cada etiqueta sin escapar, igual que `renderChips` antes de R5. Es una línea con `escapeHtml` en cada una y quedó en la sección 4: el paso F1 no la tenía asignada.
+- **Lo que sigue pendiente de antes:** la prueba con dos aparatos y el modo estricto (2c, la 12 y la 3), todo lo clínico de las tandas 3 y 4 (2d y 2e) y que nada de esto se ha visto en un aparato real.
+
+### Cierre
+
+- **Sello `NEXT-6.0-registro-evolucion`** en `build/empaquetar_cohete.js` y en los dos sitios del fuente (`<meta name="rce-version">` y el texto de «La app no pudo iniciar»); `grep` no deja ninguna `NEXT-5.9-limpieza-visual` en `v2/` ni en `build/` (quedan solo en esta bitácora y en el historial).
+  `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados con `node build/paquete_migracion.js entrega` y `node build/empaquetar_pwa.js`.
+- **Batería completa (`-j 2`): **240 verdes, 0 rojas** (742 s). Las mismas 240 de la tanda 5: ninguna guardia nueva en el cierre, pero las de los cuatro pasos (`estado_visible_escritorio`, `estado_del_bloque`, `aviso_igual_que_guardar`, `abrir_hasta_el_campo`, `chips_llevan_al_campo`, `ktm_nivel_no_se_cuela`, `terapia_fisica_vuelve_al_reabrir`, `emojis_nuevos`, `piso_letra_celular`, `tarjeta_acciones`, `contraste_tokens`) quedaron más fuertes, sin borrar aserciones que siguieran siendo ciertas. `paridad_entrega` y `pwa_paquete`, que durante los pasos estaban rojas por la regeneración pendiente, quedan verdes. Ninguna salió roja bajo carga: no hubo que repetir ninguna sola.**
+- **`node build/medir_guardado.js`** (viajes a hojas por acción): abrir 3, reabrir 3, turno nuevo **13**, re-guardar **17**, ingreso **13**, decanulación **13**, reintubación **14**. Bajo los techos 14, 18, 14, 14 y 15, sin cambios respecto del cierre de la tanda 5 (el ingreso con identificador de paciente acuñado mide 15, ya documentado en la tanda 2: lo que `guardar()` manda no cambió).
+- **Qué pegar** en el editor de Apps Script, desde `entrega/`: **solo `index.html`** (el cohete). Ningún `.gs` cambió desde el cierre de la tanda 5 (`node build/que_pegar.js 42fefde` lo confirma: 1 archivo). Si la planilla se quedó en una versión anterior a la 5.9, ver la sección 6 de `docs/PENDIENTES.md`
+  para la lista de archivos que traen las tandas 1 y 2. Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes.
+- **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian; no hay hoja ni columna nueva.
+- **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app instalada para que el sello de versión renueve su caché. El sello `NEXT-6.0-registro-evolucion` debe aparecer en «Cargando…»; si no aparece, lo pegado no es lo nuevo.
+- **Cómo revertir:** cada paso es un commit (0f9cb42, 9f300d0, bb4aadb, b2c7a29) y el cierre es otro. Como pasó con el botón único, `git revert` puede chocar con los paquetes generados: lo seguro es revertir el cambio en `v2/index.html` y regenerar con los dos comandos de arriba. No hay datos que migrar.
+
+### Para no olvidar (de la revisión)
+
+- 🪤 **Una guardia que nunca muere con un mutante no protege nada.** Las de R15 salieron verdes de entrada y parecían un adorno: dos mutantes (el Borg 0 numérico y la línea que abre el bloque de asistencia) sobrevivían a la guardia de antes. Se prueba con el mutante, no con el color.
+- 🪤 **Un arnés rápido tapa un hueco.** Con el servidor simulado respondiendo a 5 ms, el `change` que dispara el Enter repintaba por su cuenta y el mutante sin repintado en `renderFases()` sobrevivía; atrasar la respuesta a 700 ms lo mató.
+- 🪤 **Un clic llega después de que el botón se reescribió.** Si el botón se reemplaza a sí mismo (`innerHTML`), un listener en burbujeo ve un botón que ya no está en el árbol: va en captura y, además, quien reescribe pide el repintado.
+- 🪤 **Un `0` que viene como texto es verdadero.** `KTM_BORG` es una columna de texto: el servidor devuelve `'0'`, que en JavaScript es verdadero; solo un `0` numérico (celda sin formato, fila importada) delata el `if (valor)` mal puesto.
+- 🪤 **Una nota que dice «se deshace con tal comando» hay que correrla.** El `git revert` de R25 nunca se había probado y chocaba; los pasos de reversión se prueban en un clon descartable.
+- 🪤 **La auditoría estática propone; el navegador dispone** (otra vez): R24 no lo resolvía el arreglo de la grilla, `transOfIr` era peor que un pliegue y la guardia de los chips de Evaluaciones no veía el celular porque medía a un solo ancho.
+
+### El detalle, paso a paso
+
+Las cuatro entradas que siguen son las que se escribieron durante la revisión, sin cambios de contenido (solo bajaron un nivel de título).
+
+### 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F1 «estado del bloque»: las columnas no se ensanchan, un clic sobre una fase repinta, el texto sin agregar no cuenta y el encabezado dice QUÉ falta
 
 **De dónde sale.** Los diez hallazgos de la tanda 3 de la revisión de las tandas 3, 4 y 5 que caen en `v2/index.html` (R1, R6, R2, R7, R3, R8, R4, R10,
 R5, R9) más R24 (tanda 5), que tiene la misma raíz que R1/R6. Los revisores los habían demostrado; **se reprodujeron todos antes de tocar nada**
@@ -5062,7 +5144,7 @@ paquete instalable queda por regenerar en el cierre). `guardado_viajes` y `episo
 - En `docs/PENDIENTES.md` la fila «`_mFaltaTxt` dice "un dato obligatorio" para lo que no conoce» queda **resuelta** con este paso (no se editó ese
   archivo aquí).
 
-## 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F2 «el error lleva al campo»: la firma, los rangos fisiológicos, el APACHE, los chips de Evaluaciones y «Ir al bloque de…» ya llevan hasta lo que hay que corregir
+### 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F2 «el error lleva al campo»: la firma, los rangos fisiológicos, el APACHE, los chips de Evaluaciones y «Ir al bloque de…» ya llevan hasta lo que hay que corregir
 
 **De dónde sale.** El hallazgo R11 de la revisión y los dos cabos sueltos que dejó el paso 3.1 (decisiones 13 y 14 de `docs/PENDIENTES.md`): `guardar()`
 estaba cerrado desde la tanda 2 y por eso lo que quedaba de «el error lleva al campo» esperaba. Terminado el trabajo de `guardar()`, este paso lo toca
@@ -5145,7 +5227,7 @@ guardias nacieron rojas contra el código sin arreglar.
 - `docs/PENDIENTES.md`: las decisiones 13 y 14 quedan marcadas como resueltas (la 7 de la sección 2e, abrir sola la tarjeta única de Planes, sigue siendo
   una decisión de producto aparte).
 
-## 10-oct-2026 · Terapia física (tanda 4), revisión adversarial · paso F3 «terapia física al reabrir»: la tarjeta de KTM parte en blanco en todos los caminos, lo automático se va con la casilla y una fila vieja no pierde sus sesiones
+### 10-oct-2026 · Terapia física (tanda 4), revisión adversarial · paso F3 «terapia física al reabrir»: la tarjeta de KTM parte en blanco en todos los caminos, lo automático se va con la casilla y una fila vieja no pierde sus sesiones
 
 **De dónde sale.** Los hallazgos R12, R16, R13, R19, R14, R17, R15 y R18 de la revisión de la tanda 4. **Se reprodujo todo antes de tocar** (Chromium con
 reloj congelado al miércoles 12-ago-2026 11:00 y el servidor real en memoria, `build/sim/sim_srv.js`) y las guardias nacieron rojas contra el código sin
@@ -5241,7 +5323,7 @@ esperadas: `paridad_entrega` y `pwa_paquete` por la regeneración que queda para
 - El nivel **oculto** que `fillCama` copia en los caminos sin réplica (decisión 12) y la decisión 9b (la cama de noche) esperan a Diego.
 - Si la fila vieja tiene `KTM_CANT` mayor que 1 pero la KTM no está «realizada» no se conserva nada: el servidor ya la normaliza a vacío en ese caso.
 
-## 10-oct-2026 · Limpieza visual (tanda 5), revisión adversarial · paso F4 «limpieza visual y documentos»: el candado de emojis lee tres formas más, el icono de traslado cumple 24 px y un hover legible, el piso de 11 px llega al ➕, al Historial y al Registro, y los documentos hablan en palabras de la unidad
+### 10-oct-2026 · Limpieza visual (tanda 5), revisión adversarial · paso F4 «limpieza visual y documentos»: el candado de emojis lee tres formas más, el icono de traslado cumple 24 px y un hover legible, el piso de 11 px llega al ➕, al Historial y al Registro, y los documentos hablan en palabras de la unidad
 
 **De dónde sale.** Los hallazgos R21, R26, R22, R23, R25, R27 y R20 de la revisión de la tanda 5. **Se reprodujo todo antes de tocar** (Chromium con reloj congelado
 al 10-mar-2026 10:00 y el servidor real en memoria, `build/sim/sim_srv.js`) y las guardias nacieron rojas contra el código sin arreglar. Lo único de producto que
