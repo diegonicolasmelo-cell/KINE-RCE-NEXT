@@ -3997,3 +3997,63 @@ cada estado a 390, 320 y 1100 px (fuera del repositorio).
 - 🪤 **Un `role="alertdialog"` dentro de un overlay que nunca sale del árbol (solo cambia su opacidad) no tiene ninguna «aparición» que el
   navegador anuncie** (no se probó con un lector de pantalla real: es lo que se deduce del marcado). Sin mover el foco no se puede contar con
   que se lea, y por eso lleva una región viva aparte.
+
+## 10-oct-2026 · Tanda 3 · paso 3.1 · «El error lleva al campo» también cuando el campo está plegado (cubre además el cambio 3 de la tanda 4)
+
+**El defecto.** `_irAlCampo` (la que llaman los avisos de «falta esto» de `guardar()` y las validaciones del ingreso) solo cambiaba de
+PASO. Pero a 390 px el panel es un acordeón: `mAcordeonInit` pliega TODAS las tarjetas (`mcol`) y Respiratorio, además, nace con dos
+sub-bloques cerrados (`msub.cerrado`: «Eventos de vía aérea» y «Manejo respiratorio»). `_vis` ya trataba ese plegado como presentación
+—por eso el guardado SÍ exige el campo plegado—, pero el aviso no lo abría. Medido en Chromium a 390 px, con tubo + VM y la PVE sin
+responder: el toast decía «Define la PVE de este turno», el paso era el correcto, el botón estaba dentro de «Eventos de vía aérea»
+(cerrado) y el `focus()` caía en un `display:none`. Lo mismo con la hemodinamia vacía (tarjeta plegada) y con las tres razones de KTM de
+Terapia física (la razón de «no realizada», la contraindicación y el fundamento de «Otro»). La PVE y las razones de KTM son justo lo que
+más se olvida.
+
+**El cambio (solo `v2/index.html`, sin tocar datos ni ninguna ruta de guardado).** Función nueva `_abrirHastaCampo(el)`, al lado de `_vis`
+(es su contraparte): sube por los ancestros del campo y abre SOLO lo que lo esconde por presentación —la tarjeta `mcol` que lo contiene,
+el sub-bloque `cerrado` que lo contiene y cada `<details>` cerrado—; las demás tarjetas siguen plegadas. Devuelve `true` si abrió algo. La
+llaman `_irAlCampo` (dentro del mismo `setTimeout` de 60 ms, antes del `scrollIntoView`/`focus`; su firma y su retorno no cambian) y el
+`scrollA` interno de `setEventoVA`. En escritorio no hay `mcol` ni `msub`: solo puede abrir un `<details>` (el «➕ Otro procedimiento»).
+`guardar()`, `api()`, `gs()`, la franja y los `avErr*` no se tocaron.
+
+**🪤 Lo que apareció de paso, en la misma línea de `setEventoVA`.** La auditoría decía «`setEventoVA('ext')` debe dejar `#dPVE` visible».
+Al medirlo: **`dPVE` no existe en la pantalla** (el bloque de la PVE se llama `dExtSec`) y `fPVEval` es un `<input type=hidden>`, al que no se
+le puede hacer scroll. O sea que `scrollA('dPVE'); scrollA('fPVEval');` eran las dos un no-op desde que se renombró el bloque, **en cualquier
+ancho**: apretar «Extubación» declaraba el evento y no llevaba a quien lo apretó al lugar donde hay que completarlo. Se cambió por
+`scrollA('dExtSec')`. Es la única diferencia de comportamiento visible en escritorio: al apretar «Extubación» ahora la pantalla se desliza
+hasta el bloque «Extubación / PVE» y lo contornea de azul 2,5 s, igual que ya hacen la intubación, la reintubación, la TQT y la decanulación
+con sus bloques. Si Diego prefiere que no se mueva, se revierte esa palabra.
+
+**La guardia** `build/checks/abrir_hasta_el_campo.js` (nueva, a 390 y a 1200 px, reloj inventado: lunes 10-ago-2026 11:00). Mide con la
+geometría real (rectángulo con tamaño, ningún ancestro con `display:none`, ningún `<details>` cerrado, dentro de la pantalla), **no** con
+`_vis`, que a propósito quita el plegado para preguntar otra cosa y daría verde justo donde el campo no se ve. Cubre: la PVE sin responder
+(desde otro paso, vía `guardar()`), la hemodinamia vacía, «Extubación» (con Respiratorio plegada y con Respiratorio abierta pero eventos
+cerrados; el scroll se ESPÍA para exigir que caiga en algo que existe y se ve), las tres razones de KTM de Terapia física (desde Planes), un
+`<details>` cerrado, `_abrirHastaCampo` por sí sola (true/false, nulo, un campo que ya se veía) y la firma vía `_irAlCampo`. Cada escenario
+exige primero que de partida el campo NO se vea y la tarjeta esté plegada, y que después las demás tarjetas SIGAN plegadas. **Roja antes:**
+39 fallos contra el `index.html` del commit anterior (los de plegado solo a 390 px, más el `<details>` y el scroll de «Extubación» también a
+1200). **Verde después**, y cuatro mutantes mueren (sin la rama del sub-bloque: 12 fallos; sin la de la tarjeta: 29; sin la del `<details>`: 7;
+sin que `_irAlCampo` la llame: 30).
+- 🪤 **Los sub-bloques de Respiratorio se arman UNA vez por página** (`_mSubBloques` sale si «ya armado») y conservan lo que abrió el
+  escenario anterior, mientras `mAcordeonInit` sí vuelve a plegar las tarjetas: un escenario partía con «Eventos de vía aérea» abierto sin que
+  nadie lo hubiera pedido. La guardia los devuelve a su estado de nacimiento (`M_SUBS.abierto`) antes de cada escenario.
+
+**Lo que NO se arregló y queda dicho.** La rama de FIRMA de `guardar()` hace `sel.focus()` directo y no pasa por `_irAlCampo`. A 390 px,
+parado en Planes (la tarjeta «Cerrar el turno» nace plegada), apretar «Guardar» sin firma da el toast «Debes seleccionar la firma» y el foco
+cae en la tarjeta plegada; la guardia lo deja medido como «conocido» (no tumba la batería) y mide que `_irAlCampo('fFirma')` SÍ la deja a la
+vista y con el foco. Arreglarlo es una línea dentro de `guardar()` (`_irAlCampo('fFirma')` en vez de ese `focus()`), zona cerrada en la
+tanda 2: espera la autorización, o la decisión 4 de la tanda 4 (dejar abierta la tarjeta única de Planes al entrar en celular).
+Con el mismo defecto, **medido y sin tocar**: los chips de Evaluaciones que «llevan al campo» (`pasoEvalMedir`, que abre el cajón `evFam`
+pero no la tarjeta plegada). A 390 px, con las tarjetas plegadas como las deja el acordeón al abrir, los 7 chips que no abren un modal (PIM,
+dinamometría, PEM, FEmáx, IMS, ecografía, deglución) dejan su campo invisible; `chips_llevan_al_campo.js` no lo ve porque mide a un solo
+ancho. La corrección sería la misma línea (`_abrirHastaCampo(el)` antes del `scrollIntoView`). `transOfIr` (el modal de transición que lleva
+al bloque del evento) tiene el mismo patrón y no se midió.
+
+**H3 de la auditoría de la tanda 3 (solo verificado, nada cambiado), medido en pantalla a 1200 y a 390 px: confirmado.** Al INGRESAR un
+paciente con TOT, la fila «¿Qué pasó hoy con la vía aérea?» está oculta (por diseño: «al ingresar no hay "venía con"»), ningún botón de
+evento se ve, y el bloque «🔪 TRAQUEOSTOMÍA» queda a la vista con SOLO su título: la casilla «Ocurrió TQT este turno» es `display:none` y el
+detalle (hora, técnica, cánula, queda con) está oculto hasta declarar el evento. Ni un solo control visible dentro del bloque. Elegir «TQT»
+en el selector de vía aérea del ingreso lo trata como estado de llegada, no como evento: tampoco abre el detalle ni marca la casilla. Es lo
+que `regresion_ui` llama «anotable» (solo mira que el cascarón no tenga la clase `hidden`). Va a las decisiones de Diego.
+
+**Sin migración de esquema.** `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.

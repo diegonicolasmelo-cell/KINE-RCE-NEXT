@@ -10102,14 +10102,34 @@ function _vis(el){
   }
   return true;
 }
-/** Lleva a quien guarda hasta el campo que falta, cambiando de paso si hace falta. Acepta el id o el elemento. */
+/* 🔴 EL AVISO TAMBIÉN ABRE LO PLEGADO (10-oct-2026). `_vis` trata el plegado como presentación para EXIGIR el campo
+   (si no, a 390 px la PVE y las razones de KTM no se pedirían), pero el aviso que lleva al campo solo cambiaba de
+   PASO: en el celular la persona leía «Define la PVE de este turno», aterrizaba en el paso correcto y el campo seguía
+   dentro de una tarjeta `mcol` o del sub-bloque «Eventos de vía aérea» (`msub.cerrado`), o sea con `display:none`, y
+   el `focus()` caía en el vacío. Medido a 390 px: ni la PVE, ni la hemodinamia, ni las razones de KTM de Terapia física
+   quedaban a la vista. Esta es la contraparte de `_vis`: abre SOLO la cadena que esconde al campo (la tarjeta, el
+   sub-bloque y los <details> que lo contienen; las demás tarjetas siguen plegadas) y devuelve true si abrió algo.
+   No toca datos ni ninguna ruta de guardado; en escritorio no hay `mcol` ni `msub` y solo puede abrir un <details>.
+   Lo cuida abrir_hasta_el_campo.js. */
+function _abrirHastaCampo(el){
+  let abrio=false;
+  for(let a=el; a && a!==document.body; a=a.parentElement){
+    const pa=a.parentElement, cl=a.classList;
+    if(cl && cl.contains('fcard-body') && pa && pa.classList.contains('mcol')){ pa.classList.remove('mcol'); abrio=true; }
+    else if(cl && cl.contains('msub-b') && pa && pa.classList.contains('cerrado')){ pa.classList.remove('cerrado'); abrio=true; }
+    // el <summary> de un <details> cerrado SÍ se ve cerrado: no hay que abrirlo para llegar a él
+    else if(a.tagName==='DETAILS' && !a.open && !(el.closest && el.closest('summary') && el.closest('summary').parentElement===a)){ a.open=true; abrio=true; }
+  }
+  return abrio;
+}
+/** Lleva a quien guarda hasta el campo que falta, cambiando de paso y abriendo lo plegado si hace falta. Acepta el id o el elemento. */
 function _irAlCampo(id){
   const e=(typeof id==='string')?$(id):id; if(!e) return;
   const due=e.closest('[data-paso]');
   const paso=due?parseInt(due.dataset.paso||'2',10):2;
   if(typeof pasoIr==='function' && paso && paso!==PASO_ACTUAL) pasoIr(paso);
   setTimeout(function(){
-    try{ e.scrollIntoView({block:'center'}); e.focus(); }catch(x){}
+    try{ _abrirHastaCampo(e); e.scrollIntoView({block:'center'}); e.focus(); }catch(x){}
     e.style.outline='2px solid var(--danger)';
     setTimeout(()=>{ e.style.outline=''; }, 2500);
   }, 60);
@@ -21436,7 +21456,9 @@ function setEventoVA(tipo){
   // el registro afirma que se intubó a un paciente que ya estaba intubado.
   if(tipo&&tipo!=='nada') _tomarFotoPrevioVA();
   _evVAAnunciado=tipo||'nada';
-  const scrollA=id=>{ const e=$(id); if(e){ e.scrollIntoView({behavior:'smooth',block:'center'}); e.style.outline='2px solid #1d4ed8'; setTimeout(()=>{e.style.outline='';},2500); } };
+  /* 🔴 El bloque al que se scrollea puede estar PLEGADO (en el celular «Eventos de vía aérea» nace cerrado): sin abrirlo el
+     scroll iba a un display:none y al apretar el botón no pasaba nada a la vista. Ver `_abrirHastaCampo`. */
+  const scrollA=id=>{ const e=$(id); if(e){ _abrirHastaCampo(e); e.scrollIntoView({behavior:'smooth',block:'center'}); e.style.outline='2px solid #1d4ed8'; setTimeout(()=>{e.style.outline='';},2500); } };
   const fijarVA=va=>{ const s=$('fVA'); if(!s) return; s.disabled=false; s.value=va; cascadeVA(); };
   if(tipo==='nada'){
     [['cIntubO',hIntub],['cTqtO',hTqtO],['cDecanOcurrio',hDecan]].forEach(([id,fn])=>{ const e=$(id); if(e&&e.checked){ e.checked=false; try{ fn(); }catch(x){} } });
@@ -21452,7 +21474,10 @@ function setEventoVA(tipo){
     // Aquí se anuncia y se fija la vía aérea; el detalle se completa allá y
     // el guardado no pasa sin EXT_OCURRIO (cliente y servidor).
     fijarVA('Natural');
-    scrollA('dPVE'); scrollA('fPVEval');
+    /* 🪤 10-oct-2026 · Esto decía `scrollA('dPVE'); scrollA('fPVEval');` y NINGUNA de las dos hacía nada: `dPVE` no existe
+       (el bloque de la PVE se llama `dExtSec`) y `fPVEval` es un <input type=hidden>, al que no se le puede hacer scroll.
+       «Extubación» declaraba el evento pero no llevaba a la persona al lugar donde hay que completarlo. */
+    scrollA('dExtSec');
     toast('✂️ Extubación anunciada: ahora declara cómo fue — PVE superada, o extubación sin PVE con su tipo', 6000);
   } else if(tipo==='reintub'){
     fijarVA('TOT');
