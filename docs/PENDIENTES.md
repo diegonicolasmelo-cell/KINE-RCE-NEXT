@@ -1,4 +1,4 @@
-# Pendientes — al 10-oct-2026 (con la tanda 4 de terapia física y Planes)
+# Pendientes — al 10-oct-2026 (con la tanda 5 de limpieza visual)
 
 > Lo que está **decidido** vive en `docs/ACUERDOS_REDISENO.md`, con las palabras
 > de Diego. Esto es la otra mitad: lo que **falta probar**, lo que **falta
@@ -6,8 +6,8 @@
 >
 > 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G), y la **tanda 1
 > (integridad), la tanda 2 (guardado seguro), la tanda 3 (turno respiratorio,
-> cambios 1 a 5) y la tanda 4 (terapia física y Planes, cambios 1, 2 y 4)** también:
-> hoy son **232 guardias en verde**. Lo que no existe
+> cambios 1 a 5), la tanda 4 (terapia física y Planes, cambios 1, 2 y 4) y la
+> tanda 5 (limpieza visual, cambios 1 a 7)** también: hoy son **240 guardias en verde**. Lo que no existe
 > todavía es **la prueba en la planilla de NEXT**: nada de esto se ha pegado ni
 > visto en un navegador del hospital.
 >
@@ -21,8 +21,13 @@
 > respuestas a las 7, 8 y 12.
 >
 > 🟠 **La sección 2e es de la tanda 4**: tres decisiones ya implementadas (✅) y once
-> por decidir. Ninguna toca los tres bloques de Planes; las de limpieza de Planes
-> (la 8 y la 10) van con la tanda 5.
+> por decidir. Ninguna toca los tres bloques de Planes; la parte de texto de la 10
+> (el cuadro «¿Quién midió?») ya la cerró la tanda 5.
+>
+> 🟠 **La sección 2f es de la tanda 5**: nueve decisiones de pantalla ya implementadas (✅)
+> y once por decidir. Las más visibles: si los cinco emojis de 2020 se ven bien en el
+> computador del hospital (la 11), el rótulo del ➕ (la 12) y la cabecera del panel que
+> se sale de la pantalla a 360 px (la 17).
 
 ---
 
@@ -374,6 +379,7 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    de esta tanda: ahora un nivel vacío es de verdad un nivel que nadie eligió, no el de la cama.
 10. **Textos y atajos de Planes.** El modal que se abre al dejar un pendiente dice «¿Quién midió?» (texto de medición, equivocado para un pendiente); los 18 chips fijos siguen siempre a la vista; las sugerencias «Medir X» salen sin mirar
     si el paciente coopera. *Recomendado:* cambiar el título a «¿Quién deja el pendiente?» y limpiar chips y sugerencias dentro de la tanda 5; no cambia los tres bloques y es solo texto.
+    ✅ **El título del cuadro ya se cambió en la tanda 5** (ver la 8 de la sección 2f); los 18 chips y las sugerencias «Medir X» siguen sin tocar.
 11. **Números de las pestañas.** Cuando no hay nada que prevenir (pestaña 1 oculta), la primera visible es la «2». ¿Se dejan los números fijos (Turno siempre 2, Terapia física siempre 4, Planes siempre 5) o se renumeran por lo que
     se ve? *Recomendado: fijos:* es lo que ya hay, lo que usan las guardias y el equipo, y «paso 4» significa siempre lo mismo. Solo se corrigió que «Atrás» no caiga en el paso oculto (la 3).
 12. **Los dos caminos de `fillCama` sin réplica siguen copiando el nivel de la cama de noche.** Un paciente sin turno previo y el servidor que no contesta al abrir. No se alcanzan con datos reales, porque una cama que recuerda un
@@ -383,6 +389,76 @@ fácil; las dejo anotadas para que las confirme o las corrija.
     «Realizada» por defecto puede inflar el REM, y «no realizada» sin razón entra al denominador de la estadística; ninguna de las dos se inventa.
 14. **La Prevención no aparece si la vía aérea o el soporte se eligen DENTRO del turno.** La pestaña 1 se decide una sola vez, al abrir la cama; si un paciente sin dispositivos recibe uno durante el turno, la Prevención no
     aparece hasta reabrir la cama, y «Atrás» sigue a la barra. ¿Debe aparecer sola? *Recomendado: no por ahora* (sería abrir un paso que el flujo acordó saltar); si lo quieres, es otra pieza, con su guardia.
+
+## 2f · Decisiones de la tanda 5 (limpieza visual, 10-oct)
+
+> 🟢 **Las ✅ de la parte A (de la 1 a la 9) YA ESTÁN HECHAS con la opción que recomiendo** y esperan que las confirmes o las cambies. Todas son de pantalla: ninguna toca el esquema de la
+> planilla ni lo que se guarda en una evolución. Revertir cada una cuesta una línea de CSS (se dice cuál), salvo el botón único (la 7), que va en un commit propio.
+>
+> 🟠 **Las de la parte B (de la 10 a la 20) NO se hicieron**, a propósito: unas cambian una palabra de la unidad (la 10 y la 12), otras necesitan que alguien mire un computador del hospital
+> (la 11) y otras son hallazgos o ajustes finos de la tanda que quedaron sin hacer (de la 14 a la 20).
+>
+> 👀 **Las capturas del antes y el después** (tablero, traslado, retrospectiva y los seis pasos del panel, a 390 y 1400 px, en tema claro) quedaron en la carpeta de trabajo de la sesión,
+> fuera del repositorio: hay que mostrártelas desde ahí para que decidas mirando, no leyendo.
+>
+> ✍️ **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escriben con tus palabras cuando respondas. Dilas por número.
+
+**A · Ya implementadas, esperan confirmación**
+
+1. **El texto gris de toda la app se lee más firme.** ✅ (decisión 7 de la auditoría) El gris azulado del texto secundario pasó de `#5B7793` a `#4A6580`: el mismo azul grisáceo, más hondo, porque
+   sobre el fondo manila de la cama no llegaba al contraste mínimo (3,69:1; hoy el peor par de toda la app mide 4,80:1). En la misma línea: los títulos de Hemodinamia, Rehabilitación e IMT, el
+   diagnóstico de la cama, el «Egreso» y el icono de traslado (que casi no se veía, 1,84:1) se oscurecieron, y «Siguiente» sin poder avanzar pasó de azul pálido con letra blanca a gris claro con letra oscura.
+   *Recomendado: dejarlo* (es una sola línea, uniforme y sin parches por pantalla). Si prefieres oscurecerlo solo sobre el manila y el fondo gris, se vuelve `--muted` de la piel a su valor y se parcha por pantalla.
+2. **Piso de letra de 11 px en el celular.** ✅ (decisión 5) Ningún texto visible baja de 11 px en el tablero, el traslado, la retrospectiva, los seis pasos y el ingreso (antes llegaba a 9,3 px: barra de abajo, chips
+   de ventilador y equipos, palabras de estado, etiquetas). Nada se pierde ni se mueve un botón; el panel crece unos pocos píxeles (16 como máximo en la medición del paso 5.1). *Recomendado: dejarlo.* Si prefieres densidad antes que lectura, el piso baja a 10,5 px
+   (una constante en la guardia `piso_letra_celular.js`). **Solo es del celular**: el escritorio sigue con letra de 9,3 a 10,7 px (ver la 16).
+3. **El título de cada tarjeta sube un escalón** (de 11,5 a 12,5 px) para que haya tres niveles: tarjeta, bloque, etiqueta de campo. ✅ (decisión 6) *Recomendado: dejarlo;* sin ese escalón no hay tres niveles. Revertir:
+   `.fcard-title{font-size:.72rem}`, y entonces la guardia `titulos_tres_niveles.js` pide reconciliar la escalera.
+4. **Los títulos de bloque pierden su color de dominio y van todos en gris, en negrita y mayúsculas** (Respiratorio azul, Rehabilitación ámbar, Evaluaciones turquesa, AET morado; y los tres de Planes, que eran azul, verde y ámbar
+   en minúscula grande). ✅ El dominio sigue en el punto y el borde de cada tarjeta, y en Planes en el borde y el fondo de cada bloque. El ámbar de «Lo que queda pendiente» medía 3,07:1 como título. *Recomendado: dejarlo* (es lo que
+   hace que sean «una sola tupla»). Si quieres conservar el color en alguna familia, se acepta como excepción escrita en la guardia, no con una segunda regla.
+5. **La tarjeta de cama: «Evolución» (o «Editar») sola en su fila, a todo el ancho; Historial, ➕ y Egreso en una segunda fila.** ✅ Antes eran cuatro botones del mismo peso en una fila y «Evolución» —la acción de todas las camas— medía
+   el 31 % del pie. **El costo:** cada tarjeta ocupada es una fila más alta (unos 44 px) y el tablero del celular pasa de 3.414 a 3.810 px (en escritorio, de 1.069 a 1.186 px). *Recomendado: dejarlo.* Si el largo del tablero en el
+   celular te molesta, la salida es achicar el relleno de los secundarios, no volver al pie de cuatro.
+6. **«Egreso» neutro y con la palabra completa** (antes «Egr.», en verde). ✅ (decisión 3) Es la acción menos frecuente y la más difícil de deshacer: no debe parecerse a la de «Evolución» ni al color de «lo bueno».
+   *Recomendado: dejarlo.* Volver al verde es una línea de CSS.
+7. **Un solo botón principal: azul liso, sin degradado ni resplandor.** ✅ (decisión 1) **La hipótesis de la auditoría no se confirmó:** no había un índigo a la vista (era código muerto, la piel institucional lo pisaba
+   siempre). Lo que sí difería era el degradado hacia azul marino, el resplandor azul y un «hover» que aclara en vez de oscurecer. Ahora «Guardar» y «Siguiente» son del mismo azul que «Evolución», con su tamaño grande de 52 px
+   (pedido tuyo del 15-ago). *Recomendado: dejarlo.* **Va en un commit propio: `git revert 392ba34` devuelve el relieve de antes sin tocar la corrección de la barra** (la 9).
+8. **El cuadro de firma de los pendientes ya no pregunta «¿Quién midió?».** ✅ Dice «¿Quién deja el pendiente?» al dejarlo y «¿Quién cierra el pendiente?» al cerrarlo desde la cama (esto último lo agregué yo; el pedido
+   hablaba solo de «dejar»). Las evaluaciones siguen con «¿Quién midió?». Cierra la parte de texto de la 10 de la sección 2e. *Recomendado: dejarlo.* Si prefieres el cierre como estaba, es una línea (`pendEpiCerrar`).
+9. **«⚠️ Sin guardar» es una franja de ancho completo arriba de los botones, en el celular.** ✅ Antes era una pastilla en la misma fila y dejaba el botón principal en 141 px: «Siguiente: evaluaciones →» se
+   partía en tres líneas y se salía de su botón. Ahora el principal mide 258 px y se lee en una línea; **la barra queda 28 px más alta mientras hay cambios sin guardar.** *Recomendado: dejarlo.* Si prefieres la pastilla
+   compacta, la alternativa es una insignia más chica o un icono solo (cambia el texto de `#gSinGuardar`, que es del otro flujo).
+
+**B · Falta decidir (no están hechas)**
+
+10. **La palabra del botón principal de la tarjeta de cama: «Evolución» (cuando falta) y «Editar» (cuando ya está).** (decisión 2) Es un sustantivo, no un verbo, y el tutorial dice «Se abre con Evolución». *Recomendado: no cambiarla:* el
+    problema no era el nombre sino que compitiera con otros tres botones del mismo peso, y eso ya se resolvió (la 5). Si quieres «Evolucionar», se cambia en un solo lugar del `renderGrid`, en el texto del tutorial y en su guardia.
+11. **Los cinco emojis posteriores a 2019 que viven en producción.** (decisión 4, con la lista real) Son **cinco, no cuatro**: 🫁 pulmones (**27 sitios**: título de la tarjeta Respiratorio, botón «Intubación», timeline, bodega, estadísticas, la
+    campana, la entrega de turno), 🫀 corazón anatómico (la insignia **UPOT de cada tarjeta de cama**, que la auditoría no listó), 🫧 burbujas, 🪶 pluma y 😮‍💨 cara exhalando. En el Chrome de Windows 10 pueden salir como un cuadrado. *Recomendado:*
+    pide a alguien que abra, en un computador del hospital, la tarjeta Respiratorio **y** la insignia UPOT de una cama, y me dices si salen como cuadrado. Si es así, se reemplazan por un SVG propio o un emoji de 2019 en una tanda aparte, y cada emoji que
+    se cambie se borra de la lista `BASE` de `emojis_nuevos.js` (la guardia lo exige). Si se ven bien, se dejan: el candado ya impide que entren más.
+12. **El ➕ del pie de la tarjeta sigue sin rótulo.** Es un icono solo y en el celular no existe el *tooltip*: quien no sabe qué hace no tiene cómo enterarse. ¿Le ponemos «Evento»? *Recomendado: sí;* en el celular el botón mide 110 px
+    de ancho, hay lugar de sobra. En escritorio se mide con la guardia `tarjeta_acciones.js` al hacerlo. Cambia una palabra de la interfaz, por eso no se hizo.
+13. **Durante un traslado, cada cama ocupada muestra dos botones azules a ancho completo** («Intercambiar con esta cama» y «Evolución») uno sobre otro, más la fila de secundarios. Queda ordenado pero largo, y el riesgo de tocar uno por el
+    otro existía igual antes. ¿Se esconde «Evolución» mientras dura el traslado? *Recomendado: dejarlo así por ahora* (el pie del traslado es lo acordado) y esconderla solo si ves toques equivocados cuando lo uses.
+14. **El «sin registrar» en cursiva gris del encabezado de cada bloque, en el celular, mide 2,23:1** (`#b3ada2`). No estaba en la auditoría y es el «vacío» apagado a propósito de la tanda 3, así que no se tocó. ¿Quieres que también se lea?
+    *Recomendado: sí,* oscurecerlo hasta 4,5:1 conserva la cursiva y su carácter de apagado; es una línea de CSS y una aserción más en `contraste_tokens.js`.
+15. **¿Subimos los dos niveles superiores de título, T2 a .74rem y T1 a .8rem?** En el celular el escalón entre el título de un bloque (11,5 px) y la etiqueta de sus campos (11,2 px) es de solo 0,3 px, porque el piso de 11 px deja la etiqueta
+    en .7rem; los separan el peso, el espaciado, el gris y la posición. *Recomendado: primero míralo en el celular real;* si no se distingue, sí, los dos juntos (no se baja la etiqueta).
+16. **¿Un piso de letra también en el escritorio?** Hoy el escritorio sigue con 9,3 a 10,7 px en los títulos en línea y los chips; el piso de 11 px es solo del celular. *Recomendado: no a ciegas:* mira las capturas de 1400 px y dime si hay
+    algo que se lea mal en el computador. Si dices que sí, se hace en una pieza propia, con una constante de piso para el escritorio y su guardia.
+17. **La cabecera del panel desborda por debajo de 390 px.** Con un diagnóstico largo en una sola línea, el título y la ✕ de cerrar terminan 20 px fuera de la pantalla a 360 px (y 60 px a 320 px), el foco de la ✕ desliza el panel y la barra
+    aparece corrida. Es de la cabecera, no de la barra, y no se arregló. ¿Importan los celulares de 360 px o menos en la unidad? *Recomendado: sí, arreglarlo* (`min-width:0` y elipsis en el diagnóstico); una ✕ de cerrar fuera de la
+    pantalla no es algo para dejar.
+18. **El botón muerto `#btnCerrarPost`** (`display:none` en línea; nunca se ve) sigue en el HTML, pegado a la zona del guardado. No es un duplicado visible de «Cerrar la evolución». *Recomendado: borrarlo en una tanda aparte,* junto con lo que lo nombra.
+19. **Con una franja de falla (ámbar o de aviso) la barra de abajo mide 160 a 180 px** y el borde de un campo enfocado puede quedar cubierto: el `scroll-padding` fijo (112 px) cubre la barra con la insignia (100 px), no con la franja. Es la zona
+    del otro flujo y no se midió el foco con ella puesta. *Recomendado: medirlo cuando se toque esa franja,* no antes.
+20. **Escribir en `CLAUDE.md` que la regla de emojis «la fija `checks/emojis_nuevos.js`»**, como las demás reglas. Un mensaje de agente no autoriza cambiarlo; es tuyo. *Recomendado: sí,* es una frase, y le dice a la próxima sesión dónde está el candado.
+
+**Y dos que ya estaban y siguen igual:** los 18 chips fijos y las sugerencias «Medir X» de Planes (la 10 de la sección 2e) no se tocaron en esta tanda, y **nada de lo de aquí se ha visto en un aparato real**: todo se midió en Chromium con datos ficticios, no
+en el Chrome de Windows 10 ni con pulgar y guantes.
 
 ## 3 · Pendientes viejos, de antes del rediseño
 
@@ -405,6 +481,9 @@ fácil; las dejo anotadas para que las confirme o las corrija.
 | 🟠 **El P0.1 no entra en la «evaluación intermedia» ni en el REM** | informes | Se guarda y se narra, pero los conteos de evaluaciones no lo miran. |
 | 🟠 **`guardar()` y el aviso «Falta:» siguen con listas propias** (tanda 3) | `guardar()`, `_obligatoriosPendientes()` | `guardar()` está cerrado desde la tanda 2 y conserva su lista con sus toasts. Un obligatorio nuevo hay que sumarlo en los DOS sitios; `aviso_igual_que_guardar.js` avisa si se olvida uno. |
 | 🟠 **`_mFaltaTxt` dice «un dato obligatorio» para lo que no conoce** (tanda 3) | `index.html` | Las razones de la PVE, el tipo de extubación sin PVE y la hora de la reintubación salen genéricas en el encabezado del celular. Usar el texto de `_obligatoriosPendientes()` cambiaría frases que otras guardias fijan. |
+| 🟠 **La cabecera del panel desborda por debajo de 390 px** (tanda 5) | `index.html` | Con un diagnóstico largo la ✕ de cerrar queda 20 px fuera a 360 px (60 a 320 px) y el foco de la ✕ desliza el panel. `act_bar_390.js` lo esquiva. Decisión 17 de la 2f. |
+| 🟠 **El «sin registrar» del celular mide 2,23:1** (tanda 5) | `.mres.vacio` | El «vacío» apagado a propósito de la tanda 3; `contraste_tokens.js` solo mide `--muted` y su lista cerrada, no lo ve. Decisión 14 de la 2f. |
+| 🟠 **`#btnCerrarPost` es un botón muerto** (tanda 5) | `index.html` | `display:none` en línea; nunca se ve. Decisión 18 de la 2f. |
 | 🟠 **Una tecla suelta no repinta el estado de un bloque** (tanda 3) | `index.html` | Se repinta con `input`, `change`, `click` sobre un botón y al cambiar de paso. El Enter en «Resultado(s)» del cultivo no repinta hasta el siguiente evento (la casilla «Cultivo» ya cuenta). |
 
 Los que figuraban aquí el 1-oct —el FEM narrado en L/min, el BDT con las dos
@@ -443,16 +522,16 @@ línea, pero haría aparecer un aviso nuevo en cada guardado de cada turno con d
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.8-terapia-y-planes`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.9-limpieza-visual`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
 - 📦 **Archivos a pegar en el editor** (de la carpeta `entrega/`): `api.gs`,
   `dominio.gs`, `infra.gs`, `servicios.gs`, `webapp.gs` y el `index.html` (el
   cohete). Compáralos con `cmp`, no a ojo: el portapapeles corrompe los acentos en
   los archivos grandes. Son los mismos seis si tu planilla se quedó en la versión
   5.4: traen también la tanda 1.
-  **Las tandas 3 y 4 solo cambian `index.html`**: si la planilla ya está en 5.6 o
-  en 5.7, es el único archivo que hay que pegar.
-- ✅ **La tanda 1, la tanda 2, la tanda 3 y la tanda 4 NO cambian el esquema**: no hay hoja ni columna
+  **Las tandas 3, 4 y 5 solo cambian `index.html`**: si la planilla ya está en 5.6,
+  5.7 o 5.8, es el único archivo que hay que pegar.
+- ✅ **La tanda 1, la tanda 2, la tanda 3, la tanda 4 y la tanda 5 NO cambian el esquema**: no hay hoja ni columna
   nueva, así que **no hace falta correr `crearORepararEstructura()` por ellas**
   (la corrida de arriba es solo para una planilla que viene de antes del
   rediseño de septiembre). `CONTRATO_ESTRICTO` no necesita fila en la hoja CONFIG:

@@ -4546,7 +4546,79 @@ salían verdes antes y deben seguir así. Vecinas (convenciones, `cuatro_pasos`,
 
 ---
 
-## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.1: ver el antes, contraste y piso de letra en el celular
+## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución: el texto se lee, los títulos mandan por niveles, «Evolución» queda sola en la tarjeta y la barra cabe en el celular
+
+**De dónde sale.** La auditoría de solo lectura de las tandas 3, 4 y 5 dejó, para la limpieza visual, siete cambios de diseño y siete preguntas para Diego. Se construyeron los siete en cinco pasos (5.1 a 5.5; siete commits, cada guardia vista ROJA antes
+del arreglo) y este es el cierre. **Sin migración de esquema; solo cambia `v2/index.html`** (más herramientas y guardias de `build/`). **No se tocaron `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`**, ni lo acordado
+(PVE, eventos de vía aérea a mano, KTR, tres ejes, el lugar de cada bloque). Las entradas de cada paso se conservan enteras más abajo, bajo «El detalle, paso a paso».
+
+**La auditoría fue estática —leyó el CSS, no lo corrió— y al medir en Chromium cinco de sus hipótesis resultaron otra cosa.** Por eso cada paso empezó por medir y por una guardia que se vio roja:
+1. **`#gFalta` no estaba bajo AA**: mide 4,501:1 sobre su fondo real. No se cambió (es además el ámbar de la barra, color con significado); queda de candado a tres decimales.
+2. **El índigo de «Guardar» y «Siguiente» era código muerto**: la piel institucional lo pisaba siempre. Lo que de verdad diferenciaba al botón de la barra era un degradado, un resplandor azul y un «hover» que aclara en vez de oscurecer. Se unificó eso, en un commit aparte.
+3. **La regla del botón desactivado nunca ganaba** (`#btnGuardar:disabled`): el degradado de la piel pesaba más. Lo que se veía era «Siguiente» con letra blanca sobre azul pálido, 2,68:1.
+4. **El ➕ del pie de la cama no «llegaba corto» en el celular** (medía 51 × 38 px); sí el lápiz de la ficha (24 × 15) y los secundarios del traslado (31 px).
+5. **La barra de abajo no desbordaba la pantalla**; lo que rompía era la insignia «Sin guardar» en la misma fila, que dejaba el botón principal en 141 px y partía «Siguiente: evaluaciones →» en tres líneas. Y los emojis nuevos que viven en producción eran **cinco**, no cuatro.
+
+### Lo que cerró cada pieza
+
+| Paso (commit) | Cambio del plan | Defecto que cerraba | Cómo queda | Guardia (roja antes, verde después) |
+|---|---|---|---|---|
+| **5.1** (08f8ade) | 1, 2 y 3 | Letra desde 9,3 px en el celular; texto gris, tres títulos de dominio, diagnóstico, icono de traslado (1,84:1) y «Egr.» bajo AA; «Siguiente» desactivado ilegible | Capturas del antes (`build/pantallazos.js`); `--muted` `#5B7793` → `#4A6580`; piso de 11 px (.7rem) solo en el celular; desactivado gris claro con letra oscura | `contraste_tokens.js` (6 rojas antes; 9 mutantes) y `piso_letra_celular.js` (16 rojas antes) |
+| **5.2** (9babf13) | 4 | El título de un sub-bloque salía en 11 combinaciones y era **más chico que las etiquetas de sus campos**; «¿Quién midió?» al dejar un pendiente | Tres niveles con UNA tupla cada uno (T1 12,5 px, T2 11,5 px gris en mayúsculas, T3 la etiqueta); cuadro de firma «¿Quién deja / cierra el pendiente?» | `titulos_tres_niveles.js` (11 rojas; 12 mutantes) y `firma_texto_por_flujo.js` (5 rojas; 5 mutantes) |
+| **5.3** (f5cd0c9) | 5 | «Evolución» —la acción de todas las camas— medía el 31 % del pie y se leía igual que «Egr.», verde y pegado a un ➕ de 51 px | «Evolución»/«Editar» sola en su fila a todo el ancho; Historial, ➕ y «Egreso» en una segunda fila, tres tercios iguales y neutros | `tarjeta_acciones.js` (43 rojas de 97; 14 mutantes) |
+| **5.4** (24a421e, 392ba34, 8795dbe) | 6 y la pregunta 1 | Con «Sin guardar» el botón principal medía 141 px y se partía en tres líneas; botón de la barra con degradado y resplandor distintos del resto | La insignia en su propia fila (principal de 258 px, una línea) y `scroll-padding` para que la barra más alta no tape campos; **aparte (392ba34)**, un solo azul plano para todos los principales | `act_bar_390.js` (9 rojas; 12 mutantes) y `boton_principal_unico.js` (10 rojas; 12 mutantes) |
+| **5.5** (40f8e09) | 7 | Nada vigilaba la regla «ningún emoji posterior a 2019» | Candado estático: rechaza cualquier emoji de 2020 en adelante fuera de comentarios que no esté en la lista de los cinco que ya viven en producción | `emojis_nuevos.js` (nace verde; el rojo se demostró con copias de `v2/`; 20 mutantes) |
+| **Cierre** (este commit) | 8 | — | Sello `NEXT-5.9-limpieza-visual`; `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados; batería completa | — |
+
+### Lo que ve distinto la kinesióloga
+
+- **En el celular, todo lo pequeño crece a un mínimo de 11 px**: la barra de abajo, los chips de ventilador y de equipos, las insignias de evaluaciones y pendientes, las tres palabras de estado de cada bloque, las etiquetas de campo y los títulos. No se pierde información ni se mueve un botón. En escritorio no cambia el tamaño de nada.
+- **El texto gris secundario se lee más firme** (el mismo azul grisáceo, más hondo); el diagnóstico de la cama se lee mejor; el **icono de traslado deja de ser casi invisible**; y el «Siguiente» que todavía no puede avanzar pasa de azul pálido con letra blanca a **gris claro con letra oscura**.
+- **Los títulos mandan.** El título de cada tarjeta («Respiratorio», «Hemodinamia»…) sube de 11,5 a 12,5 px y conserva su color de dominio en el punto y el borde; los de cada bloque dentro de la tarjeta van **todos en el mismo gris, en negrita y mayúsculas, a 11,5 px**, y ahora se leen antes que las etiquetas de sus campos. En Planes los tres bloques conservan su fondo y su borde de color, pero el título pasa a gris en mayúsculas.
+- **En cada cama ocupada, «Evolución» (o «Editar») es un botón azul grande a todo el ancho**, solo en su fila; debajo, tres botones blancos iguales: «Hist.», ➕ y «Egreso» (que ya no es verde ni dice «Egr.»). La tarjeta es una fila más alta: el tablero del celular pasa de 3.414 a 3.810 px.
+- **Mientras escribe, «⚠️ Sin guardar» es una franja de ancho completo arriba de los botones** (antes, una pastilla en la misma fila), y «Siguiente: evaluaciones →» se lee entero, en una línea, con «← Atrás» al lado. El botón grande de abajo pierde el degradado y el resplandor: es el mismo azul liso que «Evolución».
+- **Al dejar un pendiente sin haber elegido firma, el cuadro dice «¿Quién deja el pendiente?»** (y «¿Quién cierra el pendiente?» al cerrarlo); las evaluaciones siguen diciendo «¿Quién midió?».
+- Y algo que no se ve: un candado que impide que se cuele un emoji que en el Chrome de Windows 10 del hospital saldría como cuadrado.
+
+### Lo que NO cambió
+
+`guardar()`, `api()`, `gs()`, `_guardadoBotones`, `#gEstadoGuardado` y los `avErr*` no se tocaron; tampoco el servidor ni lo que se manda a él (`guardado_viajes` y `episodio_turno`, las guardias A/B del payload, siguen verdes y los viajes a hojas no subieron). Ninguna clase, id, `data-paso` ni `onclick` se renombró o movió. Los colores con
+significado clínico (ámbar de heredado y pendiente, rojo de VM prolongada, alertas, «Falta:») no se tocaron. Los eventos de vía aérea se siguen registrando a mano. Ningún emoji existente se cambió, ni se agregó tema oscuro. No hay hoja ni columna nueva.
+
+### Lo que queda abierto a propósito
+
+- **Decisiones de Diego** (las siete de la auditoría y las que dejaron los pasos), en `docs/PENDIENTES.md`, sección 2f, cada una con su recomendación. Nueve están **ya implementadas con la opción recomendada y esperando confirmación** (✅): el texto gris global, el piso de 11 px, los tres niveles de título, los títulos sin color de dominio, la tarjeta de cama, el botón único, la firma del pendiente, «Egreso» y la franja «Sin guardar». Las más visibles de las que faltan: si se ve bien en la pantalla del hospital cada emoji de 2020 (hay **cinco**, y 🫁 está en 27 sitios), el rótulo del ➕ y los dos botones azules del traslado.
+- **Hallazgos sin arreglar** (sección 4): la cabecera del panel desborda por debajo de 390 px (la ✕ de cerrar queda 20 px fuera a 360 px con un diagnóstico largo), el «sin registrar» en cursiva de cada bloque del celular (2,23:1; era el «vacío» apagado a propósito de la tanda 3), y la barra con franja de falla (160 a 180 px) que puede cubrir el borde de un campo enfocado.
+- **No se midió en un aparato real**: todo se probó en el Chromium de Playwright con `google.script.run` simulado, reloj inventado y datos ficticios, no en el Chrome de Windows 10 del hospital ni con pulgar y guantes. La guardia de piso de 11 px mide el tablero, el traslado, la retrospectiva, los seis pasos y el ingreso; **Estadísticas, Entrega, la hoja «Más», los modales, Archivados y Ventiladores no se miden** y pueden seguir con letra bajo 11 px.
+- **Las capturas del antes y el después viven fuera del repositorio** (carpeta de trabajo de la sesión); las del panel están con todas las tarjetas desplegadas y a alto completo, no como se ve en una pantalla de 844 px.
+
+### Cierre de la tanda
+
+- **Sello `NEXT-5.9-limpieza-visual`** en `build/empaquetar_cohete.js` y en los dos sitios del fuente (`<meta name="rce-version">` y el texto de «La app no pudo iniciar»). `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados.
+- **Batería completa (`-j 2`): 240 verdes, 0 rojas** (662 s). Eran 232 al cierre de la tanda 4; se suman las ocho guardias nuevas (`contraste_tokens`, `piso_letra_celular`, `titulos_tres_niveles`, `firma_texto_por_flujo`, `tarjeta_acciones`, `act_bar_390`, `boton_principal_unico`, `emojis_nuevos`).
+  `paridad_entrega` y `pwa_paquete`, que durante los pasos estaban rojas por la regeneración pendiente, quedan verdes.
+- **`node build/medir_guardado.js`** (viajes a hojas por acción): abrir 3, reabrir 3, turno nuevo **13**, re-guardar **17**, ingreso **13**, decanulación **13**, reintubación **14**. Los techos (14, 18, 14, 14, 15) no subieron: idénticos al cierre de la tanda 4, como corresponde a una tanda que no toca lo que `guardar()` manda ni el servidor.
+- **Qué pegar** en el editor de Apps Script, desde `entrega/`: **solo `index.html`** (el cohete). Ningún `.gs` cambió desde el cierre de la tanda 4 (`node build/que_pegar.js f64fe38` lo confirma: 1 archivo). Si la planilla se quedó en 5.6 o 5.7 también basta ese archivo; si venía de 5.5 o antes, ver la lista de la tanda 2.
+  Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes.
+- **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian; no hay hoja ni columna nueva.
+- **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app instalada para que el sello de versión renueve su caché. El sello `NEXT-5.9-limpieza-visual` debe aparecer en «Cargando…»; si no aparece, lo pegado no es lo nuevo. Recordatorio de la tanda 2: la prueba con DOS aparatos sigue pendiente antes de pegar en NEXT.
+- **Cómo revertir:** cada paso es un commit (08f8ade, 9babf13, f5cd0c9, 24a421e, 392ba34, 8795dbe, 40f8e09) y el cierre es otro; `git revert` deshace lo que se quiera. **El botón único va aparte a propósito: `git revert 392ba34` devuelve el degradado y el resplandor sin tocar la corrección de la barra.** Ninguna columna cambió, así que no hay datos que migrar de vuelta.
+
+### Para no olvidar (de toda la tanda)
+
+- 🪤 **Una auditoría estática propone; el navegador dispone.** Cinco hipótesis cambiaron al medirlas (arriba). Se mide primero (`build/pantallazos.js` da la letra más chica de cada pantalla y el alto de cada botón) y se escribe la guardia roja después; una guardia que sale verde de entrada se deja de candado y NO se «arregla» el código por ese punto.
+- 🪤 **Una regla que existe puede no ganar nunca.** `#btnGuardar:disabled` y el índigo estaban escritos y no se veían: la piel institucional pesaba más. Se mide el estilo que pinta el navegador (`getComputedStyle`), no lo que dice la hoja.
+- 🪤 **Una regla móvil más tardía y de igual especificidad gana a la base.** El piso de 11 px se llevaba los títulos de vuelta a .7rem hasta que se sacaron de su lista: «una sola tupla por nivel» no admite una segunda regla por ancho.
+- 🪤 **Una guardia que mide un instante de una animación da distinto según CUÁNDO** (la misma familia del reloj congelado): el globo `#tutHola` a medio fundido daba 1,38:1 solo bajo carga; `.btn{transition:all .18s}` daba un botón transparente a medio camino; el panel entra con una transición que corre con el reloj real. Se espera a que la animación termine.
+- 🪤 **Un `grep` pelado no vigila emojis.** La ratonera 🪤 que marca las trampas del proyecto es un emoji de 2020 (224 líneas, todas en comentarios) y el 🩻 prohibido está seis veces, también en comentarios; y el fuente escribe emojis como `&#x…;`. La guardia lee comentarios de verdad y decodifica las cuatro formas.
+- 🪤 **Un mutante que empieza vivo es información.** Varios empezaron vivos (el `:hover` azul que le gana a la clase de la cama libre; la insignia fuera del `@media`; `white-space:nowrap` en el principal; un índigo solo para cuando no hay piel) y cada uno le sumó una condición a su guardia.
+- 🪤 **Subir la letra cuesta en otro lado y hay que medirlo.** Con .72rem «Fijación · cm de arcada dental» pasaba a tres líneas; se dejó en .7rem con el espaciado en .03em y la guardia lo exige. Pagó la lección de `legibilidad.js`, que mide a 1400 px y no lo ve.
+
+### El detalle, paso a paso
+
+Las cinco entradas que siguen son las que se escribieron durante la tanda, sin cambios de contenido (solo bajaron un nivel de título).
+
+### 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.1: ver el antes, contraste y piso de letra en el celular
 
 **De dónde sale.** La auditoría de solo lectura de las tandas 3, 4 y 5 dejó, para la limpieza visual, siete cambios de diseño. Los tres primeros (este paso) son los que se pueden **medir**: cómo se ve hoy,
 qué texto no llega a contraste AA (4,5:1) y qué texto se lee bajo 11 px en el celular. La auditoría fue estática —calculó los contrastes desde el CSS y supuso las envolturas— y avisó que sus hipótesis había que mirarlas
@@ -4626,7 +4698,7 @@ el texto gris secundario se lee más firme; los títulos de Hemodinamia, Rehabil
 
 ---
 
-## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.2: tres niveles de título y el cuadro de firma de los pendientes
+### 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.2: tres niveles de título y el cuadro de firma de los pendientes
 
 **De dónde sale.** Cambio 4 del plan de la tanda 5 (auditoría de solo lectura): un solo estilo de título de bloque, en tres niveles que se distingan. Más un arreglo de texto chico que estaba anotado desde la tanda 4 (punto 10 de `docs/PENDIENTES.md`): el cuadro que se abre al dejar
 un pendiente preguntaba «¿Quién midió?». **Sin migración de esquema, sin tocar `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`.** Todo es CSS y dos textos en `v2/index.html`, más dos guardias nuevas.
@@ -4687,7 +4759,7 @@ con el color de su dominio y su punto. En Planes, los tres bloques conservan su 
 
 ---
 
-## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.3: la tarjeta de cama dice cuál es la acción de todos los turnos
+### 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.3: la tarjeta de cama dice cuál es la acción de todos los turnos
 
 **De dónde sale.** Cambio 5 del plan de la tanda 5 (auditoría de solo lectura): «Evolución primero y sola; Historial, evento y Egreso en una segunda fila, todos secundarios». Es **CSS más tres líneas de HTML** en `v2/index.html`: no se renombra ninguna clase ni id, no se cambia ningún `onclick`, no se mueve nada en el DOM, no se toca `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`, y no hay migración de esquema.
 
@@ -4759,7 +4831,7 @@ Capturas del antes y el después del tablero (fuera del repositorio, carpeta de 
 
 ---
 
-## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.4: la barra de acciones cabe en el celular (y, aparte, un solo botón principal)
+### 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.4: la barra de acciones cabe en el celular (y, aparte, un solo botón principal)
 
 **De dónde sale.** Cambio 6 del plan de la tanda 5 (auditoría de solo lectura): «que el botón principal quepa, se lea y no tape nada a 390 px» y, de la decisión 1 de la auditoría, «un solo botón principal». Son **dos commits separados** para que el segundo se pueda revertir solo: este es el primero (la barra); el botón único va en el segundo. Todo es CSS del celular en `v2/index.html`: no se toca el HTML de la barra, ni `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` (zona de la revisión de la tanda 2: su `flex-wrap` y su botón de 32 px o más siguen igual), los `avErr*`, ni `#btnCerrarPost`. Sin migración de esquema.
 
@@ -4836,7 +4908,7 @@ Con `-j 2`: las 18 guardias de la zona del botón y de la barra (`convenciones`,
 Al medir la barra con una guardia de verdad apareció que el número «líneas» de `medidas.json` (de la barra y del pie de la tarjeta) no medía nada: dividía el alto del botón, menos el relleno, por el interlineado, así que un botón de 52 px de **una** línea daba «2 líneas» siempre (52 − 20 = 32 ÷ 18,8 ≈ 1,7 → 2). Las capturas del paso 5.1 lo repetían. Ahora cuenta las líneas reales por los rectángulos del propio texto (el mismo método que `act_bar_390.js` y `tarjeta_acciones.js`), y `medidas.json` suma por cada paso el alto de la barra y si la insignia «Sin guardar» estaba a la vista. Herramienta, no guardia: no cambia nada de la app.
 Capturas del antes y el después del paso (fuera del repositorio, carpeta de trabajo de la sesión: `capturas/antes_54` y `capturas/despues_54`, con `barra/` y `barra1400/` de cerca): los seis pasos y el tablero a 390 y 1400 px, y la barra en el viewport real con la insignia, con la franja ámbar y con la de aviso.
 
-## 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.5: un candado para que no entren emojis de 2020 en adelante
+### 10-oct-2026 · Tanda 5 · Limpieza visual del registro de evolución · paso 5.5: un candado para que no entren emojis de 2020 en adelante
 
 **De dónde sale.** Cambio 7 del plan de la tanda 5 (auditoría de solo lectura). CLAUDE.md prohíbe elegir emojis posteriores a 2019 —el Chrome del hospital corre en Windows 10 y su fuente no los trae; el 🩻 de 2021 salió como un cuadrado— pero **ninguna guardia lo vigilaba**: la única defensa era que alguien se acordara. Este paso agrega solo la guardia `build/checks/emojis_nuevos.js`. **No toca `v2/`, no cambia ningún emoji que ya vive en producción** (la regla es para *elegir* un ícono nuevo, no para barrer los que ya están; si se ven bien en el computador del hospital lo decide Diego, decisión 4 de la auditoría) y no necesita regenerar `entrega/` ni `pwa/`.
 

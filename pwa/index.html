@@ -11,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>RCE KINE UCIA v2</title>
-<meta name="rce-version" content="NEXT-5.8-terapia-y-planes">
+<meta name="rce-version" content="NEXT-5.9-limpieza-visual">
 <style>
 /* ─── VARIABLES ──────────────────────── */
 :root{
@@ -935,8 +935,9 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* El nombre trunca; el ✏️ NO — sin esta separación un nombre largo se comía
    el botón con la elipsis y la ficha quedaba otra vez inalcanzable. */
 .pname>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-/* Diagnóstico en la tarjeta de cama (reemplaza al código de paciente) */
-.bdx{font-size:.72rem;color:#64748b;font-style:italic;line-height:1.3;margin-top:2px;
+/* Diagnóstico en la tarjeta de cama (reemplaza al código de paciente)
+   🗂️ 10-oct-2026 · color #64748b → #475569: sobre el manila daba 3,77:1 y ahora 6,00 (tanda 5, cambio 2). */
+.bdx{font-size:.72rem;color:#475569;font-style:italic;line-height:1.3;margin-top:2px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .empty-txt{color:var(--muted);font-style:italic;text-align:center;padding:14px 0;}
 .pill{display:inline-flex;align-items:center;font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--n-gray-bg);border:1px solid transparent;color:var(--n-gray);}
@@ -952,11 +953,30 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .a-pend{background:var(--n-orange-bg);color:var(--n-orange);}
 .a-eval{background:var(--n-blue-bg);color:var(--n-blue);}
 .bfoot{position:relative;z-index:2;padding:9px 13px;background:#f0e2b6;border:1px solid #d6bf84;border-top:1px dashed #e2d09c;border-radius:0 0 12px 12px;box-shadow:0 3px 10px rgba(120,90,20,.12);display:flex;gap:6px;flex-wrap:wrap;transition:box-shadow .18s;}
-.bevo{flex-grow:1;background:var(--primary);color:#fff;border:none;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
+/* 🗂️ 10-oct-2026 · TARJETA DE CAMA: LA ACCIÓN DE TODOS LOS TURNOS, PRIMERO Y SOLA; LAS OTRAS TRES, DEBAJO Y IGUALES (tanda 5, cambio 5).
+   El pie tenía cuatro botones del mismo peso en una sola fila (`flex-grow:1` y envoltura libre): «Evolución» —la acción de todas las camas
+   en todos los turnos— medía el 31 % del pie y se leía igual que «Egr.», la acción MENOS frecuente y la MÁS difícil de deshacer, que
+   encima iba en verde (el color de «lo bueno») y pegada al ➕ de evento, un icono solo y estrecho. Ahora:
+   · `.bevo` ocupa su fila entera (`flex:1 1 100%`): sale primero —ya lo era en el DOM— y nadie más cabe a su lado. También sirve a los
+     botones del traslado (`_movPie`: Intercambiar / Cancelar / Mover aquí), que son `.bevo`: cada uno queda en su propia fila. Su
+     relleno vertical sube de 7 a 9 px: antes la fila lo estiraba hasta la altura de los demás (31 px), y solo en su fila medía 29, o
+     sea MÁS BAJO que los secundarios de abajo (31 con el borde); la acción principal no puede ser la más baja.
+   · `.btl` (Historial y evento ➕) y `.balt` (Egreso) comparten UNA sola fila y UN solo aspecto neutro (`flex:1 1 0`, tres tercios):
+     el egreso se distingue por su rótulo completo, «Egreso», no por el color. El rótulo no envuelve (`nowrap`) y las celdas pueden
+     encogerse (`min-width:0`); el relleno lateral baja a 4 px porque «🏠 Egreso» a 12,8 px en la tarjeta más angosta de la grilla (290 px)
+     deja 83 px por celda.
+   🪤 NO se renombra ninguna clase ni se mueve nada del DOM: `#bedGrid .bcard .btl` es el ancla del recorrido guiado, y retro_camas,
+   mover_camas y tutorial dependen del orden. 🪤 El candado del evento (`.ev-cand.ev-lock`, ámbar, más abajo) SIGUE ganando: es
+   información («corregir el pasado pide clave»), no decoración. Guardia: tarjeta_acciones.js. */
+.bevo{flex:1 1 100%;background:var(--primary);color:#fff;border:none;padding:9px 7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
 .bevo:hover{background:var(--pdark);}
-.btl,.balt{flex-grow:1;background:#fff;border:1px solid #cbd5e1;padding:7px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;}
-.balt{color:var(--ok);border-color:var(--ok);}
-.bmov{background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:3px;border-radius:5px;display:flex;align-items:center;}
+.btl,.balt{flex:1 1 0;min-width:0;background:#fff;border:1px solid #cbd5e1;color:#334155;padding:7px 4px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.8rem;white-space:nowrap;}
+/* Cama libre: el gris que vivía en el atributo `style` del botón. En línea nunca se oscurecía al pasar el cursor porque el `style`
+   ganaba siempre; con clase, `.bevo:hover` (azul oscuro, 0-2-0) le gana a una clase sola (0-1-0) y dejaría la letra gris sobre azul. Por
+   eso va como `.bevo.bevo-libre` y se repite en `:hover`: así no depende de qué regla se escribió después. */
+.bevo.bevo-libre,.bevo.bevo-libre:hover{background:#e2e8f0;color:#475569;}
+/* 🗂️ 10-oct-2026 · el icono de traslado era #94a3b8 sobre la pestaña manila: 1,84:1, casi invisible. #475569 da 5,43 (tanda 5, cambio 2). */
+.bmov{background:transparent;border:none;color:#475569;cursor:pointer;padding:3px;border-radius:5px;display:flex;align-items:center;}
 .bmov:hover{background:#e2e8f0;color:#3b82f6;}
 
 /* OVERLAY + PANEL */
@@ -1034,8 +1054,27 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* ── FCARD — tarjeta blanca con barra superior de color (estética prototipo) ── */
 .fcard{background:var(--card);margin-bottom:14px;border-radius:13px;border:1px solid var(--border);border-top:4px solid var(--fc,#94a3b8);box-shadow:0 1px 3px rgba(15,23,42,.06);overflow:visible;}
 .fcard-hdr{padding:12px 16px 10px;background:transparent;border-bottom:1px solid #eef2f6;display:flex;align-items:center;gap:8px;}
-.fcard-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc,#64748b);display:flex;align-items:center;gap:7px;}
+/* ── TRES NIVELES DE TÍTULO, UN SOLO ESTILO POR NIVEL (tanda 5, cambio 4, 10-oct-2026) ─────────────────────────────────────────────
+   Medido en un navegador de verdad (titulos_tres_niveles.js): el título de un sub-bloque salía en SEIS combinaciones de tamaño,
+   peso, espaciado y color —`.sub-sec-title`, `.pe2-t`, `.pv-sep span`, `.bloqueT`, `.aetT-tit`, los escritos en línea y, en el
+   celular, `.msub-t`— y los tres bloques de Planes (`.cg-t`) tenían su propia forma, MÁS GRANDES que el título de su tarjeta. El
+   resultado era que el título de un sub-bloque (9,9 px) quedaba más chico que la etiqueta de cualquiera de sus campos (10,9 px):
+   el título no mandaba y el ojo no encontraba el bloque antes que el campo.
+     T1 · título de TARJETA   .fcard-title  .78rem · 800 · mayúsculas · .08em · color de dominio + punto (el dominio sigue marcándose
+                              acá y en el borde superior de la tarjeta).
+     T2 · título de SUB-BLOQUE  UNA sola tupla (abajo): .72rem · 800 · mayúsculas · .06em · `--muted`.
+     T3 · etiqueta de CAMPO    `.col label`  .68rem · 700 · mayúsculas · .05em · `--muted`   (no se tocó; en el celular .7rem por el piso).
+   🔴 UNA SOLA TUPLA DE T2: cada familia deja aquí su tamaño, peso, mayúsculas, espaciado y color, y en su propia regla queda solo lo
+   de caja (márgenes, flex). Una familia nueva de título se agrega a ESTA lista, no con su propio tamaño. Los títulos escritos en línea
+   (peso 800 + mayúsculas) los iguala la regla de «Títulos de sub-sección inline» más abajo, con el mismo número. En el celular rige
+   la misma tupla: .72rem ya está sobre el piso de 11 px, así que ahí no hay segunda regla.
+   🪤 El color de T2 es `--muted` AUNQUE el bloque tenga color de dominio: lo que dice a qué dominio pertenece es el punto y el borde
+   de la tarjeta, no cada título (los de Respiratorio iban en azul, los de Rehabilitación en ámbar sobre blanco, 4,20:1, bajo AA).
+   Lo fija titulos_tres_niveles.js (una sola tupla, escalera T1 > T2 > T3, barrido de un quinto estilo). */
+.fcard-title{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--fc-t,var(--fc,#64748b));display:flex;align-items:center;gap:7px;}
 .fcard-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--fc,#94a3b8);flex-shrink:0;}
+.sub-sec-title,.pe2-t,.msub-t,.pv-sep span,#fcId .bloqueT,#aetTurno .aetT-tit,.cg-t{
+  font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 /* ── Ficha del episodio plegada (ago-2026, pedido de Diego) ────────────────
    `display:contents` deja los campos como hijos directos de la fila, así la
    maqueta es idéntica a antes de envolverlos; plegado pasa a `display:none`
@@ -1095,21 +1134,27 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .her-chip{margin-left:auto;background:#fffbeb;color:#b45309;border:1px solid #f59e0b;border-radius:14px;padding:2px 10px;font-size:.66rem;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .her-chip:hover{background:#fef3c7;}
 .fcard-body{padding:12px 16px 14px;}
-/* Un solo acento por dominio clínico */
+/* Un solo acento por dominio clínico.
+   🗂️ 10-oct-2026 · `--fc-t` es el color del TEXTO del título cuando el del dominio no llega a 4,5:1 sobre blanco (tanda 5, cambio 2):
+   hemodinamia 4,42 → 6,07, terapia física 4,20 → 6,11 e IMT 4,10 → 5,93. El punto y el borde superior siguen con `--fc`, así que el
+   dominio no pierde su color: solo el rótulo se lee mejor. `.fcard-title` lo usa SIEMPRE con respaldo (`var(--fc-t,var(--fc,…))`). */
 .fc-id{--fc:var(--primary);}
 .fc-g{--fc:#64748b;}
 .fc-n{--fc:var(--neuro);}
-.fc-h{--fc:var(--hemo);}
+.fc-h{--fc:var(--hemo);--fc-t:#a8403a;}
 .fc-r{--fc:var(--resp);}
-.fc-k{--fc:var(--kine);}
+.fc-k{--fc:var(--kine);--fc-t:#8f5400;}
 .fc-upot{--fc:#be123c;}
-.fc-imt{--fc:#0284c7;}
+.fc-imt{--fc:#0284c7;--fc-t:#0369a1;}
 .fc-proc{--fc:#4338ca;}
 
 /* BOTONES */
 .btn{width:100%;padding:10px 14px;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .18s;}
 .btn-p{background:var(--primary);color:#fff;}.btn-p:hover{background:var(--pdark);}
-.btn-p:disabled{background:#94a3b8;cursor:not-allowed;}
+.btn-p:disabled{background:#e2e8f0;color:#475569;cursor:not-allowed;}
+/* 🗂️ 10-oct-2026 · el desactivado era BLANCO sobre #94a3b8 (2,56:1): el rótulo se perdía justo cuando se quiere saber por qué no se
+   puede avanzar. Ahora es gris claro con letra oscura (6,15:1) y se entiende solo; el color institucional queda para lo que SÍ se puede
+   apretar. (Tanda 5, cambio 2; el del botón de la barra va más abajo, junto a la piel institucional, que es la que lo pisaba.) */
 .btn-r{background:#fff;color:#334155;border:1px solid #cbd5e1;}.btn-r:hover{background:#f8fafc;}
 .btn-c{background:var(--ok);color:#fff;}
 .act-bar{display:flex;gap:10px;align-items:center;padding:12px 2px 14px;position:sticky;bottom:0;z-index:5;background:linear-gradient(to top,var(--bg) 72%,rgba(244,246,248,0));}
@@ -1193,7 +1238,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
   color:#5f5c58;font-family:inherit;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pv-seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 2px rgba(15,23,42,.14);}
 .pv-sep{display:flex;align-items:center;gap:10px;margin:15px 0 9px;}
-.pv-sep span{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+/* (el rótulo de `.pv-sep span` toma su estilo de la tupla de T2, arriba) */
 .pv-sep i{flex-grow:1;height:1px;background:var(--border);}
 .pv-razon{border:1.5px solid var(--danger);border-radius:12px;padding:12px 14px;background:#fff;margin-top:4px;}
 .pv-razon label{display:block;font-size:.78rem;font-weight:700;color:#b3261e;margin-bottom:7px;}
@@ -1240,8 +1285,11 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .cierre-g.cg-narra{border-left:3px solid #1d4ed8;background:#eff6ff;}
 .cierre-g.cg-plan{border-left:3px solid #0e7a5f;background:#e9f6f1;}
 .cierre-g.cg-pend{border-left:3px solid #c97a12;background:#fdf4e5;}
-.cg-t{font-size:.8rem;font-weight:800;margin:0 0 3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
-.cg-narra .cg-t{color:#1d4ed8;} .cg-plan .cg-t{color:#0e7a5f;} .cg-pend .cg-t{color:#c97a12;}
+/* 🗂️ 10-oct-2026 (tanda 5, cambio 4) · el título de cada bloque toma la tupla de T2 (arriba): antes iba en .8rem, sin mayúsculas y en el
+   color del bloque —más grande que el título de su propia tarjeta («Cerrar el turno»)—, y el ámbar de «Lo que queda pendiente» medía
+   3,07:1 sobre su fondo. Cada bloque SIGUE teniendo su color: lo marcan el borde izquierdo y el fondo de arriba, y la palabra del reloj
+   va en `.cg-r`. Acá solo queda la caja. */
+.cg-t{margin:0 0 3px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
 .cg-r{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:600;
       letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:4px;
       background:rgba(255,255,255,.8);border:1px solid var(--border);color:var(--muted);}
@@ -1249,8 +1297,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 
 /* Paso 2 · los chips del episodio y la salida barata */
 #pasoEvalChips{margin-bottom:14px;}
-.pe2-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--muted);margin:0 0 7px;}
+.pe2-t{margin:0 0 7px;}
 .pe2-fila{display:flex;gap:6px;flex-wrap:wrap;}
 .pe2-fila .abadge{font-size:.8rem;padding:5px 11px;}
 /* 🪤 Con borde punteado y fondo del papel parecía un aviso, no algo que se
@@ -1266,6 +1313,8 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* 🪤 Solo el BANNER manda: la línea de la ficha que ahora comparte caja puede estar oculta sin llevarse el banner. */
 #epBannerCaja:empty,#epBannerCaja:has(> #epBanner.hidden){display:none;}
 #epBannerCaja{padding:10px 14px 0;background:var(--card);}
+/* 🗂️ 10-oct-2026 · #b45309 sobre el fondo de la app mide 4,501:1: pasa AA por un pelo. Se MIDIÓ antes de oscurecerlo (la auditoría lo
+   daba por «en el borde») y no hace falta tocarlo; contraste_tokens.js lo deja de candado. */
 #gFalta{text-align:right;font-size:.75rem;font-weight:800;color:#b45309;min-height:15px;padding:0 4px;}
 .act-bar .btn{height:46px;border-radius:12px;}
 /* El botón de guardar GRANDE (Diego, 15-ago-2026): es la acción del panel. */
@@ -1275,9 +1324,17 @@ table.rhb2 .rl{width:128px;text-align:left;}
    si no, el botón que se aprieta todo el día quedaba más chico que el que
    ya nadie ve. */
 .act-bar #btnGuardar,.act-bar #pasoAvanza{height:52px;font-size:1.02rem;}
-#btnGuardar,#pasoAvanza{background:linear-gradient(135deg,#5856d6,#4338ca);font-size:.95rem;box-shadow:0 5px 16px rgba(79,70,229,.32);}
-#btnGuardar:hover,#pasoAvanza:hover{filter:brightness(1.08);background:linear-gradient(135deg,#5856d6,#4338ca);}
-#btnGuardar:disabled,#pasoAvanza:disabled{background:#94a3b8;box-shadow:none;filter:none;}
+/* 🗂️ 10-oct-2026 · UN SOLO BOTÓN PRINCIPAL (tanda 5, cambio 6, parte 2; boton_principal_unico.js). Aquí vivían dos reglas con un degradado
+   ÍNDIGO (`#5856d6 → #4338ca`), sombra índigo y un `brightness(1.08)` al pasar el cursor, y más abajo la piel institucional les ponía encima
+   OTRO degradado (`#0058A0 → #04345E`) con sombra azul. Medido en pantalla: el índigo NO se veía nunca (lo pisaba la piel, que es la única),
+   pero el botón de la barra seguía siendo distinto de la tarjeta y de los `.btn-p`: degradado y sombra contra azul plano, y con el cursor encima
+   «Siguiente» se ACLARABA, «Guardar» usaba otro degradado y los demás se OSCURECÍAN. Ahora «Guardar» y «Siguiente» son `.btn-p` a secas: `--primary`
+   plano, `--pdark` con el cursor encima, sin sombra, degradado ni filtro. Conservan SU TAMAÑO (la regla de arriba: 52 px y 1,02rem, pedido de
+   Diego del 15-ago) y su radio de 12 px: se unifica el aspecto, no el tamaño. Revertir es devolver estas dos reglas y las dos de la piel
+   (más abajo) con el commit «un solo botón principal». */
+/* 🗂️ 10-oct-2026 · desactivado legible también aquí (tanda 5, cambio 2): era blanco sobre #94a3b8 (2,56:1). Hoy NO es lo que se ve —la piel
+   institucional (más abajo) lo pisa con la misma receta—, pero dejarlo así era una trampa: quien algún día quite la piel recuperaba el rótulo ilegible. */
+#btnGuardar:disabled,#pasoAvanza:disabled{background:#e2e8f0;color:#475569;box-shadow:none;filter:none;}
 /* 🔴 LA FRANJA DEL ÚLTIMO GUARDADO Y SUS BOTONES (revisión de la tanda 2, H27 y H31, 10-oct-2026). Antes el diseño de la franja vivía
    escrito a mano en el HTML (`white-space:nowrap`) y el de sus botones en cada `_marca…` (`padding:1px 9px`): en un celular de 390 px
    el «Reintentar ahora» medía 112 x 16 px —no se podía tocar— y la franja ámbar, de 330 px sin partirse, empujaba el botón principal
@@ -1454,7 +1511,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .sedf-btn.on{background:#8b5cf6;border-color:#8b5cf6;color:#fff;}
 .sub-sec{padding:10px 16px;border-bottom:1px solid #eef2f6;}
 .sub-sec:last-child{border-bottom:none;}
-.sub-sec-title{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;color:var(--muted);}
+.sub-sec-title{margin-bottom:7px;}
 .mega-card .fcard-body{padding:0;}
 /* ── Override estilos inline sobrecargados dentro del panel ──── */
 #sp [style*="background:#f0f9ff"],
@@ -1483,9 +1540,12 @@ table.rhb2 .rl{width:128px;text-align:left;}
   height:34px!important;font-size:.84rem!important;
   border-color:#dbe2ea!important;background:#fff!important;border-radius:8px!important;
 }
-/* Títulos de sub-sección inline */
+/* Títulos de sub-sección inline: peso 800 + mayúsculas escritos EN LÍNEA (sin clase). Igualan a la tupla de T2 de arriba, con el mismo
+   número (.72rem · .06em · `--muted`): antes se aplastaban a .62rem (9,9 px), más chicos que la etiqueta de sus propios campos
+   (tanda 5, cambio 4). `!important` porque el tamaño y el color vienen en línea. Rige también en el celular: .72rem está sobre el
+   piso de 11 px. */
 #sp [style*="font-weight:800"][style*="text-transform:uppercase"]{
-  font-size:.62rem!important;color:var(--muted)!important;letter-spacing:.05em!important;
+  font-size:.72rem!important;color:var(--muted)!important;letter-spacing:.06em!important;
 }
 /* ti-wrap: fondo neutro */
 .ti-wrap.sky{background:#fff!important;border-color:#cbd5e1!important;}
@@ -1503,7 +1563,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .bdtb-mom[aria-pressed="true"]{background:#b45309;border-color:#b45309;}
 /* Paso 0: cuatro bloques, cada uno una pregunta (1-oct-2026, Diego). */
 #fcId .bloque + .bloque{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;}
-#fcId .bloqueT{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;}
+#fcId .bloqueT{margin-bottom:8px;}
 #fcId .bloqueNota{margin-top:9px;padding:8px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.76rem;color:#14532d;}
 #fcId .oblig{color:#b91c1c;font-weight:700;text-transform:none;letter-spacing:0;}
 .ingSop{height:40px;padding:0 16px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
@@ -1513,7 +1573,7 @@ table.rhb2 .rl{width:128px;text-align:left;}
 .aetB[aria-pressed="true"]{background:#6d28d9;border-color:#6d28d9;color:#fff;}
 #aetTurno{margin:6px 0 10px;padding:10px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;}
 #aetTurno .aetT-fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-#aetTurno .aetT-tit{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6d28d9;}
+/* (el título «⚖️ Adecuación del esfuerzo terapéutico», `.aetT-tit`, toma la tupla de T2, arriba: antes iba en peso 700 y morado) */
 #aetTurno .aetT-vig{font-size:.86rem;color:#1e293b;}
 #aetTurno .aetT-ch{height:34px;padding:0 12px;border-radius:8px;border:1px solid #c4b5fd;background:#fff;color:#5b21b6;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;}
 #aetTurnoAviso{font-size:.8rem;color:#5b21b6;margin-top:8px;}
@@ -1871,7 +1931,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   body{padding-bottom:64px;}
   .grid{padding:10px 10px 84px;gap:10px 10px;}
   .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;background:#fff;border-top:1px solid var(--border);padding:6px 2px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(15,23,42,.06);}
-  .mnav button{flex:1;background:none;border:none;font-size:.58rem;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;}
+  .mnav button{flex:1;background:none;border:none;font-size:.7rem;font-weight:700;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0;}
   .mnav button .mi{font-size:20px;line-height:1.1;}
   .mnav button.on{color:var(--primary);}
   .mvelo{display:block;position:fixed;inset:0;background:rgba(20,20,18,.45);z-index:94;}
@@ -1894,7 +1954,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   #mPac .nom{font-weight:800;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;min-width:0;}
   #mPac .l2{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
-  #mPac .ch{font-size:.65rem;background:#f1efe9;border:1px solid var(--border);
+  #mPac .ch{font-size:.7rem;background:#f1efe9;border:1px solid var(--border);
     border-radius:10px;padding:1px 7px;color:#5f5a51;}
   #mPac .ch.vm{background:#eef4fa;border-color:#c9dcef;color:var(--pdark);font-weight:700;}
   .fcard-hdr{flex-wrap:wrap;}
@@ -1904,7 +1964,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .fcard-hdr>.fcard-title{flex:1 1 0;min-width:0;flex-wrap:nowrap;}
   .fcard-hdr>.fcard-title::before{flex-shrink:0;}
   .mst{display:flex;width:18px;height:18px;border-radius:50%;flex-shrink:0;
-    align-items:center;justify-content:center;font-size:.62rem;font-weight:800;}
+    align-items:center;justify-content:center;font-size:.7rem;font-weight:800;}
   /* (los colores de .mst y de .mres b / .mres.vacio se mudaron arriba, junto a .mpal: valen en los dos anchos) */
   .mres{display:block;order:1;flex-basis:100%;font-size:.7rem;line-height:1.4;
     color:#6b665d;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1916,8 +1976,7 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
     background:var(--card);}
   .msub-h{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;
     background:#f7f5f1;border-bottom:1px solid var(--border);flex-wrap:wrap;}
-  .msub-t{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
-    color:var(--resp);min-width:0;}
+  .msub-t{min-width:0;}   /* el estilo del título es la tupla de T2 (arriba): antes .68rem y azul en el celular */
   .msub-h::after{content:'▾';margin-left:auto;color:#b7b3a9;font-size:.75rem;}
   .msub.cerrado .msub-h{border-bottom:none;}
   .msub.cerrado .msub-h::after{content:'▸';}
@@ -1938,11 +1997,58 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
   .act-bar{flex-wrap:wrap;gap:6px 8px;}
   .act-bar #pasoAvanza{width:auto;flex:1 1 0;}
   #gEstadoGuardado{flex:1 1 100%;white-space:normal;border-radius:14px;padding:6px 10px;margin-right:0;}
+  /* 🗂️ 10-oct-2026 · tanda 5, cambio 6 (act_bar_390.js). «⚠️ Sin guardar» aparece apenas se toca un campo, o sea que es la barra de TODO
+     el turno, y compartía la fila con «← Atrás» y el botón principal: entre los dos se llevaban 205 de los 354 px útiles y el principal
+     quedaba de 141 px. «Siguiente: evaluaciones →» y «…terapia física →» se partían en TRES líneas (55 px de texto en un botón de 52): el
+     texto sobresalía y la flecha caía sola abajo. Ahora la insignia ocupa SU fila entera, como ya hace la franja del guardado (las dos
+     dicen cómo va el guardado), y el principal vuelve a los 258 px de siempre. Es solo CSS del celular: el id, el texto, los estados
+     (`hidden`) y el temporizador de la insignia no se tocan, y en escritorio sigue en la fila de los botones. El principal conserva sus 52 px
+     y su 1,02rem (pedido de Diego del 15-ago): no se achica para que entre. `line-height` explícito para que dos líneas quepan igual con la
+     tipografía de Windows (más alta que la de aquí). `margin-right:0!important` porque el HTML de la insignia trae `margin-right:6px` en
+     línea (no se toca) y, sin esto, su borde derecho quedaba 6 px antes que el de la franja de abajo. */
+  #gSinGuardar{flex:1 1 100%;text-align:center;margin-right:0!important;}
+  .act-bar #pasoAvanza{line-height:1.15;}
+  /* La barra pegajosa le come el borde de abajo al panel y el navegador no lo sabe: un campo que ya «se ve» bajo ella no se desplaza al
+     enfocarlo (con Tab o con el dedo) y se escribe a ciegas. Medido: el relato del paso 6 (y «Sedación» y «Vigilia» del paso 2) quedaban
+     bajo la barra. `scroll-padding-bottom` le dice cuánto reservar: la barra con la insignia puesta (la altura de todo el turno) más un
+     respiro, y la zona segura de abajo de los iPhone. Con una franja de falla (más alta) puede quedar cubierto el borde de un campo:
+     es el estado raro y la franja no se toca aquí. */
+  #sp .pcontent{scroll-padding-bottom:calc(112px + env(safe-area-inset-bottom));}
   .est-btn{min-height:40px;padding:8px 16px;}
   /* Toques más generosos */
   .col input,.col select{height:42px;}
   .ktm-state,.ktm-niv-btn,.ktm-asis-btn{min-height:38px;}
-  .bevo{min-height:38px;}
+  .bevo,.btl,.balt{min-height:38px;}
+  /* 🗂️ 10-oct-2026 · tanda 5, cambio 5: en una fila propia los secundarios (Historial, evento, Egreso) ya no heredan los 38 px del
+     `.bevo` de al lado —el estiramiento de la fila lo hacía de rebote— y medían 31; y el lápiz de la ficha tocaba 24×15 px. Los dos
+     llegan a 36 px o más. El lápiz agranda su ÁREA de toque sin agrandar la fila del nombre: el margen negativo se come lo que le sobra. */
+  .pname-lap{min-width:36px;min-height:36px;margin:-9px -6px;}
+  /* ── PISO DE LETRA EN EL CELULAR: NADA BAJO .7rem (11,2 px) (tanda 5, cambio 3, 10-oct-2026) ───────────────────────────────────────
+     Medido en un navegador de verdad a 390 px (build/pantallazos.js --solo-registro): la letra más chica que se veía era de 9,3 px.
+     Bajo 11 px quedaban la barra de abajo (.58rem), los chips de ventilador y de equipos (.62 / .6), los de evaluaciones y pendientes
+     (.67), las TRES PALABRAS DE ESTADO de cada tarjeta (.62: la tanda 3 las puso para leerlas de un vistazo y quedaron en el tamaño
+     menos legible), las etiquetas de casi todos los campos (.66 a .68) y los títulos de sub-bloque (.68). El kinesiólogo lee de pie, con
+     una mano y luz de sala. El texto corrido ya estaba sobre 12 px: solo se levanta el piso, no se cambia la jerarquía.
+     🪤 UN PISO POR CSS, NO 217 ESTILOS EN LÍNEA REESCRITOS: hay ~1.750 atributos `style` sin un patrón y cada uno puede cambiar la
+     apariencia. Los de .5 a .69rem se levantan con selector de atributo —la misma técnica que ya usa la regla de los títulos en línea
+     (`[style*="text-transform:uppercase"]`)— solo dentro del panel `#sp`, la grilla `#bedGrid` y el título de la cabecera, no en las
+     demás pestañas. `!important` porque el tamaño está EN LÍNEA y esto es solo aspecto.
+     🔒 Solo dentro de este @media: en escritorio no cambia nada (lo mide piso_letra_celular.js, sección 4). Si algún chip desborda con la
+     letra más grande, se le da espacio a ESE chip (max-width, envoltura), no se baja el piso. Los iconos de la barra (.mi, 20 px) y los
+     números grandes quedan como estaban. Lo fija piso_letra_celular.js. */
+  .vmtag,.eqtag,.abadge,.mpal{font-size:.7rem;}
+  /* Las etiquetas de campo van a .7rem —el piso— y NO a .72rem, y con el espaciado un poco más apretado (.03em en vez de .05em): con .72rem
+     «Fijación · cm de arcada dental» (columna de 104 px) pasaba de dos líneas a TRES y estiraba la fila entera, que es justo el defecto por
+     el que existe legibilidad.js (que mide a 1400 px y no lo vio). Medido en la pantalla: a .7rem con .03em cabe en dos líneas a 104 px. */
+  .col label{font-size:.7rem;letter-spacing:.03em;}
+  .cg-r{font-size:.7rem;}
+  /* 🗂️ 10-oct-2026 (tanda 5, cambio 4) · los TÍTULOS DE SUB-BLOQUE ya no se levantan acá: tienen una sola tupla de .72rem en los dos
+     anchos (`.sub-sec-title`, `.pe2-t`, `.msub-t`, `.pv-sep span`, `.bloqueT`, `.aetT-tit`, `.cg-t` arriba, y los escritos en línea con
+     la regla de «Títulos de sub-sección inline»), que ya está sobre el piso de 11 px. 🪤 No se vuelven a listar en este @media: una regla
+     de acá, más tardía, les pondría .7rem en el celular y rompería la escalera T1 > T2 > T3. */
+  #sp [style*="font-size:.5"],#sp [style*="font-size:.6"],#sp [style*="font-size: .5"],#sp [style*="font-size: .6"],
+  #bedGrid [style*="font-size:.5"],#bedGrid [style*="font-size:.6"],#bedGrid [style*="font-size: .5"],#bedGrid [style*="font-size: .6"],
+  .htitle [style*="font-size:.6"]{font-size:.7rem!important;}
 }
 
 /* ── PIEL INSTITUCIONAL «San Pablo» (conmutable) ─────────────────────────────
@@ -1952,7 +2058,11 @@ body.coord-on .ev-cand.ev-lock{color:var(--primary);border-color:var(--border);b
    superficie: filete del cromo, pestaña activa, foco y estados pendientes.
    Los pares de texto cumplen contraste AA (guardia: build/checks/piel.js). */
 html[data-piel="inst"]{
-  --bg:#EEF3F9;--card:#fff;--txt:#0D2B4E;--muted:#5B7793;--border:#D7E3F1;
+  /* 🗂️ 10-oct-2026 · `--muted` #5B7793 → #4A6580 (tanda 5, cambio 2). Es el gris azulado de TODO el texto secundario, y medido sobre
+     el fondo real daba 4,18:1 sobre el de la app, 3,69:1 sobre el manila de la carpeta de cama y 4,11:1 sobre la cama libre; el
+     mínimo AA para texto pequeño es 4,5:1. Es el mismo azul grisáceo, solo más hondo (5,43 / 4,80 / 5,35), y vale para toda la app
+     de una vez: sin parches por pantalla. Lo mide contraste_tokens.js leyendo el token y no un hex escrito. */
+  --bg:#EEF3F9;--card:#fff;--txt:#0D2B4E;--muted:#4A6580;--border:#D7E3F1;
   --primary:#0058A0;--pdark:#04345E;--ok:#0F8A5F;--danger:#C62828;--warn:#C47A09;
   --pcard:#fef7e6;
   --n-gray-bg:#eef2f7;--n-gray:#446180;
@@ -1979,8 +2089,18 @@ html[data-piel="inst"] .tab{color:#cfe3f5;}
 html[data-piel="inst"] .tab:hover{color:#fff;}
 html[data-piel="inst"] .tab.on{color:#fff;border-bottom-color:#F0A000;}
 html[data-piel="inst"] .tbanner{display:none!important;}
-html[data-piel="inst"] #btnGuardar,html[data-piel="inst"] #pasoAvanza{background:linear-gradient(135deg,#0058A0,#04345E);box-shadow:0 5px 16px rgba(0,88,160,.32);}
-html[data-piel="inst"] #btnGuardar:hover{background:linear-gradient(135deg,#0d69b6,#0058A0);filter:none;}
+/* 🗂️ 10-oct-2026 · El degradado y la sombra de «Guardar» y «Siguiente» que ponía la piel aquí se quitaron: son `.btn-p` planos como los demás
+   (tanda 5, cambio 6, parte 2; el porqué está junto a `.act-bar #btnGuardar`, arriba). */
+/* 🗂️ 10-oct-2026 · BOTÓN PRINCIPAL DESACTIVADO LEGIBLE (tanda 5, cambio 2). Medido en pantalla, no calculado desde el CSS: la regla de
+   `#btnGuardar:disabled,#pasoAvanza:disabled` (gris #94a3b8) NUNCA ganaba, porque las dos reglas de la piel que había justo antes —el degradado
+   azul, ya quitado en el paso 5.4— pesaban más (id + atributo + elemento contra id + pseudoclase). Lo que se veía era el degradado con la opacidad .55 que `prevAvanceUI` le pone en
+   línea al «Siguiente» del paso 1: letra blanca sobre #73a3cb, 2,68:1, y el rótulo «Siguiente: el turno →» casi no se leía. Y mientras se
+   guarda (`_guardadoBotones`) el botón se desactiva SIN opacidad y seguía igual de azul que uno activo. Ahora el desactivado es el mismo en los
+   dos casos: gris claro, letra oscura (6,15:1), sin sombra y sin la opacidad en línea (`!important`, porque el `style` en línea la pone
+   desde JS y esto es solo aspecto). Se pisa también el `:hover`, que le devolvía el degradado. Solo CSS: ni el HTML ni `_guardadoBotones`
+   ni la franja `#gEstadoGuardado` se tocan. */
+html[data-piel="inst"] #btnGuardar:disabled,html[data-piel="inst"] #pasoAvanza:disabled,
+html[data-piel="inst"] #btnGuardar:disabled:hover,html[data-piel="inst"] #pasoAvanza:disabled:hover{background:#e2e8f0;color:#475569;box-shadow:none;filter:none;opacity:1!important;cursor:not-allowed;}
 html[data-piel="inst"] .col input:focus,html[data-piel="inst"] .col select:focus{border-color:#0058A0;box-shadow:0 0 0 3px #f0a00055;}
 html[data-piel="inst"] .mnav button.on{color:#0058A0;}
 html[data-piel="inst"] .fase-chip.her{background:#fdf3df;border-color:#F0A000;color:#8a5c00;}
@@ -4097,7 +4217,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
               <div id="dVentBloque">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
-                <div class="sub-sec-title" style="color:var(--resp);margin:0;">💨 Terapia ventilatoria</div>
+                <div class="sub-sec-title" style="margin:0;">💨 Terapia ventilatoria</div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                   <div style="display:flex;align-items:center;gap:5px;">
                     <label style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:var(--muted);">Soporte</label>
@@ -4699,7 +4819,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
             <!-- Manejo respiratorio -->
             <div class="sub-sec">
-              <div class="sub-sec-title" style="color:var(--resp);margin-bottom:8px;">🫁 Manejo Respiratorio</div>
+              <div class="sub-sec-title" style="margin-bottom:8px;">🫁 Manejo Respiratorio</div>
 
               <!-- KTR + Sin requerimientos -->
               <div class="row" style="align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
@@ -4924,7 +5044,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
         <div class="fcard-body">
         <!-- EVALUACIONES FUNCIONALES (unificadas) -->
         <div class="sub-sec" id="fcEgrCard">
-          <div class="sub-sec-title" style="color:var(--fisico);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+          <div class="sub-sec-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
             <span>📏 Evaluaciones</span>
             <!-- 1-oct-2026 · La casilla «Registrar evaluación este turno» ya no estorba: los
                  cajones de abajo son la puerta (Diego: «como los iconos del celular»). Sigue
@@ -5213,7 +5333,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <!-- VÁLVULA DE FONACIÓN — uso del turno (solo TQT). El modo ventilatorio
                  se elige arriba; aquí se registra el USO como intervención de rehabilitación. -->
             <div id="dVfonSec" class="sub-sec hidden">
-              <div class="sub-sec-title" style="color:var(--kine);">🗣️ Válvula de fonación</div>
+              <div class="sub-sec-title">🗣️ Válvula de fonación</div>
               <div class="check wa" style="margin-bottom:7px;">
                 <input type="checkbox" id="cVfon" onchange="hVfon()">
                 <label for="cVfon" style="font-weight:700;">Se usa válvula de fonación en este turno</label>
@@ -5241,7 +5361,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
 
             <!-- KTM Estado (3-way) -->
             <div class="sub-sec">
-              <div class="sub-sec-title" style="color:var(--kine);">Kinesiterapia motora (KTM)</div>
+              <div class="sub-sec-title">Kinesiterapia motora (KTM)</div>
               <div style="display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:7px;width:fit-content;margin-bottom:9px;">
                 <button type="button" id="bKTMr" class="ktm-state on" onclick="setKTMstate('r')">✅ Realizada</button>
                 <button type="button" id="bKTMs" class="ktm-state"     onclick="setKTMstate('s')">🚫 Contraindicada</button>
@@ -5875,7 +5995,7 @@ setTimeout(function () {
             : 'Sin errores de JavaScript. Revisa Ejecuciones en el editor de Apps Script.');
       // La mascota de la pantalla de carga acompaña el aviso (si es Don Mauri).
       try { if (typeof mauriPose === 'function') mauriPose('#lov .masc-persona', 'error'); } catch (_) {}
-      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.8-terapia-y-planes]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
+      l.innerHTML = '❌ La app no pudo iniciar. <span style="font-size:.65rem;color:#8e8e93;">[index NEXT-5.9-limpieza-visual]</span><br><span style="font-size:.72rem;color:#aeaeb2;">' + det + '</span><br>' +
         '<button onclick="location.reload()" style="margin-top:12px;padding:9px 18px;border:none;border-radius:9px;background:#0071e3;color:#fff;font-weight:700;cursor:pointer;">🔄 Reintentar</button>';
     }
   } catch (_) {}
@@ -6972,14 +7092,14 @@ function renderGrid() {
           <button class="bevo" onclick="abrirPanel('${c.ID_CAMA}',false)">${btn}</button>
           <button class="btl" onclick="abrirTL('${c.ID_CAMA}')">⏱️ Hist.</button>
           ${_evBotonHTML(c.ID_CAMA, c.PATIENT_ID||'', 'btl')}
-          <button class="balt" onclick="egreso('${c.ID_CAMA}')">🏠 Egr.</button>
+          <button class="balt" onclick="egreso('${c.ID_CAMA}')">🏠 Egreso</button>
         `}</div>`;
     } else {
       const _vmtL=c.VM_TAG?`<span class="vmtag${/falla/i.test(c.VM_TAG_ESTADO||'')?' falla':(/manten/i.test(c.VM_TAG_ESTADO||'')?' mant':'')}" onclick="setTab('V')" title="Ventilador en esta cama${c.VM_TAG_ESTADO?' · '+c.VM_TAG_ESTADO:''} — clic para ir a Ventiladores">🔧 ${c.VM_TAG}</span>`:'';
       el.innerHTML=`${_vmtL}
         <div class="bhdr"><span class="bnum" style="color:var(--muted);"><div class="bdot d-empty"></div>Cama ${c.ID_CAMA}</span></div>
         <div class="bbody"><div class="empty-txt">Disponible</div></div>
-        <div class="bfoot">${_movPie(c, false)}<button class="bevo" style="background:#e2e8f0;color:#475569;" onclick="abrirPanel('${c.ID_CAMA}',true)">+ Ingresar Paciente</button></div>`;
+        <div class="bfoot">${_movPie(c, false)}<button class="bevo bevo-libre" onclick="abrirPanel('${c.ID_CAMA}',true)">+ Ingresar Paciente</button></div>`;
     }
     if(window.Turnos) Turnos.decorateCard(el, c);
     frag.appendChild(el);
@@ -7647,7 +7767,7 @@ function pasoPendDejar(texto){
     const i = $('pasoPendTxt'); if(i) i.value = '';
     return;
   }
-  _pedirFirma().then(firma => {
+  _pedirFirma(_FIRMA_PEND_DEJAR).then(firma => {
     if(firma === null) return;
     api('PEND_ABRIR', { idCama: String(idCama), texto: t, firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
@@ -7910,7 +8030,7 @@ function pendEpiPintar(){
 function pendEpiCerrar(id){
   const idCama = v('cBed'); if(!idCama || !id) return;
   const ep = _episodioAbierto;   // 🔴 G14 · el episodio con que se abrió este panel, tomado al clic (ver pasoPendDejar)
-  _pedirFirma().then(firma => {
+  _pedirFirma(_FIRMA_PEND_CERRAR).then(firma => {
     if(firma === null) return;
     api('PEND_CERRAR', { idCama: String(idCama), id: String(id), firma: firma || '', EPISODIO_ABIERTO: ep })
       .then(() => {
@@ -21638,9 +21758,17 @@ function _evalAplicarTarjeta(kind){
       .catch(e=>toastError(e));
   });
 }
-/** Quién mide. Sin login, es la firma DECLARADA (la del formulario si está
- *  abierto, si no la última usada en este navegador, si no se pregunta). */
-function _pedirFirma(){
+/** Quién firma. Sin login, es la firma DECLARADA (la del formulario si está
+ *  abierto, si no la última usada en este navegador, si no se pregunta).
+ *
+ *  🗂️ 10-oct-2026 (tanda 5, cambio 4) · EL CUADRO DICE LO QUE PASA. Por defecto pregunta «¿Quién midió?» y habla de la medición,
+ *  que es lo correcto para las evaluaciones; pero los pendientes usan la MISMA función y ahí preguntaba quién midió algo que nadie
+ *  midió. `txt` = { titulo, mensaje } para los flujos que NO son una medición: `_FIRMA_PEND_DEJAR` y `_FIRMA_PEND_CERRAR`, abajo.
+ *  Sin argumentos nada cambia para las evaluaciones. Lo fija firma_texto_por_flujo.js. */
+const _FIRMA_PEND_DEJAR = { titulo:'¿Quién deja el pendiente?', mensaje:'La firma queda con el pendiente: dice quién lo dejó para el turno que viene.' };
+const _FIRMA_PEND_CERRAR = { titulo:'¿Quién cierra el pendiente?', mensaje:'La firma queda con el cierre: dice quién lo dio por resuelto.' };
+function _pedirFirma(txt){
+  txt=txt||{};
   const enForm=v('fFirma');
   if(enForm) return Promise.resolve(enForm);
   let ult=''; try{ ult=localStorage.getItem('rce_firma_tarjeta')||''; }catch(e){}
@@ -21648,7 +21776,7 @@ function _pedirFirma(){
     const opts=[]; try{ const tmp=document.createElement('select'); fillFirmaSelect(tmp); tmp.querySelectorAll('option').forEach(o=>{ if(o.value) opts.push(o.value); }); }catch(e){}
     const sel='<select id="epFirmaSel" style="width:100%;height:36px;margin-top:6px;"><option value="">— firma —</option>'+
       opts.map(o=>`<option value="${o}"${o===ult?' selected':''}>${o}</option>`).join('')+'</select>';
-    uiConfirm({ icono:'✍️', titulo:'¿Quién midió?', mensaje:'La firma viaja con la medición: dice de dónde salió el dato.', detalle:sel, confirmar:'Guardar' })
+    uiConfirm({ icono:'✍️', titulo:txt.titulo||'¿Quién midió?', mensaje:txt.mensaje||'La firma viaja con la medición: dice de dónde salió el dato.', detalle:sel, confirmar:'Guardar' })
       .then(ok=>{ if(!ok){ res(null); return; } const f=String(v('epFirmaSel')||'').trim(); if(!f){ toast('⚠️ Elige tu firma'); res(null); return; }
         try{ localStorage.setItem('rce_firma_tarjeta',f); }catch(e){} res(f); });
   });
