@@ -21,6 +21,19 @@
 //   7. El encabezado no se desarma: nada se sale de la pantalla y el alto se mantiene.
 //   8. 🔴 El resumen del encabezado NO interpreta HTML: antes el texto tecleado entraba por `innerHTML` sin escapar (solo escapaba
 //      la rama «falta»), o sea que un valor con <etiquetas> del turno anterior de otro colega corría en la pantalla de quien abre.
+//      (Revisión de la tanda 3, F1) El vehículo de esta prueba era el cuadro «Escribir procedimiento…», que dejó de ser un dato
+//      (R3/R8: texto sin agregar no se guarda y no cuenta), así que ahora es una opción hostil de un desplegable de Sedación.
+//   9. 🔴 (R5 y R9) Lo MISMO vale para lo que la tarjeta pinta con `innerHTML` aparte del encabezado: la lista de procedimientos
+//      (`renderChips`) y los chips de fase (`renderFases`). Sus ítems vienen de texto libre y del turno anterior de otro colega
+//      (PROC_JSON, catálogo compartido de fases): una `<img onerror>` ahí corría en la pantalla de quien abre. Escapador único.
+//  10. 🔴 (R1 y R6) Un resumen largo NO ensancha una columna del Turno: la grilla de escritorio es `minmax(0,2fr) minmax(0,3fr)`.
+//      `2fr 3fr` a secas es `minmax(auto,…)` y el piso de la columna era el ancho de lo que lleva dentro; el resumen del encabezado
+//      es una línea sin partir, así que tres opciones corrientes de Auscultación (columna IZQUIERDA, la angosta) la llevaban a 659 px
+//      y el panel se salía por la derecha (80 a 156 px de scroll lateral a 1024 px). Se mide en 900 a 1366 px, con el resumen largo
+//      en la columna izquierda y con el escenario de tubo + VM con parámetros: sin scroll lateral y con las columnas 2:3.
+//  11. 🔴 (R24) El resumen del encabezado de Respiratorio no queda cortado entre 1100 y 1280 px: «Requiere revisión falta declarar la
+//      PVE — VM · ACVC» medía 302 px y el espacio que dejaba el título era de 271 a 1200 px, 241 a 1150 y 211 a 1100: se perdía el
+//      final. Cuando no cabe junto al título, el resumen pasa a una segunda línea (como ya hace en el celular) en vez de cortarse.
 //
 // 🪤 Reloj congelado: lunes 10-ago-2026 11:00 (fuera de las ventanas trampa: Fiestas Patrias, cierre de año, cumpleaños y la media
 // hora previa al cambio de turno). Solo datos ficticios.
@@ -59,9 +72,9 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
   no('…ni «Registrado»', /['"`]Registrado['"`]/.test(cuerpoPint));
   no('…ni «Sin registrar» con mayúscula', /['"`]Sin registrar['"`]/.test(cuerpoPint));
 
-  for (const ancho of [1200, 800, 390]) {
-    const movil = ancho === 390;
-    console.log('\n══════ pantalla de ' + ancho + ' px ══════');
+  /* La página y el turno de la cama 3 se arman en dos funciones para que el bucle de los tres anchos del Turno y el de los anchos de
+     ESCRITORIO (columnas y resumen largo, 5c y 5d) partan del mismo sitio: dos copias del arnés se desalinean. */
+  const nuevaPagina = async (ancho, movil) => {
     const p = await b.newPage({ viewport: { width: ancho, height: movil ? 844 : 900 }, locale: 'es-CL', isMobile: movil, hasTouch: movil });
     p.on('pageerror', e => errs.push(e.message));
     await p.addInitScript(() => {
@@ -97,22 +110,30 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
           esperada: (() => { try { return ESTADO_PALABRAS[estadoBloque(el.classList.contains('msub') ? el.querySelector('.msub-b') : el).estado]; } catch (e) { return 'ERROR: ' + e.message; } })() };
       };
     });
+    return p;
+  };
+  const abrirTurno = (p, o) => p.evaluate(async x => {
+    $('kf').reset(); $('gDate').value = '2026-08-10'; SHIFT = 'Dia';
+    window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
+    DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: x.va || 'TOT', SOPORTE: x.sop || 'VM',
+      FECHA_INGRESO: '2026-08-03', TS_INGRESO: '2026-08-03 23:00:00', FECHA_INICIO_VA: '2026-08-06', TS_INICIO_VA: '2026-08-06 10:00:00',
+      FECHA_INICIO_SOPORTE: '2026-08-06', TS_INICIO_SOPORTE: '2026-08-06 10:00:00' }];
+    window.recargarSilencioso = () => {}; window._ll.length = 0; renderGrid(); abrirPanel('3', false, false);
+    await new Promise(r => setTimeout(r, 800));
+    if (document.getElementById('msEvt')) M_SUBS.forEach(c => { const bb = document.getElementById(c.id); if (bb) bb.classList.toggle('cerrado', !c.abierto); });
+    $('fFirma').appendChild(Object.assign(document.createElement('option'), { value: 'K.T.', textContent: 'K.T.' })); $('fFirma').value = 'K.T.';
+    if (!x.sinHdn) { $('fHEst').value = 'Estable'; $('fDVA').value = 'Sin requerimientos'; }
+    PROCS.length = 0; FASES_SEL = new Set(); window._pronoAbierto = false; window.__xss = undefined; _transAvisoOk = true;
+    pasoIr(x.paso == null ? 2 : x.paso); rielRender();
+    await new Promise(r => setTimeout(r, 300));
+  }, o);
 
-    const abrir = (o) => p.evaluate(async x => {
-      $('kf').reset(); $('gDate').value = '2026-08-10'; SHIFT = 'Dia';
-      window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
-      DB = [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: x.va || 'TOT', SOPORTE: x.sop || 'VM',
-        FECHA_INGRESO: '2026-08-03', TS_INGRESO: '2026-08-03 23:00:00', FECHA_INICIO_VA: '2026-08-06', TS_INICIO_VA: '2026-08-06 10:00:00',
-        FECHA_INICIO_SOPORTE: '2026-08-06', TS_INICIO_SOPORTE: '2026-08-06 10:00:00' }];
-      window.recargarSilencioso = () => {}; window._ll.length = 0; renderGrid(); abrirPanel('3', false, false);
-      await new Promise(r => setTimeout(r, 800));
-      if (document.getElementById('msEvt')) M_SUBS.forEach(c => { const bb = document.getElementById(c.id); if (bb) bb.classList.toggle('cerrado', !c.abierto); });
-      $('fFirma').appendChild(Object.assign(document.createElement('option'), { value: 'K.T.', textContent: 'K.T.' })); $('fFirma').value = 'K.T.';
-      if (!x.sinHdn) { $('fHEst').value = 'Estable'; $('fDVA').value = 'Sin requerimientos'; }
-      PROCS.length = 0; FASES_SEL = new Set(); window._pronoAbierto = false; window.__xss = undefined; _transAvisoOk = true;
-      pasoIr(x.paso == null ? 2 : x.paso); rielRender();
-      await new Promise(r => setTimeout(r, 300));
-    }, o);
+  for (const ancho of [1200, 800, 390]) {
+    const movil = ancho === 390;
+    console.log('\n══════ pantalla de ' + ancho + ' px ══════');
+    const p = await nuevaPagina(ancho, movil);
+    const abrir = (o) => abrirTurno(p, o);
+
     /* Ejecuta algo POR CÓDIGO y repinta el estado a mano (rielRender), como lo haría un teclazo. Lo que se prueba sobre el repintado al
        TOCAR un botón va aparte (sección 3), con un click de verdad. */
     const ejecuta = (fn) => p.evaluate(async f => { new Function('return (' + f + ')')()(); rielRender(); await new Promise(r => setTimeout(r, 450)); }, fn.toString());
@@ -234,16 +255,115 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
 
     console.log('\n6 · 🔴 El resumen del encabezado NO interpreta HTML');
     await abrir({});
-    await ejecuta(() => { const e = document.getElementById('inProc'); e.value = '<img src=x onerror="window.__xss=1">'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    /* El vehículo es una opción hostil del desplegable de Sedación: un valor de un campo que SÍ se guarda, que es lo que trae también la
+       réplica del turno de otro colega. (Antes era el cuadro «Escribir procedimiento…»; un texto sin agregar no se guarda y ya no cuenta
+       como dato —R3/R8—, así que no llega al encabezado.) */
+    await ejecuta(() => { const o = document.createElement('option'); o.value = o.textContent = '<img src=x onerror="window.__xss=1">'; document.getElementById('fSed').appendChild(o); document.getElementById('fSed').value = o.value; });
     await p.waitForTimeout(500);
     const xss = await p.evaluate(() => {
-      const c = _card(/Procedimientos/), rs = c && c.querySelector('.fcard-hdr .mres');
+      const c = _card(/Sedaci/), rs = c && c.querySelector('.fcard-hdr .mres');
       return { xss: window.__xss === 1, img: !!(rs && rs.querySelector('img')), texto: rs ? rs.textContent : null };
     });
-    no('★★ una <etiqueta> tecleada NO se ejecuta (window.__xss)', xss.xss);
+    no('★★ una <etiqueta> en un campo NO se ejecuta (window.__xss)', xss.xss);
     no('★★ …ni se convierte en un elemento del encabezado', xss.img);
     si('…se muestra como texto', /<img/.test(xss.texto || ''));
 
+    console.log('\n6b · 🔴 (R5 y R9) La lista de procedimientos y los chips de fase NO interpretan HTML');
+    await abrir({});
+    const xss2 = await p.evaluate(async () => {
+      window.__b = 0; window.__a = 0;
+      const FASE_RARA = 'Agudo "x" & <b>y</b>';
+      PROCS.length = 0; PROCS.push('<img src=x onerror="window.__b=1">'); renderChips();
+      FASES = ['<img src=x onerror="window.__a=1">', FASE_RARA]; FASES_SEL = new Set(); renderFases();
+      await new Promise(r => setTimeout(r, 300));
+      /* El texto del botón sale escapado y el valor que viaja en data-f vuelve entero: tocar el chip raro elige EXACTAMENTE esa cadena. */
+      const rara = [...document.querySelectorAll('#faseChips .fase-chip')].find(c => c.dataset.f === FASE_RARA);
+      if (rara) rara.click();
+      return { b: window.__b, a: window.__a, imgChips: document.getElementById('chips').querySelectorAll('img').length,
+        imgFases: document.getElementById('faseChips').querySelectorAll('img').length,
+        textoChips: document.getElementById('chips').textContent, textoFases: document.getElementById('faseChips').textContent,
+        hayRara: !!rara, elegida: [...FASES_SEL] };
+    });
+    eq('★★ un procedimiento con <etiqueta> NO se ejecuta (window.__b)', xss2.b, 0);
+    eq('★★ …ni se convierte en un elemento de la lista', xss2.imgChips, 0);
+    si('…se muestra como texto', /<img/.test(xss2.textoChips));
+    eq('★★ una fase con <etiqueta> NO se ejecuta (window.__a)', xss2.a, 0);
+    eq('★★ …ni se convierte en un elemento de los chips', xss2.imgFases, 0);
+    si('…se muestra como texto', /<img/.test(xss2.textoFases));
+    si('el chip con comillas, & y <b> existe y su texto se ve entero', xss2.hayRara && xss2.textoFases.indexOf('Agudo "x" & <b>y</b>') >= 0);
+    eq('★ …y tocarlo elige exactamente esa cadena (el valor de data-f no se deforma)', JSON.stringify(xss2.elegida), JSON.stringify(['Agudo "x" & <b>y</b>']));
+
+    await p.close();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════
+  // ESCRITORIO A VARIOS ANCHOS (R1, R6 y R24). Las guardias de arriba miden 1200, 800 y 390 px; la banda de 821 a 1210 px (una laptop
+  // de 1366 px al 125 % de zoom queda en 1093) y la columna angosta no se veían, y por eso todo estaba verde con el panel saliéndose.
+  console.log('\n\n══════ ESCRITORIO A VARIOS ANCHOS: columnas y resumen largo ══════');
+  /* Foto de las columnas del Turno: ancho de cada una, scroll lateral del panel y de la página, y hasta dónde llega lo que se ve. */
+  const medirColumnas = (p) => p.evaluate(() => {
+    const pc = document.querySelector('#sp .pcontent');
+    const cols = [...document.querySelectorAll('#sp .sp-2col > .sp-col')].map(c => c.getBoundingClientRect().width);
+    const card = document.getElementById('fcRespCard').getBoundingClientRect();
+    /* Sin el piso de `auto`, lo que tenga un ancho rígido podría salirse de SU columna y montarse sobre la otra sin mover el scroll del
+       panel: se cuenta cualquier cosa a la vista que pase del borde derecho de su columna. */
+    const sale = [];
+    document.querySelectorAll('#sp .sp-2col > .sp-col').forEach((col, i) => {
+      const cr = col.getBoundingClientRect();
+      col.querySelectorAll('*').forEach(e => {
+        const rr = e.getBoundingClientRect(); if (!rr.width || !rr.height) return;
+        for (let a = e; a && a !== col; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden') return; }
+        if (rr.right > cr.right + 1) sale.push(i + ':' + (e.id || e.className || e.tagName));
+      });
+    });
+    return { izq: Math.round(cols[0]), der: Math.round(cols[1]), prop: cols[0] / (cols[0] + cols[1]),
+      panel: pc.scrollWidth - pc.clientWidth, doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      resp: Math.round(card.right), ventana: innerWidth, sale: sale.slice(0, 5).join(', ') };
+  });
+  const LARGO_IZQ = () => { $('fMPVal').value = 'Disminuido en Bases'; $('fRuidosVal').value = 'Sin ruidos agregados'; $('fRuidosLoc').value = 'Ambos campos pulmonares'; };
+  const LARGO_RESP = () => { $('fSed').value = 'Escalón 2'; hSed(); $('fSecrCar').value = 'Mucopurulentas con tinte hemático'; $('fTOTn').value = '7,5';
+    $('cPosDCLD').checked = true; $('fPosLibre').value = 'Decúbito lateral derecho con almohada bajo el flanco'; };
+  const PARAMS = () => { ['r_vt:450', 'r_fr:14', 'r_peep:8', 'r_fio2:40'].forEach(x => { const [id, val] = x.split(':'); const e = document.getElementById(id); if (e) e.value = val; }); };
+  for (const ancho of [900, 1024, 1100, 1150, 1200, 1280, 1366]) {
+    console.log('\n── pantalla de ' + ancho + ' px');
+    const p = await nuevaPagina(ancho, false);
+    const abrir = (o) => abrirTurno(p, o);
+    const ejecuta = (fn) => p.evaluate(async f => { new Function('return (' + f + ')')()(); rielRender(); await new Promise(r => setTimeout(r, 450)); }, fn.toString());
+    const dosColumnas = ancho > 820;          // hasta 820 px la grilla es de UNA columna (media query de la regla .sp-2col)
+    const reglaColumnas = (l, m) => {
+      eq('★★ ' + l + ': el contenido del panel no se desborda a la derecha', m.panel <= 0, true);
+      eq('…ni la página', m.doc <= 0, true);
+      si('…y la tarjeta Respiratorio termina dentro de la ventana', m.resp <= m.ventana);
+      eq('★ …y nada a la vista se sale de SU columna (el piso de `auto` ya no las sostiene)', m.sale, '');
+      if (dosColumnas) si('★★ …y las columnas conservan su proporción 2:3 (' + m.izq + ' y ' + m.der + ' px)', Math.abs(m.prop - 0.4) < 0.01);
+    };
+
+    console.log('5c · 🔴 (R1 y R6) Un resumen LARGO no ensancha una columna ni saca el panel de la pantalla');
+    await abrir({});
+    const base = await medirColumnas(p);
+    reglaColumnas('sin resúmenes largos (la referencia)', base);
+    await ejecuta(LARGO_IZQ);
+    const largoIzq = await medirColumnas(p);
+    si('el resumen de Auscultación (columna IZQUIERDA) se llenó de verdad', await p.evaluate(() => /Disminuido en Bases · Sin ruidos agregados · Ambos campos pulmonares/.test(_card(/Auscultaci/).querySelector('.fcard-hdr .mres').textContent)));
+    reglaColumnas('resumen largo en Auscultación (columna izquierda)', largoIzq);
+    if (dosColumnas) eq('★★ …y la columna izquierda NO crece por culpa del resumen (' + base.izq + ' → ' + largoIzq.izq + ' px)', largoIzq.izq, base.izq);
+    await ejecuta(LARGO_RESP);
+    reglaColumnas('…además de uno largo en Respiratorio (columna derecha)', await medirColumnas(p));
+    await abrir({});
+    await ejecuta(PARAMS);
+    const tubo = await medirColumnas(p);
+    si('el escenario de tubo + VM con VT 450, FR 14, PEEP 8 y FiO2 40 llenó los parámetros', await p.evaluate(() => document.getElementById('r_peep') && document.getElementById('r_peep').value === '8'));
+    reglaColumnas('tubo + VM con parámetros y la PVE sin responder', tubo);
+
+    console.log('5d · 🔴 (R24) El resumen de Respiratorio no queda cortado: si no cabe junto al título, pasa a otra línea');
+    await abrir({});
+    const r24 = await p.evaluate(() => { const c = document.getElementById('fcRespCard'), h = c.querySelector('.fcard-hdr'), r = h.querySelector('.mres');
+      return { txt: r.textContent, ancho: r.scrollWidth, cabe: r.clientWidth, alto: Math.round(h.getBoundingClientRect().height),
+        dentro: r.getBoundingClientRect().right <= h.getBoundingClientRect().right + 1 && r.getBoundingClientRect().right <= innerWidth + 1 }; });
+    eq('el resumen que se mide es el de siempre', r24.txt, 'Requiere revisión falta declarar la PVE — VM · ACVC');
+    si('★★ …se ve ENTERO (' + r24.ancho + ' px de texto en ' + r24.cabe + ' px de caja): no queda cortado con puntos suspensivos', r24.ancho <= r24.cabe);
+    si('…dentro del encabezado y de la ventana', r24.dentro);
+    si('…y el encabezado no se dispara de alto (' + r24.alto + ' px, menos de 80)', r24.alto > 0 && r24.alto < 80);
     await p.close();
   }
 

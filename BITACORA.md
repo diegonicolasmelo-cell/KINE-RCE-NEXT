@@ -4949,3 +4949,115 @@ Con `-j 2`: `convenciones`, `escapado_unico`, `tokens_existen`, `docs`, `paquete
 - **Ningún emoji existente se cambió.** La decisión 4 de la auditoría sigue siendo de Diego, ahora con una lista más grande que la que se le iba a mostrar: son **cinco** emojis y 🫁 está en 27 sitios, no solo en el título de Respiratorio. Pedir una captura de la tarjeta Respiratorio *y de la insignia UPOT de una cama* en un computador del hospital (¿salen como un cuadrado?). Si se cambia alguno, se borra de `BASE` en la guardia.
 - **CLAUDE.md no se editó.** Su regla de emojis podría terminar con «Lo fija `checks/emojis_nuevos.js`», como las demás; queda a elección de Diego.
 - **Límites conocidos:** de las banderas solo se conoce como nueva la de Sark (las demás son de antes de 2020; Windows de todos modos no las dibuja); `pwa/`, `entrega/` y `build/paquete_migracion/` no se miran porque se generan desde `v2/`; el lector es un mínimo para separar comentario de pantalla, no un analizador completo de JavaScript (por eso la prueba de compilación); un `</script` escrito dentro de un comentario `//` rompería el lector igual que rompería el navegador.
+
+## 10-oct-2026 · Turno respiratorio (tanda 3), revisión adversarial · paso F1 «estado del bloque»: las columnas no se ensanchan, un clic sobre una fase repinta, el texto sin agregar no cuenta y el encabezado dice QUÉ falta
+
+**De dónde sale.** Los diez hallazgos de la tanda 3 de la revisión de las tandas 3, 4 y 5 que caen en `v2/index.html` (R1, R6, R2, R7, R3, R8, R4, R10,
+R5, R9) más R24 (tanda 5), que tiene la misma raíz que R1/R6. Los revisores los habían demostrado; **se reprodujeron todos antes de tocar nada**
+(sondas en un Chromium con reloj congelado al lunes 10-ago-2026 11:00 y un `google.script.run` simulado) y las guardias nacieron rojas contra el
+código sin arreglar: **estado_visible_escritorio 78 aserciones rojas, estado_del_bloque 22, aviso_igual_que_guardar 60**.
+
+**Los defectos, en palabras.**
+- **R1 y R6 · un resumen largo ensanchaba una columna y sacaba el panel de la pantalla.** La grilla de escritorio era `2fr 3fr`, que es
+  `minmax(auto,…)`: el piso de la columna es lo que mide lo de adentro. Desde el 3.3 el encabezado de cada tarjeta muestra su resumen en una línea
+  sin partir, y tres opciones corrientes de Auscultación (columna IZQUIERDA, la angosta) —«Disminuido en Bases · Sin ruidos agregados · Ambos campos
+  pulmonares»— llevaban esa columna de 391 a **659 px** y la otra de 587 a 491: a 1024 px el panel quedaba con **156 px de scroll lateral** y a
+  1366 las columnas pasaban de 522/784 a 659/647. El arreglo de 820 px para abajo (`minmax(0,1fr)`) ya estaba; faltaba el de escritorio.
+  · **Arreglo.** `grid-template-columns:minmax(0,2fr) minmax(0,3fr)`. Las columnas guardan 2:3 pase lo que pase adentro: 342/512 a 900 px, 391/587 a
+  1024, 422/632 a 1100, 462/692 a 1200, 494/740 a 1280, 522/784 a 1366, con y sin resúmenes largos. Como sin el piso de `auto` un control rígido
+  podría salirse de SU columna sin mover el scroll del panel, la guardia también cuenta lo que pasa del borde de su columna (hoy: nada).
+- **R24 · el resumen de Respiratorio quedaba cortado entre 1100 y 1280 px.** `.mres` iba en `flex:1 1 0` y tomaba solo lo que dejaba el título
+  (354 px): «Requiere revisión falta declarar la PVE — VM · ACVC» mide 302 px y cabía en 271 a 1200 px, 241 a 1150 y 211 a 1100; se perdía el final.
+  🪤 **No lo resuelve el cambio de la grilla** (medido con solo ese cambio: 302 contra 271, igual): la columna de la derecha mide lo mismo con
+  o sin él. · **Arreglo.** El encabezado puede envolver y el resumen pide su ancho (`flex:1 1 auto`): si cabe junto al título se queda donde
+  estaba y si no pasa a una segunda línea con todo el ancho de la tarjeta, como ya hace en el celular. Solo si ni la tarjeta entera lo aguanta se
+  corta con puntos suspensivos. El encabezado queda en 60 px de alto en el peor caso (41 en una línea).
+- **R2 y R7 · tocar un chip de «Fase clínica» no repintaba el estado.** El repintado por clic de botón (3.3) escuchaba en burbujeo, y `toggleFase`
+  → `renderFases()` reescribe los botones con `innerHTML`: cuando el evento llegaba al documento el botón tocado ya no estaba en el árbol,
+  `closest('#kf button')` daba null y no se repintaba. Elegir una fase dejaba «Sin registrar» y quitarla dejaba «Registrado» hasta el siguiente
+  tecleo. Las pruebas llamaban a `toggleFase()` y `rielRender()` directos, por eso nunca lo vieron. · **Arreglo en dos líneas.** (1) el listener va
+  **en fase de captura** (corre antes del `onclick`, con el botón en su sitio; el repintado diferido de 250 ms ocurre después): cubre la CLASE de
+  defecto, cualquier botón que se reescriba a sí mismo; (2) `renderFases()` pide el repintado, como `renderChips()` con los procedimientos: es
+  donde termina SIEMPRE el cambio de fase, incluida la fase nueva agregada al catálogo, que termina en la respuesta del servidor sin clic ni input.
+  🪤 Cada una cubre un hueco distinto y la guardia lo prueba por separado: sin el (2), la fase agregada con Enter se queda en «Sin registrar» si el
+  servidor tarda más de 250 ms (con la respuesta a 5 ms del simulacro el `change` que dispara el Enter lo tapaba: por eso la guardia atrasa la
+  respuesta a 700 ms); sin el (1), solo un botón de juguete que se saca a sí mismo del árbol lo delata.
+- **R3 y R8 · el texto escrito y sin agregar contaba como dato.** `_mLeer` cuenta cualquier `<input>` de texto con valor. Escribir «aspiración de
+  secreciones» en «Escribir procedimiento…» sin apretar «+ Agregar» ni Enter hacía decir «Registrado aspiración de secreciones», y `guardar()`
+  manda `PROC_JSON:"[]"`: el procedimiento se perdía sin aviso, con el cuadro dentro de un `<details>` cerrado (el encabezado era lo único que se
+  veía). · **Arreglo.** Atributo `data-sin-dato` en los cuadros de «escribir para agregar» y un `continue` en `_mLeer`. Los marcados: `#inProc`,
+  `#faseNuevaInput` (el de «＋ nueva fase»), `#fCultInput` (Resultado(s) del cultivo), `#anotTxt` y `#anotHora` (hechos del turno) y `#pasoPendTxt`
+  (otro pendiente): ninguno lo lee `guardar()`; la lista de la guardia lleva el motivo de cada uno. Lo realmente agregado ya lo cubren `@procs`,
+  `@fase` y `fCultVal`.
+- **R4 y R10 · el encabezado decía «falta un dato obligatorio» para cinco obligatorios.** El nombre corto del encabezado vivía en una SEGUNDA
+  tabla por id (`_mFaltaTxt`) que conocía diez y no las razones de la PVE (no realizada y no corresponde), el motivo de su «Otra», el tipo de la
+  extubación sin PVE ni la hora de la reintubación (seis campos, cinco situaciones), mientras la línea «Falta:» de arriba sí los nombraba: la promesa de «una sola lista» no llegaba al texto del encabezado.
+  · **Arreglo.** Cada entrada de `_obligatoriosPendientes()` lleva ahora `{ el, texto, corto }`: `texto` es el de «Falta:» (intacto, palabra por
+  palabra), `corto` el del encabezado («la firma», «declarar la PVE», «la razón de la PVE»…) y, si una entrada no lo trae, el encabezado usa su
+  `texto`, nunca un genérico. `estadoBloque(cont, pendientes)` recibe las entradas completas y devuelve `faltaTxt` junto a `falta`;
+  `_mPintarEstado` lo usa y `_mFaltaTxt` **se borró**. Los diez nombres que ya existían se conservaron idénticos (los fijan otras guardias).
+  Se corrigió de paso el comentario de `el`: es el elemento que CONTIENE el dato (a veces un `<input type=hidden>` que no se puede enfocar:
+  `fPVEval`, `fKTMraz`), sirve para saber qué tarjeta lo tiene y nadie debe navegar con él.
+- **R5 y R9 · la lista de procedimientos y los chips de fase interpretaban HTML.** `renderChips` escribía `${p}` crudo en `innerHTML` y
+  `renderFases` el nombre de la fase en el texto y (con un reemplazo de comillas a medias) en `data-f`. El texto de un procedimiento es libre y
+  vuelve en `PROC_JSON` del turno anterior (de otro colega); el catálogo de fases es compartido. Ejecutado: una `<img onerror>` en cualquiera de los
+  dos corría. · **Arreglo.** `escapeHtml` en las tres posiciones (la regla del escapador único de CLAUDE.md); `this.dataset.f` devuelve la cadena
+  original, así que `toggleFase` sigue recibiendo el nombre exacto (la guardia lo prueba con una fase «Agudo "x" & <b>y</b>»).
+
+**Guardias.**
+- `estado_visible_escritorio.js`. **5c** (nueva): a 900, 1024, 1100, 1150, 1200, 1280 y 1366 px, con el resumen largo en la columna izquierda, además
+  con uno largo en Respiratorio y con el escenario de tubo + VM con parámetros: sin scroll lateral del panel ni de la página, columnas 2:3 (la
+  izquierda no crece), la tarjeta Respiratorio dentro de la ventana y nada que se salga de su columna. **5d** (nueva): el resumen de Respiratorio se
+  ve entero en esos anchos y el encabezado no pasa de 80 px. **6b** (nueva): `<img onerror>` en un procedimiento y en una fase no se ejecuta ni crea
+  elementos, y el chip con comillas, `&` y `<b>` conserva su valor. El arnés (página + turno de la cama 3) se sacó a dos funciones para que los dos
+  bucles de anchos partan del mismo sitio.
+  **Reconciliada con su razón (sin borrar aserciones):** la sección 6 usaba como vehículo del «el encabezado no interpreta HTML» el cuadro
+  «Escribir procedimiento…», que justamente deja de ser un dato; ahora el vehículo es una opción hostil del desplegable de Sedación (un campo que
+  SÍ se guarda). Las tres aserciones son las mismas.
+- `estado_del_bloque.js`. **4c** (nueva): clic REAL de ratón sobre un chip de fase (elegir, quitar, y quitar partiendo de «Registrado» puesto por
+  código) comparando la palabra pintada, sin llamar a `rielRender` a mano; un botón de juguete que se saca a sí mismo del árbol (la raíz); y la
+  fase agregada con ＋ → escribir → Enter con el servidor atrasado 700 ms. **4d** (nueva): texto en `#inProc` sin agregar → «sin registrar» (estado y
+  encabezado), medido también en lo que SE GUARDA (`PROC_JSON:"[]"` con vía natural); control positivo al agregarlo; y la lista de los seis
+  cuadros que llevan `data-sin-dato`, cada uno con su motivo. **Reconciliada:** la forma del resultado de `estadoBloque` pasó de
+  `estado,falta,resumen` a `estado,falta,faltaTxt,resumen` (una clave nueva; las otras tres no cambian), que es lo que pide R10.
+- `aviso_igual_que_guardar.js`. Cada obligatorio de la lista de siempre lleva ahora su frase de encabezado (se agregó el caso «PVE no corresponde con
+  Otra sin motivo», que no estaba), se exige que el encabezado de la tarjeta que lo contiene lo nombre y que **ninguno diga «un dato obligatorio»**,
+  a 1200 y a 390 px (en escritorio las tarjetas del Turno muestran el mismo encabezado); que cada entrada traiga su `corto`; que `_mFaltaTxt` ya no
+  exista; y que una entrada sin `corto` se nombre con su texto.
+- **Sensibilidad probada con mutantes** (copias fuera del repositorio): el listener sin captura → sale roja la aserción del botón de juguete (2
+  fallos: a los dos anchos), no los chips, que los cubre `renderFases`; `renderFases` sin su repintado → sale roja «agregada con Enter → Registrado»
+  (2 fallos). Hecha la guardia con la respuesta a 5 ms, este segundo mutante **sobrevivía**: ahí se vio lo del `change` del Enter y se atrasó la
+  respuesta.
+
+**Vecinas.** Con `-j 2`, en tres tandas: `convenciones`, `escapado_unico`, `emojis_nuevos`, `estado_del_bloque`, `estado_visible_escritorio`,
+`aviso_igual_que_guardar`, `obligatorios_una_sola_lista`, `abrir_hasta_el_campo`, `anotaciones_turno`, `cierre_tres_bloques`, `evaluaciones_celular`,
+`firma_texto_por_flujo`, `general_disuelta`, `general_solo_lo_suyo`, `guardado_viajes`, `ktm_otro_pantalla`, `movil_panel`, `movil`,
+`nada_del_guardado_despues`, `paso_relato`, `pendiente_arrastra`, `piso_letra_celular`, `pve_no_corresponde_razon`, `pve_otra_pantalla`,
+`regresion_ui`, `reporte_colega`, `sin_riel`, `titulos_tres_niveles`, `validacion_entre_pasos`, `panel_ux`, `seis_pasos`, `cuatro_pasos`,
+`prevencion_navm`, `ceros_de_punta_a_punta`, `hdn_y_upot`, `evento_sin_doble_pregunta`, `intubacion_modulo_evento`, `via_aerea_previo`,
+`tres_ejes_respiratorio`, `prono_arriba`, `episodio_turno`, `act_bar_390`, `contraste_tokens`, `tarjeta_acciones`, `boton_principal_unico`,
+`retro_camas`, `terapia_fisica_vuelve_al_reabrir`, `ktm_nivel_no_se_cuela`, `tutorial` y `paquete`: todas verdes. Única roja: `pwa_paquete` (el
+paquete instalable queda por regenerar en el cierre). `guardado_viajes` y `episodio_turno` verdes: lo que `guardar()` manda no cambió.
+
+**Lo que ve distinto la kinesióloga.**
+- Con el panel abierto en una pantalla de escritorio de 900 a 1366 px, una auscultación con varias opciones ya **no empuja** la tarjeta de
+  Respiratorio hacia la derecha ni deja el panel con scroll de lado; las dos columnas guardan su proporción.
+- El resumen del encabezado de Respiratorio («Requiere revisión falta declarar la PVE — VM · ACVC») **ya no se corta** entre 1100 y 1280 px:
+  cuando no cabe junto al título pasa a una segunda línea.
+- Elegir o quitar una fase clínica **actualiza al toque** la palabra del encabezado («Registrado» / «Sin registrar»).
+- Escribir un procedimiento (o una fase, un microorganismo, un hecho o un pendiente) **y no agregarlo** ya no hace decir «Registrado» ni muestra el
+  texto en el encabezado: sigue sin guardarse, pero el encabezado ya no afirma lo contrario.
+- El encabezado de la tarjeta dice **qué** falta en vez de «falta un dato obligatorio»: «falta la razón de la PVE», «falta el tipo de la
+  extubación sin PVE», «falta la hora de la reintubación», «falta el motivo de la «Otra» razón de la PVE».
+- Un procedimiento o una fase con signos como `<` o `&` se ve tal cual se escribió.
+
+**Lo que NO se hizo y queda dicho.**
+- 🪤 **Mismo defecto, otros dos sitios, sin tocar (no estaban en los hallazgos):** `tiRender` (los microorganismos del cultivo) y `renderAislTags`
+  (el aislamiento) escriben cada etiqueta con `${t}` crudo en `innerHTML`, igual que `renderChips`. El de aislamiento vive en un bloque oculto.
+  Es la misma corrección de una línea con `escapeHtml`; queda a decisión de quien arma el siguiente paso.
+- `guardar()` sigue sin agregar el texto pendiente de `#inProc` (opcional que anota R3): es decisión de Diego y no se tomó. Esta corrección solo hace
+  que el encabezado deje de afirmarlo.
+- No se tocaron `guardar()`, `api()`, `gs()`, `_guardadoBotones`, la franja `#gEstadoGuardado` ni los `avErr*`. Sin migración de esquema. `entrega/`,
+  `pwa/` y la `VERSION` quedan para el cierre; `build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js` y va en el commit.
+- En `docs/PENDIENTES.md` la fila «`_mFaltaTxt` dice "un dato obligatorio" para lo que no conoce» queda **resuelta** con este paso (no se editó ese
+  archivo aquí).

@@ -27,6 +27,16 @@
 //      cuelga de un elemento que lo declara), o está en la lista de EXENTOS de esta guardia CON SU MOTIVO. Es la red para el
 //      widget que se agregue mañana: si no se declara, vuelve a contarse como vacío, y esta guardia lo caza.
 //   8. En el celular los encabezados (✓ / — / !) salen de la MISMA función: los falsos «—» de arriba pasan a ✓.
+//   9. 🔴 (Revisión de la tanda 3, F1 · R2 y R7) UN CLIC REAL sobre un chip de «Fase clínica» repinta el encabezado. El repintado por
+//      clic de botón escuchaba en la fase de burbujeo del documento, pero `toggleFase` → `renderFases()` reescribe los botones con
+//      `innerHTML` y el botón tocado ya no estaba en el árbol cuando el evento llegaba: `closest('#kf button')` daba null y no se
+//      repintaba. Elegir una fase dejaba «Sin registrar» y quitarla dejaba «Registrado». Las pruebas de arriba llamaban a
+//      `toggleFase()` y a `rielRender()` DIRECTOS y por eso nunca lo vieron: acá se usa el ratón de verdad y no se llama a
+//      `rielRender()` a mano. También la fase AGREGADA al catálogo (＋, escribir, Enter), que termina en un `renderFases()` sin clic.
+//  10. 🔴 (R3 y R8) Lo escrito en un cuadro de «escribir para agregar» y NO agregado no es un dato: `guardar()` solo manda la lista
+//      (PROC_JSON), las fases elegidas, los microorganismos agregados y las anotaciones; el texto pendiente se pierde. Contarlo hacía
+//      decir «Registrado aspiración de secreciones» sobre un procedimiento que no se guarda. Esos cuadros llevan `data-sin-dato`
+//      y `_mLeer` los salta; lo realmente agregado ya lo cubren sus fuentes (@procs, @fase, fCultVal).
 //
 // 🪤 Reloj congelado: lunes 10-ago-2026 11:00 (fuera de las ventanas trampa: Fiestas Patrias, cierre de año, cumpleaños y la media
 // hora previa al cambio de turno). Se inventa la fecha, no se espera. Solo datos ficticios.
@@ -85,7 +95,7 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
       window.google = { script: { run: { withSuccessHandler(ok) { return { withFailureHandler() { return {
         api(a, d) { window._ll.push({ a, d }); let data = null; if (a === 'GET_CONFIG_UI') data = { NUM_CAMAS: 12, BANNERS: {} };
           else if (a === 'GET_EVO_TURNO') data = { actual: null, previa: null, pronoAbierto: '' };
-          setTimeout(() => ok({ ok: true, data }), 5); } }; } }; } } } };
+          setTimeout(() => ok({ ok: true, data }), window._lat || 5); } }; } }; } } } };
     });
     await p.goto('file://' + path.join(v2, 'index.html'));
     await p.waitForTimeout(800);
@@ -152,7 +162,10 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
     eq('…y lo que falta es la PVE', e0.falta, 'fPVEval');
     palabra('Sedación: la opción «Sin sedación» ya viene elegida (como hoy: cuenta)', await est('sed'), 'reg');
     const r0 = await seguro(p, () => { const r = estadoBloque(_bl('ausc')); return { claves: Object.keys(r).sort().join(','), tipo: typeof r.resumen }; });
-    eq('la forma del resultado: estado, resumen (texto) y falta', r0.__error ? 'ERROR: ' + r0.__error : r0.claves + '|' + r0.tipo, 'estado,falta,resumen|string');
+    /* 🗂️ F1 · R4/R10 · la forma ganó UNA clave: `faltaTxt`, el nombre corto con que el encabezado nombra lo que falta, que sale de la
+       MISMA entrada de `_obligatoriosPendientes()` que el elemento (antes lo buscaba por id una segunda tabla, `_mFaltaTxt`, y para cinco
+       obligatorios decía «un dato obligatorio»). Las otras tres claves no cambian: no se aflojó nada, se sumó lo que el hallazgo pide. */
+    eq('la forma del resultado: estado, falta (el elemento), faltaTxt (su nombre corto) y resumen (texto)', r0.__error ? 'ERROR: ' + r0.__error : r0.claves + '|' + r0.tipo, 'estado,falta,faltaTxt,resumen|string');
     if (movil) {
       palabra('sub-bloque «Ventilación» (VM · ACVC)', await est('msVent'), 'reg');
       palabra('sub-bloque «Eventos de vía aérea»: falta la PVE', await est('msEvt'), 'rev');
@@ -291,6 +304,97 @@ const seguro = async (p, fn, arg) => { try { return await p.evaluate(fn, arg); }
     eq('★★ sedantes en uso: ninguno marcado → sin registrar', sf.antes, 'sin');
     await ejecuta(() => document.querySelector('#gSedFarmacos .sedf-btn').click());
     eq('★★ …y uno marcado (botón con clase «on») → registrado', (await seguro(p, () => estadoBloque(document.getElementById('gSedFarmacos'), []).estado)), 'reg');
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    console.log('\n4c · 🔴 (R2 y R7) UN CLIC REAL en un chip de fase repinta el encabezado (sin llamar a rielRender a mano)');
+    await abrir({});
+    /* El ratón de verdad: Playwright mueve el puntero, baja y sube el botón sobre el chip. En el celular las tarjetas nacen plegadas. */
+    await p.evaluate(() => { FASES = ['Agudo', 'Weaning']; renderFases(); document.getElementById('fcFase').classList.remove('mcol'); rielRender(); });
+    await p.waitForTimeout(400);
+    const palFase = () => p.evaluate(() => { const m = document.querySelector('#fcFase .fcard-hdr .mpal'); return m ? m.textContent : null; });
+    const nFase = () => p.evaluate(() => FASES_SEL.size);
+    eq('antes de tocar nada: «Sin registrar»', await palFase(), 'Sin registrar');
+    await p.click('#faseChips .fase-chip[data-f="Agudo"]'); await p.waitForTimeout(700);
+    eq('…el clic eligió la fase', await nFase(), 1);
+    eq('★★ clic real en un chip → «Registrado» (antes se quedaba en «Sin registrar» hasta el siguiente tecleo)', await palFase(), 'Registrado');
+    await p.click('#faseChips .fase-chip[data-f="Agudo"]'); await p.waitForTimeout(700);
+    eq('…el segundo clic la quitó', await nFase(), 0);
+    eq('★★ …y quitarla con el clic real → «Sin registrar»', await palFase(), 'Sin registrar');
+    /* Quitar partiendo de «Registrado» puesto por código: el caso inverso, sin que el encabezado ya estuviera en «Sin registrar». */
+    await ejecuta(() => { FASES_SEL.add('Weaning'); renderFases(); });
+    eq('(control) con la fase puesta por código el encabezado dice «Registrado»', await palFase(), 'Registrado');
+    await p.click('#faseChips .fase-chip[data-f="Weaning"]'); await p.waitForTimeout(700);
+    eq('★★ quitarla con el clic real → «Sin registrar» (antes se quedaba en «Registrado» sin datos)', await palFase(), 'Sin registrar');
+
+    console.log('   …y el defecto de FONDO, sin depender de los chips: un botón que se reescribe a sí mismo repinta igual');
+    /* Los chips de fase quedan cubiertos también por `renderFases()` (que repinta él mismo), así que la raíz —el listener delegado del
+       documento no veía un botón que su propio clic saca del árbol— se mide con un botón de juguete que hace exactamente eso. */
+    await abrir({});
+    const juguete = await p.evaluate(async () => {
+      const d = document.createElement('div'); d.id = 'zAuto';
+      d.innerHTML = '<button type="button" id="zBtn" onclick="document.getElementById(\'zAuto\').innerHTML=\'<span>listo</span>\'">tocar</button>';
+      document.getElementById('kf').appendChild(d);
+      window.__riel = 0; const orig = window.__rielOrig = window.rielRender; window.rielRender = function () { window.__riel++; return orig.apply(this, arguments); };
+      return { hay: !!document.getElementById('zBtn'), orig: typeof orig };
+    });
+    si('(el botón de juguete está en el formulario)', juguete.hay);
+    await p.click('#zBtn'); await p.waitForTimeout(700);
+    const tras = await p.evaluate(() => { const r = { riel: window.__riel, quedoBoton: !!document.getElementById('zBtn') }; document.getElementById('zAuto').remove(); return r; });
+    si('(el clic lo sacó del árbol: así se reescriben los chips)', !tras.quedoBoton);
+    eq('★★ …y el estado de los bloques se repintó igual (rielRender corrió tras el clic)', tras.riel >= 1, true);
+    await p.evaluate(() => { window.rielRender = window.__rielOrig; });
+
+    console.log('   …y la fase AGREGADA al catálogo (＋, escribir el nombre, Enter): termina en un renderFases() sin clic');
+    await abrir({});
+    await p.evaluate(() => { FASES = ['Agudo']; renderFases(); document.getElementById('fcFase').classList.remove('mcol'); rielRender(); });
+    await p.waitForTimeout(400);
+    await p.click('#faseChips .fase-chip-add'); await p.waitForTimeout(150);
+    await p.fill('#faseNuevaInput', 'Fase de prueba'); await p.waitForTimeout(500);
+    eq('★★ escribir el nombre SIN agregarla todavía no es un dato → «Sin registrar» (R3/R8)', await palFase(), 'Sin registrar');
+    si('…y el cuadro lleva data-sin-dato', await p.evaluate(() => document.getElementById('faseNuevaInput').hasAttribute('data-sin-dato')));
+    /* El servidor de verdad tarda más que el repintado diferido (250 ms): con la respuesta a los 5 ms del simulacro, el `change` que dispara el
+       propio Enter repintaba DESPUÉS de que la fase ya estaba elegida y tapaba el defecto. Se atrasa la respuesta a 700 ms, como un viaje real. */
+    await p.evaluate(() => { window._lat = 700; });
+    await p.press('#faseNuevaInput', 'Enter'); await p.waitForTimeout(1600);
+    await p.evaluate(() => { window._lat = 0; });
+    eq('…se agregó a las elegidas', await nFase(), 1);
+    eq('★★ …agregada con Enter → «Registrado» sin tocar nada más', await palFase(), 'Registrado');
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    console.log('\n4d · 🔴 (R3 y R8) Un texto escrito para agregar y NO agregado no es un dato');
+    await abrir({});
+    const palProc = () => p.evaluate(() => { const c = _card(/Procedimientos/), m = c && c.querySelector('.fcard-hdr'); return { pal: m && m.querySelector('.mpal') ? m.querySelector('.mpal').textContent : null, txt: m && m.querySelector('.mres') ? m.querySelector('.mres').textContent : '' }; });
+    await ejecuta(() => { const e = document.getElementById('inProc'); e.value = 'aspiración de secreciones'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    palabra('★★ texto en «Escribir procedimiento…» sin agregar → estado «sin registrar»', await est('proc'), 'sin');
+    const pp0 = await palProc();
+    eq('★★ …y el encabezado de Procedimientos dice «Sin registrar»', pp0.pal, 'Sin registrar');
+    no('★★ …sin mostrar como registrado el texto que se perdería al guardar', /aspiraci[oó]n de secreciones/.test(pp0.txt));
+    /* El mismo hecho medido en lo que SE GUARDA: con vía natural nada bloquea el guardado, y el procedimiento sin agregar no viaja. */
+    await abrir({ va: 'Natural', sop: 'Ambiente' });
+    const guardado = await p.evaluate(async () => {
+      const e = document.getElementById('inProc'); e.value = 'aspiración de secreciones'; e.dispatchEvent(new Event('input', { bubbles: true }));
+      window._ll.length = 0; guardar(); await new Promise(r => setTimeout(r, 500));
+      const l = window._ll.find(x => x.a === 'GUARDAR_EVOLUCION');
+      return { llamo: !!l, proc: l && l.d ? l.d.PROC_JSON : null };
+    });
+    si('(con vía natural y todo en regla guardar() guarda)', guardado.llamo);
+    eq('…y el procedimiento escrito sin agregar NO viaja (PROC_JSON)', guardado.proc, '[]');
+    await abrir({});
+    await ejecuta(() => { document.getElementById('inProc').value = 'aspiración de secreciones'; addProc(); });
+    palabra('(control) al agregarlo con «+ Agregar» → registrado', await est('proc'), 'reg');
+    eq('(control) …y el encabezado dice «Registrado»', (await palProc()).pal, 'Registrado');
+
+    /* Los cuadros de «escribir para agregar» de TODO el panel, con su motivo: lo que se teclea ahí y no se agrega no se guarda. Si se suma
+       uno nuevo, se declara acá; el que no lleve `data-sin-dato` vuelve a contarse como dato y esta lista lo caza. */
+    const SIN_DATO = [
+      { id: 'inProc', motivo: 'Otro procedimiento: solo viaja la lista PROCS (se agrega con «+ Agregar» o Enter)' },
+      { id: 'fCultInput', motivo: 'Resultado(s) del cultivo: viaja fCultVal, que arma tiKeydown al apretar Enter' },
+      { id: 'anotTxt', motivo: 'Hechos del turno: viaja ANOTS, que arma anotAgregar' },
+      { id: 'anotHora', motivo: 'la hora de la anotación que se está escribiendo: la lleva anotAgregar junto con el texto' },
+      { id: 'pasoPendTxt', motivo: 'Otro pendiente: se abre en el episodio con su botón o Enter; el texto suelto no viaja' },
+    ];
+    const marcados = await p.evaluate(ids => ids.map(id => { const e = document.getElementById(id); return id + ':' + (e ? e.hasAttribute('data-sin-dato') : 'NO EXISTE'); }), SIN_DATO.map(x => x.id));
+    eq('★★ los cuadros de «escribir para agregar» llevan data-sin-dato (' + SIN_DATO.map(x => x.id).join(', ') + ')', marcados.join(' '), SIN_DATO.map(x => x.id + ':true').join(' '));
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     console.log('\n5 · 🔴 Un 0 TECLEADO es dato (vacío no es 0)');

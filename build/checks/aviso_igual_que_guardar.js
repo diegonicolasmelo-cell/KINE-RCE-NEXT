@@ -21,6 +21,13 @@
 //   3. Control positivo: con todo en regla el aviso queda vacío Y guardar() guarda (si no, el aviso estaría pidiendo de más).
 //   4. En el celular el encabezado de la tarjeta lo nombra (la hemodinamia es de la tarjeta Hemodinamia, la razón de no
 //      extubar es de Respiratorio) y no dice el genérico «un dato obligatorio».
+//   5. 🔴 (Revisión de la tanda 3, F1 · R4 y R10) Eso vale para TODOS los obligatorios, no solo los tres nuevos. El encabezado
+//      buscaba el nombre por id en una SEGUNDA tabla (`_mFaltaTxt`) que conocía diez y para seis campos decía «falta un dato
+//      obligatorio» (las razones de la PVE, su «Otra», el tipo de la extubación sin PVE y la hora de la reintubación) mientras la línea «Falta:»
+//      de arriba sí los nombraba: la promesa de «una sola lista» no llegaba al texto del encabezado. Ahora el nombre corto vive en la
+//      MISMA entrada de `_obligatoriosPendientes()` que el texto y el elemento (`corto`), la tabla paralela ya no existe y un
+//      obligatorio nuevo se nombra con su propio texto aunque nadie escriba su forma corta. Se mide en las dos anchuras: en
+//      escritorio las tarjetas del Turno muestran el mismo encabezado.
 //
 // 🪤 «El mismo lugar» se compara por TARJETA, no por id: guardar() lleva a un botón visible (`btnPVESi`) y la lista guarda
 // el input oculto que contiene el valor (`fPVEval`); el celular marca la tarjeta que contiene el elemento. Para los tres
@@ -62,16 +69,17 @@ const NUEVOS = [
 
 /* LOS DE SIEMPRE: el mismo invariante, para que la próxima deriva no tenga que esperar a un bug. `id` = destino de guardar(). */
 const DE_SIEMPRE = [
-  { n: 'tubo + VM con la PVE sin responder', armar: '() => {}', id: 'btnPVESi' },
-  { n: 'PVE «No» sin razón', armar: "() => hPVEtoggle('no')", id: 'fPveSCraz' },
-  { n: 'PVE «No corresponde» sin razón', armar: "() => hPVEtoggle('nc')", id: 'fPveNcRaz' },
-  { n: 'PVE «No» con «Otra» sin motivo', armar: "() => { hPVEtoggle('no'); $('fPveSCraz').value = 'Otra'; hPveSCraz(); }", id: 'fPveSCdet' },
-  { n: 'extubación sin PVE sin su tipo', armar: "() => { hPVEtoggle('no'); $('cExtSinPve').checked = true; hExtSinPve(); }", id: 'dExtTipoBox' },
-  { n: 'KTM «No realizada» sin razón', armar: "() => { hPVEtoggle('si'); setKTMstate('n'); }", id: 'fKTMnoRaz' },
-  { n: 'KTM «Contraindicada» sin contraindicación', armar: "() => { hPVEtoggle('si'); setKTMstate('s'); }", id: 'fKTMcontra' },
-  { n: 'KTM suspendida en sesión sin criterio', armar: "() => { hPVEtoggle('si'); setKTMstate('r'); $('cKTMalert').checked = true; }", id: 'fKTMalertRaz' },
-  { n: 'KTM «No realizada · Otro» sin fundamento', armar: "() => { hPVEtoggle('si'); setKTMstate('n'); _ktmNoRazonSel('Otro'); }", id: 'fKTMnoCom' },
-  { n: 'reintubación sin hora', natural: true, armar: "() => { $('cReintubT').checked = true; }", id: 'fReintubHoraT' },
+  { n: 'tubo + VM con la PVE sin responder', armar: '() => {}', id: 'btnPVESi', cab: /^Requiere revisión falta declarar la PVE/ },
+  { n: 'PVE «No» sin razón', armar: "() => hPVEtoggle('no')", id: 'fPveSCraz', cab: /falta la razón de la PVE/ },
+  { n: 'PVE «No corresponde» sin razón', armar: "() => hPVEtoggle('nc')", id: 'fPveNcRaz', cab: /falta la razón de la PVE/ },
+  { n: 'PVE «No» con «Otra» sin motivo', armar: "() => { hPVEtoggle('no'); $('fPveSCraz').value = 'Otra'; hPveSCraz(); }", id: 'fPveSCdet', cab: /falta el motivo de la «Otra» razón de la PVE/ },
+  { n: 'PVE «No corresponde» con «Otra» sin motivo', armar: "() => { hPVEtoggle('nc'); $('fPveNcRaz').value = 'Otra'; hPveNcRaz(); }", id: 'fPveNcDet', cab: /falta el motivo de la «Otra» razón de la PVE/ },
+  { n: 'extubación sin PVE sin su tipo', armar: "() => { hPVEtoggle('no'); $('cExtSinPve').checked = true; hExtSinPve(); }", id: 'dExtTipoBox', cab: /falta el tipo de la extubación sin PVE/ },
+  { n: 'KTM «No realizada» sin razón', armar: "() => { hPVEtoggle('si'); setKTMstate('n'); }", id: 'fKTMnoRaz', cab: /falta la razón de KTM/ },
+  { n: 'KTM «Contraindicada» sin contraindicación', armar: "() => { hPVEtoggle('si'); setKTMstate('s'); }", id: 'fKTMcontra', cab: /falta la contraindicación/ },
+  { n: 'KTM suspendida en sesión sin criterio', armar: "() => { hPVEtoggle('si'); setKTMstate('r'); $('cKTMalert').checked = true; }", id: 'fKTMalertRaz', cab: /falta el criterio de la suspensión en sesión/ },
+  { n: 'KTM «No realizada · Otro» sin fundamento', armar: "() => { hPVEtoggle('si'); setKTMstate('n'); _ktmNoRazonSel('Otro'); }", id: 'fKTMnoCom', cab: /falta el fundamento de la razón/ },
+  { n: 'reintubación sin hora', natural: true, armar: "() => { $('cReintubT').checked = true; }", id: 'fReintubHoraT', cab: /falta la hora de la reintubación/ },
 ];
 
 (async () => {
@@ -119,7 +127,8 @@ const DE_SIEMPRE = [
       const llave = c => c ? (c.id || ((c.querySelector('.fcard-title') || {}).textContent || '')).trim() : null;
       const r = { gFalta: $('gFalta').textContent, existe: typeof _obligatoriosPendientes === 'function', lista: [], listaOk: false,
         vaTipo: v('fVA'), firma: v('fFirma'), hest: v('fHEst'), dva: v('fDVA') };
-      if (r.existe) { const l = _obligatoriosPendientes(); r.listaOk = Array.isArray(l); r.lista = r.listaOk ? l.map(o => ({ id: o && o.el && o.el.id, card: llave(o && o.el && o.el.closest('.fcard')) })) : []; }
+      if (r.existe) { const l = _obligatoriosPendientes(); r.listaOk = Array.isArray(l); r.lista = r.listaOk ? l.map(o => ({ id: o && o.el && o.el.id, card: llave(o && o.el && o.el.closest('.fcard')) })) : [];
+        r.cortos = r.listaOk ? l.map(o => o && o.corto) : []; }
       window._ll.length = 0; window._destinos.length = 0;
       guardar();
       await new Promise(r2 => setTimeout(r2, 400));
@@ -156,6 +165,15 @@ const DE_SIEMPRE = [
       si('★ …y #gFalta no queda vacío', r.gFalta !== '');
       si('★ …y la lista de elementos incluye el lugar al que guardar() lleva (' + s.id + ')',
         r.lista.some(o => o.id === s.id || (r.destinoCard && o.card === r.destinoCard)));
+      /* R4/R10 · el encabezado de la tarjeta que lo contiene NOMBRA lo que falta (no el genérico). En el celular toda tarjeta lo lleva; en
+         escritorio, las del Turno (las de otros pasos no pintan estado). */
+      const enCab = !!r.destinoCard && Object.prototype.hasOwnProperty.call(r.cabeceras, r.destinoCard);
+      if (movil) si('★★ …y en el celular su tarjeta (' + r.destinoCard + ') queda con «!»', enCab);
+      if (enCab) {
+        si('★★ …y su encabezado lo nombra: ' + s.cab, s.cab.test(r.cabeceras[r.destinoCard] || ''));
+        no('★★ …y no dice el genérico «un dato obligatorio»', /un dato obligatorio/.test(r.cabeceras[r.destinoCard] || ''));
+      }
+      si('★★ …y cada obligatorio de la lista trae su nombre corto (' + JSON.stringify(r.cortos) + ')', r.cortos.length > 0 && r.cortos.every(c => typeof c === 'string' && c.trim() !== ''));
     }
 
     console.log('\n3 · El orden del aviso es el de guardar(): firma · hemodinamia · vía aérea');
@@ -176,6 +194,32 @@ const DE_SIEMPRE = [
       const r3 = await intento({ armar: '() => { ' + SUP_SIN_EXT + " $('fPveSupRaz').value = 'Otra'; $('fPveSupDet').value = 'aseo quirúrgico a las 12'; hPveSupExt(); setKTMstate('r'); }" });
       eq('★ …con «Otra» y su detalle escrito: el aviso está vacío', r3.gFalta, '');
       si('★ …y guardar() guarda', r3.guardo);
+    }
+    console.log('\n5 · 🔴 (R4 y R10) UNA sola fuente para el nombre: la tabla paralela ya no existe y un obligatorio sin forma corta se nombra con su texto');
+    {
+      const e = await p.evaluate(() => {
+        const out = { tabla: typeof _mFaltaTxt };
+        /* Una función que todavía no acepta entradas no puede tumbar la guardia con una excepción: sale como un fallo con nombre. */
+        try {
+        /* Una entrada SIN `corto` (un obligatorio que alguien suma mañana y no escribe su forma corta) se nombra con su propio texto. */
+        const hemo = [...document.querySelectorAll('#kf .fcard')].find(c => /Hemodinamia/.test((c.querySelector('.fcard-title') || {}).textContent || ''));
+        const r = estadoBloque(hemo, [{ el: document.getElementById('fHEst'), texto: 'algo que falta' }]);
+        out.sinCorto = r.faltaTxt; out.elemento = r.falta && r.falta.id; out.estado = r.estado;
+        /* Una entrada CON `corto` se nombra con él, y la entrada de otra tarjeta no marca ésta. */
+        const r2 = estadoBloque(hemo, [{ el: document.getElementById('fHEst'), texto: 'largo del aviso', corto: 'el corto del encabezado' }]);
+        out.conCorto = r2.faltaTxt;
+        const r3 = estadoBloque(hemo, [{ el: document.getElementById('fFirma'), texto: 'firma', corto: 'la firma' }]);
+        out.ajena = r3.falta; out.ajenaEstado = r3.estado;
+        } catch (err) { out.error = String(err && err.message || err); }
+        return out;
+      });
+      if (e.error) eq('estadoBloque acepta las entradas {el, texto, corto}', 'ERROR: ' + e.error, 'sin error');
+      eq('★★ la segunda tabla de nombres por id (_mFaltaTxt) ya no existe', e.tabla, 'undefined');
+      eq('★★ una entrada sin `corto` se nombra con su texto, no con un genérico', e.sinCorto, 'algo que falta');
+      eq('…y marca el elemento de la entrada', e.elemento, 'fHEst');
+      eq('…y la tarjeta queda «rev»', e.estado, 'rev');
+      eq('★ una entrada con `corto` se nombra con él', e.conCorto, 'el corto del encabezado');
+      eq('una entrada de OTRA tarjeta no marca ésta', e.ajena, null);
     }
     await p.close();
   }

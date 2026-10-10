@@ -979,7 +979,15 @@ table.rhb2 .rl{width:128px;text-align:left;}
 /* Panel de evolución a pantalla completa (100dvh sigue la barra del navegador móvil) */
 .spanel{position:fixed;top:0;left:0;width:100vw;height:100dvh;background:#fff;z-index:100;border-radius:0;overflow:hidden;transform:translateY(12px);opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
 .spanel.on{opacity:1;pointer-events:auto;transform:translateY(0);}
-.sp-2col{display:grid;grid-template-columns:2fr 3fr;gap:14px;align-items:start;}
+/* 🪤 10-oct-2026 (revisión de la tanda 3, R1 y R6) · `2fr 3fr` a secas es `minmax(auto,2fr) minmax(auto,3fr)`: el piso de cada columna es el
+   ancho mínimo de lo que lleva dentro. Desde que el encabezado de cada tarjeta del Turno muestra su resumen en una línea SIN partir
+   (`.mres`, paso 3.3), tres opciones corrientes de Auscultación —«Disminuido en Bases · Sin ruidos agregados · Ambos campos pulmonares»,
+   en la columna IZQUIERDA, la angosta— llevaban esa columna de 391 a 659 px y empujaban la otra: a 1024 px el panel quedaba con 156 px
+   de scroll lateral y la tarjeta Respiratorio cortada (a 1366 px las columnas pasaban de 522/784 a 659/647). El arreglo de 820 px para
+   abajo ya estaba (`minmax(0,1fr)`, más abajo); esta es la misma regla para escritorio. Con `minmax(0,…)` las columnas guardan su
+   proporción 2:3 pase lo que pase adentro y el resumen se corta o pasa a otra línea (`.mres`), que es para lo que está pensado.
+   Lo fija estado_visible_escritorio.js (5c): resumen largo en la columna izquierda a 900-1366 px. */
+.sp-2col{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:14px;align-items:start;}
 .sp-col{display:flex;flex-direction:column;gap:0;}
 @media(max-width:820px){
   /* 🪤 10-oct-2026 · `1fr` es `minmax(auto,1fr)`: el piso de la columna es el ancho mínimo de lo que lleva dentro, y el resumen del
@@ -1120,7 +1128,14 @@ table.rhb2 .rl{width:128px;text-align:left;}
 @media (min-width:741px){
   .fcard.est-on>.fcard-hdr .mst{display:flex;width:18px;height:18px;border-radius:50%;flex-shrink:0;
     align-items:center;justify-content:center;font-size:.62rem;font-weight:800;}
-  .fcard.est-on>.fcard-hdr .mres{display:block;flex:1 1 0;min-width:0;font-size:.74rem;line-height:1.4;
+  /* 🪤 10-oct-2026 (revisión de la tanda 3, R24) · el resumen iba en `flex:1 1 0`: tomaba SOLO lo que el título dejaba libre, y el título
+     de Respiratorio mide 354 px. «Requiere revisión falta declarar la PVE — VM · ACVC» (302 px) quedaba en 271 px a 1200 px, 241 a 1150
+     y 211 a 1100: se cortaba justo el final («VM · ACVC»). Ahora el encabezado puede envolver y el resumen pide su ancho (`flex:1 1 auto`):
+     si cabe junto al título se queda en la misma línea, y si no, pasa a una SEGUNDA línea con todo el ancho de la tarjeta —igual que
+     en el celular, donde `.mres` ya va debajo del título—. Solo si ni la tarjeta entera lo aguanta se corta con puntos suspensivos
+     (`max-width:100%`). Lo fija estado_visible_escritorio.js (5d). */
+  .fcard.est-on>.fcard-hdr{flex-wrap:wrap;row-gap:2px;}
+  .fcard.est-on>.fcard-hdr .mres{display:block;flex:1 1 auto;min-width:0;max-width:100%;font-size:.74rem;line-height:1.4;
     color:#6b665d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 }
 /* Etapa 2: mediciones heredadas de la réplica — ámbar hasta tocarlas o confirmar el módulo */
@@ -4925,7 +4940,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                     <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#7c3aed;margin-bottom:4px;">Resultado(s)</div>
                     <div class="ti-wrap violet" onclick="document.getElementById('fCultInput').focus()">
                       <div id="fCultTags" style="display:contents;"></div>
-                      <input id="fCultInput" class="ti-input" type="text" placeholder="Microorganismo… + Enter"
+                      <input id="fCultInput" class="ti-input" type="text" data-sin-dato placeholder="Microorganismo… + Enter"
                         onkeydown="tiKeydown(event,'fCultTags','fCultVal','violet',[])">
                     </div>
                     <input type="hidden" id="fCultVal">
@@ -5009,7 +5024,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
                 <summary style="font-size:.78rem;font-weight:700;color:#475569;cursor:pointer;">➕ Otro procedimiento (olvidado o fuera de lista)</summary>
                 <div id="chips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:26px;margin:8px 0;"></div>
                 <div style="display:flex;gap:8px;">
-                  <input type="text" id="inProc" placeholder="Escribir procedimiento..." list="dlProc"
+                  <input type="text" id="inProc" data-sin-dato placeholder="Escribir procedimiento..." list="dlProc"
                     style="flex-grow:1;height:35px;border:1px solid #cbd5e1;border-radius:6px;padding:0 10px;font-size:.84rem;">
                   <datalist id="dlProc"></datalist>
                   <button type="button" class="btn btn-p" style="width:auto;padding:0 15px;height:35px;" onclick="addProc()">+ Agregar</button>
@@ -5579,8 +5594,8 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <p class="cg-s">Hechos que se cuentan y no suman a estadística.</p>
             <div id="anotLista" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;"></div>
             <div style="display:flex;gap:6px;align-items:center;">
-              <input type="text" id="anotTxt" placeholder="ej.: EEG realizado, evaluado por neurología" style="flex:1;min-width:0;height:32px;" onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();anotAgregar();}">
-              <input type="time" id="anotHora" title="Hora (opcional)" style="width:104px;height:32px;flex-shrink:0;">
+              <input type="text" id="anotTxt" data-sin-dato placeholder="ej.: EEG realizado, evaluado por neurología" style="flex:1;min-width:0;height:32px;" onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();anotAgregar();}">
+              <input type="time" id="anotHora" data-sin-dato title="Hora (opcional)" style="width:104px;height:32px;flex-shrink:0;">
               <button type="button" class="dpset" style="flex-shrink:0;" onclick="anotAgregar()">➕ Agregar</button>
             </div>
             <!-- 🪤 El campo de la Nota se queda ESCONDIDO y vacío: `fillForm`
@@ -5618,7 +5633,7 @@ document.documentElement.setAttribute('data-piel', 'inst');
             <div id="pendChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
             <div id="pasoPendSugs" class="pp-sugs"></div>
             <div style="display:flex;gap:6px;align-items:center;margin-top:5px;">
-              <input type="text" id="pasoPendTxt" placeholder="Otro pendiente: escríbelo como quieras…" style="flex:1;min-width:0;height:32px;"
+              <input type="text" id="pasoPendTxt" data-sin-dato placeholder="Otro pendiente: escríbelo como quieras…" style="flex:1;min-width:0;height:32px;"
                      onkeydown="if(event.key===&apos;Enter&apos;){event.preventDefault();pasoPendEscrito();}">
               <button type="button" class="dpset" id="pasoPendBtn" style="flex-shrink:0;" data-nodirty onclick="pasoPendEscrito()">📌 Dejar</button>
             </div>
@@ -7138,8 +7153,14 @@ function _resetHiddenYEventos(){
 let _rielT=null;
 function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
 /**
- * LA LISTA ÚNICA de lo que falta para poder guardar, en el orden en que se anuncia: `[{ el, texto }]`, con `el` el campo
- * al que hay que llevar a la persona y `texto` lo que dice la línea «Falta:» de #gFalta.
+ * LA LISTA ÚNICA de lo que falta para poder guardar, en el orden en que se anuncia: `[{ el, texto, corto }]`.
+ *   · `texto` es lo que dice la línea «Falta:» de #gFalta (la fija palabra por palabra obligatorios_una_sola_lista.js).
+ *   · `corto` es cómo lo nombra el ENCABEZADO de la tarjeta («falta la firma», «falta declarar la PVE»): con artículo y sin la
+ *     explicación de más, porque ahí compite con el título y el resumen. Si una entrada no lo trae, el encabezado usa su `texto`
+ *     (nunca un genérico).
+ *   · `el` es el elemento que CONTIENE el dato, y sirve para saber QUÉ TARJETA lo tiene (`contains`). 🪤 No siempre es un campo al que
+ *     se pueda llevar a la persona: para la PVE y la contraindicación de KTM es un <input type=hidden> (`fPVEval`, `fKTMraz`) que no
+ *     se puede enfocar ni desplazar. A dónde llevar lo decide `guardar()` con su propio destino (`btnPVESi`…); nadie debe navegar con `el`.
  *
  * 🔴 10-oct-2026 · ANTES eran dos listas paralelas dentro de `rielRender` (textos y elementos) y una tercera en `guardar()`.
  * Bastaba agregar un obligatorio a una y olvidar la otra para que el aviso y el bloqueo se contradijeran, y se
@@ -7148,6 +7169,10 @@ function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
  * con la firma y la vía aérea puestas decía «Falta:» en blanco y al apretar Guardar salía «Registra la hemodinamia»: el
  * aviso mentía por omisión. Un obligatorio que bloquea tiene que anunciarse ANTES de apretar. Ahora el texto de la línea y
  * el elemento que marca el celular salen de la MISMA entrada: no se pueden separar.
+ * 🔴 Y el NOMBRE CORTO del encabezado también (revisión de la tanda 3, R4 y R10): vivía en una segunda tabla por id (`_mFaltaTxt`) que
+ * conocía diez y para seis campos decía «falta un dato obligatorio» —las razones de la PVE (no realizada y no corresponde), el motivo de su
+ * «Otra», el tipo de la extubación sin PVE y la hora de la reintubación— mientras la línea de arriba sí los nombraba. Una tabla aparte se desactualiza en silencio: ahora
+ * el obligatorio nuevo se nombra donde se declara, y si no, con su `texto`.
  * 🪤 El ORDEN es el de `guardar()` (firma · hemodinamia · vía aérea · PVE · razón de no extubar · KTM · reintubación), y el
  * primero de la lista es el campo al que `guardar()` lleva. `guardar()` sigue con su propia secuencia (cada obligatorio con
  * su toast y su frase), así que un obligatorio nuevo va en los DOS sitios: lo cuida aviso_igual_que_guardar.js, y
@@ -7155,25 +7180,25 @@ function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
  */
 function _obligatoriosPendientes(){
   const o=[];
-  const falta=(el,texto)=>{ o.push({el:el, texto:texto}); };
-  if(!v('fFirma')) falta($('fFirma'),'firma');
+  const falta=(el,texto,corto)=>{ o.push({el:el, texto:texto, corto:corto||texto}); };
+  if(!v('fFirma')) falta($('fFirma'),'firma','la firma');
   // Estado Y DVA (las dos). Como en guardar(), se lleva al primero que está vacío.
-  if(!v('fHEst') || !v('fDVA')) falta(!v('fHEst')?$('fHEst'):$('fDVA'),'hemodinamia');
-  if(!v('fVA')) falta($('fVA'),'vía aérea');
+  if(!v('fHEst') || !v('fDVA')) falta(!v('fHEst')?$('fHEst'):$('fDVA'),'hemodinamia','la hemodinamia');
+  if(!v('fVA')) falta($('fVA'),'vía aérea','la vía aérea');
   // Obligatorias nuevas (ago-2026, Diego): declarar la PVE con TOT y la
   // razón cuando la KTM no se realiza o está contraindicada.
-  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) falta($('fPVEval'),'PVE sí / no / no corresponde');
-  { const _pr=_pveRazonFalta(); if(_pr) falta(_pr, v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada'); }
-  { const _po=_pveOtraSinMotivo(); if(_po) falta(_po,'motivo de la «Otra» razón de PVE'); }
-  { const _pt=_pveExtSinTipo(); if(_pt) falta(_pt,'tipo de la extubación sin PVE'); }
+  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) falta($('fPVEval'),'PVE sí / no / no corresponde','declarar la PVE');
+  { const _pr=_pveRazonFalta(); if(_pr) falta(_pr, v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada', 'la razón de la PVE'); }
+  { const _po=_pveOtraSinMotivo(); if(_po) falta(_po,'motivo de la «Otra» razón de PVE','el motivo de la «Otra» razón de la PVE'); }
+  { const _pt=_pveExtSinTipo(); if(_pt) falta(_pt,'tipo de la extubación sin PVE','el tipo de la extubación sin PVE'); }
   // PVE superada y NO se extubó: la razón es obligatoria y «Otra» exige el detalle (tanda 2a). Mismas condiciones que guardar().
-  if(_pveSupSinExt() && !_pveSupRazon()) falta($('fPveSupRaz'),'razón de la PVE superada sin extubar');
-  if(_pveSupSinExt() && String(v('fPveSupRaz')||'').trim()==='Otra' && !String(v('fPveSupDet')||'').trim()) falta($('fPveSupDet'),'motivo de la «Otra» razón de no extubar');
-  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) falta($('fKTMnoRaz'),'razón de KTM no realizada');
-  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) falta($('fKTMraz'),'contraindicación de KTM');
-  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) falta($('fKTMalertRaz'),'criterio de la suspensión de KTM en sesión');
-  { const _kof=_ktmOtroSinFundamento(); if(_kof) falta(_kof,'fundamento de la razón de KTM'); }
-  if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) falta(_rh,'hora de la reintubación'); }
+  if(_pveSupSinExt() && !_pveSupRazon()) falta($('fPveSupRaz'),'razón de la PVE superada sin extubar','la razón de no extubar');
+  if(_pveSupSinExt() && String(v('fPveSupRaz')||'').trim()==='Otra' && !String(v('fPveSupDet')||'').trim()) falta($('fPveSupDet'),'motivo de la «Otra» razón de no extubar','el motivo de la «Otra» razón de no extubar');
+  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) falta($('fKTMnoRaz'),'razón de KTM no realizada','la razón de KTM');
+  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) falta($('fKTMraz'),'contraindicación de KTM','la contraindicación');
+  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) falta($('fKTMalertRaz'),'criterio de la suspensión de KTM en sesión','el criterio de la suspensión en sesión');
+  { const _kof=_ktmOtroSinFundamento(); if(_kof) falta(_kof,'fundamento de la razón de KTM','el fundamento de la razón'); }
+  if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) falta(_rh,'hora de la reintubación','la hora de la reintubación'); }
   return o;
 }
 /**
@@ -7196,11 +7221,11 @@ function rielRender(){
   const pend=_obligatoriosPendientes();
   const fEl=$('gFalta');
   if(fEl) fEl.textContent=pend.length?('Falta: '+pend.map(o=>o.texto).join(' y ')):'';
-  // Los MISMOS obligatorios, pero como elementos: en el celular el aviso va en
-  // el encabezado de la sección que lo contiene, no en una línea al final que
-  // en un teléfono queda fuera de la pantalla. Se deduce por `contains`, no por
-  // el título de la tarjeta — un título se cambia y nadie se acuerda del riel.
-  _mPintarSecciones(pend.map(o=>o.el));
+  // Las MISMAS entradas (elemento y nombre corto, no solo el elemento): el aviso va en
+  // el encabezado de la sección que lo contiene —en el celular una línea al final queda
+  // fuera de la pantalla—. Se deduce por `contains`, no por el título de la tarjeta:
+  // un título se cambia y nadie se acuerda del riel.
+  _mPintarSecciones(pend);
   _mPacBar();
 }
 /* 🗂️ 17-sep-2026 · Acá vivía `rielIr(i)`, el salto a una sección desde el
@@ -7212,8 +7237,14 @@ document.addEventListener('input', e=>{ if(e.target && e.target.closest && e.tar
 document.addEventListener('change', e=>{ if(e.target && e.target.closest && e.target.closest('#kf')) _rielDeb(); });
 /* 🪤 10-oct-2026 · UN BOTÓN NO DISPARA input NI change. La PVE (sí / no / no corresponde), el prono, las secreciones, los eventos de vía
    aérea, la fase y los sedantes se responden con botones: sin esto el aviso «Falta:» y la palabra de estado de cada bloque quedaban
-   VIEJOS hasta el siguiente tecleo, o sea que «Requiere revisión» seguía puesto después de haber respondido lo que pedía. */
-document.addEventListener('click', e=>{ if(e.target && e.target.closest && e.target.closest('#kf button')) _rielDeb(); });
+   VIEJOS hasta el siguiente tecleo, o sea que «Requiere revisión» seguía puesto después de haber respondido lo que pedía.
+   🪤 10-oct-2026 (revisión de la tanda 3, R2 y R7) · EN FASE DE CAPTURA (el `true` del final). Un botón que se reescribe a sí mismo —los chips
+   de «Fase clínica»: `toggleFase` → `renderFases()` pone otro `innerHTML`— ya no estaba en el árbol cuando el evento subía en burbuja
+   hasta el documento: `e.target.closest('#kf button')` daba null y no se repintaba. Elegir una fase dejaba «Sin registrar» y quitarla
+   dejaba «Registrado» hasta el siguiente tecleo, o sea el mismo defecto que este listener decía haber arreglado. En captura el listener corre
+   ANTES del `onclick` del botón, con el botón todavía en su sitio, y el repintado (250 ms después) ocurre cuando el clic ya hizo su trabajo.
+   Lo fija estado_del_bloque.js (4c) con un clic de ratón de verdad, sin llamar a `rielRender()` a mano. */
+document.addEventListener('click', e=>{ if(e.target && e.target.closest && e.target.closest('#kf button')) _rielDeb(); }, true);
 
 // ── Dos rescates del SmartEvo (15-ago-2026, aprobados por Diego) ──
 // 1) FiO₂ escrita como fracción se convierte sola a porcentaje (0.4 → 40):
@@ -13280,8 +13311,11 @@ function addProc() {
 }
 function quitarProc(i) { PROCS.splice(i,1); renderChips(); }
 function renderChips() {
+  // 🔴 10-oct-2026 (revisión de la tanda 3, R5 y R9) · `${p}` iba CRUDO dentro de innerHTML: el texto de un procedimiento es libre y
+  // vuelve en PROC_JSON de la réplica del turno anterior (de otro colega), así que un `<img onerror>` corría en la pantalla de quien
+  // abre. Un solo escapador, el de siempre (CLAUDE.md); lo fija estado_visible_escritorio.js (6b).
   $('chips').innerHTML=PROCS.map((p,i)=>`
-    <span class="chip">${p}<button type="button" onclick="quitarProc(${i})">×</button></span>`).join('');
+    <span class="chip">${escapeHtml(p)}<button type="button" onclick="quitarProc(${i})">×</button></span>`).join('');
   // La lista de procedimientos es una FUENTE del estado de la tarjeta (data-fuentes="@procs"): agregar uno con Enter no dispara input ni
   // change ni click, y sin esto el encabezado seguía diciendo lo de antes de agregarlo.
   if(typeof _rielDeb==='function') _rielDeb();
@@ -16531,6 +16565,12 @@ function _mLeer(cont){
   for(const el of ctrls){
     if(hay && out.length>=4) break;
     if(el.disabled||_mOculto(el,cont)) continue;
+    /* 🔴 10-oct-2026 (revisión de la tanda 3, R3 y R8) · un cuadro de «escribir para agregar» con texto TODAVÍA SIN AGREGAR no es un dato:
+       `guardar()` solo manda la lista que se arma al agregar (PROC_JSON, fases elegidas, microorganismos, anotaciones) y el texto suelto
+       se pierde. Contarlo hacía decir «Registrado aspiración de secreciones» sobre un procedimiento que no se iba a guardar, y con el
+       cuadro dentro de un <details> cerrado el encabezado era lo único que se veía. Esos cuadros llevan `data-sin-dato`; lo que SÍ se
+       agregó lo cubren sus fuentes declaradas (@procs, @fase, fCultVal). Los declara estado_del_bloque.js (4d) con su motivo. */
+    if(el.hasAttribute('data-sin-dato')) continue;
     if(el.type==='checkbox'||el.type==='radio'){
       if(el.checked){ hay=true; if(out.length<4){ const e=_mEtiq(el); if(e) out.push(e); } }
       continue;
@@ -16556,14 +16596,17 @@ function _mLeer(cont){
 }
 
 /**
- * EL ESTADO DE UN BLOQUE: `{ estado:'sin'|'reg'|'rev', resumen, falta }`. `faltaEls` es la lista de elementos obligatorios
- * pendientes (rielRender ya la tiene calculada y se la pasa a los 16 encabezados); sin ella se calcula acá. Ver el recuadro de arriba.
+ * EL ESTADO DE UN BLOQUE: `{ estado:'sin'|'reg'|'rev', resumen, falta, faltaTxt }`. `pendientes` es la lista de `_obligatoriosPendientes()`
+ * (rielRender ya la tiene calculada y se la pasa a los 16 encabezados); sin ella se calcula acá. `falta` es el elemento obligatorio que
+ * está DENTRO del bloque y `faltaTxt` el nombre corto con que el encabezado lo nombra: salen de la MISMA entrada, no de dos tablas
+ * (revisión de la tanda 3, R4 y R10). Ver el recuadro de arriba.
  */
-function estadoBloque(cont, faltaEls){
-  const r={ estado:'sin', resumen:'', falta:null };
+function estadoBloque(cont, pendientes){
+  const r={ estado:'sin', resumen:'', falta:null, faltaTxt:null };
   if(!cont) return r;
-  const fe=faltaEls || _obligatoriosPendientes().map(o=>o.el);
-  r.falta=fe.find(e=>e && cont.contains(e)) || null;
+  const pend=pendientes || _obligatoriosPendientes();
+  const ent=pend.find(o=>o && o.el && cont.contains(o.el));
+  if(ent){ r.falta=ent.el; r.faltaTxt=ent.corto||ent.texto; }
   const l=_mLeer(cont);
   r.resumen=l.txt;
   r.estado = r.falta ? 'rev' : ((l.hay || _hayFuenteConDato(cont)) ? 'reg' : 'sin');
@@ -16581,7 +16624,7 @@ const _MST_CLS={ sin:'no', reg:'ok', rev:'req' }, _MST_GLIFO={ sin:'—', reg:'�
 function _mPintarEstado(st, rs, e, conPalabra){
   st.className='mst '+_MST_CLS[e.estado]; st.textContent=_MST_GLIFO[e.estado];
   const res=e.resumen?_escSt(e.resumen):'';
-  const falta=e.falta?'<b>falta '+_escSt(_mFaltaTxt(e.falta))+'</b>':'';
+  const falta=e.falta?'<b>falta '+_escSt(e.faltaTxt)+'</b>':'';
   if(conPalabra){
     rs.className='mres';
     // Lo que falta va PRIMERO: es lo accionable, y el resumen es una línea que se corta con puntos suspensivos —al final se perdía justo eso.
@@ -16598,7 +16641,7 @@ function _mPintarEstado(st, rs, e, conPalabra){
  * El dueño de una tarjeta se decide con la MISMA regla que `pasoIr`: sin `data-paso` es del Turno (paso 2). Una tarjeta nueva
  * del Turno recibe su palabra sin que nadie se acuerde de tocar esta función.
  */
-function _mPintarSecciones(faltaEls){
+function _mPintarSecciones(pendientes){
   const movil=esMovil();
   document.querySelectorAll('#kf .fcard').forEach(c=>{
     const turno=String(c.dataset.paso||'2')==='2';
@@ -16609,7 +16652,7 @@ function _mPintarSecciones(faltaEls){
     if(!st){ st=document.createElement('span'); st.className='mst'; hdr.insertBefore(st, hdr.firstChild); }
     let rs=hdr.querySelector('.mres');
     if(!rs){ rs=document.createElement('span'); rs.className='mres'; hdr.appendChild(rs); }
-    _mPintarEstado(st, rs, estadoBloque(c, faltaEls), turno);
+    _mPintarEstado(st, rs, estadoBloque(c, pendientes), turno);
   });
   if(!movil) return;
   document.querySelectorAll('#kf .msub').forEach(sb=>{
@@ -16619,22 +16662,9 @@ function _mPintarSecciones(faltaEls){
     if(!rs){ rs=document.createElement('span'); rs.className='mres'; h.appendChild(rs); }
     let st=h.querySelector('.mst');
     if(!st){ st=document.createElement('span'); st.className='mst'; h.insertBefore(st,h.firstChild); }
-    _mPintarEstado(st, rs, estadoBloque(b, faltaEls), true);
+    _mPintarEstado(st, rs, estadoBloque(b, pendientes), true);
   });
 }
-/** Nombre corto de lo que falta, para el chip rojo. */
-function _mFaltaTxt(el){
-  const id=el&&el.id;
-  return id==='fFirma'?'la firma':id==='fVA'?'la vía aérea':
-         (id==='fHEst'||id==='fDVA')?'la hemodinamia':
-         id==='fPveSupRaz'?'la razón de no extubar':
-         id==='fPveSupDet'?'el motivo de la «Otra» razón de no extubar':
-         id==='fPVEval'?'declarar la PVE':id==='fKTMnoRaz'?'la razón de KTM':
-         id==='fKTMnoCom'?'el fundamento de la razón':
-         id==='fKTMraz'?'la contraindicación':
-         id==='fKTMalertRaz'?'el criterio de la suspensión en sesión':'un dato obligatorio';
-}
-
 /** Cabecera del paciente (solo celular). */
 function _mPacBar(){
   const el=$('mPac'); if(!el) return;
@@ -18911,7 +18941,9 @@ function renderFases(){
   box.classList.toggle('fase-heredada', _faseHeredada && FASES_SEL.size>0);
   const chips=(FASES||[]).map(f=>{
     const on=FASES_SEL.has(f);
-    return `<button type="button" class="fase-chip${on?' on':''}${on&&_faseHeredada?' her':''}" onclick="toggleFase(this.dataset.f)" data-f="${String(f).replace(/"/g,'&quot;')}">${f}</button>`;
+    // 🔴 R5/R9 · el nombre de la fase sale del catálogo COMPARTIDO (lo agrega cualquier colega): se escapa en el texto y en el atributo con
+    // el escapador único. `this.dataset.f` devuelve la cadena original, así que `toggleFase` sigue recibiendo el nombre exacto.
+    return `<button type="button" class="fase-chip${on?' on':''}${on&&_faseHeredada?' her':''}" onclick="toggleFase(this.dataset.f)" data-f="${escapeHtml(f)}">${escapeHtml(f)}</button>`;
   });
   // Chip "+" para agregar una fase nueva al catálogo compartido
   chips.push('<button type="button" class="fase-chip fase-chip-add" onclick="agregarFaseUI()" title="Agregar nueva fase al catálogo">＋</button>');
@@ -18919,6 +18951,10 @@ function renderFases(){
   if(_faseHeredada && FASES_SEL.size>0)
     chips.push('<button type="button" class="fase-chip fase-chip-conf" onclick="confirmarFaseHeredada()" title="La fase clínica sigue igual que el turno anterior">✓ Sin cambios</button>');
   box.innerHTML=chips.join('');
+  // La fase elegida es una FUENTE del estado de la tarjeta (@fase) y esta función es donde SIEMPRE termina el cambio: al elegir, al quitar,
+  // al confirmar, al reabrir un turno y al agregar una fase nueva al catálogo (que ocurre en la respuesta del servidor, sin clic ni
+  // input que repinte el encabezado). Igual que `renderChips` con @procs (R2 y R7).
+  if(typeof _rielDeb==='function') _rielDeb();
 }
 function confirmarFaseHeredada(){ _faseHeredada=false; renderFases(); toast('✓ Fase clínica confirmada'); }
 function toggleFase(f){ if(FASES_SEL.has(f)) FASES_SEL.delete(f); else FASES_SEL.add(f); _faseHeredada=false; renderFases(); if(typeof aplicarGatesNeuro==='function') aplicarGatesNeuro(); }
@@ -18928,7 +18964,8 @@ function agregarFaseUI(){
   if(box.querySelector('#faseNuevaInput')) { $('faseNuevaInput').focus(); return; }
   const wrap=document.createElement('span');
   wrap.style.cssText='display:inline-flex;gap:4px;align-items:center;';
-  wrap.innerHTML='<input id="faseNuevaInput" type="text" maxlength="40" placeholder="Nueva fase…" '+
+  // `data-sin-dato`: el nombre escrito y todavía sin agregar no es una fase elegida (R3 y R8; ver `_mLeer`).
+  wrap.innerHTML='<input id="faseNuevaInput" type="text" data-sin-dato maxlength="40" placeholder="Nueva fase…" '+
     'style="font-size:.73rem;padding:4px 9px;border:1px solid var(--primary);border-radius:20px;'+
     'outline:none;width:130px;font-family:inherit;">';
   box.appendChild(wrap);
