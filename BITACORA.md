@@ -3335,3 +3335,5 @@ protegen contra un error, fijan cómo funcionaba RCE-KINE.
   la puede corregir.
 - Diego marca en una página (artefacto «Guardias heredadas»); sus marcas quedan guardadas y se leen desde aquí. Las H
   que «se van» se borran en una tanda propia, con su frase.
+- **10-oct · Diego:** «respecto a las decisiones de las guardias, mejor déjalo como está, y con el uso te voy diciendo». La
+  lista no se marca de una vez; todas siguen y lo heredado se suelta caso a caso cuando el uso lo pida.

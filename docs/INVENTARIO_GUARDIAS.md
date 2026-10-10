@@ -13,6 +13,10 @@
 > La columna **Decisión** se llena con lo que Diego marque. Una H que «se va» se borra de `build/checks/` y
 > se anota en `BITACORA.md` con su frase.
 
+> 🟢 **10-oct-2026 · Decisión de Diego:** «respecto a las decisiones de las guardias, mejor déjalo como está, y con el uso te
+> voy diciendo». No se marca la lista de una vez: **todas siguen**. Cuando en el uso algo heredado le estorbe, lo dice, se
+> busca aquí qué guardia lo fija y se resuelve caso a caso con la regla de `CLAUDE.md`.
+
 Total: 212 guardias.
 
 ## H · Heredadas de RCE-KINE
