@@ -1,12 +1,17 @@
-# Pendientes — al 2-oct-2026 (con el horario corregido)
+# Pendientes — al 10-oct-2026 (con la tanda 2 de guardado seguro)
 
 > Lo que está **decidido** vive en `docs/ACUERDOS_REDISENO.md`, con las palabras
 > de Diego. Esto es la otra mitad: lo que **falta probar**, lo que **falta
 > decidir** y lo que **se encontró y no se arregló**.
 >
-> 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G, 212
-> guardias en verde). Lo que no existe todavía es **la prueba en la planilla
-> de NEXT**: nada de esto se ha pegado ni visto en un navegador del hospital.
+> 🟢 **El rediseño del 30-sep y 1-oct está programado** (tandas A a G), y la **tanda 1
+> (integridad) y la tanda 2 (guardado seguro)** también: hoy son **225 guardias en
+> verde**. Lo que no existe todavía es **la prueba en la planilla de NEXT**: nada
+> de esto se ha pegado ni visto en un navegador del hospital.
+>
+> 🔴 **Lo más urgente ahora es la sección 2c**: la tanda 2 dejó varias decisiones
+> ya implementadas con la opción recomendada, esperando tu confirmación, y una
+> prueba con dos aparatos que hay que hacer **antes** de pegar.
 
 ---
 
@@ -87,6 +92,155 @@ fácil; las dejo anotadas para que las confirme o las corrija.
    ¿Se le da a NEXT un prefijo propio (`rce-next-armazon-`)?
 7. **Qué conserva la pantalla cuando se corta la sesión** (política de borradores) y si reintenta sola ante un tropiezo de la planilla.
 
+## 2c · Decisiones de la tanda 2 (guardado seguro, 10-oct)
+
+> 🟢 **Varias YA ESTÁN HECHAS con la opción que recomiendo** y esperan que las confirmes o las cambies. Las que más se notan:
+> los **textos y tiempos de «No confirmado»** (la 8 y la 9), la **memoria de 6 horas** (la 1), los **días de VM, VNI y vía aérea que
+> se conservan al volver a guardar el mismo turno** (la 5) y los **números internos nuevos** de la planilla (la 2). Las marco con ✅.
+> Si dices que no, se cambian; ninguna toca el esquema de la planilla.
+>
+> 🔴 **Antes de pegar nada en la planilla de NEXT hace falta una prueba práctica con DOS aparatos** (la 12): todo lo de esta tanda se
+> probó con un servidor simulado en un navegador de laboratorio, no en el Chrome del hospital ni contra el Apps Script real.
+>
+> ⚙️ **El «modo estricto» (`CONTRATO_ESTRICTO`) nace APAGADO** (la 3). Mientras esté apagado, una pantalla vieja puede seguir
+> escribiendo sobre el paciente equivocado; se enciende recién después de la prueba con dos aparatos.
+>
+> ✍️ **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escriben con tus palabras cuando respondas. Dilas por
+> número.
+
+**A · Las 12 del diseño**
+
+1. **La memoria de 6 horas.** ✅ Para que un doble clic o un reintento no repita algo que ya se hizo, el servidor recuerda 6 horas
+   —en la memoria temporal del propio proyecto de Apps Script, no en la planilla ni fuera de Google— que esa operación ya se hizo.
+   Solo guarda números de cama, de paciente y de registro; jamás nombres, RUT ni texto escrito (una guardia lo comprueba con un
+   paciente inventado). *Ejemplo:* aprietas «Guardar», se corta el wifi, vuelves a apretar: el sistema contesta «ya estaba» y no escribe
+   otra evolución. Si esa memoria falla **y además** se perdió la respuesta, la entrega de turno, el stock y los ventiladores pueden
+   duplicarse una vez. *Recomendado: sí.*
+2. **Números internos nuevos.** ✅ Los registros nuevos (procedimientos, hitos de la línea de tiempo, mediciones, pendientes,
+   sugerencias y los **egresos**) llevan un número interno armado a partir del de la operación, no uno al azar. *Lo que ves:* si abres
+   la hoja, esos números son más largos y el del egreso es `ARCH_` más el código del paciente (ya no lleva la hora). Nada los lee ni los
+   ordena, salvo la búsqueda de Coordinación. Es lo que impide que una caída a medias deje un egreso o un procedimiento repetido.
+   *Recomendado: sí.* (La alternativa es dejarlos al azar y aceptar esos repetidos.)
+3. **Modo estricto: cuándo encenderlo.** ⚙️ Encendido, una pantalla vieja (que no avisa a qué paciente le abrió la ventana) se
+   rechaza con «esta pantalla es de una versión anterior, recárgala». Apagado, esa pantalla pasa y puede actuar sobre el paciente
+   equivocado. Se enciende escribiendo `TRUE` en `CONTRATO_ESTRICTO` de la hoja CONFIG de la planilla de NEXT (no hay función nueva).
+   ¿Cuándo, y quién confirma que todos los aparatos ya tienen la versión nueva? *Recomendado: apagado hasta la prueba con dos aparatos,
+   y encenderlo recién después.*
+4. **Ingreso perdido porque otra persona ocupó la cama.** ✅ Si dos personas ingresan a la misma cama libre, la segunda ve un aviso
+   rojo, no pierde nada de lo que escribió y solo puede «Seguir editando». ¿Quieres además un botón «usar estos datos en otra cama»?
+   Hoy, para pasarlo a otra cama tiene que ingresar de nuevo a mano. *Recomendado: no en esta tanda* (hay que elegir cama: es un
+   diseño de uso aparte).
+5. **Volver a guardar el mismo turno: los días de VM, VNI y vía aérea.** ✅ **Cambia un valor clínico.** Si vuelves a guardar un turno
+   sin cambiar el soporte ni la vía aérea (o si un guardado se cortó y se repite), los días quedan como estaban en el primer guardado.
+   *Ejemplo:* un paciente pasa de VM a VNI y de tubo a natural en la noche; el primer guardado cuenta 3 días de VM, 0 de VNI y 3 de vía
+   aérea. Con el cálculo de antes, al volver a guardar bajaban a 1, 0 y 1, y el turno siguiente partía de ese 1: el error se arrastraba
+   al resto de la estadía y al REM. Ahora se quedan en 3, 0 y 3, y el turno siguiente da 3, 1 y 3. *Costo:* en el turno de INGRESO de
+   alguien que llega con vía aérea de afuera (por ejemplo una traqueostomía de 5 días), el primer guardado cuenta 0 días de vía aérea y
+   volver a guardar ya no lo «corrige» a 5 (antes lo hacía por accidente); el turno siguiente sí da 5. Y el aviso «cambió la vía aérea
+   sin evento declarado», con la razón que escribiste, ahora se conserva al volver a guardar (antes se borraba en silencio), salvo que
+   en ese mismo guardado declares el evento: entonces se apaga. *Recomendado: sí; lo ideal es que lo apruebe Manuel, que tocó esos
+   contadores.* Si dices que no, se quita la regla, pero un guardado cortado y repetido puede entonces dar otros días.
+6. **Corregir el turno pasado de un paciente ya egresado cuando su cama la ocupa otro.** Sigue siendo NO (es la 1 de la sección 2b).
+   Antes de esta tanda, anular un evento en ese caso reinsertaba la fila y volvía a ocupar la cama; ahora el sistema responde «Ese turno
+   ya está archivado…» y no toca nada. Si algún día es sí, hace falta una operación aparte que nombre al paciente. *Recomendado: dejarlo.*
+7. **Puertas que quizá ya no se usan** (limpiar cama, confirmar dispositivos, agregar hito, ingresar paciente por la vía directa).
+   La pantalla de hoy no las llama; el servidor las mantiene y ya llevan la misma comprobación de paciente. De paso, «agregar hito» ya no
+   deja que quien llama elija el autor ni el número. ¿Se retiran del servidor? *Recomendado: no en esta tanda; se decide después.*
+8. **Tiempos.** ✅ Después de **45 segundos** sin respuesta aparece «No confirmado»; el sistema reintenta solo a los **3, 10 y 30
+   segundos** con exactamente lo mismo que ella escribió, y después solo a mano con «Reintentar ahora». Se ajustan en un solo lugar del
+   código (`GUARDADO_ESPERA_MS` y `GUARDADO_REINTENTOS_MS`). Con una red lenta de verdad, 45 s puede ser mucho o poco: conviene verlo
+   en la prueba. *Recomendado: sí.*
+9. **Colores y textos.** ✅ Ámbar: «No confirmado · No sabemos si se guardó. Tu texto sigue aquí.» con «Reintentar ahora» y «Seguir
+   editando»; «Guardado con aviso» cuando el servidor guardó pero algo quedó pendiente; rojo «NO se guardó» **solo** cuando el servidor
+   contestó que no. Reemplaza al «NO se guardó» que antes salía a los 3 s sin respuesta y afirmaba algo que no se sabía. *Recomendado: sí.*
+10. **Bitácora de auditoría: ¿registrar cada repetición evitada?** Una fila corta `<ACCIÓN>_REPETIDA` cada vez que la memoria de 6
+    horas evita repetir algo, para medir cuánto ayuda. **Esta NO está hecha**: hoy una repetición no deja rastro. Lo que sí está es la
+    marca `[sin episodio]` en la bitácora cuando una pantalla vieja llama sin avisar el paciente (salvo al guardar la evolución), que
+    sirve para decidir cuándo encender el modo estricto. *Recomendado: sí.*
+11. **Ampliar `auditoriaIntegridad`** con lecturas puras (egresos duplicados, camas con paciente y a la vez fila de archivo). No se
+    incluyó porque no se pidió. *Recomendado: tanda aparte.*
+12. **Prueba práctica con dos aparatos, antes de pegar en NEXT y antes de encender el modo estricto.** Casos: dos personas ingresan a la
+    misma cama a la vez; dar un alta con un formulario viejo abierto; guardar con el celular en modo avión y volver la señal; doble toque
+    en Guardar; anular un evento después de un alta; el ➕ sobre un paciente ya egresado, que debe seguir pidiendo la clave de coordinación;
+    corregir una ficha desde Coordinación. ¿Quién la hace y cuándo?
+
+**B · Nuevas, que salieron al construir**
+
+13. **Textos de rechazo nuevos que va a leer el equipo.** ✅ (a) Limpiar o mover una cama que ya ocupa otro paciente: «La cama N ya fue
+    ocupada por otro paciente mientras elegías el traslado, así que no se movió a nadie…» (y su equivalente al limpiar). (b) Pantalla vieja
+    con el modo estricto encendido: «Esta pantalla es de una versión anterior… Recárgala». (c) Cerrar un pendiente de un paciente que ya
+    no está en esa cama: antes «ese pendiente ya no está en la cama», ahora dice que la cama cambió de paciente y que la reabras para
+    ver cómo está. (d) «Desde que abriste **esta ventana**…» en vez de «este formulario», para diálogos y formularios por igual. (e)
+    Ingresar de nuevo a un paciente que ya egresó: se reutiliza el aviso de «la cama ya fue ocupada por otro paciente mientras llenabas
+    este ingreso», que aquí no es exacto (quizá la cama está libre) pero lleva a la misma acción: cerrar y mirar la cama. (f) Un paciente
+    que ya figura en OTRA cama ocupada: «Este paciente ya figura en otra cama ocupada, así que no se guardó nada. Revisa el censo…». Casi
+    imposible, pero es un texto que verías. *Recomendado: sí; si alguno no te gusta, es una línea.*
+14. **El aviso rojo de 8 segundos.** ✅ Cuando el servidor frena una acción porque la cama cambió de paciente o porque otra persona se
+    adelantó (alta, mover, anular, pendientes, escalas, gases y también guardar la evolución), el aviso sale rojo claro y dura 8 segundos,
+    en vez del aviso gris de 3. Es un cambio de costumbre para el equipo. ¿Te sirve así o prefieres un cuadro en el centro como el de «NO se
+    guardó»? *Recomendado: dejarlo así.*
+15. **Episodios cargados a mano, sin ingreso formal (sin código de paciente).** Si el servidor se cae justo antes de recordar el alta,
+    el reintento contesta «la cama ya está libre» aunque el alta quedó bien registrada: no pierde ni duplica nada. Además, en el primer
+    guardado de uno de esos episodios, un reintento anterior al cierre puede inventar otro identificador. ¿Se acepta, o se les da una
+    identidad estable al primer guardado? *Recomendado: aceptarlo mientras sean raros.*
+16. **La traqueostomía no se puede anular desde la pantalla.** (Ya era así antes de la tanda.) La pantalla ofrece «Anular» para la
+    traqueostomía y el servidor responde «Tipo de evento desconocido». ¿Se agrega la anulación de la TQT, o se saca el botón? *Recomendado:
+    que lo decidas tú; si la pantalla lo ofrece, lo coherente es que funcione.*
+17. **Qué acciones recuerdan «ya lo hice».** ✅ 26 de las 36 acciones que escriben. Las otras 10 (informe del REM, plantillas,
+    importación de PDF de gases, descartar un gas, banner, asignación de turno, fase, estado de una sugerencia y la corrección de
+    Coordinación) se pueden repetir sin daño. *Lo que ves:* si guardas una plantilla y se pierde la respuesta, puede quedar repetida (se
+    ve y se retira). *Recomendado: dejarlo así.* Sellarlas todas cuesta una espera más por llamada.
+18. **Modo estricto y Coordinación.** Con el modo encendido, corregir una ficha desde Coordinación nombrando solo la cama (sin el
+    paciente) se rechaza si la cama tiene a alguien. La pantalla de hoy nunca lo hace (siempre manda el paciente de la ficha), así que no
+    cambia nada visible. *Recomendado: confirmarlo en la prueba de la 12.*
+19. **«Borrar un anexo» cuando su hito ya no está.** Si una pantalla vieja (sin número de operación) pide borrar un anexo cuyo aviso en la
+    línea de tiempo ya no existe, hoy se rechaza y se pide reportarlo; con la pantalla nueva, el mismo caso continúa y borra la fila. ¿La
+    pantalla vieja también debe continuar? Borraría una fila que el REM cuenta sin poder confirmar que era una anulación a medias.
+    *Recomendado: dejarlo como está.*
+
+**C · Nuevas, que salieron de la revisión independiente**
+
+20. **Una medición con el identificador de otro paciente se RECHAZA.** ✅ Si una medición llega con el identificador de otro paciente, o
+    pide anular la medición de otro, el sistema ahora se detiene con un aviso en vez de ignorarlo o corregirlo en silencio. La pantalla de
+    hoy nunca lo manda. *Recomendado: rechazar* (lo más conservador para datos clínicos).
+21. **Alta de un paciente que ya figura en el archivo de una estadía anterior.** ✅ Si la cama volvió a ocuparse con un paciente cuyo
+    egreso anterior ya está en el archivo, el alta se **bloquea**: «La cama N tiene a un paciente que ya figura dado de alta en el archivo,
+    de una estadía anterior. No se dio el alta para no pisar ese registro. Avisa a coordinación para revisarlo.» La alternativa es
+    escribir un segundo egreso (`ARCH_<paciente>_2`), pero eso cambia cómo cuenta el REM. *Recomendado: bloquear.*
+22. **Cada ingreso hace dos consultas más a la planilla.** ✅ Para saber si el paciente ya egresó antes y que no esté en otra cama, un
+    ingreso hecho por la pantalla pasa de 13 a **15** viajes a la planilla (una sola vez por estadía). La batería mide un ingreso sin
+    identificador propio y no ve esos dos viajes; su techo es 14. *Recomendado: aceptarlo;* si prefieres no pagarlo, se puede dejar solo la
+    consulta al archivo y quitar la del hito de egreso.
+23. **El aviso ámbar «No sabemos si se hizo…» es el mismo para todas las escrituras.** ✅ «No sabemos si se hizo. Revisa la cama; si no está
+    hecho, vuelve a intentarlo: es seguro repetirlo.» Sale en alta, mover, anexar, entrega de turno, stock y ventiladores, donde «la cama»
+    no aplica del todo. *Recomendado: dejarlo; un texto por tipo de acción es un cambio de una línea.*
+24. **Un movimiento de stock idéntico no se puede forzar.** ✅ Si repites un movimiento de stock exactamente igual (mismo ítem, cantidad,
+    detalle y fecha) y el primero no tuvo respuesta, aparece «Ya estaba registrado… Revisa el stock.» y no se repite; para forzarlo hay
+    que cambiar el detalle. La alternativa, acortar la memoria de ese número a 10–15 minutos, permitiría repetirlo pero duplicaría el stock
+    si el primero sí había llegado. *Recomendado: dejarlo.*
+25. **Un error interno del servidor, repetido, sale ámbar y no rojo.** ✅ Si el servidor tuviera un error fijo (un fallo de programación),
+    verías «No confirmado» con «Reintentar ahora» en vez de «NO se guardó». Es lo honesto: ese error puede venir después de escrituras
+    parciales. El detalle técnico va a la consola del navegador, no a la pantalla. *Recomendado: sí.*
+26. **El borrador se escribe antes de la llamada.** ✅ Se guarda en el aparato al apretar «Guardar» (antes, solo al fallar) y se borra al
+    confirmarse. *Lo que ves:* si cierras la pestaña a mitad de un guardado que sí llegó, al reabrir esa cama y turno puede ofrecerte
+    «Borrador sin guardar recuperado»; volver a guardar es inocuo (mismo contenido). *Recomendado: sí.*
+27. **«Guardado con aviso» y cerrar el panel.** Hoy el turno sigue avanzando solo al paso 6 con «Cerrar la evolución», y cerrar el panel no
+    pregunta aunque haya una medición a medias; solo se muestra la instrucción en la franja. ¿Prefieres que cerrar pregunte, o que no
+    avance al paso 6 mientras haya avisos? *Recomendado: dejarlo.*
+28. **El celular con la barra en tres filas.** Con «Sin guardar» y la franja del estado, la barra de abajo ocupa tres filas. La
+    alternativa es esconder «Sin guardar» mientras el estado no sea verde, pero cambiaría lo que se decidió en la tanda 1. *Recomendado:
+    dejarlo.*
+29. **Las demás acciones no tienen tope de espera.** 🟠 Guardar la evolución pasa a «No confirmado» a los 45 s. Pero el alta, el
+    traslado, el intercambio y el resto muestran «Cargando…» y, si el servidor no contesta nunca, ese cartel queda tapando la pantalla
+    más de 10 minutos (medido con un servidor simulado colgado) sin decir nada. *Recomendado: sí, en una tanda aparte:* ponerles un tope
+    parecido y un «Reintentar» con el mismo número de operación.
+30. **Un aparato que se cayó y volvió.** 🟠 La pantalla ya no reintenta sola una foto vieja tras cerrar y reabrir. Pero si un aparato se
+    cayó con un guardado a medias y vuelve más tarde, su reintento viejo podría pisar lo que otra persona escribió después (el servidor
+    no ordena versiones: gana la última en llegar). *Recomendado: tanda aparte,* con un rechazo en el servidor.
+31. **Un clic justo en el repintado.** 🟠 El censo se refresca solo cada cierto rato. Si la actualización automática del censo cambió al paciente de una cama y el tablero aún no
+    se repinta (cerca de un segundo), un clic en esa ventana toma al paciente nuevo mientras la pantalla muestra al anterior. La misma
+    ventana existía al abrir el panel. *Recomendado: tanda aparte* (se cierra llevando el paciente en la tarjeta misma).
+
 ## 3 · Pendientes viejos, de antes del rediseño
 
 - Sacarle el **estado previo a la TQT** — Diego dijo que ahí es irrelevante.
@@ -143,8 +297,22 @@ línea, pero haría aparecer un aviso nuevo en cada guardado de cada turno con d
 
 - 🔴 **Hay que correr `crearORepararEstructura()`**: la evolución pasó de 411 a
   **414 columnas**, y la cama y el archivo ganan una columna (`AET_SERIE`).
-- El cohete lleva el sello de versión nuevo (`NEXT-5.4-revision-maxima`); si no
+- El cohete lleva el sello de versión nuevo (`NEXT-5.6-guardado-seguro`); si no
   aparece en «Cargando…», lo pegado no es lo nuevo.
+- 📦 **Archivos a pegar en el editor** (de la carpeta `entrega/`): `api.gs`,
+  `dominio.gs`, `infra.gs`, `servicios.gs`, `webapp.gs` y el `index.html` (el
+  cohete). Compáralos con `cmp`, no a ojo: el portapapeles corrompe los acentos en
+  los archivos grandes. Son los mismos seis si tu planilla se quedó en la versión
+  5.4: traen también la tanda 1.
+- ✅ **La tanda 1 y la tanda 2 NO cambian el esquema**: no hay hoja ni columna
+  nueva, así que **no hace falta correr `crearORepararEstructura()` por ellas**
+  (la corrida de arriba es solo para una planilla que viene de antes del
+  rediseño de septiembre). `CONTRATO_ESTRICTO` no necesita fila en la hoja CONFIG:
+  sin ella vale «apagado».
+- 🧪 **Antes de pegar en la planilla de NEXT: la prueba con dos aparatos** (2c, la
+  12). Se publica como nueva versión de la implementación web de **NEXT** (nunca
+  la del hospital) y se recarga la app instalada. **Solo después de la prueba**
+  se enciende `CONTRATO_ESTRICTO` (2c, la 3).
 - 🕗 **Esa misma corrida corrige el horario de turno** en CONFIG: si
   `TURNO_DIA_INICIO` y `TURNO_NOCHE_INICIO` dicen 9 y 21, pasan a 8 y 20, una
   sola vez. Si pusiste otro horario, no lo toca. Se puede revisar a mano en la

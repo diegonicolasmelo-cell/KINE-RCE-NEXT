@@ -3371,7 +3371,171 @@ Sello `NEXT-5.5-integridad`.
 
 ---
 
-## 5-oct-2026 · Guardado seguro (tanda 2), paso 16: dos guardias cambian de convención, con su razón
+## 10-oct-2026 · Tanda 2 · Guardado seguro: nada se escribe sobre el paciente equivocado, un reintento no duplica y la pantalla no afirma lo que no sabe
+
+**De dónde sale.** La tanda 1 dejó anotado a propósito lo que faltaba: el ingreso sobre una cama libre que otro ocupa en el
+intertanto, extender el candado del episodio a las demás puertas y un identificador de operación para el reintento. El 4-oct se
+auditaron TODAS las escrituras de la app (cuatro áreas, tres propuestas independientes, dos jueces y una síntesis) y salió un
+diseño de 17 pasos. Se construyeron los pasos 1 a 16 (un commit cada uno, cada guardia vista ROJA antes del arreglo); después seis
+revisiones independientes dejaron **34 hallazgos** (2 bloqueaban, 9 importantes, 23 menores) y siete pasos de arreglos (A a G) los
+cerraron. Esta entrada es el paso 17: junta lo que antes eran entradas sueltas, deja la batería y la entrega. **Sin migración de
+esquema.** Las entradas sueltas se conservan enteras más abajo, bajo «El detalle, paso a paso».
+
+**Los tres defectos que había** (los tres con el mismo origen: el servidor no sabía de quién era la petición ni si ya la había hecho).
+1. **Escribir sobre el paciente equivocado.** Un formulario o diálogo se abre para P; entremedio P recibe el alta y entra Q a la misma
+   cama; al apretar el botón, el alta, la limpieza, el traslado, el ➕, la medición, la escala, el pendiente o el gas actuaban sobre
+   «quien esté en la cama»: le daban el alta a Q, le anulaban un evento a Q, le medían a Q. `anularEvento` además leía FUERA del
+   candado (pisaba un guardado concurrente con una fila vieja) y, si el turno estaba archivado, **resucitaba** al egresado.
+2. **Duplicar o perder por una caída a medias.** Doble clic, reintento tras un corte de red o un servidor que murió entre dos
+   escrituras: dos evoluciones, dos pendientes, el stock sumado dos veces, el egreso contado dos veces en el REM, un intercambio de camas
+   que dejaba a un paciente **borrado** de la hoja, un «anular anexo» atascado para siempre.
+3. **Una pantalla que afirmaba lo que no sabía.** Tras dos intentos sin respuesta decía «NO se guardó» aunque el primero hubiera
+   aterrizado.
+
+### Lo que cerró cada pieza
+
+| Pieza (pasos) | Defecto que cerraba | Cómo queda | Guardias (rojas antes, verdes después) |
+|---|---|---|---|
+| **Banco de pruebas** (1) | El simulador tenía un candado de juguete, no podía matar una corrida a medias y dos corridas iguales no se podían comparar | `activarLockReal` (el `infra_lock.gs` de verdad), `sim_muerte.js` (la escritura N aterriza y de ahí en adelante toda escritura lanza, aunque un `catch` la trague) e `instantanea()` | `guardado_seguro_banco.js` |
+| **Candado de episodio en cada puerta** (2, 4 a 8, 14; B) | Las 16 puertas que actúan sobre una cama no comparaban a quién le abrió la pantalla el diálogo con quién ocupa la cama | La pantalla manda `EPISODIO_ABIERTO` (el paciente de la tarjeta **al abrir** el diálogo, también vacío, nunca releído al enviar). El servidor lo compara DENTRO del candado y ANTES de la primera escritura (`validarEpisodioPuerta` / `decidirEpisodioPuerta`, puras): si la cama cambió de paciente es VALIDACION, si otra persona se adelantó es el `ERR.CONFLICTO` nuevo; nunca nombra al otro paciente. Reconoce el reintento («ya hecho») sin escribir. `AUDIT_LOG` anota `[sin episodio]` cuando la pantalla no lo manda | `guardado_seguro_cobertura.js` (el censo: cada puerta clasificada y cada una con su sitio de llamada), `guardado_seguro_episodio_g14.js` |
+| **Sello de operación e ids derivados** (3, 11, 12; D) | Un reintento o doble clic repetía la acción | La pantalla pone un `OP_ID` por **intención** (mismo contenido sin respuesta = mismo número; 26 escrituras). El servidor guarda 6 h en la memoria temporal del propio script «esto ya lo hice» —solo ids y banderas, nunca nombre, RUT ni texto libre— y devuelve lo mismo sin tocar la planilla. Se sella tras el `flush` y solo si todo terminó limpio. Si el sello no está, los ids de lo que se escribe se **derivan** del `OP_ID` (`PROC_`, `HITO_`, `EVAL_`, `PEND_`, `SUG_`, `ARCH_<pid>`) y se inserta solo si no existe | `guardado_seguro_operacion_g16.js` |
+| **Ingreso concurrente** (8, 15; C) | El segundo ingreso sobre la misma cama libre se escribía ENCIMA del primero, sin error (el vacío no reclama episodio a propósito, para no confundir el reintento propio con un ingreso ajeno) | La pantalla **acuña** un `PATIENT_ID` al abrir el formulario sobre una cama libre y lo manda con `EPISODIO_ABIERTO` vacío. Mismo id = reintento propio (una sola fila, un solo hito); otro id sobre una cama ya ocupada = CONFLICTO sin escribir. Además se exige la forma del id, que no esté en otra cama y que un paciente ya egresado no vuelva a ingresar | `guardado_seguro_ingreso_g15.js` |
+| **Muerte a medias** (9, 10, 11; B, C, E) | Intercambio y traslado eran dos escrituras (una muerte entre ambas borraba a un paciente o lo dejaba en dos camas); el alta duplicaba el egreso; anular un anexo quedaba atascado tras borrar el hito; guardar un turno repetido movía los días de VM/VNI/VA y borraba el aviso «sin evento declarado»; las colas que fallaban (evaluaciones desde el turno, cultivo a la serie) callaban | Un solo compromiso por puerta y todo lo anterior converge: intercambio y traslado en UNA escritura de camas; `ARCH_<pid>` insertar-si-no-existe y un solo hito de egreso; el reintento completa lo que falte; las colas que fallan devuelven `advertencias[]` («Guardado con aviso») y **no** se sellan, así el reintento las completa | La matriz de muerte N = 0 a total + 1 en `guardado_seguro_operacion_g16.js`: el estado final es IGUAL al de una corrida limpia, puerta por puerta, con y sin `OP_ID` |
+| **Pantalla con «No confirmado»** (12, 13, 15, 16; F, G) | «NO se guardó» sin saberlo; dos clics = dos guardados; un éxito tardío no corregía nada; el reintento releía el formulario y podía llevar otro contenido | Ver «Lo que ve distinto la kinesióloga» | `guardado_seguro_no_confirmado_g17.js`; `fallo_guardado_visible.js` y `episodio_al_guardar.js` reconciliadas con su razón (paso 16) |
+
+### Lo que ve distinto la kinesióloga
+
+- **Guardar sin respuesta ya no dice «NO se guardó».** Sale una franja **ámbar** «No confirmado · Reintentando…» con el botón
+  «Reintentar ahora»; el sistema reintenta solo a los 3, 10 y 30 s con **el mismo paquete** (la misma foto de lo que ella había
+  escrito, el mismo número de operación); a los 45 s sin respuesta se abre un cuadro ámbar «No sabemos si se guardó. Tu texto sigue
+  aquí.». Nunca dice «Guardado» ni «NO se guardó» sin saberlo. Si la confirmación llega tarde, la franja pasa sola a «✓ Guardado hh:mm»
+  y el cuadro se cierra. El rojo «NO se guardó» queda para cuando **el servidor contestó que no** (la cama cambió de paciente, otra
+  persona la ocupó, un dato inválido).
+- **Doble clic o Enter = una sola llamada** (mientras hay una en vuelo, devuelve la misma).
+- **Ingreso perdido por una carrera:** si otra persona ocupó la cama mientras llenaba el ingreso, sale rojo «NO se guardó · la cama ya
+  fue ocupada por otro paciente», conserva todo lo escrito (pantalla y borrador) y ofrece solo «Seguir editando». No nombra al otro.
+- **Las demás puertas** (alta, mover, intercambiar, anular, pendientes, escalas, gases, mediciones, el ➕): si la cama cambió de paciente
+  desde que abrió el diálogo, el servidor no hace nada y el aviso sale **rojo claro y dura 8 s** (antes salía el aviso gris de 3 s;
+  y, sin el candado, la acción caía sobre el paciente equivocado). Dice «desde que abriste **esta ventana**… Cierra esta ventana y vuelve a abrir la cama»; el
+  mismo texto vale para formularios y diálogos.
+- **Una escritura sin respuesta** (alta, mover, anexar, entrega de turno, stock) avisa en ámbar durante 9 s «No sabemos si se hizo.
+  Revisa la cama; si no está hecho, vuelve a intentarlo: es seguro repetirlo.» (antes decía «❌ Se agotó el tiempo» o, en la app
+  instalada, nada). Un error interno del servidor también sale en ámbar, sin el texto técnico (al guardar la evolución: «El servidor tuvo un tropiezo —
+  reintentando…»).
+- **Un stock repetido** dice «Ya estaba registrado: ese mismo movimiento ya se había hecho antes y no se repitió. Revisa el stock.».
+- **«Guardado con aviso»** muestra en la franja, en dos líneas, la instrucción («Vuelve a guardar el turno para completarlas») en vez
+  de dejarla solo en un aviso de 9 s.
+- **El éxito tardío nombra la cama:** «✅ Evolución de la cama 2 guardada» cuando ya tiene otra cama delante.
+- **En el celular** la franja se parte en filas, el botón mide al menos 32 px (40 en el celular) y el panel ya no se desliza de lado
+  (medido a 390 y 320 px). El cuadro «No confirmado» **no le roba el cursor** a quien sigue escribiendo.
+- **El borrador local sale antes de la llamada** y se borra solo al confirmarse; efecto raro e inocuo: si cierra la pestaña a mitad de
+  un guardado que sí aterrizó, al reabrir esa cama y turno puede ofrecer «Borrador sin guardar recuperado» (volver a guardar da lo mismo).
+- **Re-guardar el mismo turno** conserva los días de VM, VNI y vía aérea que ya tenía si el soporte y la vía no cambiaron, y el aviso
+  «cambió la vía aérea sin evento declarado» sigue ahí salvo que ese re-guardado **declare** el evento (entonces se apaga).
+- **En la planilla:** los identificadores internos nuevos se ven distintos (más largos, con el código de la operación adentro; los
+  egresos son `ARCH_<paciente>` y ya no llevan la hora). Nada los lee ni los ordena salvo la búsqueda de Coordinación.
+
+### Lo que NO cambió
+
+Los eventos de vía aérea se siguen registrando a mano; el cálculo clínico es el mismo salvo el re-guardado del mismo turno (decisión 5);
+el RUT no viaja a ninguna parte nueva; el sello no guarda texto clínico (la guardia usa un texto centinela ficticio); el POST sigue
+siendo `text/plain`; la dirección del `/exec` sigue sin escribirse en el código; no hay hoja ni columna nuevas.
+
+### Lo que queda apagado o abierto a propósito
+
+- 🔴 **`CONTRATO_ESTRICTO` nace APAGADO.** Con el interruptor en `TRUE` (hoja CONFIG de la planilla de NEXT, sin función nueva) una
+  pantalla vieja que no manda `EPISODIO_ABIERTO` se rechaza («esta pantalla es de una versión anterior, recárgala») y un ingreso sin
+  identidad propia sobre una cama con paciente es CONFLICTO. Mientras esté apagado, una pantalla vieja pasa por el modo tolerante y
+  puede escribir sobre el paciente equivocado: es el único hueco grande que queda, y lo cierra encenderlo **después** del ensayo con dos
+  aparatos (decisión 12 del diseño). `AUDIT_LOG` mide cuántas llamadas siguen sin candado (`[sin episodio]`).
+- **Pendiente de Diego, ya implementado con la opción recomendada** (docs/PENDIENTES.md, sección 2c): los textos y tiempos de «No
+  confirmado» (decisiones 8 y 9), la memoria de 6 horas del sello (1), los días que se conservan al re-guardar (5) y los ids internos
+  nuevos (2). **Ninguna está escrita todavía en `docs/ACUERDOS_REDISENO.md`**: se escribe con sus palabras cuando las responda (H34).
+- **No atendido:** H23 (las demás puertas no tienen tope de espera; con el servidor colgado el «Cargando…» de un alta o un traslado
+  queda tapando la pantalla), el complemento de servidor de H22 (rechazar un reintento rezagado de un aparato que se cayó y volvió), la
+  ventana de un clic entre el sondeo y el repintado en que se puede capturar al paciente nuevo (paso 14), los episodios cargados a mano sin
+  `PATIENT_ID` (el primer guardado acuña uno y un reintento antes del compromiso acuña otro), y que la traqueostomía (`tqt`) no se puede
+  anular desde la pantalla (el servidor responde «Tipo de evento desconocido»; es previo a la tanda).
+- **Hueco de las puertas sin estado propio** (entrega de turno, stock, movimiento de ventilador): si el sello falta (expiró a las 6 h o el
+  caché falló) **y** además se perdió la respuesta, pueden duplicar una vez. Se acepta y se dijo a Diego (decisión 1).
+
+### La revisión independiente (34 hallazgos, siete pasos de arreglos)
+
+Seis revisiones independientes, dos lentes por área (el candado en las puertas, el servidor de ingreso y recuperación, la pantalla).
+Se reprodujo cada hallazgo antes de tocar nada y se cerró con una guardia vista roja primero; en los pasos B a F se probaron además de
+8 a 23 mutaciones a mano del arreglo, para comprobar que la guardia nueva muere cuando el arreglo se rompe.
+
+| Paso | Hallazgos | Qué cerró |
+|---|---|---|
+| A · relojes (9b73bf9) | H20, H28 (los dos que **bloqueaban**) | Dos guardias creían congelar el reloj con `page.clock.install` y ponían la batería roja al azar, sin que el código estuviera mal |
+| B · puertas del servidor (c77a46c) | H1 a H7, H12 | Una cama libre ya no «tiene dueño» (conserva su `PATIENT_ID` como rastro); el reclamo resuelve al paciente cuando hay dos en un turno; la medición de otro paciente se rechaza; el reintento de anular un anexo no borra el hito de otro |
+| C · ingreso y forma del id (c56eca8) | H9, H14, H18 | Un paciente ya egresado no vuelve a ingresar (ni su segundo alta se pierde en silencio); el id nuevo tiene su forma y no está en dos camas; el ingreso que murió a medias se completa |
+| D · sello y sugerencia (905890b) | H10, H15, H13, H17, H8 | El sello ya no guarda texto libre; el aviso de un lote repetido no dice «0»; la sugerencia no se duplica; el hito lleva la firma de la sesión, no la que mande el paquete |
+| E · línea de tiempo y días (598a7e4) | H11, H16, H19 | Declarar el evento después apaga la advertencia falsa; los días del re-guardado quedan fijados (la decisión 5 queda para Diego) |
+| F · pantalla: INTERNO y reintentos (ea17510) | H21, H29, H22, H30, H24, H32 | Un error INTERNO conserva el número de operación y es ámbar; una sesión vieja no reintenta la foto A tras guardar la B; el borrador sale antes; el stock repetido no se muestra como éxito nuevo; las escrituras sin respuesta avisan |
+| G · pantalla: celular y textos (22bab55) | H27, H31, H25, H26, H33, H34(2) | La franja cabe y se toca en el celular; el cuadro no roba el cursor; el aviso dice de qué cama habla; «esta ventana» en vez de «este formulario» |
+
+De los 34: 31 arreglados; H34 arreglado en el texto (su otra mitad es de Diego: confirmar y escribir en ACUERDOS); **H19** se dejó con la
+regla puesta y la guardia 20b que la fija, a la espera de la decisión 5; **H23** no se trabajó.
+
+### Cierre de la tanda (paso 17)
+
+- **Sello `NEXT-5.6-guardado-seguro`** en `build/empaquetar_cohete.js` y en los dos sitios del fuente (`<meta name="rce-version">` y el
+  texto de «La app no pudo iniciar»). `entrega/`, `pwa/` y `build/paquete_migracion/` regenerados.
+- **Batería completa (`-j 2`): 225 verdes, 0 rojas** (436 s). La base de la tanda 0 eran 212; se suman seis guardias de la tanda 2 y las
+  que sumó la tanda 1.
+- **`node build/medir_guardado.js`** (viajes a hojas por acción): abrir 3, reabrir 3, turno nuevo **13**, re-guardar **17**, ingreso
+  **13**, decanulación **13**, reintubación **14**. Los techos (14, 18, 14, 14, 15) no se tocaron y se respetan, con 1 viaje de holgura
+  en cada uno. El sello es `CacheService` y no suma viajes a las hojas.
+  · 🪤 **Pero el ingreso real de la pantalla mide 15**, no 13: el escenario de la batería no manda `PATIENT_ID` y la pantalla sí
+  (lo acuña), y con identidad propia el servidor lee dos columnas más (el archivo y la línea de tiempo del paciente, para saber si ya
+  egresó). Medido con una sonda: 13 viajes sin `PATIENT_ID`, **15** con `PATIENT_ID` acuñado (10 lecturas en vez de 8, ~280 celdas
+  más). Excede en 1 el techo de 14 de ese escenario, **que ninguna guardia mide**. No se aflojó el techo ni se agregó escenario
+  (`guardado_viajes.js` compara contra el árbol congelado). Es el costo de ingresar un paciente, una vez por estadía.
+- **Qué pegar** en el editor de Apps Script, desde `entrega/`: `api.gs`, `dominio.gs`, `infra.gs`, `servicios.gs`, `webapp.gs` y el
+  `index.html` (el cohete). Comparar con `cmp`, no a ojo: el portapapeles corrompe los acentos en archivos grandes. La lista sale de
+  `node build/que_pegar.js aa842ec` (la tanda 1) y es la misma contra 5.4: si la planilla se quedó en 5.4, estos seis archivos
+  traen también la tanda 1.
+- **¿`crearORepararEstructura()`?** **No hace falta**: `esquema.gs` y `mantenimiento.gs` no cambian desde la tanda 1 (el `OP_ID`, los
+  dos `EPISODIO_ABIERTO`, el `PATIENT_ID` acuñado y las advertencias viajan transitorios; `CONTRATO_ESTRICTO` se lee con su valor
+  por defecto sin tocar la hoja). Quien venga de antes del rediseño (411 columnas) sí la necesita: ver `PENDIENTES.md`, sección 6.
+- **Cómo se publica:** nueva versión de la implementación web de la **planilla de NEXT** (nunca la del hospital) y recargar la app
+  instalada para que el sello de versión renueve su caché. El sello `NEXT-5.6-guardado-seguro` debe aparecer en «Cargando…».
+- 🔴 **Antes de pegar en la planilla de NEXT: ensayo práctico con DOS aparatos** (decisión 12): dos personas ingresan a la misma cama a
+  la vez; alta con un formulario viejo abierto; guardar con el celular en modo avión y volver la señal; doble toque en Guardar; anular un
+  evento después de un alta; y el ➕ sobre un paciente ya egresado debe seguir pidiendo la clave de coordinación. **Solo después** se
+  enciende `CONTRATO_ESTRICTO`. Todo lo de esta tanda se probó con un servidor simulado en el Chromium de Playwright, no en el Chrome
+  de Windows 10 del hospital ni contra el Apps Script real.
+- **Cómo revertir:** cada paso es un commit (pasos 1 a 16 desde `dff2df5` hasta `72e16b0`; arreglos desde `9b73bf9` hasta `22bab55`) y el
+  cierre es otro; `git revert` deshace lo que se quiera. Ninguna columna cambió, así que no hay datos que migrar de vuelta.
+
+### Para no olvidar (de toda la tanda)
+
+- 🪤 **Un reintento solo es seguro si todo lo que escribe converge**: ids derivados del contenido, «insertar si no existe», el compromiso
+  (lo que hace visible el cambio en el censo) AL FINAL, y un estado «ya hecho» que se reconoce por el paciente. El sello es un atajo; la
+  convergencia es lo que sobrevive cuando el caché se evapora.
+- 🪤 **«El servidor respondió» no es «el servidor no lo hizo».** Solo VALIDACION, CONFLICTO, NO_AUTORIZADO, NO_ENCONTRADO y LOCK_TIMEOUT
+  dicen «no se hizo»; INTERNO es ambiguo igual que no tener respuesta.
+- 🪤 **Cama libre ≠ cama sin `PATIENT_ID`:** al liberarla conserva el del último paciente (es el rastro). Cualquier puerta nueva que lea
+  el dueño de una cama pregunta `OCUPADA` primero.
+- 🪤 **Una guardia con un doble de juguete prueba el juguete.** La sugerencia no tomaba el candado y la guardia la sustituía por un doble que
+  sí; «la red cayó» simulado con un `Error` pelado seguía verde por un camino de compatibilidad que la red real ya no recorre. El doble
+  tiene que ser lo que el embudo de verdad entrega.
+- 🪤 **`page.clock.install` no congela el reloj; `pauseAt` sí** (y se instala antes de la hora que se quiere fijar).
+- 🪤 **Un mutante que sobrevive es una afirmación que falta.** La prueba de mutación se repite cada vez que se amplía una guardia.
+- 🪤 **El techo de viajes se mide en un escenario; la pantalla real puede hacer otro.** El ingreso con identidad propia cuesta 2 viajes más
+  que el que mide la batería.
+- 🪤 **Mientras `CONTRATO_ESTRICTO` esté apagado, el candado protege solo a quien manda el reclamo.** Una pantalla vieja sin él sigue
+  pasando; el service worker cachea el armazón por sello de versión, que es lo que las va retirando.
+
+### El detalle, paso a paso
+
+Las entradas que siguen son las que se fueron escribiendo durante la tanda, sin cambios de contenido (solo bajaron un nivel de título).
+Los pasos 1 a 15 no dejaron entrada propia: su detalle es el de las tablas de arriba y el de sus mensajes de commit.
+
+Sello `NEXT-5.6-guardado-seguro`.
+
+### 5-oct-2026 · Guardado seguro (tanda 2), paso 16: dos guardias cambian de convención, con su razón
 
 **De dónde sale.** El diseño de la tanda 2 (G14 a G17) cambia lo que la pantalla le dice a la persona cuando un guardado no
 tiene respuesta: antes, dos intentos fallidos eran «NO se guardó»; ahora una red caída o un tiempo agotado es **«No
@@ -3413,7 +3577,7 @@ las siete dejan alguna de las dos guardias en rojo.
 los 3 s. Si el equipo se apaga en esa ventana, lo escrito se pierde. Se dice aquí, y la guardia ata lo diseñado (borrador al
 agotar), no lo que falta.
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **Una guardia que simula «la red cayó» con un `Error` pelado puede quedar verde por un camino de compatibilidad** aunque el
   camino real haya cambiado. El doble tiene que ser lo que el embudo de verdad entrega (`sinRespuesta`, `codigo`), no lo que
@@ -3423,7 +3587,7 @@ agotar), no lo que falta.
 - 🪤 **Reconciliar no es aflojar**: las afirmaciones de antes quedaron (sección C) y se sumaron las nuevas; ninguna aserción
   se borró para tapar un rojo, porque no hubo rojo que tapar.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: los relojes de dos guardias no estaban congelados
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: los relojes de dos guardias no estaban congelados
 
 **De dónde sale.** Seis revisiones independientes de la tanda 2 dejaron 34 hallazgos; dos de ellos (H20 y H28) bloqueaban el cierre
 porque ponían la batería roja **al azar, sin que el código estuviera mal**: `guardado_seguro_no_confirmado_g17.js` y
@@ -3451,7 +3615,7 @@ pared antes de cada `runFor`, lo que hace una máquina cargada) y una sección n
   dispara solo, `runFor(100)` mueve exactamente 100 ms, y el reloj parte en T0 + 1500 (no una hora antes).
 - `RCE_DEMORA_REAL_MS` queda disponible para repetir la prueba de estrés: con 1500 (G17) y 4000 (fallo_guardado_visible) las dos pasan.
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **`page.clock.install` no congela; `pauseAt` sí.** Y después de `pauseAt` un `setTimeout(…, 0)` de la página tampoco dispara solo:
   toda acción que espera al doble de `google.script.run` necesita su `runFor`.
@@ -3465,7 +3629,7 @@ pared antes de cada `runFor`, lo que hace una máquina cargada) y una sección n
   cargada (hasta 10 de carga en 4 núcleos, dos guardias más corriendo a la vez); si alguna vez una de esas secciones se pone roja
   sola, el camino es esperar una condición con `waitForFunction` y no alargar el tiempo.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: las puertas del servidor y una cama libre que conserva su PATIENT_ID
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: las puertas del servidor y una cama libre que conserva su PATIENT_ID
 
 **De dónde sale.** Paso «B puertas servidor» de la revisión de la tanda 2. Siete hallazgos del servidor, todos reproducidos con un
 guion antes de tocar nada, y uno de la guardia misma (H4): `guardado_seguro_episodio_g14.js` daba verde con mutantes del código que
@@ -3514,7 +3678,7 @@ debían ponerla roja.
   guardado con el mismo nombre insertado directo para que la cuenta no mezcle tipos).
 - `build/paquete_migracion/servicios.gs`: lo regenera la guardia `paquete.js`. `entrega/` queda para el cierre.
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **Cama libre ≠ cama sin `PATIENT_ID`.** Al liberar una cama el `PATIENT_ID` se queda (es el rastro del último paciente). Cualquier
   puerta nueva que lea el dueño de una cama tiene que preguntar `OCUPADA` primero; la regla vive en `_pidDeCama` y G14 tiene ahora
@@ -3526,7 +3690,7 @@ debían ponerla roja.
   siguió mostrando «ambigua» después del arreglo; se rehízo apuntando al repositorio y contesta `ok`. Antes de dudar del arreglo,
   mirar contra qué árbol corre el guion.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el ingreso de un paciente que ya egresó, la forma del PATIENT_ID y el ingreso que murió a medias
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el ingreso de un paciente que ya egresó, la forma del PATIENT_ID y el ingreso que murió a medias
 
 **De dónde sale.** Paso «C ingreso y forma del pid» de la revisión de la tanda 2: H9, H14 y H18. Los tres reproducidos con guardias
 antes de tocar el código (rojo visto en G15 y G16) y los tres cerrados con una guardia que ahora los ata.
@@ -3581,7 +3745,7 @@ momento real; ahora hay un caso por señal.
 - `build/checks/guardado_seguro_operacion_g16.js`: sección 19b (matriz de INGRESAR_PACIENTE) y el alta de un pid ya archivado.
 - `build/paquete_migracion/{dominio,servicios}.gs`: los regenera la guardia `paquete.js`. `entrega/` y la VERSION quedan para el cierre.
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **El mensaje del CONFLICTO de ingreso se reutiliza a propósito para el pid ya egresado** («la cama ya fue ocupada por otro paciente
   mientras llenabas este ingreso»): la franja roja de la pantalla está fija para todo CONFLICTO y un texto distinto en el cuadro la
@@ -3597,7 +3761,7 @@ momento real; ahora hay un caso por señal.
 - 🪤 **Contar «escrituras» con un OP_ID incluye el sello del caché**: un reintento que no escribe a las hojas igual cuenta 1 en
   `sim_muerte` (el `CacheService.put`). Los casos de «cero escrituras» sin sello usan un payload sin OP_ID.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el sello sin texto libre, la sugerencia que no se duplica y el hito con la firma de la sesión
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el sello sin texto libre, la sugerencia que no se duplica y el hito con la firma de la sesión
 
 **De dónde sale.** Paso «D sello y sugerencia» de la revisión de la tanda 2: H10, H15, H13, H17 y H8. Los cinco reproducidos con la guardia
 antes de tocar el código (34 rojos en `guardado_seguro_operacion_g16.js`) y los cinco cerrados con la misma guardia en verde.
@@ -3654,7 +3818,7 @@ el paquete pisando la firma, dejar pasar `id` o `ID_HITO`, el respaldo `||0` del
 - `build/paquete_migracion/*`: los regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre
   (`paridad_entrega` y `pwa_paquete` están rojas hasta regenerarlos).
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **La respuesta repetida ya no trae `accion` ni `entidad`.** Quien en el futuro las lea de una respuesta en la pantalla se encontrará
   con `undefined` solo en el reintento: la guardia cuenta hoy 0 lecturas y se pondrá roja si aparece una.
@@ -3667,7 +3831,7 @@ el paquete pisando la firma, dejar pasar `id` o `ID_HITO`, el respaldo `||0` del
 - 🪤 **La sugerencia con el sello evaporado se reconoce por la fila** (mismo id derivado), no por el caché: cuesta una lectura de la
   columna de ids, y solo cuando hay OP_ID.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el evento declarado después apaga la advertencia y los días del re-guardado quedan fijados
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el evento declarado después apaga la advertencia y los días del re-guardado quedan fijados
 
 **De dónde sale.** Paso «E timeline y DIAS» de la revisión de la tanda 2: H11 y H16 (el mismo defecto visto por dos revisores) y H19.
 Los tres reproducidos antes de tocar nada.
@@ -3711,14 +3875,14 @@ Los tres reproducidos antes de tocar nada.
 - `build/paquete_migracion/servicios.gs`: lo regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre
   (`paridad_entrega` y `pwa_paquete` están rojas hasta regenerarlos).
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **Conservar el hito de transición y declarar el evento son dos cosas que se pisan.** Cualquier regla nueva que haga sobrevivir un hito
   automático a un re-guardado tiene que preguntarse si el payload nuevo ya trae lo que lo apaga.
 - 🪤 **Quitar la regla de los días no es «volver a como estaba»:** el cálculo de antes bajaba los días al volver a guardar una transición y
   la tanda 2 vive de que un reintento dé lo mismo que la corrida limpia. Si algún día se quita, caen las matrices de muerte de la sección 19.
 
-## 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el error INTERNO ya no duplica ni dice «NO se guardó», y la pantalla no afirma lo que no sabe
+### 9-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: el error INTERNO ya no duplica ni dice «NO se guardó», y la pantalla no afirma lo que no sabe
 
 **De dónde sale.** Paso «F pantalla: INTERNO y reintentos» de la revisión de la tanda 2: H21, H29, H22, H30, H24 y H32, todos en
 `v2/index.html`. Los seis reproducidos antes de tocar nada (la sección I de `guardado_seguro_no_confirmado_g17.js` nació con 34 fallos
@@ -3771,7 +3935,7 @@ rojos contra la pantalla del paso 15).
   el de reescribir en el ámbar, no pisar el ajeno, la repetida disfrazada, gs() sin INTERNO) mueren.
 - `build/paquete_migracion/index.html`: lo regenera la guardia `paquete.js`. `entrega/`, `pwa/` y la VERSION quedan para el cierre.
 
-### Para no olvidar
+#### Para no olvidar
 
 - 🪤 **«El servidor respondió» no es «el servidor no lo hizo».** Un código de error no dice si hubo escrituras antes: INTERNO es ambiguo igual
   que la falta de respuesta. Solo VALIDACION, CONFLICTO, NO_AUTORIZADO, NO_ENCONTRADO y LOCK_TIMEOUT dicen «no se hizo».
@@ -3782,7 +3946,7 @@ rojos contra la pantalla del paso 15).
 - **Queda del lado del servidor** (no es de este paso): rechazar un reintento rezagado cuyo momento de apertura es anterior al último
   guardado del turno (el complemento que propuso H22), para el aparato que se cayó y volvió, o para la llamada original que sigue en la red.
 
-## 10-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: la franja del guardado cabe y se toca en el celular, el cuadro no le roba el cursor a quien escribe y el aviso dice de qué cama habla
+### 10-oct-2026 · Guardado seguro (tanda 2), revisión adversarial: la franja del guardado cabe y se toca en el celular, el cuadro no le roba el cursor a quien escribe y el aviso dice de qué cama habla
 
 **De dónde sale.** Paso «G pantalla: móvil y textos» de la revisión de la tanda 2: H27, H31, H25, H26, H33 y H34(2), en `v2/index.html`,
 `v2/dominio_validacion.gs` y `v2/svc_evoluciones.gs`. Todos reproducidos antes de tocar nada: la sección J de

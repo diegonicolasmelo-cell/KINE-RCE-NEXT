@@ -489,7 +489,8 @@ function _horasEntreTS(desde, hasta) {
  *     al escribir), la operación corre exactamente como hoy. Lo que cubre la falta del sello son los ids derivados y el
  *     «insertar si no existe» de cada puerta (`uid(prefijo, clave)`, infra_util.gs).
  *   · Lo guardado son ids y banderas (`_selloDepurar`), nunca un nombre, un RUT ni un texto: el sello vive 6 horas en la
- *     memoria temporal del propio proyecto de Apps Script y no tiene por qué cargar nada clínico.
+ *     memoria temporal del propio proyecto de Apps Script y no tiene por qué cargar nada clínico. (Tampoco la `accion` de la
+ *     respuesta: en el ➕ es el texto de quien anota. Ver `_SELLO_CLAVES`.)
  *
  * 🪤 Es `var` y no `const` por una razón de arnés: las const no cuelgan de globalThis con el eval indirecto del
  * simulador, y `api.gs` la asigna desde otro archivo. En Apps Script da igual (un solo ámbito global).
@@ -511,8 +512,23 @@ var OP_ACTUAL = null;
 var _SELLO_TTL_SEG = 21600;
 /** Un sello de más de esto se descarta: el caché admite 100 KB por valor y un put que lanza no puede tumbar nada. */
 var _SELLO_MAX_CHARS = 90000;
-/** Lo único que se recuerda de una respuesta: ids. Las banderas (verdadero/falso) pasan aparte. */
-var _SELLO_CLAVES = ['idCama', 'idEvolucion', 'id', 'patientId', 'turnoKey', 'accion', 'entidad'];
+/**
+ * Lo único que se recuerda de una respuesta: ids. Las banderas (verdadero/falso) pasan aparte.
+ *
+ * 🔴 `accion` y `entidad` NO están (revisión de la tanda 2, H10 y H15). Parecían inocuas —una etiqueta corta— y no lo son: en
+ * ANEXAR_EVENTO la acción ES el texto clínico libre de quien anota («evento rápido: <la nota, el hallazgo del cultivo, el detalle>») y en
+ * ANULAR_ANEXO lleva el nombre del anexo, y cortarla a 80 caracteres dejaba igual el principio del texto en el caché seis horas. Tampoco
+ * hacen falta: la bitácora ya las anotó en la primera respuesta (la repetida no vuelve a auditar) y ningún sitio de la pantalla las lee de una
+ * respuesta (build/checks/guardado_seguro_operacion_g16.js, sección 29, lo ata). La regla: una clave nueva en esta lista tiene que ser un ID,
+ * jamás un texto que alguien escribió.
+ */
+var _SELLO_CLAVES = ['idCama', 'idEvolucion', 'id', 'patientId', 'turnoKey'];
+/**
+ * Los números que se recuerdan de UNA acción (H13): la pantalla los lee de la respuesta y la repetida los perdería. El lote de ventiladores
+ * dice «N ventiladores movidos» con `total`, y sin él una respuesta repetida decía «0». Es un CONTEO; el mismo nombre en otra acción puede ser
+ * otra cosa (en EVAL_REGISTRAR `total` es el puntaje de una escala del paciente, un dato clínico), por eso va POR ACCIÓN y no en la lista de arriba.
+ */
+var _SELLO_NUMEROS = { MOVER_VENTILADORES_LOTE: ['total'] };
 
 function conLock(fn) {
   // El sello es del PRIMER conLock de la petición: los servicios hacen uno por acción, y si algún día hicieran dos
@@ -562,7 +578,7 @@ function _selloGuardar(op, r) {
     if (!r || r.ok !== true) return;                         // un rechazo no se sella: reintentar vuelve a evaluar
     const adv = r.data && r.data.advertencias;
     if (adv && (!Array.isArray(adv) || adv.length)) return;  // quedó algo a medias: el reintento tiene que completarlo
-    const valor = JSON.stringify({ h: op.h, d: _selloDepurar(r.data), t: Date.now() });
+    const valor = JSON.stringify({ h: op.h, d: _selloDepurar(r.data, op.accion), t: Date.now() });
     if (valor.length > _SELLO_MAX_CHARS) return;
     SpreadsheetApp.flush();                                  // primero lo escrito, recién después el «ya hecho»
     CacheService.getScriptCache().put(_selloClave(op), valor, _SELLO_TTL_SEG);
@@ -578,21 +594,25 @@ function _selloRepetida(op, sello) {
 }
 
 /**
- * De la respuesta `data`, solo lo que puede viajar al caché: ids (de las claves de `_SELLO_CLAVES`) y banderas
- * booleanas. Nunca un nombre, un RUT, un diagnóstico ni un texto, ni un objeto ni una lista: el sello no tiene por qué
- * cargar nada clínico. `TEXTO_GENERADO` queda como marca vacía para que la repetición sepa que debe devolver el del
- * payload. `accion` y `entidad` se acotan: no son un lugar para pegar texto.
+ * De la respuesta `data`, solo lo que puede viajar al caché: ids (de las claves de `_SELLO_CLAVES`), banderas booleanas y, de
+ * ciertas acciones, un conteo (`_SELLO_NUMEROS`). Nunca un nombre, un RUT, un diagnóstico ni un texto, ni un objeto ni una lista: el
+ * sello no tiene por qué cargar nada clínico. `TEXTO_GENERADO` queda como marca vacía para que la repetición sepa que debe devolver el
+ * del payload. `accion` y `entidad` NO pasan, ni acotadas: la primera lleva texto escrito por la persona (ver `_SELLO_CLAVES`).
+ *
+ * @param d       la `data` de la respuesta.
+ * @param accion  la acción del dispatcher, para los números que solo esa acción puede sellar (opcional: sin ella no pasa ninguno).
  */
-function _selloDepurar(d) {
+function _selloDepurar(d, accion) {
   const o = {};
   if (!d || typeof d !== 'object' || Array.isArray(d)) return o;
+  const numeros = (accion && _SELLO_NUMEROS[accion]) || [];
   Object.keys(d).forEach(function (k) {
     const v = d[k];
     if (typeof v === 'boolean') { o[k] = v; return; }
     if (k === 'TEXTO_GENERADO') { o[k] = ''; return; }
+    if (numeros.indexOf(k) !== -1) { if (typeof v === 'number' && isFinite(v)) o[k] = v; return; }
     if (_SELLO_CLAVES.indexOf(k) === -1) return;
-    if (typeof v === 'number' && isFinite(v)) { o[k] = v; return; }
-    if (typeof v === 'string') o[k] = (k === 'accion' || k === 'entidad') ? v.slice(0, 80) : v;
+    if ((typeof v === 'number' && isFinite(v)) || typeof v === 'string') o[k] = v;
   });
   return o;
 }
