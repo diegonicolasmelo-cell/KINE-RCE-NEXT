@@ -5408,3 +5408,19 @@ por la regeneración que queda para el cierre. `paquete.js` regeneró `build/paq
 - La barra de botones del Registro que se sale de la pantalla en el celular, y las pestañas Estadísticas, Entrega y Ventiladores bajo 11 px: decisión 22.
 - Los pares de color a mano de la decisión 21 (el gris del chip «no evaluables», el ámbar de la evaluación vieja, «— sin evolución —», «Sin colegas asignados» y el naranja de «Volver a hoy»): esperan a Diego; **el ámbar y el naranja no se tocan sin su palabra.**
 - Los textos de `docs/archivo/` y la sección 4 de PENDIENTES (tabla técnica «dónde está») siguen con nombres internos: son tablas para quien programa, no decisiones.
+
+### «Estoy desdiciéndome en acuerdos que eran del otro proyecto» · 9-oct-2026
+
+Diego, mirando el mockup: muchas cosas se tomaron del proyecto anterior «a rajatabla», y cambiarlas se sentía como
+contradecirse. Tenía razón y parte era culpa de cómo trabajaba yo: trataba cada guardia como ley, y 97 de las 212 no
+protegen contra un error, fijan cómo funcionaba RCE-KINE.
+
+- **Regla nueva en `CLAUDE.md`:** lo que vino de RCE-KINE no es un acuerdo de NEXT; cuando Diego decide distinto, decide
+  por primera vez. La excepción a «si una guardia falla se arregla el código» es solo para las heredadas.
+- **`docs/INVENTARIO_GUARDIAS.md`:** las 212 en tres montones — T cicatriz técnica (64, valen enteras), H heredada (97,
+  Diego decide), N decidida en NEXT (51, con fecha). La clasificación es mía, leyendo la cabecera de cada guardia; Diego
+  la puede corregir.
+- Diego marca en una página (artefacto «Guardias heredadas»); sus marcas quedan guardadas y se leen desde aquí. Las H
+  que «se van» se borran en una tanda propia, con su frase.
+- **10-oct · Diego:** «respecto a las decisiones de las guardias, mejor déjalo como está, y con el uso te voy diciendo». La
+  lista no se marca de una vez; todas siguen y lo heredado se suelta caso a caso cuando el uso lo pida.
