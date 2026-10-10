@@ -4330,3 +4330,47 @@ y con la cantidad de secreciones puesta, «Manejo respiratorio» también.)
 - `_mFaltaTxt` sigue siendo la tabla de nombres cortos por id (dice «un dato obligatorio» para los que no conoce: las razones de la PVE, el tipo de extubación sin PVE, la hora de la reintubación). Usar el `texto` de `_obligatoriosPendientes()` cambiaría frases que otras guardias fijan; queda para un paso aparte.
 - La decisión 5 de la auditoría (con TQT + VM la PVE no se pregunta, y por eso nunca puede decir «Sin registrar») no se tocó: el estado refleja lo que el sistema pregunta hoy.
 - Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).
+
+### 10-oct-2026 · Tanda 4 · paso 4.1 · El nivel de KTM que la cama recuerda no se cuela de noche ni en el primer día tras una noche (cambio 1)
+
+**El defecto.** Al abrir un turno nuevo corren dos llenados en fila: `fillCama` copia `cama.KTM_NIVEL` al campo oculto `fKTMniv`, y después
+`fillFormReplica` repone lo que se hereda (`_tf`). Esa segunda escribía el nivel solo `if(_tf.KTM_NIVEL_KTR)`: cuando NO había nada que heredar
+—de noche `_tf` es `{}`, y de día tras una noche sin fila de día también— tampoco borraba lo que `fillCama` había dejado. Y la cama SÍ recuerda un nivel de
+noche: el servidor conserva el último y, si la noche hizo KTM, se queda con el de la noche (`svc_evoluciones.gs`, el `KTM_NIVEL:` de la fila de la cama).
+Resultado: un nivel que nadie eligió metido en un campo oculto, **sin ningún botón de nivel encendido que lo delate**. Medido en Chromium antes de tocar
+nada (cama con `KTM_NIVEL='3'`, reloj inventado): **de noche**, sin tocar nada el payload ya llevaba `KTM_NIVEL_KTR='3'` (el servidor lo limpia si la KTM no
+está realizada, pero la pantalla ya lo había mezclado en el relato y en la categorización SOCHIMI), y **elegir «Realizada» sin elegir nivel mandaba `true/3`** y
+el relato decía «nivel 3»; **el primer turno de día tras una noche** (sin `_PREVIA_DIA`) arrancaba con nivel `3`, y también cuando la última fila de día no traía
+nivel pero una noche de por medio le había dejado el suyo a la cama. Contradice 8.6 («parte en blanco, sin el nivel del día») y 8.7 («no hereda tampoco hacia el
+día»), y esa KTM entra al REM y a las atenciones. (Confirmada la hipótesis de la auditoría.)
+
+**El cambio (solo `v2/index.html`, `fillFormReplica`; ni `guardar()`, ni `fillCama`, ni el servidor).** Si `_tf` no trae `KTM_NIVEL_KTR`, el formulario parte SIN
+nivel: el oculto vacío, los botones de nivel apagados y su descripción en blanco; si lo trae, `setKTMniv` como siempre. La línea se ata a `_tf` y no se limpia a
+ciegas: **DÍA→DÍA sigue heredando** (BUG 5 de `regresion_ui.js`), y con una noche de por medio se hereda el nivel del DÍA, no el de la noche ni el de la cama.
+Un mutante que limpia a ciegas rompe 6 aserciones de la sección DÍA→DÍA. De paso cae un defecto vecino que apareció al medirlo: **el botón de nivel que el paciente
+anterior dejó encendido tampoco se apagaba** (`$('kf').reset()` vacía el oculto vía `_resetHiddenYEventos`, pero no toca los botones; solo `fillForm` los apagaba): la
+pantalla mostraba el «4» iluminado con el campo vacío por debajo. Ahora lo apaga el mismo `else`.
+
+**Lo que ve distinto la kinesióloga.** De noche la terapia física parte de verdad en blanco: si marca «Realizada» sin elegir nivel, la sesión no lleva el nivel de la
+cama ni el relato dice «nivel 3». El primer turno de día tras una noche arranca sin el nivel de la noche. De día, tras otro turno de día, nada cambia (el nivel se
+hereda y se ve encendido). Y ya no queda iluminado el nivel del paciente que acababa de mirar.
+
+**La guardia (`build/checks/ktm_nivel_no_se_cuela.js`, nueva).** Cama de prueba con `KTM_NIVEL='3'` (la de `ktm_de_noche.js` no traía nivel y por eso no veía el
+defecto), `Date` fijo en el 12-ago-2026 a las 11:00 y el turno forzado en `SHIFT`. Cuatro secciones: (1) de noche, el oculto vacío, el nivel derivado vacío, sin
+tocar nada no viaja, «Realizada» sin nivel viaja `true/` y el relato no dice «nivel 3», y si SE ELIGE un nivel ese viaja; (2) primer día tras una noche, con y sin
+`_PREVIA_DIA` de una fila de día sin nivel, y el default «Realizada» de día no se tocó; (3) DÍA→DÍA hereda el 3 con su botón, su descripción y en el payload, y con una
+noche de por medio hereda el 2 del día; (4) el botón del paciente anterior (de noche y de día sin nivel que heredar) se apaga, y con nivel que heredar queda el heredado.
+**Roja antes: 11 fallos contra el `index.html` anterior** (los controles DÍA→DÍA ya salían verdes); **verde después**. Mutantes: limpiar a ciegas → 6 fallos; no limpiar el
+oculto → 9. Vecinas: 57 verdes de 58 corridas con `-j 2` ( `convenciones`, `ktm_*`, `regresion_ui`, `afinado`, `arranque`, `guardado_viajes`, `episodio_turno`, `tablero`,
+`seis_pasos`, `cuatro_pasos`, `validacion_entre_pasos`, `evaluaciones_de_noche`, `ingreso_noche`, `movil_panel`, `cierre_tres_bloques`, `paquete`, entre otras); la única roja fue `pwa_paquete`,
+por la regeneración pendiente del cierre.
+
+**Lo que NO se hizo y queda dicho.**
+- `fillCama` no se tocó (así lo pide la auditoría). Sus dos caminos SIN réplica —paciente sin turno previo y servidor sin contestar al abrir— siguen copiando el nivel de la
+  cama también de noche (medido: quedaba `3`). No se alcanzan con datos reales, porque una cama que recuerda un nivel siempre tiene un turno previo del que abrir la réplica, así que
+  no se midió ni se cambió; si Diego o la tanda 5 quieren cerrar también esa puerta, es una condición en `fillCama` (de noche no copiar) y la guardia es el lugar de su caso.
+- El default de DÍA sigue en «Realizada» (`ktmEstadoInicial`) como antes: tras una noche, el día abre «Realizada» pero ahora SIN nivel. Es una decisión de producto abierta (la auditoría la lista
+  entre los menores), no se tocó.
+- Un botón de nivel encendido que queda del paciente anterior en el camino de INGRESO o sin réplica sigue sin apagarse (el reset de `abrirPanel` no lo cubre); se cubrió en la réplica, que es el camino
+  de todo turno con historia.
+- Sin migración de esquema. `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).

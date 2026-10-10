@@ -9434,7 +9434,21 @@ function fillFormReplica(s) {
   else setKTMstate(ktmEstadoInicial(false));   // de noche parte neutra: no se hereda ni se supone
   set('fKTMct',_tf.KTM_CONTRA_TIPO); set('fKTMraz',_tf.KTM_CONTRA_RAZON); set('fKTMman',_tf.KTM_CONTRA_MANUAL);
   _ktmContraSel(_tf.KTM_CONTRA_RAZON);   // el select quedaba vacío con la razón ya cargada en el hidden
+  /* 🔴 10-oct-2026 · EL NIVEL SALE DE LO QUE SE HEREDA (`_tf`), NO DE LA CAMA. `fillCama` corre justo antes y copia
+     `cama.KTM_NIVEL` al campo oculto `fKTMniv`; y la cama SÍ recuerda un nivel de noche (el servidor conserva el último,
+     y si la noche hizo KTM, se queda con el de la noche). Escribir el nivel solo `if(_tf.KTM_NIVEL_KTR)` dejaba, cuando no
+     había nada que heredar —de noche `_tf` es `{}`, y de día tras una noche sin fila de día también—, un nivel que nadie eligió
+     metido en un campo oculto, sin ningún botón encendido que lo delatara: de noche, elegir «Realizada» sin elegir nivel
+     mandaba el de la cama, y el primer día tras una noche arrancaba con el de la noche (8.6: «parte en blanco, sin el nivel
+     del día»; 8.7: «no hereda tampoco hacia el día»). Ahora, si `_tf` no trae nivel, el formulario parte SIN nivel: oculto
+     vacío y botones apagados (de paso, un botón que quedó encendido del paciente anterior, que el reset no apaga).
+     DÍA→DÍA no cambia: la previa de día trae su nivel y se hereda. Lo cuida ktm_nivel_no_se_cuela.js. */
   if(_tf.KTM_NIVEL_KTR) setKTMniv(String(_tf.KTM_NIVEL_KTR));
+  else {
+    document.querySelectorAll('.ktm-niv-btn').forEach(b=>b.classList.remove('on'));
+    const _hn=$('fKTMniv'); if(_hn) _hn.value='';
+    const _nd=$('ktmNivDesc'); if(_nd) _nd.textContent='';
+  }
   if(_tf.KTM_ASISTENCIA) setKTMasis(_tf.KTM_ASISTENCIA);
   // REM: sesiones y educación son ACCIÓN DIARIA — no se heredan del turno previo
   set('fKtmCant','1'); set('fKtmSesiones','');
