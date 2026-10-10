@@ -209,6 +209,11 @@ function validarPayloadEvolucion(d) {
   const errs = [];
   if (!d) return ['Payload vacío'];
 
+  // 🔴 NaN e Infinity no se guardan (G06, 4-oct-2026): se rechazan SOLOS y con el nombre del campo. Ver
+  // _errsNoFinitos: sin esto un «Infinity» o un «1e999» entraba a la planilla como si fuera una medición.
+  const noFinitos = _errsNoFinitos(d);
+  if (noFinitos.length) return noFinitos;
+
   if (!d.ID_CAMA && !d.idCama) errs.push('Falta ID_CAMA');
   if (!d.TURNO_KEY && !d.turnoKey) errs.push('Falta TURNO_KEY');
   if (!d.PLAN_FIRMA_KINE || String(d.PLAN_FIRMA_KINE).trim() === '') errs.push('Falta firma del kinesiólogo');
@@ -420,16 +425,82 @@ function _ktmCantidad(v) {
   return String(Math.min(9, Math.max(1, isNaN(n) ? 1 : n)));
 }
 
+/**
+ * Forma del PATIENT_ID que acuña quien ingresa (G15, 4-oct-2026): lo que `crypto.randomUUID()` de la pantalla produce, de 8
+ * a 64 caracteres de `[A-Za-z0-9_-]`. Es parte del contrato porque ese texto termina como identificador del episodio en la
+ * cama, la evolución y la línea de tiempo (y mañana en ids derivados como ARCH_<pid>): sin espacios ni «|» no se cuela en
+ * una clave ni en una celda donde no debe. `var` y no `const`: las const no cuelgan de globalThis en el eval del simulador.
+ */
+var _PATIENT_ID_ACUNADO_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * La forma de un PATIENT_ID que llega de afuera (H14, revisión de la tanda 2): '' si no viene o tiene la forma acuñada; el motivo
+ * si viene y no la tiene. Un valor que no es texto (número, objeto, lista) tampoco vale. El mensaje no repite lo recibido. La usan
+ * `validarPayloadIngreso` (antes del lock) y `_candadoDePidNuevo` (svc_evoluciones.gs, dentro del lock, porque a un pid que ya es
+ * el de la cama —una cama antigua con un pid que no tiene esta forma— no se le exige).
+ */
+function _errPatientIdAcunado(v) {
+  if (v === undefined || v === null || v === '') return '';
+  return (typeof v === 'string' && _PATIENT_ID_ACUNADO_RE.test(v)) ? '' : 'PATIENT_ID inválido: son de 8 a 64 letras, números, guiones o guion bajo';
+}
+
 function validarPayloadIngreso(d) {
   const errs = [];
   if (!d) return ['Payload vacío'];
   if (!d.idCama && !d.ID_CAMA) errs.push('Falta idCama');
+  // El PATIENT_ID acuñado es OPCIONAL (sin él el servidor acuña uno, como siempre); si viene, tiene que tener la forma.
+  const ePid = _errPatientIdAcunado(d.PATIENT_ID);
+  if (ePid) errs.push(ePid);
   const nombre = d.nombre || d.NOMBRE || d.PAC_NOMBRE;
   if (!nombre || String(nombre).trim() === '') errs.push('Falta nombre del paciente');
   const firma = d.firmaKine || d.PLAN_FIRMA_KINE || d.FIRMA_KINE;
   if (!firma || String(firma).trim() === '') errs.push('Falta firma del kinesiólogo');
   _rango(errs, d.edad || d.EDAD, 'Edad', 15, 110, true);
   _rango(errs, d.talla || d.TALLA_CM, 'Talla (cm)', 100, 230, false);
+  return errs;
+}
+
+/**
+ * _errsNoFinitos — un número que no es un número no se guarda (G06, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. El contrato de los ceros tiene cuatro frases y esta es la tercera: el 0 se conserva, el
+ * vacío no se vuelve 0, y lo que NO es un número finito (NaN, Infinity) se rechaza con un mensaje que dice
+ * cuál campo. Antes pasaba derecho: solo los campos con rango (_rango) lo frenaban, y un «Infinity» en la PIC,
+ * en el EB o en el PEEP-0 de un campo sin tope entraba a la fila de EVOLUCIONES y de ahí a la cama.
+ *
+ * Qué mira:
+ *  · Un valor de tipo `number` no finito, en CUALQUIER clave (nada lo vuelve válido).
+ *  · Un TEXTO que dice «NaN», «Infinity» o «-Infinity», o que desborda al leerlo («1e999»), pero SOLO en las
+ *    columnas entero/decimal del esquema de EVOLUCIONES: en una columna de texto «NaN» es un apellido o un
+ *    diagnóstico, y «Infinity» una frase como cualquier otra. Sin ESQUEMA a mano (algún banco antiguo carga este
+ *    archivo suelto) solo corre la primera mirada.
+ * Qué NO mira, a propósito: texto basura en una columna numérica («abc»). No es un valor no finito y rechazarlo
+ * es una decisión de producto aparte; hoy se guarda tal cual y los lectores lo toleran.
+ */
+function _errsNoFinitos(d) {
+  const errs = [];
+  const rot = {};
+  const numericas = [];
+  if (typeof ESQUEMA !== 'undefined' && ESQUEMA && ESQUEMA.EVOLUCIONES && ESQUEMA.EVOLUCIONES.cols) {
+    ESQUEMA.EVOLUCIONES.cols.forEach(function (c) {
+      rot[c[0]] = c[2];
+      if (c[1] === 'entero' || c[1] === 'decimal') numericas.push(c[0]);
+    });
+  }
+  Object.keys(d).forEach(function (k) {
+    if (typeof d[k] === 'number' && !isFinite(d[k])) {
+      errs.push((rot[k] || k) + ' no es un número válido (' + String(d[k]) + ')');
+    }
+  });
+  numericas.forEach(function (k) {
+    const v = d[k];
+    if (typeof v !== 'string') return;
+    const t = v.trim();
+    if (t === '') return;
+    if (/^[+-]?(nan|infinity)$/i.test(t) || Math.abs(parseFloat(t)) === Infinity) {
+      errs.push(rot[k] + ' no es un número válido (' + t + ')');
+    }
+  });
   return errs;
 }
 
@@ -502,6 +573,218 @@ function validarTransicionVA(d, cama) {
   if (!inv(ini) && inv(va) && !vv(d.INTUB_OCURRIO) && !vv(d.EXT_REINTUB) && !vv(d.TQT_OCURRIO))
     falta('Venía con ' + ini + ' y queda con ' + va + ', pero no hay intubación ni reintubación registrada. Decláralo en «¿Qué pasó hoy con la vía aérea?» o escribe por qué.');
   return errs;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  🔐 G14 en TODAS las puertas que actúan sobre una cama (tanda 2 del guardado seguro, 4-oct-2026).
+//  Puras, como el resto de este archivo: reciben lo que necesitan y no leen ninguna hoja. Quien llama (el servicio
+//  de cada puerta) lee la cama DENTRO del lock, llama a estas y rechaza ANTES de la primera escritura.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Los dos mensajes de rechazo del candado de episodio. Son funciones y no constantes para que el texto exista en un
+ * solo lugar y se pueda comparar con el de `validarEpisodioAbierto` (svc_evoluciones.gs) palabra por palabra: una
+ * sola frase para todas las puertas. Ninguno nombra a nadie ni lleva el identificador de un episodio: el otro
+ * paciente no es asunto de quien tenía el formulario abierto (Ley 19.628); lo que pasó queda en AUDIT_LOG.
+ */
+function _msgCambioDePaciente(idCama) {
+  // 🪤 La pantalla reconoce este rechazo por la frase «cambió de paciente» (`_EP_CAMBIO_RE` en index.html): si se
+  // reescribe, se reescribe en los dos lados — la guardia lo ata.
+  // H34(2): dice «ventana» y no «formulario» porque lo leen también los diálogos SIN formulario (egreso, mover, intercambiar,
+  // anular un evento, escalas, gases): «Cierra el formulario» le hablaba a quien confirmaba un egreso de algo que no tenía delante.
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste esta ventana, ' +
+    'así que no se guardó nada. Cierra esta ventana y vuelve a abrir la cama para ver cómo está ahora.';
+}
+function _msgPantallaVieja() {
+  // 🪤 SIN la frase «cambió de paciente»: la pantalla mostraría la salida del cambio de paciente («Cerrar la cama») y
+  // lo que hay que hacer aquí es otra cosa —recargar—.
+  return 'Esta pantalla es de una versión anterior y no puede guardar con seguridad. ' +
+    'Recárgala (cierra y vuelve a abrir la aplicación) y repite lo que hacías. No se guardó nada.';
+}
+function _msgPidEnOtraCama() {
+  // H14. VALIDACION y no CONFLICTO a propósito: la pantalla muestra todo CONFLICTO como «la cama ya fue ocupada por otro paciente»,
+  // y aquí lo que hay es el MISMO paciente en dos camas. No da el identificador ni nombra a nadie (Ley 19.628).
+  return 'Este paciente ya figura en otra cama ocupada, así que no se guardó nada. ' +
+    'Revisa el censo: un mismo paciente no puede estar en dos camas a la vez.';
+}
+function _msgIngresoConflicto(idCama) {
+  // 🪤 SIN la frase «cambió de paciente», por lo mismo que arriba: aquí NO hay un paciente que se fue, hay OTRO que se
+  // adelantó a esta misma cama mientras se llenaba el ingreso, y la salida no es cerrar ni volver a abrir la cama —el
+  // formulario se queda como está, con lo escrito—. Tampoco nombra ni da el identificador del que ganó (Ley 19.628).
+  return 'La cama ' + idCama + ' ya fue ocupada por otro paciente mientras llenabas este ingreso. ' +
+    'No se guardó nada. Tu formulario sigue abierto con lo que escribiste.';
+}
+
+/**
+ * validarEpisodioPuerta — la pantalla que se abrió para un paciente no actúa sobre otro, en CUALQUIER puerta
+ * (G14, tanda 2, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `validarEpisodioAbierto` (svc_evoluciones.gs) cerró el hueco en UNA puerta, el guardado de la
+ * evolución. Las demás —dar el alta, limpiar la cama, moverla, intercambiarla, anular un evento, anexar, medir,
+ * abrir un pendiente…— siguen atribuyendo lo que hacen a «quien tenga la cama AHORA»: el diálogo que quedó abierto
+ * mientras la cama se daba de alta y se reingresaba a OTRO paciente limpia, mueve o le anula el evento al nuevo, y
+ * nadie lo ve. Esta es la MISMA regla, extendida: una función pura que cada puerta llama con la cama que leyó
+ * dentro de su lock.
+ *
+ * LAS REGLAS (las mismas de `validarEpisodioAbierto`, más el modo estricto):
+ *  · AUSENTE (undefined/null) ⇒ no se compara. Es COMPATIBILIDAD con las llamadas sin pantalla (smoke tests,
+ *    build/sim) y con las pantallas viejas que todavía no mandan el campo. La pantalla nueva SIEMPRE lo manda.
+ *  · VACÍO ⇒ la pantalla no abrió ningún episodio (ingreso en cama libre, o episodio sin ingreso formal): no
+ *    reclama ninguno. 🪤 A propósito: si el vacío rechazara sobre una cama ocupada, el reintento de un ingreso cuyo
+ *    primer intento sí aterrizó se vería idéntico a «otro ingreso en la misma cama» (esa ambigüedad la resuelve el
+ *    PATIENT_ID que la pantalla acuña al abrir el ingreso, G15, no esta función).
+ *  · CON VALOR ⇒ igualdad EXACTA con el PATIENT_ID de la cama (tras recortar espacios): si la cama pasó a otro
+ *    paciente, o quedó libre, se rechaza.
+ *  · ESTRICTO (CONFIG.CONTRATO_ESTRICTO = TRUE, nace APAGADO): el AUSENTE se rechaza —«esta pantalla es de una versión
+ *    anterior, recárgala»— y el VACÍO no se acepta sobre una cama que tiene paciente. 🪤 La excepción «un ingreso con
+ *    PATIENT_ID propio sí entra con vacío» la decide quien ingresa (G15) ANTES de llamar aquí: esta función no
+ *    conoce ingresos.
+ *
+ * Devuelve '' si la puerta puede seguir, o el mensaje en palabras simples si no. Quien llama lo devuelve como
+ * `err(msg, ERR.VALIDACION)` sin haber escrito nada. (El CONFLICTO —«otro se adelantó, no es un reintento»— lo
+ * decide `decidirEpisodioPuerta`, que además reconoce el reintento de una operación que sí aterrizó.)
+ *
+ * @param  abierto   EPISODIO_ABIERTO del payload (el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el diálogo)
+ * @param  pidCama   PATIENT_ID que tiene la cama AHORA (leída dentro del lock)
+ * @param  idCama    número de la cama, solo para el mensaje
+ * @param  estricto  true solo en modo estricto; cualquier otra cosa (incluido no pasarlo) es el modo tolerante
+ */
+function validarEpisodioPuerta(abierto, pidCama, idCama, estricto) {
+  const pid = (pidCama === undefined || pidCama === null) ? '' : String(pidCama).trim();
+  if (abierto === undefined || abierto === null) return estricto === true ? _msgPantallaVieja() : '';
+  const ab = String(abierto).trim();
+  if (!ab) return (estricto === true && pid) ? _msgCambioDePaciente(idCama) : '';
+  return ab === pid ? '' : _msgCambioDePaciente(idCama);
+}
+
+/**
+ * decidirEpisodioPuerta — qué hace cada puerta de CAMA ante un reclamo de episodio, incluido el «ya hecho»
+ * (G14, tanda 2, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `validarEpisodioPuerta` sola trata todo desacuerdo como «la cama cambió de paciente». Pero hay
+ * un desacuerdo que NO es un conflicto: el REINTENTO de una operación que sí aterrizó. La respuesta se perdió, la
+ * pantalla reenvía lo mismo, y la cama ya no es la de antes PORQUE ESA OPERACIÓN YA SE HIZO (el alta ya archivó y
+ * limpió; el traslado ya movió; el intercambio ya cruzó). Rechazarlo le diría a la persona «no se guardó» sobre algo
+ * que sí se guardó. Y hay otro desacuerdo que no se puede tratar como reintento: limpiar la cama que ahora ocupa
+ * OTRO paciente borraría al ocupante nuevo.
+ *
+ * Devuelve `{estado, codigo, error}`:
+ *  · 'seguir'   — el reclamo coincide (o no hay reclamo que comparar): la puerta hace lo suyo.
+ *  · 'yaHecho'  — la operación ya aterrizó: la puerta responde ok `yaEstaba` y, donde quedan pasos por completar
+ *                 (intercambio, traslado), completa los que falten sin repetir el cambio de camas.
+ *  · 'rechazo'  — no se toca nada; `codigo` es VALIDACION (la cama no es la de la pantalla) o CONFLICTO (otra
+ *                 persona se adelantó), y `error` el mensaje, sin nombres ni identificadores.
+ *
+ * LAS PUERTAS (`e` trae lo que cada una lee dentro de su lock):
+ *  · DAR_ALTA — reclamo `abierto` contra la cama `pid`. Si no coincide, es un reintento SOLO si ARCHIVO_PACIENTES ya
+ *    tiene la fila de ese paciente (`hayArchivo`): cama libre u ocupada por otro, da igual, el alta ya se hizo. Sin
+ *    esa fila, el paciente se trasladó o la cama se limpió, no se le dio el alta: rechazo como hoy.
+ *  · LIMPIAR_CAMA — cama libre: ya hecho. Ocupada por OTRO: CONFLICTO (nunca se limpia al ocupante nuevo).
+ *    🪤 «Libre» NO es «sin PATIENT_ID»: una cama ocupada por un episodio sin ingreso formal (cargado a mano) tiene el
+ *    pid vacío igual que una libre. Quien llama pasa `ocupada: true` cuando la cama está OCUPADA, tenga o no pid, y
+ *    esa cama es un ocupante nuevo (CONFLICTO), no un «ya hecho». Sin la bandera (los bancos antiguos) se decide solo
+ *    por el pid, como antes.
+ *  · INTERCAMBIAR_CAMAS — `abierto`/`pid` es la cama A y `abiertoB`/`pidB` la B. Ya hecho si A tiene el paciente que
+ *    la pantalla vio en B y B el que vio en A. Cualquier otra diferencia rechaza (también la mitad hecha: con un
+ *    solo setValues para las dos filas no debería existir, y si existe no es un reintento seguro).
+ *  · MOVER_A_CAMA_VACIA — `abierto`/`pid` es el origen y `abiertoB`/`pidB` el destino (`''` = estaba libre al
+ *    elegir). Ya hecho si el destino ya tiene al paciente y el origen quedó libre. Un destino que ahora ocupa OTRO
+ *    paciente es CONFLICTO. Se juzga primero el origen. 🪤 Se decide por PATIENT_ID: una cama ocupada SIN
+ *    PATIENT_ID (episodio sin ingreso formal) se ve igual que una libre, y la comprobación de «ocupada» que el
+ *    servicio ya hace se queda como está.
+ *  · INGRESO — G15, el INGRESO CONCURRENTE (paso 8). El ingreso CREA el episodio: no reclama uno que todavía no existe
+ *    (por eso aquí no se mira `abierto`), trae el SUYO, el PATIENT_ID que la pantalla acuñó al abrir el formulario sobre
+ *    una cama libre (`propio`). Con él, la cama libre o ocupada SIN PATIENT_ID (un episodio sin ingreso formal: no hay a
+ *    quién ganarle) deja entrar; la cama con ESE MISMO pid es el reintento de su propio ingreso (ya hecho: un solo hito,
+ *    la puerta decide si eso es «seguir» o «ya estaba»); la cama con OTRO pid es CONFLICTO, porque otra persona se
+ *    adelantó y no es un reintento. Sin `propio` (pantalla vieja o llamada por API sin navegador) el modo tolerante no
+ *    compara —es el hueco que el modo estricto cierra— y el estricto no acepta ese vacío sobre una cama con paciente
+ *    (CONFLICTO). `pid` es el de quien ocupa la cama AHORA: vacío si está libre (una cama libre no tiene dueño aunque la
+ *    fila conserve un pid viejo) o si la ocupa un episodio sin ingreso formal. Las dos puertas que ingresan —el
+ *    guardado de la evolución con ES_INGRESO y INGRESAR_PACIENTE— deciden con esta misma fila: una sola regla.
+ *    H9 (revisión de la tanda 2): `archivado` (true) es que el pid propio YA TIENE su egreso (una fila en ARCHIVO_PACIENTES o un
+ *    hito de egreso, lo lee quien llama). Un ingreso con el pid de alguien ya egresado es CONFLICTO sin importar la cama: sin el
+ *    sello del OP_ID (otro OP_ID, el caché evaporado) el reenvío de un ingreso viejo —el borrador de la pantalla— volvía a
+ *    ocupar la cama con ese pid, y el segundo alta no escribía su egreso porque `ARCH_<pid>` ya existía. Sin definir (los bancos
+ *    antiguos) no cambia nada.
+ *
+ * Una puerta que no está aquí REVIENTA: un candado que se saltara callando cuando le falta la fila de su puerta
+ * sería peor que no tenerlo.
+ *
+ * @param  puerta  'DAR_ALTA' | 'LIMPIAR_CAMA' | 'INTERCAMBIAR_CAMAS' | 'MOVER_A_CAMA_VACIA' | 'INGRESO'
+ * @param  e       { abierto, abiertoB, pid, pidB, idCama, idCamaB, hayArchivo, ocupada, estricto, propio, archivado }
+ */
+function decidirEpisodioPuerta(puerta, e) {
+  e = e || {};
+  const estricto = e.estricto === true;
+  const txt = function (x) { return (x === undefined || x === null) ? '' : String(x).trim(); };
+  const ab = txt(e.abierto), abB = txt(e.abiertoB), pid = txt(e.pid), pidB = txt(e.pidB);
+  const seguir = { estado: 'seguir' }, yaHecho = { estado: 'yaHecho' };
+  const rechazo = function (codigo, error) { return { estado: 'rechazo', codigo: codigo, error: error }; };
+  const invalida = function (msg) { return rechazo(ERR.VALIDACION, msg); };
+
+  switch (String(puerta)) {
+    case 'DAR_ALTA': {
+      const m = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (!m) return seguir;
+      // Con un episodio reclamado que no coincide, el alta ya hecha lo explica. Sin episodio reclamado (ausente o
+      // vacío) no hay a quién buscar en el archivo: el «ya hecho» no se inventa.
+      if (ab && e.hayArchivo === true) return yaHecho;
+      return invalida(m);
+    }
+    case 'LIMPIAR_CAMA': {
+      const m = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (!m) return seguir;
+      const hayOcupante = !!pid || e.ocupada === true;
+      if (ab && !hayOcupante) return yaHecho;
+      if (ab && hayOcupante) {
+        return rechazo(ERR.CONFLICTO, 'La cama ' + e.idCama + ' ya está ocupada por otro paciente (la limpieza que pediste era para quien estaba antes), ' +
+          'así que no se limpió nada. Cierra esta ventana y mira cómo está la cama ahora.');
+      }
+      return invalida(m);
+    }
+    case 'INTERCAMBIAR_CAMAS': {
+      if (ab && abB && ab !== abB && pid === abB && pidB === ab) return yaHecho;
+      const mA = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (mA) return invalida(mA);
+      const mB = validarEpisodioPuerta(e.abiertoB, e.pidB, e.idCamaB, estricto);
+      if (mB) return invalida(mB);
+      return seguir;
+    }
+    case 'MOVER_A_CAMA_VACIA': {
+      if (ab && !pid && pidB === ab) return yaHecho;
+      const mA = validarEpisodioPuerta(e.abierto, e.pid, e.idCama, estricto);
+      if (mA) return invalida(mA);
+      if (e.abiertoB === undefined || e.abiertoB === null) {
+        return estricto ? invalida(_msgPantallaVieja()) : seguir;
+      }
+      if (!abB) {
+        // La pantalla vio el destino LIBRE al elegir: si ahora tiene a alguien, otra persona se adelantó.
+        return pidB
+          ? rechazo(ERR.CONFLICTO, 'La cama ' + e.idCamaB + ' ya fue ocupada por otro paciente mientras elegías el traslado, ' +
+              'así que no se movió a nadie. Mira cómo está la cama ahora y vuelve a elegir.')
+          : seguir;
+      }
+      const mB = validarEpisodioPuerta(e.abiertoB, e.pidB, e.idCamaB, estricto);
+      return mB ? invalida(mB) : seguir;
+    }
+    case 'INGRESO': {
+      const propio = txt(e.propio);
+      if (propio) {
+        // H9: un paciente que YA EGRESÓ no vuelve a ingresar con el mismo pid, esté la cama libre u ocupada por él (un alta a
+        // medias). Esto va ANTES de mirar la cama: si «cama ocupada por ese pid» ganara, el reintento de un alta que murió a mitad
+        // se tomaría por el reintento del ingreso.
+        if (e.archivado === true) return rechazo(ERR.CONFLICTO, _msgIngresoConflicto(e.idCama));
+        if (!pid) return seguir;
+        return pid === propio ? yaHecho : rechazo(ERR.CONFLICTO, _msgIngresoConflicto(e.idCama));
+      }
+      // Sin identidad propia no hay cómo distinguir un reintento de otro ingreso: el modo tolerante no compara (como hasta
+      // hoy); el estricto no acepta ese vacío sobre una cama que ya tiene paciente.
+      return (estricto && pid) ? rechazo(ERR.CONFLICTO, _msgIngresoConflicto(e.idCama)) : seguir;
+    }
+    default:
+      throw new Error('decidirEpisodioPuerta: la puerta «' + puerta + '» no está en la tabla (DAR_ALTA, LIMPIAR_CAMA, INTERCAMBIAR_CAMAS, MOVER_A_CAMA_VACIA, INGRESO).');
+  }
 }
 
 

@@ -29,6 +29,49 @@
  * Se guarda su huella (SHA-256 con sal por persona) en PropertiesService, no en
  * CONFIG: CONFIG es una hoja del Sheet y cualquiera con acceso al archivo la
  * lee — o la exporta sin darse cuenta.
+ *
+ * ── LA SESIÓN SE PUEDE CORTAR (4-oct-2026, G20) ───────────────────────────
+ * 🔴 Es el permiso MÁS ALTO de la app (corrige la ficha de cualquier paciente), y
+ * hasta hoy `coordSesion` solo miraba que el token existiera en el caché: cambiar
+ * o restablecer una clave NO cerraba lo que ya estaba abierto, y como la sesión se
+ * renueva con cada uso, una tablet olvidada con la clave «filtrada» seguía
+ * corrigiendo fichas mientras alguien la tocara. Es el mismo patrón del acceso del
+ * turno (svc_acceso.gs): una VERSIÓN por usuario de login (`coord_ver_<usuario>`,
+ * en las propiedades y no en el caché, que se puede vaciar en cualquier momento),
+ * que cada clave nueva estrena (`_coordGuardarClave`: cambio, restablecimiento,
+ * recuperación por correo, siembra) y con la que cada sesión se sella al abrirse.
+ * Una sesión de otra versión no vale. Es un UUID y no un contador: tras un
+ * reinicio de las propiedades un contador volvería a «1» e igualaría la de una
+ * sesión vieja.
+ *  · «Persona» acá es el USUARIO de login (coord1/2/3), que es a lo que ya se atan
+ *    la clave, los intentos fallidos y la sesión. La firma clínica no sirve de
+ *    llave: la tabla es del código y nada garantiza que sea 1:1 para siempre.
+ *  · 🔒 Espacios separados: el sello de coordinación es `coord_ver_*` y el del
+ *    turno `acc_ver_*`. Cortar el uno no corta el otro, aunque sea la misma
+ *    persona (DMV es coord2 y es del turno).
+ *  · 🔴 El texto que se resume (`_coordHuella`) NO se tocó: las claves ya existen.
+ *  · Quien CAMBIA su propia clave conserva su sesión (`tokenQueSigue`): la
+ *    pantalla sigue con ese mismo token, y la clave temporal obliga a cambiarla al
+ *    entrar. Se cortan las OTRAS.
+ *  · Las sesiones abiertas antes de esta versión no traen sello y valen como la
+ *    versión «vacía», que rige hasta el primer cambio de clave: pegar el archivo no
+ *    saca a nadie de la app.
+ *  · Cerrar sesión (`coordCerrarSesion`) borra el token sin depender de nada más,
+ *    ni siquiera de poder leer la versión.
+ *  · La renovación no re-escribe lo viejo: se vuelve a LEER el token y se escribe lo
+ *    que hay ahora, pegado (si otra llamada cerró la sesión no resucita, si la
+ *    resello no se pisa el sello nuevo). Y una versión que no calza no BORRA el
+ *    token: borrar con una vista vieja es la misma carrera. 🪤 Límite: CacheService
+ *    no tiene compare-and-set, así que queda un viaje al caché entre esa lectura y
+ *    su escritura (ver el detalle en svc_acceso.gs).
+ *  · Si las propiedades no responden al comprobar la versión, la excepción sube y
+ *    la acción se rechaza como error interno, honesto, SIN cortar la sesión: no se
+ *    acepta lo que no se pudo comprobar, pero tampoco se dice «expiró».
+ *  · 🪤 Lo que coordinación NO tiene es un concepto de «persona activa»: la tabla
+ *    de arriba es del código y `coordEntrar` no mira ACTIVO en KINESIOLOGOS. Por eso
+ *    el corte es por CLAVE y no por baja; que dar de baja a alguien en la hoja
+ *    también le corte coordinación es una decisión de producto, no de este archivo.
+ *    Guardia: coordinacion_revocacion.js.
  */
 
 // El único lugar donde vive el emparejamiento usuario→firma. Cambiar esto es
@@ -80,14 +123,59 @@ function _coordHuella(usuario, clave, sal) {
 
 function _coordProps() { return PropertiesService.getScriptProperties(); }
 
-/** Escribe la clave de un usuario. Genera una sal nueva en cada cambio. */
-function _coordGuardarClave(usuario, clave) {
+/**
+ * Escribe la clave de un usuario. Genera una sal nueva en cada cambio.
+ *
+ * 🔴 Y CORTA sus sesiones: toda clave nueva pasa por aquí (cambio propio,
+ * restablecimiento, recuperación por correo, siembra), así que ningún camino puede
+ * olvidarse de revocar. Quien tenía la clave vieja no tiene por qué conservar el
+ * acceso: una clave restablecida porque «se filtró» o «se perdió la tablet» que
+ * dejara viva la sesión de esa tablet no habría restablecido nada.
+ *
+ * `tokenQueSigue` es la ÚNICA excepción y solo la usa `coordCambiarClave`: la
+ * sesión de quien acaba de cambiar su propia clave en esa misma llamada. No es una
+ * cortesía: la pantalla sigue trabajando con ese token después de «Clave cambiada»,
+ * y la clave temporal obliga a cambiarla al entrar; si el cambio matara a quien lo
+ * hace, cada persona saldría del modo justo después de elegir su clave.
+ */
+function _coordGuardarClave(usuario, clave, tokenQueSigue) {
   const u = _coordUsuarioNorm(usuario);
   const sal = Utilities.getUuid();
   _coordProps().setProperty('coord_sal_' + u, sal);
   _coordProps().setProperty('coord_hash_' + u, _coordHuella(u, clave, sal));
   _coordProps().deleteProperty('coord_fallidos_' + u);
+  _coordRevocarSesiones(u, tokenQueSigue);
   return true;
+}
+
+/** La versión vigente de las sesiones de un usuario ('' si nunca se cortaron). */
+function _coordVersion(usuario) {
+  return _coordProps().getProperty('coord_ver_' + _coordUsuarioNorm(usuario)) || '';
+}
+
+/**
+ * Corta TODAS las sesiones de un usuario estrenando una versión nueva: las que se
+ * abrieron con otra dejan de valer en su próximo uso, sin recorrer el caché.
+ * `tokenQueSigue` (opcional) es la sesión que se re-sella con la versión nueva para
+ * que sobreviva; ver `_coordGuardarClave` por qué existe esa excepción.
+ */
+function _coordRevocarSesiones(usuario, tokenQueSigue) {
+  const u = _coordUsuarioNorm(usuario);
+  const ver = Utilities.getUuid();
+  _coordProps().setProperty('coord_ver_' + u, ver);
+  if (!tokenQueSigue) return;
+  const cache = CacheService.getScriptCache();
+  const clave = 'coordses_' + tokenQueSigue;
+  const hit = cache.get(clave);
+  if (!hit) return;
+  try {
+    const s = JSON.parse(hit);
+    // Solo si la sesión es de ESE usuario: el sello de otro no se toca.
+    if (s && _coordUsuarioNorm(s.usuario) === u) {
+      s.ver = ver;
+      cache.put(clave, JSON.stringify(s), _COORD_SESION_MIN * 60);
+    }
+  } catch (e) { /* una sesión ilegible ya no valía */ }
 }
 
 /** ¿La clave enviada es la de ese usuario? */
@@ -146,24 +234,48 @@ function _coordAbrirSesion(usuario, firma) {
   const token = Utilities.getUuid();
   const seg = _COORD_SESION_MIN * 60;
   CacheService.getScriptCache().put('coordses_' + token,
-    JSON.stringify({ usuario: _coordUsuarioNorm(usuario), firma: String(firma).toUpperCase(), desde: Date.now() }), seg);
+    JSON.stringify({ usuario: _coordUsuarioNorm(usuario), firma: String(firma).toUpperCase(), desde: Date.now(),
+      ver: _coordVersion(usuario) }), seg);
   return token;
 }
 
 /**
  * Resuelve un token a {usuario, firma}, o null. Renueva la ventana en cada
- * uso: la sesión muere por INACTIVIDAD, no a los 30 minutos de haber entrado.
+ * uso: la sesión muere por INACTIVIDAD, no a los 30 minutos de haber entrado. Y
+ * se puede CORTAR desde fuera: no vale si ese usuario cambió o le restablecieron
+ * la clave desde que se abrió (ver el encabezado, «LA SESIÓN SE PUEDE CORTAR»).
  */
 function coordSesion(token) {
   if (!token) return null;
   const cache = CacheService.getScriptCache();
-  const hit = cache.get('coordses_' + token);
+  const clave = 'coordses_' + token;
+  // Primera lectura: solo para saber DE QUIÉN es y con qué versión se abrió.
+  const hit = cache.get(clave);
   if (!hit) return null;
   let s;
   try { s = JSON.parse(hit); } catch (e) { return null; }
   if (!s || !s.firma || !s.usuario) return null;
-  cache.put('coordses_' + token, hit, _COORD_SESION_MIN * 60);
-  return s;
+
+  // ¿Sigue siendo la versión vigente? Es UNA lectura de propiedad. Si no calza se
+  // rechaza y NADA MÁS: no se borra el token (una llamada paralela pudo haberlo
+  // resellado, y borrar con una vista vieja se lo llevaría). Si la propiedad no se
+  // puede leer la excepción SUBE a propósito: la acción se rechaza como error
+  // interno y la sesión queda como estaba; devolver null acá diría «expiró».
+  if (String(s.ver || '') !== _coordVersion(s.usuario)) return null;
+
+  // Renovar. 🔴 Se vuelve a LEER el token y se escribe LO QUE HAY AHORA, de
+  // inmediato: durante la comprobación otra llamada pudo cerrar la sesión (si ya no
+  // está, no se resucita) o cambiar la clave resellándola (si cambió, se conserva el
+  // sello nuevo en vez de pisarlo con el viejo). Entre esta lectura y la escritura
+  // no va nada más. El límite que queda —un viaje al caché, porque no hay
+  // compare-and-set— está en el encabezado.
+  const fresco = cache.get(clave);
+  if (!fresco) return null;
+  let vigente;
+  try { vigente = JSON.parse(fresco); } catch (e) { return null; }
+  if (!vigente || !vigente.firma || !vigente.usuario) return null;
+  cache.put(clave, fresco, _COORD_SESION_MIN * 60);
+  return vigente;
 }
 
 /** Atajo cuando solo hace falta la firma (lo que usan casi todas las acciones). */
@@ -230,22 +342,33 @@ function coordEntrar(datos) {
  * cambia es que solo se audita cuando había algo que cerrar.
  *
  * Cierra la sesión de ESTE token, o sea el dispositivo donde se tocó. Cerrar
- * todas las de una persona a la vez exigiría un índice de sesiones vivas por
- * usuario, que hoy no existe.
+ * todas las de una persona a la vez es lo que hace cambiar o restablecer su
+ * clave (la versión de `_coordRevocarSesiones`), no este botón.
+ *
+ * 🔴 Quita el token SIEMPRE que exista, sin depender de nada más: se lee el caché
+ * CRUDO y no la sesión «comprobada» (`coordSesion`), que ahora mira una propiedad
+ * y podría fallar. Para borrar una llave no hace falta saber si todavía valía, y
+ * una sesión ya cortada también se limpia. Se borra ANTES de auditar. Mismo
+ * contrato que `accesoSalir` (svc_acceso.gs), donde un cierre que dependía de la
+ * hoja dejaba la tablet abierta justo cuando la planilla andaba mal.
  */
 function coordCerrarSesion(datos) {
   try {
     const token = String((datos && datos.token) || '');
     if (!token) return ok({ cerrada: false, motivo: 'sin token' });
 
-    const ses = coordSesion(token);
-    if (!ses) return ok({ cerrada: false, motivo: 'la sesión ya no estaba abierta' });
+    const cache = CacheService.getScriptCache();
+    const clave = 'coordses_' + token;
+    const hit = cache.get(clave);
+    if (!hit) return ok({ cerrada: false, motivo: 'la sesión ya no estaba abierta' });
 
-    CacheService.getScriptCache().remove('coordses_' + token);
-    auditar({ email: 'coordinacion', firma: ses.firma, accion: 'COORD_SALIDA',
-      entidad: 'COORDINACION', idEntidad: ses.usuario, patientId: '',
+    cache.remove(clave);
+    let ses = {};
+    try { ses = JSON.parse(hit) || {}; } catch (e) { /* ilegible: se borró igual */ }
+    auditar({ email: 'coordinacion', firma: ses.firma || '', accion: 'COORD_SALIDA',
+      entidad: 'COORDINACION', idEntidad: ses.usuario || '', patientId: '',
       resumen: 'cerró la sesión de coordinación' });
-    return ok({ cerrada: true, firma: ses.firma });
+    return ok({ cerrada: true, firma: ses.firma || '' });
   } catch (e) { return err('coordCerrarSesion: ' + e.message, ERR.INTERNO, e); }
 }
 
@@ -452,10 +575,13 @@ function coordCambiarClave(datos) {
     if (!_coordEsTemporal(g.usuario) && !_coordClaveOk(g.usuario, String((datos && datos.actual) || ''))) {
       return err('La clave actual no coincide.', ERR.NO_AUTORIZADO);
     }
-    _coordGuardarClave(g.usuario, nueva);
+    // Corta las demás sesiones de este usuario; la de quien cambia SIGUE viva (ver
+    // `_coordGuardarClave`: la pantalla sigue trabajando con este mismo token).
+    _coordGuardarClave(g.usuario, nueva, String(datos.token));
     _coordMarcarTemporal(g.usuario, false);
     auditar({ email: 'coordinacion', firma: g.firma, accion: 'COORD_CAMBIO_CLAVE',
-      entidad: 'COORDINACION', idEntidad: g.usuario, patientId: '', resumen: 'cambió su clave' });
+      entidad: 'COORDINACION', idEntidad: g.usuario, patientId: '',
+      resumen: 'cambió su clave (cerró sus otras sesiones)' });
     return ok({ firma: g.firma });
   } catch (e) { return err('coordCambiarClave: ' + e.message, ERR.INTERNO, e); }
 }
@@ -567,7 +693,16 @@ function coordSoltarMarca(hoja, colKey, id, obj, campo) {
 // CORREGIR UNA FICHA
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo. */
+/**
+ * Ubica al paciente por PATIENT_ID: primero en cama, después en el archivo.
+ *
+ * 🔴 CON patientId NUNCA SE RESUELVE POR LA CAMA (G14, tanda 2 del guardado seguro, paso 7, 4-oct-2026). Antes, si el
+ * patientId no estaba en ninguna parte, la búsqueda seguía de largo y caía a `idCama`: el episodio que la ficha mostró ya no
+ * existía —un paciente que se LIMPIÓ no deja fila en ARCHIVO_PACIENTES— y la corrección se escribía en la ficha de quien
+ * ocupara esa cama AHORA (nombre, RUT, fechas de ingreso: justo lo que coordinación corrige). La respuesta correcta a «no
+ * encuentro a ESE paciente» es «no se encontró», no «encontré a otro». La cama sola solo ubica cuando NO se declara
+ * patientId (un episodio sin ingreso formal no tiene pid).
+ */
 function _coordUbicar(patientId, idCama) {
   const pid = String(patientId || '').trim();
   if (pid) {
@@ -583,6 +718,7 @@ function _coordUbicar(patientId, idCama) {
         return { tipo: 'egresado', hoja: 'ARCHIVO_PACIENTES', colKey: 'ID_ARCHIVO', id: String(arch[j].ID_ARCHIVO), obj: arch[j] };
       }
     }
+    return null;
   }
   if (idCama) {
     const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', String(idCama));
@@ -676,6 +812,24 @@ function _coordCorregirFichaInterno(datos) {
 
     const ubic = _coordUbicar(datos && datos.patientId, datos && datos.idCama);
     if (!ubic) return err('No se encontró ese paciente, ni en cama ni en el archivo.', ERR.NO_ENCONTRADO);
+
+    /* 🔐 EL CANDADO DE EPISODIO EN MODO ESTRICTO (G14, tanda 2, paso 7, 4-oct-2026). El reclamo de esta puerta es
+       `patientId` (el episodio que la ficha mostró) y `_coordUbicar` ya lo respeta: con patientId no se cae a la cama. Lo que
+       queda abierto es ubicar POR LA CAMA SOLA, sin declarar a nadie: ahí se corrige a quien esté ahora, y quien llamó nunca
+       dijo a quién quería corregir. En modo estricto eso se rechaza si la cama tiene paciente (ausente: «pantalla de una
+       versión anterior»; vacío: el cambio de paciente). Un episodio sin ingreso formal —cama ocupada sin PATIENT_ID— no
+       tiene a quién reclamar y pasa con el vacío, igual que en las demás puertas. En modo tolerante todo corre como siempre.
+       🪤 El modo estricto se lee aquí con la MISMA lectura que `_epDeDatos` (api.gs): con valor por defecto, sin distinguir
+       mayúsculas ni espacios, solo TRUE lo enciende. Esta puerta no recibe `ep` porque su reclamo no es EPISODIO_ABIERTO, así
+       que son dos copias de una misma lectura; la guardia build/checks/guardado_seguro_episodio_g14.js (E6) las ata: que un
+       interruptor de seguridad se encienda por un lado y no por el otro no se ve en ninguna pantalla. Solo se lee cuando
+       hace falta (ubicado por la cama, sin patientId), y la regla viene de dominio_validacion.gs: si alguien llega aquí en
+       modo estricto sin cargarla, REVIENTA (INTERNO) en vez de saltarse el candado. */
+    if (ubic.tipo === 'activo' && !String((datos && datos.patientId) || '').trim() &&
+        String(leerConfig('CONTRATO_ESTRICTO', 'FALSE')).trim().toUpperCase() === 'TRUE') {
+      const _msgEp = validarEpisodioPuerta(datos && datos.patientId, String(ubic.obj.PATIENT_ID || ''), ubic.id, true);
+      if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+    }
 
     const cambios = (datos && datos.cambios) || {};
     const horas   = (datos && datos.horas) || {};

@@ -1,0 +1,594 @@
+// guardado_seguro_cobertura.js — EL CENSO DE PUERTAS DEL GUARDADO SEGURO (tanda 2, paso 2).
+//
+// 🔴 DE DÓNDE SALE. La auditoría de la tanda 2 encontró que SOLO guardarEvolucion comparaba el paciente que la
+// pantalla abrió con el que ocupa la cama; las otras quince puertas atribuían lo que hacen a «quien esté en la cama
+// ahora». Arreglar quince puertas una por una tiene un riesgo que no es técnico: que se arregle catorce, o que
+// mañana alguien agregue la puerta número dieciséis en api.gs sin pensar en esto, y que nadie lo note —porque una
+// puerta sin candado no da ningún error: guarda, y guarda sobre la persona equivocada—.
+//
+// Esta guardia es el CENSO. Lee api.gs y exige que TODA acción que pasa por `_auditar` (o sea, toda escritura)
+// esté en una tabla, clasificada en una de tres clases, con su razón por escrito:
+//
+//   · 'episodio'    actúa sobre «quien esté en la cama»: lleva candado de episodio (EPISODIO_ABIERTO, capturado por
+//                   la pantalla al abrir el diálogo). Es la clase que se va a ir cerrando.
+//   · 'ingreso'     crea el episodio: no puede reclamar uno que todavía no existe; lleva en su lugar un PATIENT_ID
+//                   acuñado por quien llama (G15).
+//   · 'sinEpisodio' no actúa sobre ningún paciente (la cama aparece como un número —stock, ventiladores— o no
+//                   aparece). Cada una dice POR QUÉ no necesita candado: «no lo pensé» no es una razón.
+//
+// Y ata las dos puntas, para que la tabla no sea un papel:
+//   1. cada `case` de api.gs que pasa por `_auditar` está en la tabla, y cada fila de la tabla sigue existiendo;
+//   2. `epImplementado`: las filas NACEN en false y se voltean a true UNA a una, y voltearla es el rojo de ese paso.
+//      Una fila en true exige que el dispatcher pase el reclamo a su servicio (`_epDeDatos(datos)`); una en false
+//      exige que todavía NO lo pase. Así la tabla no puede mentir en ninguno de los dos sentidos. Al cerrar la
+//      tanda (paso 17) no puede quedar NINGUNA fila 'episodio' o 'ingreso' en false;
+//   3. la lista `_ACC_EPISODIO` de api.gs —la que decide qué filas de AUDIT_LOG llevan « [sin episodio]»— es
+//      exactamente la de las filas 'episodio' de la tabla: dos listas escritas a mano que no se pueden separar.
+//
+// Fuera de `_auditar` hay una sola puerta con candado de episodio: COORD_CORREGIR (se audita sola, con la firma de
+// coordinación). Entra a la tabla con `viaAuditar:false` y su reclamo es `patientId`, no EPISODIO_ABIERTO: lo compara el
+// propio servicio (el dispatcher no le pasa `ep`), así que `epImplementado` no se mide contra api.gs en esa fila; lo prueba
+// la sección E de guardado_seguro_episodio_g14.js (comportamiento y forma).
+//
+// 🪤 LA GUARDIA SE PRUEBA A SÍ MISMA. Un censo que nunca se vio rojo no prueba que cace nada: antes de dar por
+// bueno el resultado real, se le corrige un defecto a propósito a la tabla o a api.gs (borrar una fila, agregar una
+// puerta, voltear una fila sin implementarla, vaciar una razón, separar las dos listas) y se exige que cada uno la
+// ponga roja.
+//
+// 🔐 EL SELLO EN LA PANTALLA (paso 12). `index.html` tiene una lista, `_ACC_ESCRITURA`: las acciones a las que el embudo
+// `api()` le pone un OP_ID por intención, para que un reintento que ya aterrizó no se ejecute dos veces (infra_lock.gs).
+// Una escritura que no esté en esa lista se manda sin OP_ID y, si la respuesta se pierde, se puede repetir. Por eso la
+// tabla manda: CADA acción de la tabla está en la lista, salvo las marcadas `sinSello` con su razón por escrito. La razón
+// existe porque sellar no es gratis (cuesta un `flush` por llamada) ni inocuo (la respuesta repetida solo trae ids, no el
+// informe ni la plantilla que la pantalla lee de la respuesta): «no lo pensé» no es una razón. Y en el otro sentido: la
+// lista no puede traer nada que no sea una escritura de la tabla (una lectura con OP_ID llenaría el almacenamiento del
+// aparato sin ganar nada), ni una marcada `sinSello`.
+//
+// 🔐 EL RECLAMO EN LA PANTALLA (paso 14). El servidor compara EPISODIO_ABIERTO con quien ocupa la cama, pero solo si la
+// pantalla lo MANDA: una puerta que el servidor ya cuida y que la pantalla llama sin reclamo sigue siendo un hueco, y no da
+// ningún error. Por eso cada fila 'episodio' tiene que cumplir UNA de dos cosas, escrita en la tabla:
+//   · la pantalla la llama (hay una llamada a la acción en index.html, fuera de comentarios y de la lista
+//     `_ACC_ESCRITURA`) y la función que la arma pone el reclamo en el paquete: `EPISODIO_ABIERTO` (y `EPISODIO_ABIERTO_B`
+//     en las dos que mueven camas), o `patientId` en COORD_CORREGIR, cuyo reclamo es otro. `arma` nombra la función cuando
+//     el paquete se arma en una y se envía desde otra (el guardado de la evolución);
+//   · la pantalla NO la llama (`sinSitio`, con su razón): el servidor la publica pero nadie en la pantalla la usa. Y en el
+//     otro sentido: si el día de mañana la pantalla la llama, la fila se pone roja hasta que mande el reclamo.
+// Que el reclamo se tome AL ABRIR el diálogo y no se relea de la base al enviar lo mide la guardia de la pantalla
+// (guardado_seguro_no_confirmado_g17.js, sección G): leer el código no dice de dónde sale el valor.
+//
+// Uso: node build/checks/guardado_seguro_cobertura.js
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const V2 = path.resolve(__dirname, '..', '..', 'v2');
+const API_SRC = fs.readFileSync(path.join(V2, 'api.gs'), 'utf8');
+const INDEX_SRC = fs.readFileSync(path.join(V2, 'index.html'), 'utf8');
+
+const fails = [];
+const eq = (l, g, w) => {
+  const okk = String(g) === String(w);
+  console.log((okk ? '✅' : '❌') + ' ' + l + ': ' + JSON.stringify(g) + (okk ? '' : ' (esperado ' + JSON.stringify(w) + ')'));
+  if (!okk) fails.push(l);
+};
+const si = (l, c) => eq(l, !!c, true);
+const info = t => console.log('ℹ️  ' + t);
+
+/* ══ LA TABLA ═════════════════════════════════════════════════════════════ */
+// clase: 'episodio' | 'ingreso' | 'sinEpisodio'. razon: para 'episodio' e 'ingreso', cuál es el reclamo y de dónde
+// lo toma la pantalla; para 'sinEpisodio', por qué no necesita candado. epImplementado: nace en false.
+// `hecho` voltea la fila a epImplementado:true: es lo que cierra un paso (el dispatcher le pasa el reclamo a su servicio).
+// `extra` (opcional, cuarto argumento): lo que la pantalla tiene que cumplir para esta puerta (ver «EL RECLAMO EN LA PANTALLA»):
+//   · reclamoB: true  también manda EPISODIO_ABIERTO_B (las dos que mueven camas: la cama B o el destino)
+//   · arma: 'fn'      la función que arma el paquete, cuando no es la que lo envía
+//   · reclamo: 'x'    el reclamo no es EPISODIO_ABIERTO (COORD_CORREGIR declara `patientId`)
+//   · sinSitio: 'razón'  la pantalla no llama a esta acción
+const E = (accion, razon, hecho, extra) => Object.assign({ accion, clase: 'episodio', epImplementado: hecho === true, razon }, extra || {});
+// `sinSello` (opcional, tercer argumento): la RAZÓN por la que la pantalla NO le pone OP_ID a esta escritura. Sin él, la
+// acción tiene que estar en `_ACC_ESCRITURA` de index.html.
+const SIN = (accion, razon, sinSello) => Object.assign({ accion, clase: 'sinEpisodio', razon }, sinSello ? { sinSello } : {});
+const TABLA = [
+  // ── Actúan sobre «quien esté en la cama» ──
+  E('GUARDAR_EVOLUCION',       'EPISODIO_ABIERTO del formulario, capturado al abrirlo; y en un ingreso, el PATIENT_ID acuñado por la pantalla (G15).', true, { arma: 'guardar' }),   // paso 8
+  E('DAR_ALTA',                'EPISODIO_ABIERTO tomado al abrir el diálogo de egreso y pasado por argumento, nunca releído de la base al confirmar.', true),   // paso 5
+  E('LIMPIAR_CAMA',            'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: nunca se limpia al ocupante nuevo.', true, {   // paso 5
+    sinSitio: 'La pantalla no la llama: una cama se libera con el egreso (DAR_ALTA), que archiva y limpia. El servidor la sigue publicando.' }),
+  E('INTERCAMBIAR_CAMAS',      'EPISODIO_ABIERTO (cama A) y EPISODIO_ABIERTO_B (cama B), capturados al elegir las dos camas.', true, { reclamoB: true }),   // paso 5
+  E('MOVER_A_CAMA_VACIA',      'EPISODIO_ABIERTO (origen) y EPISODIO_ABIERTO_B (destino; vacío = libre al elegir).', true, { reclamoB: true }),   // paso 5
+  E('ANULAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta mostrada al abrir el menú del evento; la comparación va DENTRO del lock.', true),   // paso 4
+  E('ANEXAR_EVENTO',           'EPISODIO_ABIERTO de la tarjeta al abrir el ➕; datos.patientId declarado queda como respaldo.', true),   // paso 6
+  E('ANULAR_ANEXO',            'EPISODIO_ABIERTO de la tarjeta al abrir.', true),   // paso 6
+  E('CONFIRMAR_DISPOSITIVOS',  'EPISODIO_ABIERTO de la tarjeta al abrir el diálogo: hoy basta con que la cama esté ocupada.', true, {   // paso 6
+    sinSitio: 'La pantalla no la llama: el aviso «Dispositivos asumidos instalados» y su botón Aceptar se retiraron el 17-sep-2026 (se corroboran en el paso 1 de la evolución). El servidor la sigue publicando.' }),
+  E('AGREGAR_HITO',            'EPISODIO_ABIERTO de la tarjeta al abrir: hoy el hito se atribuye a quien esté en la cama.', true, {   // paso 6
+    sinSitio: 'La pantalla no la llama: los hitos nacen del guardado y del ➕ (ANEXAR_EVENTO), no de una acción propia. El servidor la sigue publicando (retirarla o no es la decisión 7 de Diego, pendiente).' }),
+  E('EVAL_REGISTRAR',          'EPISODIO_ABIERTO de la tarjeta al abrir la medición: además escribe el espejo ULT_* en la cama del ocupante actual.', true),   // paso 7
+  E('EPISODIO_ESCALA',         'EPISODIO_ABIERTO de la tarjeta al abrir la escala previa a la UCI: hoy escribe sobre la cama que esté ocupada.', true),   // paso 7
+  E('PEND_ABRIR',              'EPISODIO_ABIERTO de la tarjeta al abrir el chip de pendientes.', true),   // paso 7
+  E('PEND_CERRAR',             'EPISODIO_ABIERTO de la tarjeta al abrir: ya la protege el id del pendiente, se agrega para que el censo no tenga excepciones.', true),   // paso 7
+  E('GSA_ASIGNAR',             'EPISODIO_ABIERTO = el paciente de la cama elegida en la bandeja al abrir el selector de asignación.', true),   // paso 7
+  // ── Crea el episodio ──
+  { accion: 'INGRESAR_PACIENTE', clase: 'ingreso', epImplementado: true,   // paso 8
+    razon: 'Crea el episodio: no puede reclamar uno que no existe. Lleva datos.PATIENT_ID acuñado por quien llama (la pantalla actual ingresa por GUARDAR_EVOLUCION y no usa esta acción).' },
+  // ── Fuera de _auditar: se audita sola, con la firma del modo coordinación ──
+  { accion: 'COORD_CORREGIR', clase: 'episodio', viaAuditar: false, epImplementado: true, reclamo: 'patientId',   // paso 7
+    razon: 'Reclamo = datos.patientId (el episodio que la ficha mostró) más idCama, resueltos por _coordUbicar; exige además la sesión de coordinación.',
+    sinSello: 'No pasa por _auditar: el servidor no arma OP_ACTUAL para ella, así que un OP_ID no tendría ningún efecto. Su candado es patientId más la sesión de coordinación.' },
+  // ── No actúan sobre ningún paciente ──
+  SIN('PLANTILLA_GUARDAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.',
+    'La pantalla lee la plantilla completa de la respuesta y una respuesta repetida solo trae ids (saldría un falso «el servidor no devolvió la plantilla»); un duplicado de plantilla es visible y se retira con PLANTILLA_RETIRAR.'),
+  SIN('PLANTILLA_RETIRAR',          'Catálogo de plantillas de texto del equipo: no tiene paciente ni cama.',
+    'Fija ACTIVO=false: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
+  SIN('GSA_IMPORTAR',               'Lee el archivo de gases y deja filas PENDIENTES en la bandeja: todavía no se asignan a ningún paciente (eso es GSA_ASIGNAR).',
+    'La pantalla lee de la respuesta los importados y los sin emparejar (una repetida solo trae ids), y importar ya es idempotente: los PDF ya leídos se cuentan como repetidos.'),
+  SIN('GSA_DESCARTAR',              'Descarta una fila de la bandeja de gases: no toca ningún paciente ni ninguna cama.',
+    'Marca una fila de la bandeja como descartada: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
+  SIN('GUARDAR_SUGERENCIA',         'Buzón de sugerencias del equipo: no tiene paciente ni cama.'),
+  SIN('SET_SUGERENCIA_ESTADO',      'Cambia el estado de una sugerencia del buzón: no tiene paciente ni cama.',
+    'Asigna un estado a una sugerencia: repetirla deja lo mismo, y su servicio ni siquiera toma el candado, así que el sello no entraría.'),
+  SIN('SET_ASIGNACION_TURNO',       'Reparte kinesiólogos por turno: la cama es un número de la asignación (quién cubre la cama N), no quién la ocupa.',
+    'Reemplaza la asignación entera del turno: repetirla deja lo mismo. La pantalla la manda en cada edición, y sellar costaría un flush cada vez.'),
+  SIN('AGREGAR_FASE',               'Catálogo de fases clínicas de la unidad: no tiene paciente ni cama.',
+    'El servicio ya rechaza solo la fase repetida («ya existe»), la pantalla lee la lista de fases de la respuesta y no toma el candado, así que el sello no entraría.'),
+  SIN('SET_BANNER',                 'Texto de portada de cada pestaña, en la hoja CONFIG: no tiene paciente ni cama.',
+    'Asigna un texto a la portada de una pestaña: repetirla deja lo mismo. Sellar cuesta un flush y no gana nada.'),
+  SIN('GENERAR_REM',                'Informe mensual agregado, sin RUT y sin episodio: se calcula del archivo, no de la cama.',
+    'Calcula el informe del mes: repetirlo da lo mismo, y la pantalla lee el informe entero de la respuesta (una repetida solo trae ids).'),
+  SIN('GUARDAR_ENTREGA_TURNO',      'Texto de la entrega de turno con las camas como números: no escribe sobre ningún paciente. Va con sello de operación (su id nace del reloj).'),
+  SIN('GUARDAR_VENTILADOR',         'Inventario de ventiladores: la cama aparece como número de ubicación del equipo, no como quien la ocupa.'),
+  SIN('MOVER_VENTILADOR',           'Ubicación de un ventilador: la cama es un número de destino. Va con sello de operación (inserta un movimiento).'),
+  SIN('MOVER_VENTILADORES_LOTE',    'Ubicación de varios ventiladores: la cama es un número de destino.'),
+  SIN('BAJA_VENTILADOR',            'Baja de un ventilador del inventario: no tiene paciente.'),
+  SIN('REGISTRAR_FALLA_VM',         'Falla de un ventilador: se asocia al equipo, no al paciente. Va con sello de operación (inserta una falla).'),
+  SIN('GUARDAR_STOCK',              'Stock de equipos de la unidad: no tiene paciente.'),
+  SIN('AJUSTAR_STOCK',              'Ajuste de stock: el delta no es idempotente, por eso va con sello de operación; no tiene paciente.'),
+  SIN('ASIGNAR_STOCK',              'Entrega stock a una cama NUMERADA: el destino es un número, no quien la ocupa. Va con sello de operación (delta no idempotente).'),
+];
+
+// La familia COORD_* se audita SOLA (con la firma de quien entró al modo coordinación), no por `_auditar`: es la única
+// que puede tocar la planilla saltándose el censo de arriba. Por eso la guardia también le pide cuentas: toda acción
+// COORD_* de api.gs o está en la tabla (COORD_CORREGIR, la que corrige la ficha de un paciente) o está en esta lista
+// de las que NO actúan sobre ningún paciente (sesión, claves, aviso al buzón, lectura de una ficha).
+const COORD_SIN_PACIENTE = ['COORD_ESTADO', 'COORD_ENTRAR', 'COORD_SALIR', 'COORD_PEDIR_CODIGO', 'COORD_RECUPERAR',
+  'COORD_CAMBIAR_CLAVE', 'COORD_RESTABLECER', 'COORD_FICHA', 'COORD_AVISO'];
+
+/* ══ EL CENSO ═════════════════════════════════════════════════════════════ */
+// Los `case` del interruptor de api(), cada uno con su cuerpo SIN comentarios (un comentario que nombre _auditar
+// no puede hacer pasar por auditada una puerta que no lo es).
+function casosDe(src) {
+  const ini = src.indexOf('function api(');
+  const fin = ini === -1 ? -1 : src.indexOf('\n}\n', ini);
+  const cuerpo = (ini === -1 || fin === -1) ? '' : src.slice(ini, fin);
+  const re = /^[ \t]*case '([A-Z0-9_]+)':/gm;
+  const hits = []; let m;
+  while ((m = re.exec(cuerpo))) hits.push({ n: m[1], ini: m.index, fin: m.index + m[0].length });
+  const out = {};
+  const def = cuerpo.indexOf('default:');
+  hits.forEach((h, i) => {
+    const hasta = i + 1 < hits.length ? hits[i + 1].ini : (def > -1 ? def : cuerpo.length);
+    out[h.n] = cuerpo.slice(h.fin, hasta).split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  });
+  return out;
+}
+const pasaPorAuditar = txt => /_auditar\(\s*ctx\s*,\s*accion\b/.test(txt);
+const pasaEp = txt => /_epDeDatos\(/.test(txt);
+
+// La lista _ACC_EPISODIO tal como la declara api.gs (null si todavía no existe).
+function listaAccEpisodio(src) {
+  try { return new Function(src + '\n;return typeof _ACC_EPISODIO === "undefined" ? null : _ACC_EPISODIO;')(); }
+  catch (e) { return null; }
+}
+
+// Devuelve los problemas (vacío = el censo cuadra). PURA: recibe el fuente y la tabla, para poder probarse con
+// versiones estropeadas a propósito.
+function censar(src, tabla) {
+  const P = [];
+  const casos = casosDe(src);
+  const auditados = Object.keys(casos).filter(n => pasaPorAuditar(casos[n]));
+  const filas = {};
+  tabla.forEach(f => {
+    if (filas[f.accion]) P.push('la tabla repite la acción ' + f.accion);
+    filas[f.accion] = f;
+  });
+
+  // 1 · el censo contra api.gs, en los dos sentidos
+  auditados.forEach(n => { if (!filas[n]) P.push('api.gs: ' + n + ' pasa por _auditar y NO está en la tabla (¿lleva candado de episodio?)'); });
+  tabla.forEach(f => {
+    const c = casos[f.accion];
+    if (f.viaAuditar === false) {
+      if (c === undefined) P.push('tabla: ' + f.accion + ' ya no existe en api.gs');
+      else if (pasaPorAuditar(c)) P.push('tabla: ' + f.accion + ' dice viaAuditar:false pero api.gs la pasa por _auditar');
+      return;
+    }
+    if (c === undefined) P.push('tabla: ' + f.accion + ' ya no existe en api.gs (fila huérfana)');
+    else if (!pasaPorAuditar(c)) P.push('tabla: ' + f.accion + ' ya no pasa por _auditar');
+  });
+
+  // 1c · la familia COORD_*, que se audita sola: ninguna acción suya sin cuenta
+  Object.keys(casos).filter(n => /^COORD_/.test(n) && !pasaPorAuditar(casos[n])).forEach(n => {
+    if (!filas[n] && COORD_SIN_PACIENTE.indexOf(n) === -1)
+      P.push('api.gs: ' + n + ' es de coordinación, no pasa por _auditar y NO está en la tabla ni entre las que no tocan a un paciente');
+  });
+  COORD_SIN_PACIENTE.forEach(n => { if (casos[n] === undefined) P.push('guardia: ' + n + ' ya no existe en api.gs (sácala de COORD_SIN_PACIENTE)'); });
+
+  // 2 · la clasificación y su razón
+  tabla.forEach(f => {
+    if (['episodio', 'ingreso', 'sinEpisodio'].indexOf(f.clase) === -1) P.push('tabla: ' + f.accion + ' tiene una clase inválida («' + f.clase + '»)');
+    if (String(f.razon || '').trim().length < 25) P.push('tabla: ' + f.accion + ' no dice su razón por escrito');
+  });
+
+  // 3 · epImplementado contra lo que el dispatcher hace de verdad (solo filas que pasan por _auditar)
+  tabla.forEach(f => {
+    if (f.viaAuditar === false || casos[f.accion] === undefined) return;
+    const pasa = pasaEp(casos[f.accion]);
+    if (f.clase === 'sinEpisodio') {
+      if (f.epImplementado) P.push('tabla: ' + f.accion + ' es sinEpisodio y no puede tener epImplementado');
+      if (pasa) P.push('api.gs: ' + f.accion + ' es sinEpisodio y pasa un episodio a su servicio');
+    } else if (f.epImplementado && !pasa) {
+      P.push('tabla: ' + f.accion + ' dice epImplementado:true pero api.gs NO le pasa _epDeDatos(datos) a su servicio');
+    } else if (!f.epImplementado && pasa) {
+      P.push('tabla: ' + f.accion + ' dice epImplementado:false pero api.gs YA le pasa _epDeDatos(datos): voltea la fila');
+    }
+  });
+
+  // 4 · la lista que decide « [sin episodio]» es la de las filas 'episodio' que pasan por _auditar
+  const lista = listaAccEpisodio(src);
+  if (!Array.isArray(lista)) P.push('api.gs: falta la lista _ACC_EPISODIO (decide qué filas de AUDIT_LOG llevan « [sin episodio]»)');
+  else {
+    const queda = tabla.filter(f => f.clase === 'episodio' && f.viaAuditar !== false).map(f => f.accion).sort().join(',');
+    const esa = lista.slice().sort().join(',');
+    if (queda !== esa) P.push('api.gs: _ACC_EPISODIO no es la de las filas episodio de la tabla (tabla: ' + queda + ' · api.gs: ' + esa + ')');
+  }
+  return P;
+}
+
+// La lista _ACC_ESCRITURA tal como la declara index.html (null si todavía no existe). Se lee el literal del arreglo sin sus
+// comentarios (un comentario puede nombrar acciones) y se sacan las cadenas: index.html es una página entera, no se evalúa.
+function listaAccEscritura(html) {
+  const m = /(?:const|let|var)\s+_ACC_ESCRITURA\s*=\s*\[([\s\S]*?)\]\s*;/.exec(html || '');
+  if (!m) return null;
+  const cuerpo = m[1].replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  const out = []; const re = /'([^']*)'|"([^"]*)"/g; let x;
+  while ((x = re.exec(cuerpo))) out.push(x[1] !== undefined ? x[1] : x[2]);
+  return out;
+}
+
+// Los problemas del sello en la pantalla (vacío = cuadra). Aparte de `censar` porque mira OTRO archivo; PURA igual.
+function censarSello(html, tabla) {
+  const P = [];
+  const lista = listaAccEscritura(html);
+  if (!Array.isArray(lista)) return ['index.html: falta la lista _ACC_ESCRITURA (las acciones a las que el embudo api() le pone OP_ID)'];
+  const filas = {}; tabla.forEach(f => { filas[f.accion] = f; });
+  const vistas = {};
+  lista.forEach(a => {
+    if (vistas[a]) P.push('index.html: _ACC_ESCRITURA repite ' + a);
+    vistas[a] = true;
+    if (!filas[a]) P.push('index.html: _ACC_ESCRITURA trae ' + a + ', que no es una escritura de la tabla (¿una lectura? un OP_ID ahí no gana nada)');
+    else if (filas[a].sinSello) P.push('index.html: _ACC_ESCRITURA trae ' + a + ' pero la tabla la marca sinSello (' + filas[a].sinSello.slice(0, 40) + '…)');
+  });
+  tabla.forEach(f => {
+    if (f.sinSello !== undefined) {
+      if (String(f.sinSello).trim().length < 25) P.push('tabla: ' + f.accion + ' es sinSello y no dice su razón por escrito');
+    } else if (!vistas[f.accion]) {
+      P.push('index.html: _ACC_ESCRITURA no trae ' + f.accion + ' (la pantalla la mandaría sin OP_ID: una respuesta perdida la repetiría) y la tabla no la marca sinSello');
+    }
+  });
+  return P;
+}
+
+/* ── El reclamo en la pantalla (paso 14) ──────────────────────────────────────────────────────────────────────────────
+   index.html es una página entera: no se evalúa ni se parsea con un analizador de JavaScript. Se lee como lo lee una
+   persona con `grep`, pero con tres cuidados: (1) sin comentarios (un comentario que nombra EPISODIO_ABIERTO no manda
+   nada), (2) por FUNCIÓN de nivel superior (el reclamo tiene que estar en la función que arma o envía la llamada, no en
+   cualquier parte del archivo) y (3) el reclamo como CLAVE o ASIGNACIÓN (`EPISODIO_ABIERTO: x`, `datos.EPISODIO_ABIERTO=x`),
+   no como una palabra suelta. */
+function sinComentarios(t) {
+  return String(t).replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .filter(l => !/^\s*\/\//.test(l))
+    .map(l => l.replace(/\s\/\/[^'"`\n]*$/, '')).join('\n');
+}
+// Las funciones de nivel superior ({nombre, ini, fin, cuerpo}) sobre un texto SIN comentarios: empiezan en la columna 0 y
+// terminan en la primera llave de la columna 0 que sigue (el estilo de todo el archivo).
+function funcionesDe(limpio) {
+  const out = []; const re = /^(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/gm; let m;
+  while ((m = re.exec(limpio))) {
+    const fin = limpio.indexOf('\n}', m.index);
+    out.push({ nombre: m[1], ini: m.index, fin: fin === -1 ? limpio.length : fin + 2, cuerpo: limpio.slice(m.index, fin === -1 ? limpio.length : fin + 2) });
+  }
+  return out;
+}
+// Las llamadas a una acción: cada aparición de su nombre ENTRE COMILLAS, fuera de comentarios y fuera de la lista
+// `_ACC_ESCRITURA` (que nombra todas las escrituras sin llamar a ninguna). Devuelve la función que la contiene (o null).
+function sitiosDe(html, accion) {
+  const limpio = sinComentarios(html).replace(/(?:const|let|var)\s+_ACC_ESCRITURA\s*=\s*\[[\s\S]*?\]\s*;/, '');
+  const fns = funcionesDe(limpio);
+  const out = []; const re = new RegExp('[\'"]' + accion + '[\'"]', 'g'); let m;
+  while ((m = re.exec(limpio))) out.push(fns.find(f => m.index >= f.ini && m.index < f.fin) || null);
+  return out;
+}
+const claveRe = k => new RegExp('(?:\\b' + k + '\\s*:|\\.' + k + '\\s*=(?!=)|\\[\\s*[\'"]' + k + '[\'"]\\s*\\]\\s*=(?!=))');
+
+function censarPantalla(html, tabla) {
+  const P = [];
+  const fns = funcionesDe(sinComentarios(html));
+  tabla.forEach(f => {
+    if (f.clase !== 'episodio') {
+      if (f.sinSitio !== undefined) P.push('tabla: ' + f.accion + ' no es de episodio y trae sinSitio (solo las de episodio lo usan)');
+      return;
+    }
+    const sitios = sitiosDe(html, f.accion);
+    if (f.sinSitio !== undefined) {
+      if (String(f.sinSitio).trim().length < 25) P.push('tabla: ' + f.accion + ' es sinSitio y no dice su razón por escrito');
+      if (sitios.length) {
+        P.push('index.html: ' + f.accion + ' dice sinSitio pero la pantalla YA la llama (en ' + sitios.map(x => x ? x.nombre : '?').join(', ') +
+          '): tiene que mandar el reclamo; quita el sinSitio de la tabla');
+      }
+      return;
+    }
+    if (!sitios.length) {
+      P.push('index.html: ninguna llamada a ' + f.accion + ' (¿la pantalla ya no la usa? entonces la fila dice sinSitio con su razón)');
+      return;
+    }
+    const claves = [f.reclamo || 'EPISODIO_ABIERTO'].concat(f.reclamoB ? ['EPISODIO_ABIERTO_B'] : []);
+    // La función que arma el paquete: la que dice `arma` o, por defecto, cada una de las que llaman a la acción.
+    const armadoras = f.arma ? [fns.find(x => x.nombre === f.arma) || null] : sitios;
+    armadoras.forEach(a => {
+      if (!a) { P.push('index.html: ' + f.accion + ' dice que su paquete lo arma «' + f.arma + '» y esa función no existe'); return; }
+      claves.forEach(k => {
+        if (!claveRe(k).test(a.cuerpo)) {
+          P.push('index.html: ' + a.nombre + '() llama a ' + f.accion + ' y NO manda ' + k + ' (la puerta del servidor queda abierta para esta pantalla)');
+        }
+      });
+    });
+  });
+  return P;
+}
+
+const CIERRE = (tabla) => tabla.filter(f => f.clase !== 'sinEpisodio' && !f.epImplementado).map(f => f.accion);
+
+/* ══ 1 · EL CENSO REAL ════════════════════════════════════════════════════ */
+console.log('1 · El censo: api.gs contra la tabla');
+const casosReales = casosDe(API_SRC);
+const auditadosReales = Object.keys(casosReales).filter(n => pasaPorAuditar(casosReales[n]));
+si('★ api.gs trae un interruptor con acciones (el lector lo encontró)', Object.keys(casosReales).length > 40);
+si('   …y varias pasan por _auditar (si el lector no ve ninguna, el censo no mide nada)', auditadosReales.length >= 30);
+const problemas = censar(API_SRC, TABLA);
+problemas.forEach(p => console.log('   · ' + p));
+eq('★★ el censo cuadra: ninguna puerta sin clasificar, ninguna fila huérfana, ninguna razón vacía', problemas.length, 0);
+const problemasSello = censarSello(INDEX_SRC, TABLA);
+problemasSello.forEach(p => console.log('   · ' + p));
+eq('★★ el sello en la pantalla cuadra: cada escritura de la tabla está en _ACC_ESCRITURA o dice por qué no', problemasSello.length, 0);
+const problemasPantalla = censarPantalla(INDEX_SRC, TABLA);
+problemasPantalla.forEach(p => console.log('   · ' + p));
+eq('★★ el reclamo en la pantalla cuadra: cada puerta de episodio que la pantalla llama manda EPISODIO_ABIERTO (o dice por qué no hay llamada)', problemasPantalla.length, 0);
+{
+  const conSitio = TABLA.filter(f => f.clase === 'episodio' && f.sinSitio === undefined);
+  const sinSitio = TABLA.filter(f => f.sinSitio !== undefined);
+  info('puertas de episodio con llamada en la pantalla: ' + conSitio.length + '; sin llamada, con su razón: ' + sinSitio.length + ' (' + sinSitio.map(f => f.accion).join(', ') + ')');
+}
+const clases = c => TABLA.filter(f => f.clase === c).length;
+info('con sello de operación en la pantalla (_ACC_ESCRITURA): ' + TABLA.filter(f => f.sinSello === undefined).length + '; sin sello, con su razón: ' + TABLA.filter(f => f.sinSello !== undefined).length);
+info('puertas: ' + TABLA.length + ' (' + clases('episodio') + ' de episodio, ' + clases('ingreso') + ' de ingreso, ' + clases('sinEpisodio') + ' sin episodio); '
+  + 'auditadas por _auditar en api.gs: ' + auditadosReales.length);
+const pend = CIERRE(TABLA);
+info('con el candado todavía por implementar (epImplementado:false): ' + pend.length + ' de ' + (clases('episodio') + clases('ingreso')));
+info('(el cierre de la tanda, paso 17, exige CERO aquí: mientras tanto es la cuenta regresiva)');
+
+/* ══ 2 · LA GUARDIA SE VE ROJA ════════════════════════════════════════════ */
+console.log('\n2 · La guardia caza lo que dice cazar (cada defecto se introduce a propósito)');
+const rojo = (l, src, tabla, pista) => {
+  const p = censar(src, tabla);
+  si('★ ' + l + ' → ROJO', p.length > 0 && (!pista || p.some(x => x.indexOf(pista) > -1)));
+  return p;
+};
+// a) borrar una fila de la tabla, cualquiera: una puerta sin clasificar
+let sinCazar = [];
+TABLA.forEach(f => {
+  const t = TABLA.filter(x => x !== f);
+  const p = censar(API_SRC, t);
+  // 🪤 «algún problema» no basta: tiene que ser EL de la fila borrada (si no, una tabla que ya estuviera roja por otra
+  // cosa haría pasar esta prueba sin cazar nada).
+  if (!p.some(x => x.indexOf(f.accion) > -1)) sinCazar.push(f.accion);
+});
+eq('★★ borrar CUALQUIER fila de la tabla la pone roja (' + TABLA.length + ' filas probadas, una a una)', sinCazar.join(',') || '(todas cazadas)', '(todas cazadas)');
+// b) una puerta nueva en api.gs que nadie clasificó
+const nueva = API_SRC.replace(/\n(\s*)default:/, "\n$1case 'ESCRITURA_NUEVA':\n$1  return _auditar(ctx, accion, () => escrituraNueva(datos, ctx), datos);\n$1default:");
+si('(la mutación de la prueba sí agregó la puerta nueva)', nueva !== API_SRC && /ESCRITURA_NUEVA/.test(nueva));
+rojo('una puerta NUEVA que pasa por _auditar sin estar en la tabla', nueva, TABLA, 'ESCRITURA_NUEVA');
+// c) una fila de una puerta que ya no existe
+rojo('una fila huérfana (la puerta se borró de api.gs)', API_SRC, TABLA.concat([SIN('PUERTA_BORRADA', 'Una puerta que ya no existe en el dispatcher: la fila quedó huérfana.')]), 'PUERTA_BORRADA');
+// d) una fila «implementada» cuyo dispatcher NO pasa el reclamo. 🪤 Se le QUITA el reclamo a una puerta que ya lo trae
+//    (DAR_ALTA, hecha en el paso 5) en vez de voltear una fila pendiente: así la prueba sigue midiendo lo mismo el día que
+//    ya no quede ninguna pendiente (paso 17), que es cuando una mutación «sobre una puerta sin hacer» dejaría de existir.
+const sinEpAlta = API_SRC.replace('darAltaPaciente(datos, ctx, _epDeDatos(datos))', 'darAltaPaciente(datos, ctx)');
+si('(la mutación de la prueba sí le quitó el reclamo a DAR_ALTA)', sinEpAlta !== API_SRC);
+rojo('una fila implementada (true) cuyo dispatcher NO pasa el reclamo (la tabla mintiendo hacia delante)', sinEpAlta, TABLA, 'DAR_ALTA');
+// e) el dispatcher pasa el reclamo y la fila dice que no (la otra punta, mutando la TABLA)
+const alta = f => f.accion === 'DAR_ALTA';
+rojo('api.gs YA pasa el reclamo y la fila dice false (la tabla mintiendo hacia atrás)', API_SRC,
+  TABLA.map(f => alta(f) ? Object.assign({}, f, { epImplementado: false }) : f), 'DAR_ALTA');
+{
+  const p = censar(sinEpAlta, TABLA.map(f => alta(f) ? Object.assign({}, f, { epImplementado: false }) : f));
+  eq('★ …y verde cuando las dos puntas coinciden (voltear la fila Y pasar el reclamo es lo que cierra un paso)',
+    p.filter(x => x.indexOf('DAR_ALTA') > -1).length, 0);
+}
+// f) una razón vacía
+rojo('una puerta sin episodio SIN su razón escrita', API_SRC, TABLA.map(f => f.accion === 'SET_BANNER' ? Object.assign({}, f, { razon: '' }) : f), 'SET_BANNER');
+// g) las dos listas separadas
+{
+  const lista = listaAccEpisodio(API_SRC) || [];
+  const sinUna = API_SRC.replace(/var _ACC_EPISODIO = \[[\s\S]*?\];/, 'var _ACC_EPISODIO = ' + JSON.stringify(lista.filter(a => a !== 'DAR_ALTA')) + ';');
+  si('(la mutación de la prueba sí le quitó una acción a _ACC_EPISODIO)', lista.length > 0 && sinUna !== API_SRC);
+  rojo('_ACC_EPISODIO sin una de las acciones de episodio de la tabla', sinUna, TABLA, '_ACC_EPISODIO');
+  const demas = API_SRC.replace(/var _ACC_EPISODIO = \[[\s\S]*?\];/, 'var _ACC_EPISODIO = ' + JSON.stringify(lista.concat(['SET_BANNER'])) + ';');
+  rojo('_ACC_EPISODIO con una acción de más (SET_BANNER no lleva episodio)', demas, TABLA, '_ACC_EPISODIO');
+}
+// h) un comentario que nombra _auditar no cuenta
+{
+  const comentada = API_SRC.replace(/\n(\s*)default:/, "\n$1case 'SOLO_COMENTARIO':\n$1  // return _auditar(ctx, accion, () => x(datos), datos);\n$1  return err('no', ERR.VALIDACION);\n$1default:");
+  const p = censar(comentada, TABLA);
+  eq('un comentario que nombra _auditar NO hace pasar una puerta por auditada (no exige fila)', p.filter(x => x.indexOf('SOLO_COMENTARIO') > -1).length, 0);
+}
+// i) la clase inválida
+rojo('una clase que no existe', API_SRC, TABLA.map(f => f.accion === 'SET_BANNER' ? Object.assign({}, f, { clase: 'tal_vez' }) : f), 'SET_BANNER');
+// i2) una acción de coordinación NUEVA que escribe sin pasar por _auditar
+{
+  const coordNueva = API_SRC.replace(/\n(\s*)default:/, "\n$1case 'COORD_ESCRIBE_ALGO':\n$1  return coordEscribeAlgo(datos);\n$1default:");
+  si('(la mutación de la prueba sí agregó la acción de coordinación nueva)', coordNueva !== API_SRC);
+  rojo('una acción COORD_* nueva fuera de _auditar y fuera de la tabla', coordNueva, TABLA, 'COORD_ESCRIBE_ALGO');
+}
+// j) una acción de coordinación que se pasó a _auditar sin avisar
+{
+  const t = TABLA.map(f => f.accion === 'COORD_CORREGIR' ? Object.assign({}, f, { viaAuditar: undefined }) : f);
+  rojo('COORD_CORREGIR sin viaAuditar:false mientras api.gs no la pasa por _auditar', API_SRC, t, 'COORD_CORREGIR');
+}
+
+// k) el sello en la pantalla: cada defecto se introduce a propósito en index.html o en la tabla
+{
+  const lista = listaAccEscritura(INDEX_SRC) || [];
+  const redefinir = nueva => INDEX_SRC.replace(/(const|let|var)(\s+_ACC_ESCRITURA\s*=\s*)\[[\s\S]*?\]\s*;/,
+    (_, k, r) => k + r + '[' + nueva.map(x => "'" + x + "'").join(', ') + '];');
+  // 🪤 La reescritura conserva las comillas simples del original: con JSON.stringify (comillas dobles) la lista quedaba
+  // ilegible y TODAS las mutaciones de abajo se ponían rojas por esa razón, no por la que decían (una guardia que da rojo
+  // por el motivo equivocado se ve igual que una que funciona).
+  si('(la lista reescrita se lee igual que la original: la mutación no la rompe por la forma)',
+    JSON.stringify(listaAccEscritura(redefinir(lista))) === JSON.stringify(lista));
+  si('(la lista de la pantalla se pudo leer y reescribir para las pruebas)', lista.length > 15 && redefinir(lista) !== undefined);
+  const casiTodas = a => redefinir(lista.filter(x => x !== a));
+  // una acción sellada que se cae de la lista: cualquiera, una a una
+  const sinCazarSello = [];
+  lista.forEach(a => { if (!censarSello(casiTodas(a), TABLA).some(x => x.indexOf(a) > -1)) sinCazarSello.push(a); });
+  eq('★★ quitar CUALQUIER acción de _ACC_ESCRITURA la pone roja (' + lista.length + ' acciones probadas, una a una)', sinCazarSello.join(',') || '(todas cazadas)', '(todas cazadas)');
+  const rojoSello = (l, html, tabla, pista) => {
+    const p = censarSello(html, tabla);
+    si('★ ' + l + ' → ROJO', p.length > 0 && p.some(x => x.indexOf(pista) > -1));
+  };
+  rojoSello('una acción que NO es escritura (una lectura) metida en _ACC_ESCRITURA', redefinir(lista.concat(['GET_BOOT'])), TABLA, 'GET_BOOT');
+  rojoSello('una acción repetida en _ACC_ESCRITURA', redefinir(lista.concat([lista[0]])), TABLA, lista[0]);
+  rojoSello('una acción marcada sinSello que aun así está en _ACC_ESCRITURA', redefinir(lista.concat(['GENERAR_REM'])), TABLA, 'GENERAR_REM');
+  rojoSello('una acción sinSello SIN su razón por escrito', INDEX_SRC, TABLA.map(f => f.accion === 'SET_BANNER' ? Object.assign({}, f, { sinSello: 'no' }) : f), 'SET_BANNER');
+  rojoSello('una acción de la tabla que pasa a sinSello y se nombra aun así (la tabla y la lista se separaron)',
+    INDEX_SRC, TABLA.map(f => f.accion === 'DAR_ALTA' ? Object.assign({}, f, { sinSello: 'Una razón escrita cualquiera que no cambia nada.' }) : f), 'DAR_ALTA');
+  rojoSello('index.html sin la lista _ACC_ESCRITURA', INDEX_SRC.replace(/_ACC_ESCRITURA/g, '_OTRA_LISTA'), TABLA, '_ACC_ESCRITURA');
+  // un comentario dentro de la lista que nombra una acción no la cuenta
+  {
+    const conComentario = INDEX_SRC.replace(/(const|let|var)(\s+_ACC_ESCRITURA\s*=\s*\[)/, (_, k, r) => k + r + "\n  // 'GET_BOOT' no va\n  /* 'GET_CAMAS' tampoco */");
+    const p = censarSello(conComentario, TABLA);
+    eq('un comentario dentro de la lista que nombra una lectura NO cuenta como un miembro de la lista', p.filter(x => /GET_BOOT|GET_CAMAS/.test(x)).length, 0);
+  }
+}
+
+// l) el reclamo en la pantalla (paso 14): cada defecto se introduce a propósito.
+//    l1 · sobre una pantalla de juguete, para probar la REGLA sin depender de cómo esté escrito index.html hoy (si solo se
+//    mutara el archivo real, una pantalla que ya estuviera mal haría pasar estas pruebas sin cazar nada);
+//    l2 · sobre index.html de verdad, fila por fila.
+{
+  const JUGUETE = [
+    "const _ACC_ESCRITURA = ['DAR_ALTA', 'MOVER_A_CAMA_VACIA', 'ANULAR_EVENTO', 'COORD_CORREGIR', 'LIMPIAR_CAMA', 'GUARDAR_EVOLUCION'];",
+    "function egresoJ(id) {",
+    "  gs('DAR_ALTA', { idCama: id, EPISODIO_ABIERTO: EG_EP });",
+    "}",
+    "function moverJ(a, b) {",
+    "  gs('MOVER_A_CAMA_VACIA', { idOrigen: a, idDestino: b, EPISODIO_ABIERTO: epA, EPISODIO_ABIERTO_B: epB });",
+    "}",
+    "function anularJ() {",
+    "  const datos = { idCama: 1 };",
+    "  datos.EPISODIO_ABIERTO = _episodioAbierto;",
+    "  gs('ANULAR_EVENTO', datos);",
+    "}",
+    "function coordJ() {",
+    "  gs('COORD_CORREGIR', { token: T, patientId: COORD_PID });",
+    "}",
+    "function armaJ() {",
+    "  const d = { x: 1 };",
+    "  d.EPISODIO_ABIERTO = ep;",
+    "  _enviaJ(d);",
+    "}",
+    "function _enviaJ(d) {",
+    "  api('GUARDAR_EVOLUCION', d);",
+    "}",
+    "",
+  ].join('\n');
+  const TJ = [
+    { accion: 'DAR_ALTA', clase: 'episodio', razon: 'x'.repeat(30) },
+    { accion: 'MOVER_A_CAMA_VACIA', clase: 'episodio', razon: 'x'.repeat(30), reclamoB: true },
+    { accion: 'ANULAR_EVENTO', clase: 'episodio', razon: 'x'.repeat(30) },
+    { accion: 'COORD_CORREGIR', clase: 'episodio', razon: 'x'.repeat(30), reclamo: 'patientId' },
+    { accion: 'GUARDAR_EVOLUCION', clase: 'episodio', razon: 'x'.repeat(30), arma: 'armaJ' },
+    { accion: 'LIMPIAR_CAMA', clase: 'episodio', razon: 'x'.repeat(30), sinSitio: 'La pantalla de juguete no la llama: se libera con el egreso.' },
+    { accion: 'GENERAR_REM', clase: 'sinEpisodio', razon: 'x'.repeat(30) },
+  ];
+  const pj = (html, tabla) => censarPantalla(html, tabla || TJ);
+  eq('(la pantalla de juguete cumple: cero problemas, y la prueba nace verde antes de estropearla)', pj(JUGUETE).join(' | ') || '(cero)', '(cero)');
+  const rojoJ = (l, html, tabla, pista) => {
+    const p = pj(html, tabla);
+    si('★ ' + l + ' → ROJO', p.length > 0 && p.some(x => x.indexOf(pista) > -1));
+  };
+  // El reclamo desaparece de cada función, una a una: cada puerta tiene que quedar señalada POR NOMBRE
+  [['egresoJ', 'DAR_ALTA'], ['moverJ', 'MOVER_A_CAMA_VACIA'], ['anularJ', 'ANULAR_EVENTO'], ['armaJ', 'GUARDAR_EVOLUCION']].forEach(([fn, acc]) => {
+    const ini = JUGUETE.indexOf('function ' + fn + '('); const fin = JUGUETE.indexOf('\n}', ini) + 2;
+    const sin = JUGUETE.slice(0, ini) + JUGUETE.slice(ini, fin).replace(/EPISODIO_ABIERTO/g, 'EPISODIO_PERDIDO') + JUGUETE.slice(fin);
+    si('(la mutación le quitó el reclamo a ' + fn + ')', sin !== JUGUETE);
+    rojoJ('la pantalla llama a ' + acc + ' SIN mandar el reclamo', sin, TJ, acc);
+  });
+  rojoJ('MOVER_A_CAMA_VACIA sin EPISODIO_ABIERTO_B (manda la A y se olvida de la B)', JUGUETE.replace(', EPISODIO_ABIERTO_B: epB', ''), TJ, 'EPISODIO_ABIERTO_B');
+  rojoJ('COORD_CORREGIR sin patientId (su reclamo es otro)', JUGUETE.replace('patientId: COORD_PID', 'pid: COORD_PID'), TJ, 'COORD_CORREGIR');
+  rojoJ('un COMENTARIO que nombra el reclamo NO lo manda',
+    JUGUETE.replace('  gs(\'DAR_ALTA\', { idCama: id, EPISODIO_ABIERTO: EG_EP });', "  // EPISODIO_ABIERTO: EG_EP\n  /* EPISODIO_ABIERTO: EG_EP */\n  gs('DAR_ALTA', { idCama: id });"), TJ, 'DAR_ALTA');
+  rojoJ('el reclamo como palabra SUELTA (en un texto) NO lo manda',
+    JUGUETE.replace('  gs(\'DAR_ALTA\', { idCama: id, EPISODIO_ABIERTO: EG_EP });', "  toast('falta EPISODIO_ABIERTO');\n  gs('DAR_ALTA', { idCama: id });"), TJ, 'DAR_ALTA');
+  rojoJ('el reclamo en OTRA función (no en la que llama ni en la que dice arma) NO cuenta',
+    JUGUETE.replace('  gs(\'DAR_ALTA\', { idCama: id, EPISODIO_ABIERTO: EG_EP });', "  gs('DAR_ALTA', { idCama: id });") + "function otraJ() {\n  return { EPISODIO_ABIERTO: 'x' };\n}\n", TJ, 'DAR_ALTA');
+  rojoJ('la función que dice arma ya no existe', JUGUETE.replace('function armaJ(', 'function otraArmaJ('), TJ, 'armaJ');
+  rojoJ('la acción solo aparece en _ACC_ESCRITURA: eso NO es una llamada (ninguna llamada)',
+    JUGUETE.replace("  gs('DAR_ALTA', { idCama: id, EPISODIO_ABIERTO: EG_EP });", '  /* nada */'), TJ, 'ninguna llamada a DAR_ALTA');
+  rojoJ('sinSitio SIN su razón por escrito', JUGUETE, TJ.map(f => f.accion === 'LIMPIAR_CAMA' ? Object.assign({}, f, { sinSitio: 'no' }) : f), 'LIMPIAR_CAMA');
+  rojoJ('sinSitio pero la pantalla YA la llama (hay que mandar el reclamo y quitar el sinSitio)',
+    JUGUETE + "function limpiarJ() {\n  gs('LIMPIAR_CAMA', { idCama: 1 });\n}\n", TJ, 'LIMPIAR_CAMA');
+  rojoJ('una puerta que no es de episodio con sinSitio', JUGUETE, TJ.map(f => f.accion === 'GENERAR_REM' ? Object.assign({}, f, { sinSitio: 'Una razón escrita cualquiera que no corresponde.' }) : f), 'GENERAR_REM');
+  eq('   …y una puerta sinEpisodio sin llamada no pide nada (GENERAR_REM no está en la pantalla de juguete)',
+    pj(JUGUETE).filter(x => x.indexOf('GENERAR_REM') > -1).length, 0);
+
+  // l2 · index.html de verdad: el reclamo desaparece de la función de cada puerta, una a una
+  const porFila = [];
+  TABLA.filter(f => f.clase === 'episodio' && f.sinSitio === undefined).forEach(f => {
+    const nombres = f.arma ? [f.arma] : sitiosDe(INDEX_SRC, f.accion).filter(Boolean).map(x => x.nombre);
+    const k = f.reclamo || 'EPISODIO_ABIERTO';
+    nombres.forEach(nom => {
+      const ini = INDEX_SRC.indexOf('\nfunction ' + nom + '(') !== -1 ? INDEX_SRC.indexOf('\nfunction ' + nom + '(') : INDEX_SRC.indexOf('\nasync function ' + nom + '(');
+      const fin = INDEX_SRC.indexOf('\n}\n', ini + 1) + 3;
+      // El reclamo se renombra SOLO dentro de esa función (en las demás sigue igual)
+      const re = k === 'EPISODIO_ABIERTO' ? /EPISODIO_ABIERTO/g : new RegExp('\\b' + k + '\\b', 'g');
+      const sin = INDEX_SRC.slice(0, ini) + INDEX_SRC.slice(ini, fin).replace(re, k + '_PERDIDO') + INDEX_SRC.slice(fin);
+      const p = censarPantalla(sin, TABLA);
+      if (ini < 0 || sin === INDEX_SRC || !p.some(x => x.indexOf(f.accion) > -1)) porFila.push(f.accion + '@' + nom);
+    });
+  });
+  eq('★★ quitar el reclamo de CUALQUIER función que llama a una puerta de episodio de la pantalla la pone roja (una a una, en index.html de verdad)',
+    porFila.join(',') || '(todas cazadas)', '(todas cazadas)');
+  // y las filas que no llevan reclamo en la pantalla: si la pantalla las llamara, rojo
+  const llamadas = TABLA.filter(f => f.sinSitio !== undefined).map(f => f.accion);
+  const sinCazarLlamada = llamadas.filter(a => {
+    const con = INDEX_SRC + "\nfunction _llamaDePrueba() {\n  gs('" + a + "', { idCama: '1' });\n}\n";
+    return !censarPantalla(con, TABLA).some(x => x.indexOf(a) > -1 && /YA la llama/.test(x));
+  });
+  eq('★ si la pantalla pasara a LLAMAR una acción marcada sinSitio, la fila se pone roja (' + llamadas.length + ' filas probadas)', sinCazarLlamada.join(',') || '(todas cazadas)', '(todas cazadas)');
+}
+
+/* ══ 3 · LA TABLA TAL COMO LA PIDE EL DISEÑO ══════════════════════════════ */
+console.log('\n3 · Las puertas de episodio del diseño están todas, y las que no lo llevan dicen por qué');
+const DISENO_EPISODIO = ['GUARDAR_EVOLUCION', 'DAR_ALTA', 'LIMPIAR_CAMA', 'INTERCAMBIAR_CAMAS', 'MOVER_A_CAMA_VACIA', 'ANULAR_EVENTO', 'ANEXAR_EVENTO',
+  'ANULAR_ANEXO', 'CONFIRMAR_DISPOSITIVOS', 'AGREGAR_HITO', 'EVAL_REGISTRAR', 'EPISODIO_ESCALA', 'PEND_ABRIR', 'PEND_CERRAR', 'GSA_ASIGNAR', 'COORD_CORREGIR'];
+const DISENO_SIN = ['GUARDAR_ENTREGA_TURNO', 'ASIGNAR_STOCK', 'AJUSTAR_STOCK', 'GUARDAR_STOCK', 'MOVER_VENTILADOR', 'MOVER_VENTILADORES_LOTE', 'GUARDAR_VENTILADOR',
+  'BAJA_VENTILADOR', 'REGISTRAR_FALLA_VM', 'GUARDAR_SUGERENCIA', 'SET_SUGERENCIA_ESTADO', 'SET_ASIGNACION_TURNO', 'AGREGAR_FASE', 'SET_BANNER', 'GENERAR_REM',
+  'PLANTILLA_GUARDAR', 'PLANTILLA_RETIRAR', 'GSA_IMPORTAR', 'GSA_DESCARTAR'];
+eq('★ las puertas de episodio son las del diseño aprobado (ni una más ni una menos)',
+  TABLA.filter(f => f.clase === 'episodio').map(f => f.accion).sort().join(','), DISENO_EPISODIO.slice().sort().join(','));
+eq('★ las puertas sin episodio son las del diseño aprobado, cada una con su razón',
+  TABLA.filter(f => f.clase === 'sinEpisodio').map(f => f.accion).sort().join(','), DISENO_SIN.slice().sort().join(','));
+eq('   …y la de ingreso es INGRESAR_PACIENTE', TABLA.filter(f => f.clase === 'ingreso').map(f => f.accion).join(','), 'INGRESAR_PACIENTE');
+si('★ ninguna razón de «sin episodio» dice «no lo pensé»: todas tienen al menos 25 caracteres',
+  TABLA.filter(f => f.clase === 'sinEpisodio').every(f => f.razon.length >= 25));
+
+console.log(fails.length ? `\n❌ ${fails.length} fallos:\n  - ${fails.join('\n  - ')}` : '\n✅ guardado_seguro_cobertura: ninguna puerta de escritura sin clasificar.');
+process.exit(fails.length ? 1 : 0);

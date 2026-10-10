@@ -145,9 +145,20 @@ dónde está.
   configura la primera vez y queda en su localStorage.
 
 ### 🔴 El service worker no guarda datos clínicos
-`pwa/sw.js` cachea **solo el armazón**: pantalla, manifiesto e iconos. Dos
-filtros, y cualquiera basta: solo `GET` y solo del propio origen. Guardar las
-respuestas dejaría el censo de la UCI escrito en el teléfono de cada uno.
+`pwa/sw.js` cachea **solo el armazón**: pantalla, manifiesto e iconos. Para
+entrar al caché una petición tiene que pasar **tres filtros**, y con que falle
+uno va a la red y no se guarda: solo `GET`, solo del propio origen y solo las
+direcciones de su lista `ARMAZON`, resueltas contra el scope y comparadas
+exactas (un JSON del mismo sitio, o el armazón con `?parámetros`, no se
+guardan). «Mismo origen» no quiere decir «armazón»: un sitio de GitHub Pages
+comparte origen con los demás repositorios de la cuenta. Guardar las respuestas
+dejaría el censo de la UCI escrito en el teléfono de cada uno.
+🪤 **El caché es del origen, no de la aplicación.** Otras aplicaciones del mismo
+origen guardan los suyos al lado: el service worker solo borra los suyos (nombre
+que **empieza con** `rce-armazon-` y distinto del vigente) y solo lee de su
+propio caché, nunca con `caches.match()` global. Borrar «todo lo que no sea mío»
+le quitaba el armazón a las demás, y leer global servía copias ajenas. Lo fija
+`checks/pwa_cache_aislado.js`.
 🪤 El nombre del caché lleva el **sello de versión**: con un nombre fijo el
 equipo se queda con la pantalla vieja y el síntoma es «pegué el archivo y no
 cambió nada».

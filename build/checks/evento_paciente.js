@@ -140,6 +140,15 @@ global._procClaveHito = (function () {
   if (_i < 0) throw new Error('svc_timeline.gs ya no declara _procClaveHito');
   return (0, eval)('(' + _s.slice(_i, _s.indexOf('\n}', _i) + 2) + ')');
 })();
+/* G16 (paso 11): el hito de operación (`_hitoDeOperacion` y sus ayudas, svc_timeline.gs) se trae del FUENTE por la misma razón. Este
+   arnés no declara OP_ACTUAL, así que SIN OP_ID el helper llama a los espías de arriba (`_agregarHitoInterno` / `...SinSync`) igual
+   que antes del paso 11: nada de lo que mide esta guardia cambia. */
+['_opIdDeLaPeticion', '_claveHitoDeOperacion', '_idHitoDeOperacion', '_hitoDeOperacion'].forEach(n => {
+  const _s = fs.readFileSync(path.join(v2, 'svc_timeline.gs'), 'utf8');
+  const _i = _s.indexOf('function ' + n + '(');
+  if (_i < 0) throw new Error('svc_timeline.gs ya no declara ' + n);
+  global[n] = (0, eval)('(' + _s.slice(_i, _s.indexOf('\n}', _i) + 2) + ')');
+});
 // El motor de texto vive en dominio_texto.gs; aquí solo interesa que anular
 // llegue (o no llegue) al camino de escritura, no qué narra.
 global.generarTextoEvolucion = () => 'texto de prueba';

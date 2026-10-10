@@ -5,8 +5,155 @@
  * se sirve con obtenerEvolucionPrevia().
  */
 
+/**
+ * validarEpisodioAbierto — el formulario que se abrió para un paciente no se guarda sobre otro (G14, 4-oct-2026).
+ *
+ * 🔴 POR QUÉ EXISTE. `guardarEvolucion` atribuía lo que se guarda a «el paciente que tenga la cama AHORA» y nunca
+ * lo comparaba con el que el formulario había abierto. Un formulario que quedaba abierto mientras la cama se
+ * daba de alta y se reingresaba a OTRO paciente escribía la evolución del anterior sobre el nuevo ocupante:
+ * la fila salía con el PATIENT_ID del nuevo y `_syncCamaDesdeEvolucion` le copiaba a su tarjeta los parámetros
+ * del que ya no estaba. Dato verdadero, persona equivocada, y nadie lo ve. Guardia: episodio_al_guardar.js.
+ *
+ * El campo se llama `EPISODIO_ABIERTO`: el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el formulario (no al
+ * guardar). NO es columna de ninguna hoja (viaja transitorio, como PAC_RUT): no entra a `esquema.gs`.
+ *
+ * LAS REGLAS, y por qué cada una:
+ *  · AUSENTE (undefined/null) ⇒ no se comprueba. Es COMPATIBILIDAD con las llamadas por API sin navegador (smoke
+ *    tests, build/sim, medidores), que nunca lo mandaron. El cliente real SIEMPRE lo manda.
+ *  · VACÍO ('') ⇒ el formulario no abrió ningún episodio (ingreso en cama libre, o episodio sin ingreso formal)
+ *    y por lo tanto no reclama ninguno: guarda como hasta hoy. 🪤 A propósito: si el vacío rechazara cuando la
+ *    cama ya tiene paciente, el reintento automático de un INGRESO cuyo primer intento sí aterrizó (y cuya
+ *    respuesta se perdió) se vería idéntico a «otro ingreso en la misma cama» y se rechazaría por error. La
+ *    pantalla cierra ese hueco por su lado: al guardar bien toma el episodio que el servidor le devuelve, y desde
+ *    ahí el formulario ya es de ese paciente.
+ *  · CON VALOR ⇒ tiene que ser el de la cama. Si la cama pasó a otro paciente, o quedó libre (alta, traslado,
+ *    limpieza), se rechaza.
+ *
+ * 🗂️ CORREGIR UN TURNO PASADO (F2, 4-oct-2026). Desde la vista de un día pasado, «Ver / editar» abre el turno de
+ * ESE día, y el formulario reclama el episodio de la tarjeta que esa vista MOSTRÓ (la que arma lo registrado ese
+ * día), no el del censo vivo: la pantalla lo decide, y aquí solo se compara con quien ocupa la cama HOY. El turno
+ * pasado del paciente que SIGUE en la cama se corrige como siempre. El de uno que ya no está (egresado, trasladado)
+ * se RECHAZA con este mismo mensaje, tenga la cama otro paciente o esté libre. 🔴 DECISIÓN DE PRODUCTO DE DIEGO,
+ * PENDIENTE: ¿debe poderse corregir el turno pasado de un paciente ya egresado cuando su cama la ocupa otro? Hoy NO:
+ * es el comportamiento seguro por omisión —atribuir ese turno «a quien esté en la cama» es justo el error que esta
+ * regla existe para impedir— y su costo es que esa corrección no se puede hacer desde la pantalla. Si la respuesta
+ * es que sí, hace falta una operación aparte que nombre el episodio; NO se arregla aflojando esta comparación.
+ * (La frase «desde que abriste esta ventana» no es exacta en ese caso —el cambio fue antes de abrirla—, pero es
+ * el mensaje acordado y la pantalla lo reconoce por su texto: cambiarlo se hace en los dos lados. Dice «ventana» y no
+ * «formulario» porque es el MISMO texto de las demás puertas, y varias abren un diálogo sin formulario: H34(2).)
+ *
+ * Es PURA: no lee la cama, la recibe. Quien llama la lee DENTRO del lock y la compara ANTES de escribir nada.
+ * El mensaje no nombra a nadie ni lleva el identificador del episodio (queda en AUDIT_LOG y en pantalla). La
+ * pantalla reconoce este rechazo por la frase «cambió de paciente» (`_EP_CAMBIO_RE` en index.html): si se
+ * reescribe, se reescribe en los dos lados — la guardia lo ata.
+ *
+ * 🪤 VIVE AQUÍ y no en `dominio_validacion.gs`, aunque sea una validación pura: varios bancos de prueba antiguos
+ * cargan una lista FIJA de archivos que trae este servicio y no aquel (y le ponen un doble a
+ * `validarPayloadEvolucion`). Una comprobación de seguridad que se SALTARA en silencio cuando no está definida
+ * —el `typeof` de más abajo para la vía aérea— es peor que una que viaja siempre con quien la usa.
+ *
+ * @param  abierto  EPISODIO_ABIERTO del payload
+ * @param  pidCama  PATIENT_ID que tiene la cama AHORA
+ * @param  idCama   número de la cama, solo para el mensaje
+ * @return '' si se puede guardar; el mensaje, en palabras simples, si no.
+ */
+function validarEpisodioAbierto(abierto, pidCama, idCama) {
+  if (abierto === undefined || abierto === null) return '';
+  const ab = String(abierto).trim();
+  if (!ab) return '';
+  if (ab === String(pidCama === undefined || pidCama === null ? '' : pidCama).trim()) return '';
+  return 'La cama ' + idCama + ' cambió de paciente (o quedó libre) desde que abriste esta ventana, ' +
+    'así que no se guardó nada. Cierra esta ventana y vuelve a abrir la cama para ver cómo está ahora.';
+}
+
+/**
+ * _candadoDeIngreso — el INGRESO CONCURRENTE y el modo estricto en el guardado de la evolución (G15, tanda 2 del guardado
+ * seguro, paso 8, 4-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Dos kinesiólogos abren el formulario de ingreso sobre la MISMA cama libre, cada uno con su paciente. El
+ * primero en guardar gana la cama. El segundo guardaba DESPUÉS y `validarEpisodioAbierto` no lo frenaba: su
+ * `EPISODIO_ABIERTO` iba vacío (la tarjeta no tenía episodio al abrir) y el vacío no reclama nada, a propósito —si
+ * rechazara sobre una cama con paciente, el REINTENTO de un ingreso cuyo primer intento sí aterrizó se vería idéntico a
+ * «otro ingreso en la misma cama»—. Y el pid salía de `datos.PATIENT_ID || cama.PATIENT_ID`: el segundo ingreso se
+ * escribía encima del primero, con el nombre, la edad y el diagnóstico de uno bajo el episodio del otro, y nadie lo veía.
+ *
+ * LA SALIDA: el ingreso trae su identidad propia, `datos.PATIENT_ID`, que la pantalla acuña al abrir el formulario sobre
+ * una cama LIBRE y manda junto con `EPISODIO_ABIERTO = ''`. Con ella el vacío sí se puede juzgar (la regla vive en
+ * `decidirEpisodioPuerta('INGRESO')`, dominio_validacion.gs): cama libre o sin PATIENT_ID ⇒ sigue; cama con ESE MISMO pid ⇒
+ * es el reintento de su propio ingreso y sigue, idempotente (el hito de ingreso único por pid ya lo asegura
+ * `_timelineDelGuardado`); cama con OTRO pid ⇒ ERR.CONFLICTO, sin escribir nada.
+ *
+ * MODO ESTRICTO (`ep.estricto`, CONFIG.CONTRATO_ESTRICTO = TRUE, nace APAGADO): el EPISODIO_ABIERTO AUSENTE se rechaza
+ * —«esta pantalla es de una versión anterior, recárgala»—, y el vacío SIN identidad propia no se acepta sobre una cama con
+ * paciente (CONFLICTO). Sin identidad propia y con el modo tolerante no se compara nada: es el hueco que dejan las
+ * pantallas viejas hasta que se enciende el modo estricto, y no se disimula.
+ *
+ * 🔐 H9 (revisión de la tanda 2, 5-oct-2026). Un ingreso con el PATIENT_ID de alguien que YA EGRESÓ tampoco entra, esté la cama
+ * libre u ocupada por él: sin el sello (otro OP_ID, el caché evaporado) el reenvío de un ingreso viejo —el borrador de la pantalla
+ * sobre la cama libre— volvía a ocuparla con ese pid, y el segundo alta no escribía su egreso porque `ARCH_<pid>` ya existía (se
+ * perdía en silencio el egreso, su motivo y el conteo del REM). Se lee SOLO con identidad propia (`_episodioYaEgresado`: la fila del
+ * archivo o el hito de egreso) y decide la misma regla pura (`archivado`). El reintento legítimo —cama ocupada por ese pid, SIN
+ * egreso— sigue siendo «ya hecho» y converge. 🪤 Con EPISODIO_ABIERTO ausente (pantalla vieja, modo tolerante) esta regla NO corre,
+ * como el resto de este candado: es el hueco que cierra el modo estricto.
+ *
+ * Con VALOR en EPISODIO_ABIERTO no hace nada: eso ya lo comparó `validarEpisodioAbierto`. Va DENTRO del lock, con la cama
+ * que se leyó adentro, y ANTES de la primera escritura. Devuelve la respuesta de rechazo para devolver tal cual, o null si
+ * se puede seguir.
+ *
+ * 🪤 Solo invoca las reglas de dominio_validacion.gs cuando el payload trae identidad propia o está el modo estricto: varios
+ * bancos antiguos cargan una lista FIJA de archivos que trae este servicio y no aquel. Uno nuevo que sí manda el reclamo
+ * sin cargarlas REVIENTA (INTERNO) en vez de saltarse el candado en silencio.
+ *
+ * @param  cama  la fila de la cama leída dentro del lock ({} si no existe)
+ * @param  ep    {a, b, estricto, ausente} de api.gs (`_epDeDatos`); sin él (bancos, llamadas internas) es el modo tolerante
+ */
+function _candadoDeIngreso(datos, cama, idCama, ep) {
+  const abierto = datos.EPISODIO_ABIERTO;
+  const estricto = !!ep && ep.estricto === true;
+  if (abierto === undefined || abierto === null) {
+    if (!estricto) return null;   // ausente en modo tolerante: no se compara (compatibilidad con llamadas sin pantalla)
+    const m = validarEpisodioPuerta(abierto, '', idCama, true);
+    return m ? err(m, ERR.VALIDACION) : null;
+  }
+  if (String(abierto).trim() !== '') return null;   // con valor: ya lo comparó validarEpisodioAbierto
+  const propio = (datos.PATIENT_ID === undefined || datos.PATIENT_ID === null) ? '' : String(datos.PATIENT_ID).trim();
+  if (!propio && !estricto) return null;            // vacío sin identidad propia en modo tolerante: como hasta hoy
+  // Quien ocupa la cama AHORA: una cama libre no tiene dueño aunque la fila conserve un pid viejo, y un episodio sin
+  // ingreso formal (ocupada, sin PATIENT_ID) tampoco tiene a quién reclamarle.
+  const pidAhora = esVerdadero(cama.OCUPADA) ? String(cama.PATIENT_ID || '').trim() : '';
+  // H9: el pid propio de alguien que YA EGRESÓ no vuelve a ingresar (ver `decidirEpisodioPuerta`). Solo se lee con identidad propia.
+  const archivado = propio ? _episodioYaEgresado(propio) : false;
+  const d = decidirEpisodioPuerta('INGRESO', { propio: propio, pid: pidAhora, idCama: idCama, estricto: estricto, archivado: archivado });
+  return d.estado === 'rechazo' ? err(d.error, d.codigo) : null;   // «yaHecho» aquí es el reintento propio: sigue (idempotente)
+}
+
+/**
+ * _candadoDePidNuevo — el PATIENT_ID que llega en el payload y NO es el de la cama tiene la forma de siempre y no está en OTRA cama
+ * ocupada (H14, revisión de la tanda 2, 5-oct-2026).
+ *
+ * 🔴 EL DEFECTO. Solo `validarPayloadIngreso` miraba la forma del PATIENT_ID, y la pantalla no entra por esa puerta: ingresa por
+ * GUARDAR_EVOLUCION. Un valor como «X Y/../<b>» quedaba de identidad de la cama y de parte de los ids derivados (`ARCH_<pid>`). Y
+ * nada impedía que el mismo pid estuviera en dos camas.
+ *
+ * LA REGLA. Un pid NUEVO —distinto del que ya tiene la cama— tiene que cumplir la forma acuñada y no pertenecer a otra cama
+ * OCUPADA. 🪤 A un pid que es el de la cama NO se le exige la forma: las camas ya ocupadas con pids antiguos (cargados a mano, de
+ * versiones previas) siguen guardando evoluciones normales, y la pantalla solo manda PATIENT_ID en el ingreso acuñado. Por eso
+ * no vive en `validarPayloadEvolucion` (pura, antes del lock, sin cama): necesita la cama para saber qué es «nuevo». Va DENTRO del
+ * lock, con la cama leída ahí, y ANTES de la primera escritura. No repite el identificador en el mensaje (Ley 19.628).
+ * @return la respuesta de rechazo (VALIDACION) para devolver tal cual, o null si se puede seguir.
+ */
+function _candadoDePidNuevo(datos, cama, idCama) {
+  const crudo = datos.PATIENT_ID;
+  if (crudo === undefined || crudo === null || crudo === '') return null;
+  if (typeof crudo === 'string' && crudo.trim() === String(cama.PATIENT_ID || '').trim()) return null;   // el de la cama: no es nuevo
+  const eForma = _errPatientIdAcunado(crudo);
+  if (eForma) return err('Validación: ' + eForma, ERR.VALIDACION);
+  if (_pidEnOtraCamaOcupada(crudo, idCama)) return err(_msgPidEnOtraCama(), ERR.VALIDACION);
+  return null;
+}
+
 // ═══ ESCRITURA ════════════════════════════════════════════
-function guardarEvolucion(datos, ctx) {
+function guardarEvolucion(datos, ctx, ep) {
   const errs = validarPayloadEvolucion(datos);
   if (errs.length) return err('Validación: ' + errs.join('; '), ERR.VALIDACION);
   ctx = ctx || {};
@@ -74,6 +221,34 @@ function guardarEvolucion(datos, ctx) {
       // qué episodio es la fila previa, y eso solo lo dice la cama.
       const filaCama = repoBuscarFila('CAMAS_ESTADO', 'ID_CAMA', idCama);
       const cama = filaCama === -1 ? {} : repoLeerFila('CAMAS_ESTADO', filaCama);
+
+      /* 🔴 EL EPISODIO SE COMPRUEBA AL GUARDAR (G14, 4-oct-2026). Lo primero que se hace con la cama leída, y
+         antes de CUALQUIER escritura: la pantalla manda `EPISODIO_ABIERTO` (el paciente que tenía la tarjeta
+         cuando se abrió el formulario) y aquí, dentro del lock, se compara con el que ocupa la cama AHORA. Un
+         formulario que quedó abierto mientras la cama se daba de alta y se reingresaba a OTRO paciente
+         escribía la evolución del anterior sobre el nuevo: la línea `datos.PATIENT_ID || cama.PATIENT_ID` de
+         más abajo atribuía todo a «quien esté en la cama», sin preguntar de quién era el formulario.
+         Si no coinciden se rechaza sin escribir nada (la huella queda en AUDIT_LOG, que lo hace el
+         dispatcher). La regla —campo ausente no rechaza, vacío no reclama episodio— y su porqué están en
+         `validarEpisodioAbierto`, y la guardia que la ata es episodio_al_guardar.js. 🪤 Tiene que ir ANTES de
+         la validación de vía aérea de abajo: esa ya mira la cama, y mirar una cama que cambió de dueño solo
+         produce un mensaje que habla de otro paciente. */
+      const _errEpisodio = validarEpisodioAbierto(datos.EPISODIO_ABIERTO, cama.PATIENT_ID, idCama);
+      if (_errEpisodio) return err(_errEpisodio, ERR.VALIDACION);
+
+      /* 🔐 H14 (revisión de la tanda 2). Un PATIENT_ID NUEVO en el payload (distinto del de la cama) tiene la forma acuñada y no
+         está en otra cama ocupada. Antes de cualquier escritura y de la regla del ingreso de abajo: un pid mal formado no debe llegar
+         ni a las búsquedas de esa regla. El de la cama no se toca (las camas con pids antiguos siguen guardando). */
+      const _rPid = _candadoDePidNuevo(datos, cama, idCama);
+      if (_rPid) return _rPid;
+
+      /* 🔐 EL INGRESO CONCURRENTE (G15, 4-oct-2026). Con el episodio abierto VACÍO —el formulario se abrió sobre una cama
+         libre— la regla de arriba no puede juzgar nada; la identidad propia del ingreso (`datos.PATIENT_ID`, acuñado por
+         la pantalla al abrir) sí: cama de OTRO pid ⇒ CONFLICTO sin escribir; del MISMO pid ⇒ el reintento de su propio
+         ingreso, que sigue. Y el modo estricto: el ausente se rechaza y el vacío sin identidad propia no pasa sobre una
+         cama con paciente. Va justo DESPUÉS de la regla de arriba y antes de cualquier escritura. */
+      const _rIngreso = _candadoDeIngreso(datos, cama, idCama, ep);
+      if (_rIngreso) return _rIngreso;
 
       // 🗂️ Dos reglas del episodio que necesitan la CAMA para decidir, y por
       // eso no caben en validarPayloadEvolucion (que es puro). Se evalúan
@@ -395,6 +570,43 @@ function guardarEvolucion(datos, ctx) {
           _esVA(datos.VENT_VIA_AEREA) || _esVA(_vaT),
           function (x) { return !_esVA(_finalVa(x)); },
           _esVA(cama.VIA_AEREA) ? cama.FECHA_INICIO_VA : fecha);
+
+        /* 🔐 LOS DÍAS NO CAMBIAN AL REPETIR EL GUARDADO (G16, paso 10, 5-oct-2026). Los tres contadores de arriba se
+           calculan leyendo la CAMA (`cama.SOPORTE`, `cama.VIA_AEREA`, `cama.FECHA_INICIO_*`), no la evolución previa. La
+           primera corrida los calcula con la cama como estaba; el compromiso (la escritura de la cama, más abajo) la deja ya
+           en el soporte y la vía aérea con que termina el turno y con sus fechas de inicio estampadas. Si el guardado murió
+           justo después —o si alguien re-guarda el turno— la segunda corrida lee ESA cama y da otro número: la guardia midió
+           un ingreso con VA de afuera que pasaba de 0 a 5 días de VA y una transición VM→VNI con TOT→Natural que pasaba de 3
+           a 1.
+           LA REGLA: si la cama YA absorbió este turno (`ULTIMO_TURNO_KEY === turnoKey`) y la fila del turno es del MISMO
+           paciente con el MISMO soporte y la MISMA vía aérea (inicial y final), el turno no cambió en nada que mueva los
+           contadores: se conservan los de esa fila. Con un soporte o una vía distintos se calcula como siempre. Una fila
+           sin días (anterior a las columnas) tampoco se «conserva»: se calcula. Es un CAMBIO DE CÁLCULO solo en el reintento y
+           en el re-guardado del turno, que antes daban un número que dependía de en qué estado hubiera quedado la cama.
+
+           🔴 H19 (revisión de la tanda 2): ESTA REGLA NO SE PUEDE REEMPLAZAR POR EL SELLO. El sello de operación se escribe
+           solo cuando el guardado terminó limpio: una corrida que murió después de escribir la cama no deja sello, y su
+           reintento (o el guardado sin OP_ID, o el que llega con otra OP_ID) calcula de nuevo leyendo la cama ya ingresada
+           como si fuera la de antes del turno. Con el cálculo de antes de la tanda 2, la transición VM→VNI y TOT→Natural
+           daba 3, 0 y 3 días al guardarla y 1, 0 y 1 al volver a guardarla; el turno siguiente partía de ese 1 y el error
+           se arrastraba al resto del episodio. Sin la regla caen las matrices de muerte de la sección 19 de
+           `guardado_seguro_operacion_g16.js` (el ingreso con y sin OP_ID, el ingreso con vía aérea de afuera y la
+           transición). Desde fuera no se distingue un reintento de un re-guardado legítimo (la fila y la cama quedan
+           iguales), así que la regla es tan estricta como lo permite el estado: misma cama ya al día con el turno, mismo
+           paciente, mismo soporte y misma vía inicial y final. LO QUE CAMBIA FRENTE A ANTES, y la guardia 20b fija: (1)
+           volver a guardar una transición ya no baja los días; (2) el turno de ingreso de un paciente con vía aérea de
+           afuera conserva el 0 del primer guardado (antes, el segundo guardado lo «corregía» a los días de afuera por
+           accidente); (3) por construcción, si se corrige un turno anterior y luego se vuelve a guardar este, los días de
+           ESTE turno no se recalculan hasta el siguiente. Es la decisión 5 del diseño: Diego aún no la responde, así que no
+           figura en ACUERDOS_REDISENO.md. */
+        if (_prev && String(cama.ULTIMO_TURNO_KEY || '') === turnoKey && String(_prev.PATIENT_ID || '') === String(patientId) &&
+            ['VENT_SOPORTE', 'VENT_SOPORTE_FINAL', 'VENT_VIA_AEREA', 'VENT_VIA_AEREA_FINAL'].every(function (k) {
+              return String(datos[k] == null ? '' : datos[k]) === String(_prev[k] == null ? '' : _prev[k]);
+            })) {
+          ['DIAS_VM', 'DIAS_VNI', 'DIAS_VA'].forEach(function (k) {
+            if (_prev[k] !== '' && _prev[k] != null) datos[k] = _prev[k];
+          });
+        }
       }
 
       // BDT (test de azul) — repetible: cada resultado marcado en el turno se
@@ -555,10 +767,14 @@ function guardarEvolucion(datos, ctx) {
       const accion = repoUpsertEnFila('EVOLUCIONES', filaEvo, evo);
       const esNuevo = (accion === 'crear');
 
-      // Hito de ingreso — solo en la primera escritura. Viaja en el MISMO lote
-      // que los hitos de procedimientos (una inserción, un solo cache).
+      // Hito de ingreso. Viaja en el MISMO lote que los hitos de procedimientos (una inserción, un solo cache).
+      // 🔐 G16 (paso 10): ya NO «solo en la primera escritura». Si el guardado moría tras escribir la evolución y antes de
+      // insertar los hitos, el reintento ya no veía una fila nueva, se quedaba sin el hito de ingreso con su diagnóstico y el
+      // procedimiento INGRESO dejaba en su lugar uno genérico («Ingreso a UCI»). El ingreso se anota UNA vez por episodio y eso
+      // ya lo garantiza `_timelineDelGuardado` (`hayIngreso`: si el paciente ya tiene su hito no escribe otro), así que
+      // proponerlo siempre que el turno es de ingreso es seguro: lo repone si falta y no duplica si está.
       const hitosExtra = [];
-      if (esVerdadero(evo.ES_INGRESO) && esNuevo) {
+      if (esVerdadero(evo.ES_INGRESO)) {
         hitosExtra.push({
           tipo: 'ingreso',
           texto: 'Ingreso UCI. Dx: ' + (evo.PAC_DIAGNOSTICO || evo.PAC_NOMBRE || 'Sin especificar'),
@@ -648,15 +864,25 @@ function guardarEvolucion(datos, ctx) {
       }
       // La salida con RAZÓN ESCRITA: la vía aérea cambió sin evento y el colega
       // explicó por qué. No es una columna de EVOLUCIONES: vive en el hito.
+      // 🔐 G16 (paso 10): el hito se calcula contra la vía de la CAMA («venía con TOT»), y tras el compromiso la cama ya dice la
+      // nueva: en un reintento, o en cualquier re-guardado del turno, ya no se regeneraba y el barrido de `_timelineDelGuardado`
+      // (es de tipo `via_aerea`, automático) lo borraba. Por eso el barrido recibe la vía con que QUEDA el turno y la razón que
+      // trae el payload (`conservar`): el hito que el turno ya dejó se queda, o se rehace con la razón corregida.
       const _transMotivo = String(datos.TRANS_MOTIVO || '').trim();
+      const _vaFinalTurno = String(evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '');
+      // 🔴 H11 y H16 (revisión de la tanda 2): conservar el hito vale SOLO si el turno no declara un evento de vía aérea. La
+      // kinesióloga que guardó el cambio con su razón y después reabre el turno a declarar la extubación (o la intubación, la
+      // reintubación, la traqueostomía, la decanulación) no manda razón —la cama ya dice la vía nueva—, y conservar dejaba en la
+      // línea de tiempo y en la entrega de turno «cambió sin evento declarado» JUNTO al evento: la alerta que ese registro debía
+      // apagar. Antes de la tanda 2 el re-guardado barría el hito. Son los mismos cinco eventos con que `validarTransicionVA`
+      // (dominio_validacion.gs) da por explicado un cambio de vía; se miran en `evo`, la fila ya fusionada y normalizada
+      // (la PVE superada sin extubar ya apagó EXT_OCURRIO). Con evento declarado el barrido corre como siempre: sin `conservar`.
+      const _declaraEventoVA = ['EXT_OCURRIO', 'INTUB_OCURRIO', 'EXT_REINTUB', 'TQT_OCURRIO', 'DECAN_OCURRIO']
+        .some(function (k) { return esVerdadero(evo[k]); });
       if (_transMotivo && cama && cama.VIA_AEREA) {
-        const _vaSale = String(evo.VENT_VIA_AEREA_FINAL || evo.VENT_VIA_AEREA || '');
-        if (_vaSale && _vaSale !== String(cama.VIA_AEREA)) {
-          hitosExtra.push({ tipo: 'via_aerea',
-            texto: '⚠️ Vía aérea ' + cama.VIA_AEREA + ' → ' + _vaSale + ' sin evento declarado: «' +
-                   (_transMotivo.length > 160 ? _transMotivo.slice(0, 159) + '…' : _transMotivo) + '»',
-            autor: evo.PLAN_FIRMA_KINE, autorEmail: ctx.email || '',
-            datos: { evento: 'transicion_sin_evento', de: String(cama.VIA_AEREA), a: _vaSale, motivo: _transMotivo, firma: _vv('PLAN_FIRMA_KINE') } });
+        if (_vaFinalTurno && _vaFinalTurno !== String(cama.VIA_AEREA)) {
+          hitosExtra.push(_hitoTransicionSinEvento(String(cama.VIA_AEREA), _vaFinalTurno, _transMotivo, _vv('PLAN_FIRMA_KINE'),
+            evo.PLAN_FIRMA_KINE, ctx.email || ''));
         }
       }
 
@@ -684,31 +910,49 @@ function guardarEvolucion(datos, ctx) {
       // narra maniobras, no cuenta eventos.
       const procsStats = procs.filter(function (p) { return !/^SUPINACI/i.test(String(p)); });
       _guardarProcedimientosInterno(idEvolucion, idCama, patientId, fecha, turno, procsStats, ctx.email);
-      const timelineJson = _timelineDelGuardado(idCama, fecha, turno, procs, evo.PLAN_FIRMA_KINE, ctx.email, patientId, hitosExtra, datosPorProc);
+      const timelineJson = _timelineDelGuardado(idCama, fecha, turno, procs, evo.PLAN_FIRMA_KINE, ctx.email, patientId, hitosExtra, datosPorProc,
+        _declaraEventoVA ? null : { a: _vaFinalTurno, motivo: _transMotivo });
 
       // Sincronizar el snapshot de la cama: la ÚNICA escritura a CAMAS_ESTADO
       // del guardado (lleva también las fechas de ingreso corregidas arriba y
       // el cache de la línea de tiempo recién armado).
       _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, patientId, filaCama, timelineJson);
 
+      /* 🔐 LAS COLAS YA NO SE TRAGAN EL ERROR (G16, paso 10). Lo que sigue al compromiso —las mediciones a la serie, el
+         cultivo y la reintubación— terminaba en un `try { … } catch (e) { console.warn(…) }`: si fallaba una, la respuesta era
+         un OK limpio, el sello recordaba «ya hecho» y el reintento con el mismo OP_ID devolvía la repetida; la medición no se
+         copiaba NUNCA. Ahora lo que no se pudo vuelve en `data.advertencias[]`, en palabras de la unidad: la respuesta sigue
+         siendo OK (el turno YA está guardado: la fila, los procedimientos, los hitos y la cama), pero con el aviso, y SIN
+         sellar — el reintento ejecuta de nuevo y completa lo que faltó (`_evalCompletarCola`; la reintubación es un upsert
+         con id derivado). Sin ninguna falla la respuesta no trae la clave: es la de siempre. */
+      const advertencias = [];
+
       // 🗂️ Lo que este turno MIDIÓ pasa a la serie fechada del episodio con la
       // firma del turno (rama episodio/turno). No hereda nada: un valor
       // presente en el payload es una medición de HOY.
-      try { if (typeof _evalDesdeEvolucion === 'function') _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx); }
-      catch (e) { console.warn('_evalDesdeEvolucion:', e.message); }
+      try { if (typeof _evalDesdeEvolucion === 'function') _evalDesdeEvolucion(evo, idCama, idEvolucion, ctx, advertencias); }
+      catch (e) {
+        console.warn('_evalDesdeEvolucion:', e.message);
+        advertencias.push('Las mediciones de este turno no quedaron completas en la serie. Vuelve a guardar el turno para completarlas.');
+      }
 
       // Reintubación desde el bloque EXT_* (le viaja el lector perezoso del
       // episodio: si el EXT_TS hay que buscarlo hacia atrás, no re-baja la hoja)
       if (esVerdadero(evo.EXT_REINTUB)) {
         try { _registrarReintubacion(evo, idCama, idEvolucion, fecha, turno, ctx, _evosCama); }
-        catch (e) { console.warn('_registrarReintubacion:', e.message); }
+        catch (e) {
+          console.warn('_registrarReintubacion:', e.message);
+          advertencias.push('La reintubación no quedó en el registro de reintubaciones. Vuelve a guardar el turno para completarla.');
+        }
       }
 
       SpreadsheetApp.flush();
       // El resumen del AUDIT_LOG dice si la fila nació aparte por una rotación
       // sin alta: es la huella que después busca auditoriaIntegridad().
       const _accion = esNuevo ? (_ubic.ajena ? 'crear (fila aparte: la cama rotó sin alta)' : 'crear') : 'actualizar';
-      return ok({ idEvolucion, idCama, patientId, turnoKey, accion: _accion, entidad: 'EVOLUCIONES', TEXTO_GENERADO: evo.TEXTO_GENERADO || '' });
+      const _resp = { idEvolucion, idCama, patientId, turnoKey, accion: _accion, entidad: 'EVOLUCIONES', TEXTO_GENERADO: evo.TEXTO_GENERADO || '' };
+      if (advertencias.length) _resp.advertencias = advertencias;
+      return ok(_resp);
     } catch (e) { return err('guardarEvolucion: ' + e.message, ERR.INTERNO, e); }
   });
 }
@@ -791,7 +1035,12 @@ function _aetSerieDelTurno(cama, evo, turnoKey, fecha, turno) {
 
 function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, patientId, filaCama, timelineJson) {
   const esIngreso = esVerdadero(evo.ES_INGRESO);
-  const val = (a, b) => (a !== undefined && a !== null && a !== '') ? a : (b || '');
+  /* 🔴 EL CERO DE RESPALDO NO SE PIERDE (G06, 4-oct-2026). `val(a, b)` es «lo del turno y, si el turno no dijo
+     nada, lo que ya tenía la cama». El respaldo era `b || ''`: Sheets devuelve el 0 de una celda numérica como
+     el número 0 —que es falso— y el siguiente guardado sin ese campo borraba Barthel 0, FSS 0, MRC 0… justo los
+     pacientes más dependientes. Vacío es solo undefined, null o ''; el 0 es un dato. */
+  const _vacio = x => x === undefined || x === null || x === '';
+  const val = (a, b) => !_vacio(a) ? a : (_vacio(b) ? '' : b);
 
   /* 🔴 UNA SOLA PUERTA AL RELOJ (17-sep-2026). El paso de prevención no manda
      fechas: manda la MARCA ('' sin revisar · 'ok' vigente · 'chg' cambiado).
@@ -1038,7 +1287,9 @@ function _syncCamaDesdeEvolucion(idCama, cama, evo, turno, turnoKey, fecha, pati
   if (_marcasSueltas !== null) campos.CORRECCIONES_JSON = _marcasSueltas;
 
   // Snapshot por turno (para la tabla de Registro Diario)
-  const ktrCant = parseInt(evo.RESP_KTR_CANT) || 0;
+  // 🔴 Sin sesiones anotadas el snapshot queda VACÍO, no «0 sesiones» (G06): «nadie anotó» no es «hizo cero».
+  const _ktrN = parseInt(evo.RESP_KTR_CANT, 10);
+  const ktrCant = isNaN(_ktrN) ? '' : _ktrN;
   const ktmTurno = esVerdadero(evo.KTM_REALIZADA) ? (evo.KTM_NIVEL_KTR || '') : (esVerdadero(evo.KTM_SUSPENDIDA) ? 'C' : '');
   const procStr = evo.PROC_RESUMEN || '';
   const firmaT = evo.PLAN_FIRMA_KINE || '';
@@ -1567,39 +1818,36 @@ function obtenerHistorialPaciente(idCama, patientId) {
  * la cama (incluidas las fechas de inicio de soporte/VA para que los días
  * no se reinicien). Solo permitido si NO existen evoluciones posteriores del
  * paciente (para no romper la historia construida sobre el evento).
+ *
+ * 🔴 LA PUERTA MÁS GRAVE DEL GUARDADO SEGURO (G14, tanda 2, paso 4, 4-oct-2026). Esta función escribe más lejos que
+ * ninguna otra: al final le reescribe a la CAMA el estado del turno (vía aérea, soporte, modo, fechas de inicio) y a
+ * la hoja de EVOLUCIONES la fila entera. Tenía cuatro defectos, todos de la misma raíz —actuar sobre «lo que había
+ * al leer» y «quien esté en la cama»—:
+ *  · LEÍA FUERA DEL LOCK. La evolución, la cama y los turnos posteriores se leían ANTES de tomar el candado. Otra
+ *    petición que se adelantaba mientras esta esperaba quedaba pisada con una fila vieja (la FiO₂ que alguien acababa
+ *    de corregir volvía a la de antes), y un turno guardado en medio no frenaba la anulación aunque ya se hubiera
+ *    construido sobre ese estado. Ahora TODO se lee dentro del lock.
+ *  · SU CANDADO DE PACIENTE ERA DÉBIL. Comparaba la evolución con la cama, nunca con lo que la pantalla abrió: con
+ *    la cama libre, o con un alta y un ingreso entremedio, no veía nada raro. Ahora compara EPISODIO_ABIERTO (el
+ *    PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el menú del evento) con la cama, dentro del lock y antes de la
+ *    primera escritura, con la regla y la frase de las demás puertas (validarEpisodioPuerta).
+ *  · RESUCITABA AL EGRESADO. Si el turno estaba en EVOLUCIONES_ARCHIVO, `repoUpsert('EVOLUCIONES', …)` reinsertaba la
+ *    fila en la hoja viva y `_syncCamaDesdeEvolucion` le ponía OCUPADA:true a la cama —libre, o de otro paciente—. Ahora
+ *    se ubica el turno por episodio (`_ubicarEvolucionDeTurno`) y un turno que no es VIVO se rechaza sin escribir.
+ *    🔴 Corregir el turno pasado de un egresado sigue siendo NO (decisión 6 de Diego, pendiente desde F2): este paso
+ *    no lo afloja.
+ *  · LA RESTA NO ERA IDEMPOTENTE. `DIAS_VM_PREVIOS` resta los días de VM del turno al anular una extubación o una
+ *    decanulación: anular dos veces (el doble toque, el reintento de una respuesta perdida) restaba dos veces. Ahora
+ *    un evento que ya no está contesta ok `yaEstaba` sin tocar nada, y la resta solo corre si el evento ESTABA.
+ *
+ * @param ep  el reclamo de episodio de la petición ({a, b, estricto, ausente}, api.gs `_epDeDatos`). Sin él (los
+ *            bancos antiguos y las llamadas internas) no se compara nada: es el modo tolerante de siempre.
  */
-function anularEvento(datos, ctx) {
+function anularEvento(datos, ctx, ep) {
   const idCama = String(datos.idCama || datos.ID_CAMA || '');
   const turnoKey = String(datos.turnoKey || datos.TURNO_KEY || '');
   const tipo = String(datos.tipo || '');
   if (!idCama || !turnoKey || !tipo) return err('Faltan idCama/turnoKey/tipo.', ERR.VALIDACION);
-
-  const evoR = obtenerEvolucion(idCama, turnoKey, datos.patientId);
-  if (!evoR.ok) return evoR;   // p. ej. la cama tuvo dos pacientes ese turno
-  if (!evoR.data) return err('No existe evolución para ese turno.', ERR.VALIDACION);
-  const evo = evoR.data;
-
-  /* 🔴 CANDADO MÍNIMO. Al final, `anularEvento` llama a `_syncCamaDesdeEvolucion`
-     con los datos de la evolución: vía aérea, soporte, modo, fechas de inicio.
-     Si esa evolución es de un episodio que ya no ocupa la cama, ese sync le
-     reescribe el censo AL OCUPANTE ACTUAL — escribe más lejos que el bug que
-     esta tanda vino a cerrar. Anular sobre episodios cerrados es deuda conocida
-     y queda fuera (NO3 del PRD); lo que no puede pasar es que toque a un tercero. */
-  const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
-  const _pidCama = String((_camaAnu && _camaAnu.PATIENT_ID) || '');
-  const _pidEvo = String(evo.PATIENT_ID || '');
-  if (_pidCama && _pidEvo && _pidCama !== _pidEvo) {
-    return err('Esa evolución es de un episodio anterior de la cama ' + idCama + '. Anular desde ' +
-      'aquí le reescribiría el estado al paciente que está ahora.', ERR.VALIDACION);
-  }
-
-  // Guard: sin evoluciones posteriores del mismo paciente
-  const posteriores = repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', evo.PATIENT_ID)
-    .filter(function (e) { return String(e.TURNO_KEY) > turnoKey; });
-  if (posteriores.length) {
-    return err('Solo se puede anular un evento desde la ÚLTIMA evolución del paciente (hay ' +
-      posteriores.length + ' turnos posteriores que se construyeron sobre este estado).', ERR.VALIDACION);
-  }
 
   const GRUPOS = {
     pve_ext: ['PVE_RESULTADO','PVE_FR_MOTIVOS','PVE_SC_RAZON','PVE_SC_DET','PVE_VAL','EXT_OCURRIO','EXT_HORA','EXT_TS','EXT_TIPO','EXT_MOTIVO','EXT_POST_DET','EXT_PE_VA','EXT_PE_SOP','EXT_PE_MODO'],
@@ -1619,13 +1867,116 @@ function anularEvento(datos, ctx) {
     cambio_tot: ['CAMBIO TOT'],
     cambio_tqt: ['CAMBIO TQT'],
   };
+  // Validación pura, ANTES del lock: no hay por qué tomar el candado (ni leer nada) por un tipo que no existe.
   if (!GRUPOS[tipo]) return err('Tipo de evento desconocido: ' + tipo, ERR.VALIDACION);
 
-  const tipos = [tipo];
-  // Anular la extubación arrastra la reintubación anidada del mismo turno
-  if (tipo === 'pve_ext' && esVerdadero(evo.EXT_REINTUB)) tipos.push('reintub');
-
+  /* 🔐 Desde aquí, TODO dentro del lock. Antes de él no se lee ninguna hoja (la guardia
+     guardado_seguro_episodio_g14.js lo ata): lo que se lee antes de tener el candado puede estar viejo cuando se
+     obtiene, y esta función reescribe filas enteras sobre lo que leyó. */
   return conLock(function () {
+    // La cama, leída UNA vez y dentro del lock: la comparan el reclamo de la pantalla y el candado de abajo.
+    const _camaAnu = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
+    /* 🔴 EL DUEÑO DE UNA CAMA LIBRE ES NADIE (revisión de la tanda 2, H5). Una cama libre cuya fila conserva un PATIENT_ID viejo
+       (una fila editada a mano en la planilla) no tiene dueño: con el PATIENT_ID crudo el reclamo de P coincidía con quien ya no está
+       ahí, la evolución viva de P se anulaba y `_syncCamaDesdeEvolucion` reocupaba la cama libre. Es la misma regla de `_pidDeCama`
+       (svc_camas.gs, que usan el alta, limpiar, intercambiar y mover); aquí va en línea porque los bancos antiguos cargan este
+       servicio con una lista fija de archivos, sin svc_camas.gs. */
+    const _pidCama = (_camaAnu && esVerdadero(_camaAnu.OCUPADA)) ? String(_camaAnu.PATIENT_ID || '').trim() : '';
+
+    /* El candado de episodio de las demás puertas: lo que la pantalla abrió contra quien ocupa la cama AHORA, antes de
+       la primera escritura. Solo corre si la pantalla declaró EPISODIO_ABIERTO o está encendido el modo estricto: los
+       bancos antiguos y las llamadas internas (sin `ep`) siguen como siempre. 🪤 Si alguien lo pide y el archivo de la
+       regla no está cargado, REVIENTA (INTERNO) en vez de saltarse la comprobación en silencio. */
+    const _ep = ep || {};
+    if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+      const _msgEp = validarEpisodioPuerta(_ep.a, _pidCama, idCama, _ep.estricto === true);
+      if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+    }
+
+    // La evolución del turno, por EPISODIO (no por la clave de la cama, que dos pacientes comparten cuando la cama
+    // rota) y mirando las DOS hojas: el localizador avisa cuando no puede decidir en vez de elegir por su cuenta.
+    /* 🔴 EL RECLAMO TAMBIÉN IDENTIFICA LA FILA (revisión de la tanda 2, H3/H7). La pantalla no manda `patientId` en ANULAR_EVENTO, solo
+       EPISODIO_ABIERTO, así que en una cama que rotó dentro del mismo turno (P recibió el alta y Q ingresó y guardó el mismo turno) la
+       clave `CAMA_<n>_<turno>` está una vez en EVOLUCIONES y otra en EVOLUCIONES_ARCHIVO: el localizador por clave contaba dos y contestaba
+       «dos pacientes», y Q no tenía forma de anular su propio evento. El reclamo —que arriba ya se comparó con la cama: si no es vacío,
+       ES el ocupante— lo identifica sin duda. Un `patientId` declarado manda sobre él (como siempre). Si por episodio no hay fila (una fila
+       antigua sin PATIENT_ID) se vuelve a la clave de antes: adoptar la identidad de esa fila no es asunto del reclamo. */
+    const _declarado = String(datos.patientId || '').trim();
+    const _reclamado = (_ep.a === undefined || _ep.a === null) ? '' : String(_ep.a).trim();
+    let ubic = _ubicarEvolucionDeTurno(_declarado || _reclamado, turnoKey, idCama);
+    if (!ubic && !_declarado && _reclamado) ubic = _ubicarEvolucionDeTurno('', turnoKey, idCama);
+    if (ubic && ubic.ambigua) {
+      return err('La cama ' + idCama + ' tuvo dos pacientes en ese turno: hay que indicar de cuál ' +
+        'se está hablando.', ERR.VALIDACION);
+    }
+    if (!ubic) return err('No existe evolución para ese turno.', ERR.VALIDACION);
+    const evo = ubic.obj;
+
+    /* 🔴 CANDADO MÍNIMO. Al final, `anularEvento` llama a `_syncCamaDesdeEvolucion`
+       con los datos de la evolución: vía aérea, soporte, modo, fechas de inicio.
+       Si esa evolución es de un episodio que ya no ocupa la cama, ese sync le
+       reescribe el censo AL OCUPANTE ACTUAL — escribe más lejos que el bug que
+       esta tanda vino a cerrar. Anular sobre episodios cerrados es deuda conocida
+       y queda fuera (NO3 del PRD); lo que no puede pasar es que toque a un tercero. */
+    const _pidEvo = String(evo.PATIENT_ID || '');
+    if (_pidCama && _pidEvo && _pidCama !== _pidEvo) {
+      return err('Esa evolución es de un episodio anterior de la cama ' + idCama + '. Anular desde ' +
+        'aquí le reescribiría el estado al paciente que está ahora.', ERR.VALIDACION);
+    }
+
+    /* 🔴 NO SE RESUCITA AL EGRESADO. Una fila que vive en EVOLUCIONES_ARCHIVO es de un paciente que ya salió. Anularle
+       el evento reinsertaría la fila en la hoja viva (`repoUpsert` no la encuentra ahí) y el sync de abajo le pondría
+       OCUPADA:true a una cama que está libre, o le copiaría su estado a quien la ocupa. Corregir el turno pasado de un
+       egresado es la decisión 6 de Diego (NO, pendiente desde F2): hace falta una operación aparte que nombre el
+       episodio, no aflojar esto. */
+    if (!ubic.vivo) {
+      return err('Ese turno ya está archivado: el paciente egresó de la cama ' + idCama + '. Desde aquí no se puede ' +
+        'anular un evento de un turno archivado. No se guardó nada.', ERR.VALIDACION);
+    }
+
+    /* 🔴 UNA CAMA SIN DUEÑO NO RECIBE EL ESTADO DE NADIE (revisión de la tanda 2, H1). El rechazo de arriba solo corría con la cama
+       CON paciente. Con la cama LIBRE (o ocupada sin PATIENT_ID: un episodio sin ingreso formal) y un `patientId` declarado de un
+       paciente vivo en OTRA cama, el localizador hallaba su fila viva, ningún candado saltaba y `_syncCamaDesdeEvolucion` le escribía
+       el estado de ese paciente a esta cama y la dejaba OCUPADA: el paciente en dos camas. Mismo daño que el egresado de arriba, por la
+       variante «fila viva de otra cama». Va DESPUÉS del rechazo por archivado: ese tiene su propio motivo. */
+    if (_pidEvo && !_pidCama) {
+      return err('Esa evolución es de un paciente que no está en la cama ' + idCama + ': la cama no tiene un paciente registrado. ' +
+        'Anular desde aquí le copiaría el estado de ese paciente a la cama. No se guardó nada.', ERR.VALIDACION);
+    }
+
+    // Guard: sin evoluciones posteriores del mismo paciente. Dentro del lock: un turno que otra petición guardó
+    // mientras esta esperaba ya cuenta.
+    const posteriores = repoLeerTodos('EVOLUCIONES', 'PATIENT_ID', evo.PATIENT_ID)
+      .filter(function (e) { return String(e.TURNO_KEY) > turnoKey; });
+    if (posteriores.length) {
+      return err('Solo se puede anular un evento desde la ÚLTIMA evolución del paciente (hay ' +
+        posteriores.length + ' turnos posteriores que se construyeron sobre este estado).', ERR.VALIDACION);
+    }
+
+    const tipos = [tipo];
+    // Anular la extubación arrastra la reintubación anidada del mismo turno
+    if (tipo === 'pve_ext' && esVerdadero(evo.EXT_REINTUB)) tipos.push('reintub');
+
+    /* ¿El evento ESTABA? Está si alguna columna de su grupo tiene algo (un `false` suelto no es un evento). Es lo que
+       distingue la primera anulación del doble toque o del reintento de una respuesta perdida: lo que la primera
+       borró no se resta, ni se descuenta, una segunda vez. */
+    const _hay = function (x) {
+      if (x === undefined || x === null || x === '' || x === false) return false;
+      const t = String(x).trim().toLowerCase();
+      return t !== '' && t !== 'false';
+    };
+    const estaba = {};
+    tipos.forEach(function (t) { estaba[t] = GRUPOS[t].some(function (c) { return _hay(evo[c]); }); });
+    if (!tipos.some(function (t) { return estaba[t]; })) {
+      // Ya estaba anulado: nada que borrar, nada que restar, nada que escribir. ok, porque el efecto pedido ya es
+      // verdad (el mismo criterio que el alta y la limpieza que ya aterrizaron).
+      return ok({
+        idEvolucion: evo.ID_EVOLUCION, idCama: idCama, patientId: evo.PATIENT_ID || '',
+        turnoKey: turnoKey, accion: 'anular_' + tipos.join('+') + ' (ya estaba)', entidad: 'EVOLUCIONES',
+        yaEstaba: true, TEXTO_GENERADO: evo.TEXTO_GENERADO || '',
+      });
+    }
+
     tipos.forEach(function (t) {
       GRUPOS[t].forEach(function (c) { evo[c] = ''; });
       if (t === 'reintub') {
@@ -1651,14 +2002,23 @@ function anularEvento(datos, ctx) {
       evo.VENT_VIA_AEREA_FINAL = evo.VENT_VIA_AEREA;
       evo.VENT_SOPORTE_FINAL = evo.VENT_SOPORTE;
       evo.VENT_MODO_FINAL = evo.VENT_MODO;
-      if (tipo === 'pve_ext' || tipo === 'decan') {
+      // La resta SOLO si el evento estaba: ya no es idempotente por sí sola (restar dos veces dejaba de más), así que
+      // se ata a la presencia del evento que acaba de borrarse.
+      if ((tipo === 'pve_ext' || tipo === 'decan') && estaba[tipo]) {
         const dvm = parseInt(evo.DIAS_VM) || 0;
         evo.DIAS_VM_PREVIOS = Math.max(0, (parseInt(evo.DIAS_VM_PREVIOS) || 0) - dvm);
       }
     }
 
     evo.TEXTO_GENERADO = generarTextoEvolucion(evo);
-    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
+
+    /* 🔐 G16 (paso 11, 5-oct-2026) — LA FILA DE LA EVOLUCIÓN SE ESCRIBE AL FINAL. Era lo primero que se escribía, y a la cama le
+       faltaba el resto: la corrida que moría entre ambas dejaba el evento YA borrado de la evolución y a la cama con la vía
+       aérea y el soporte del evento anulado. El reintento miraba la evolución, veía el evento ausente y contestaba «ya estaba»
+       (para no restar los días de VM dos veces): la cama se quedaba mal para siempre. Con la evolución al FINAL, «el evento
+       sigue en la fila» significa «la anulación no terminó», y el reintento lo rehace todo: re-sincroniza la cama, restaura las
+       fechas de inicio y escribe la fila. La resta de DIAS_VM_PREVIOS parte de la fila vieja, así que sigue pasando UNA sola vez.
+       🪤 Todo lo de abajo trabaja con `evo` en memoria (ya con el evento borrado), no con lo que hay en la hoja. */
 
     // Re-sincronizar la cama y restaurar las fechas de inicio (para que los
     // contadores de días de VM/VA no se reinicien tras la anulación)
@@ -1685,6 +2045,9 @@ function anularEvento(datos, ctx) {
       if (evo.VENT_VIA_AEREA && evo.VENT_VIA_AEREA !== 'Natural' && fecha && !coordCampoCorregido(_camaAct, 'FECHA_INICIO_VA')) campos.FECHA_INICIO_VA = rest(fecha, dva);
       if (Object.keys(campos).length) repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, campos);
     }
+
+    // El compromiso: la fila de la evolución, lo ÚLTIMO que se escribe.
+    repoUpsert('EVOLUCIONES', 'ID_EVOLUCION', evo.ID_EVOLUCION, evo);
 
     return ok({
       idEvolucion: evo.ID_EVOLUCION, idCama: idCama, patientId: evo.PATIENT_ID || '',

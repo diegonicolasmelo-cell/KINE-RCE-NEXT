@@ -12,7 +12,9 @@ function _agregarHitoInternoSinSync(hito) {
     if (c && c.PATIENT_ID) patId = c.PATIENT_ID;
   }
   repoInsertar('TIMELINE', {
-    ID_HITO:     uid('HITO'),
+    // 🔐 G16 (paso 9): quien necesita que el reintento de SU operación reconozca este hito le pasa el id derivado del OP_ID
+    // (`uid('HITO', clave)`, ver `_hitoTraslado` en svc_camas.gs). Sin `hito.id`, el de siempre: reloj más azar.
+    ID_HITO:     hito.id || uid('HITO'),
     ID_CAMA:     String(hito.idCama || ''),
     PATIENT_ID:  patId,
     FECHA:       hito.fecha || hoyISO(),
@@ -36,6 +38,78 @@ function _agregarHitoInterno(hito) {
 }
 
 /**
+ * El OP_ID de la petición en curso ('' si no hay), el mismo que arma `_auditar` en OP_ACTUAL (infra_lock.gs).
+ * 🪤 `typeof OP_ACTUAL` es compatibilidad y no una comprobación de seguridad: la variable se declara en infra_lock.gs y los
+ * bancos antiguos, que cargan una lista fija de archivos, ni la tienen declarada. Es la misma regla de `_opIdCamas()`
+ * (svc_camas.gs); vive también acá porque los bancos que cargan esta pieza no siempre cargan la de camas.
+ */
+function _opIdDeLaPeticion() {
+  return (typeof OP_ACTUAL !== 'undefined' && OP_ACTUAL && OP_ACTUAL.id) ? String(OP_ACTUAL.id) : '';
+}
+
+/** La clave de CONTENIDO de un hito de operación: lo que lo identifica en lógica (tipo, cama, paciente, momento y texto). */
+function _claveHitoDeOperacion(hito) {
+  return [hito.tipo, hito.idCama, hito.patientId, hito.fecha || '', hito.turno || '', hito.texto].join('|');
+}
+
+/**
+ * El id que le toca a un hito dentro de la operación en curso ('' si no hay operación): `HITO_<op>_<huella de la clave>`.
+ * La clave es de CONTENIDO, no un contador (ver `uid` en infra_util.gs): el mismo OP_ID con otro contenido (el usuario
+ * editó la hora, el texto) da OTRO id y por lo tanto otro hito, y el reintento de lo mismo da EL MISMO.
+ */
+function _idHitoDeOperacion(hito, clave) {
+  if (!_opIdDeLaPeticion()) return '';
+  return uid('HITO', clave != null ? String(clave) : _claveHitoDeOperacion(hito));
+}
+
+/**
+ * Escribe un hito SOLO SI NO ESTÁ cuando hay una operación en curso (G16, paso 11), y devuelve `{ id, existia, sincronizado }`.
+ *
+ * 🔴 DE DÓNDE SALE. Un hito nacía con un id de reloj y azar y nadie preguntaba «¿ya estoy?»: si la corrida murió después de
+ * escribirlo y antes de sellar, el reintento con el mismo OP_ID (el sello solo se escribe cuando TODO terminó limpio) escribía
+ * otro, y la línea de tiempo mostraba el mismo cultivo, la misma nota o el mismo anexo dos veces. Con operación en curso el id
+ * se DERIVA del OP_ID y del contenido (`_idHitoDeOperacion`), se busca antes de insertar (`repoBuscarFila`) y el hito que ya
+ * estaba no se escribe otra vez. Es el mismo modelo de `_hitoTraslado` (svc_camas.gs), para el resto de las puertas.
+ *
+ * El hito sirve además de MARCADOR de «este intento ya empezó»: quien escribe varias caras (el anexo: evolución, fila de la
+ * estadística y hito) lo escribe PRIMERO y, si ya estaba, sabe que está reintentando y que lo que sigue puede estar hecho.
+ *
+ * @param hito              el hito de siempre ({idCama, patientId, fecha, turno, tipo, texto, autor, autorEmail, datos}).
+ * @param sincronizar       si además deja la tarjeta de la cama mostrándolo. Con el hito recién escrito se sincroniza; si ya
+ *                          estaba solo se vuelve a sincronizar cuando la tarjeta NO lo muestra (la muerte cayó entre las dos
+ *                          escrituras): si ya lo muestra no se escribe nada. Quien lo pide en `false` sincroniza él, al final.
+ * @param clave             la clave de contenido si la puerta necesita una propia (por omisión tipo, cama, paciente, fecha,
+ *                          turno y texto). Una clave propia sirve para dejar FUERA lo que cambia entre un intento y su reintento.
+ * @param existiaConocida   si quien llama ya buscó el hito (para no leer dos veces), el resultado de esa búsqueda.
+ *
+ * SIN operación en curso (los bancos antiguos y las llamadas internas) escribe como siempre, con id de reloj y azar, y no
+ * lee nada de más: `existia` es siempre false.
+ */
+function _hitoDeOperacion(hito, sincronizar, clave, existiaConocida) {
+  const op = _opIdDeLaPeticion();
+  if (!op) {
+    if (sincronizar) _agregarHitoInterno(hito); else _agregarHitoInternoSinSync(hito);
+    return { id: '', existia: false, sincronizado: true };
+  }
+  const id = _idHitoDeOperacion(hito, clave);
+  const existia = (existiaConocida !== undefined && existiaConocida !== null)
+    ? !!existiaConocida
+    : (repoBuscarFila('TIMELINE', 'ID_HITO', id) !== -1);
+  if (!existia) _agregarHitoInternoSinSync(Object.assign({}, hito, { id: id }));
+  let sincronizado = true;
+  if (sincronizar) {
+    const idCama = String(hito.idCama);
+    if (!existia) {
+      sincronizado = _sincronizarTimelineCama(idCama);
+    } else {
+      const c = repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama);
+      if (c && String(c.TIMELINE_JSON || '').indexOf(id) === -1) sincronizado = _sincronizarTimelineCama(idCama);
+    }
+  }
+  return { id: id, existia: existia, sincronizado: sincronizado };
+}
+
+/**
  * Guarda en CAMAS_ESTADO.TIMELINE_JSON los últimos 30 hitos de la cama (cache).
  *
  * 🔴 DEL EPISODIO VIGENTE, no de la cama entera (20-ago-2026). Leía solo por
@@ -48,6 +122,10 @@ function _agregarHitoInterno(hito) {
  * Si la cama no tiene paciente (censo sin ingreso formal, fila legacy) se cae al
  * comportamiento de siempre: filtrar por cama. Esconder los hitos de una cama
  * así sería el error simétrico.
+ *
+ * 🔐 G16 (paso 10): devuelve `true` si el caché quedó al día y `false` si no pudo escribirlo (sigue sin lanzar: un caché
+ * viejo no tumba un guardado). Quien lo llama desde una COLA del guardado lo convierte en un aviso en vez de tragárselo;
+ * los demás callers lo ignoran, como siempre.
  */
 function _sincronizarTimelineCama(idCama) {
   try {
@@ -62,17 +140,82 @@ function _sincronizarTimelineCama(idCama) {
         return !hp || hp === pid;
       });
     }
-    if (!hitos.length) return;
+    if (!hitos.length) return true;
     hitos.sort((a, b) => String(b.TIMESTAMP).localeCompare(String(a.TIMESTAMP)));
     repoActualizar('CAMAS_ESTADO', 'ID_CAMA', idCama, { TIMELINE_JSON: JSON.stringify(hitos.slice(0, 30)) });
-  } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); }
+    return true;
+  } catch (e) { console.warn('_sincronizarTimelineCama:', e.message); return false; }
+}
+
+/**
+ * ¿La tarjeta de la cama (`TIMELINE_JSON`) ya muestra este hito? (H18, revisión de la tanda 2.) Una tarjeta con 30 hitos y ESTE fuera
+ * no está desactualizada: el tope de 30 de `_sincronizarTimelineCama` lo dejó fuera, y volver a sincronizar escribiría lo mismo.
+ */
+function _tarjetaMuestraHito(cama, idHito) {
+  const txt = String((cama && cama.TIMELINE_JSON) || '');
+  if (idHito && txt.indexOf(String(idHito)) !== -1) return true;
+  try { const l = JSON.parse(txt); return Array.isArray(l) && l.length >= 30; } catch (e) { return false; }
+}
+
+/**
+ * ¿Este paciente (episodio) YA EGRESÓ? Sí cuando tiene una fila en ARCHIVO_PACIENTES o un hito de egreso (H9, revisión de la tanda 2).
+ * El egreso se escribe primero en el archivo y después como hito, así que mirar el archivo basta en el camino normal; el hito cubre
+ * la fila que alguien borró a mano. Solo lee (el archivo primero: si está, no hace falta bajar la línea de tiempo). Un pid vacío no
+ * es de nadie. Vive aquí y no en svc_camas.gs porque la usan las dos puertas que ingresan (el guardado de la evolución y
+ * INGRESAR_PACIENTE) y las dos cargan este archivo.
+ */
+function _episodioYaEgresado(pid) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  if (repoBuscarFila('ARCHIVO_PACIENTES', 'PATIENT_ID', p) !== -1) return true;
+  return repoLeerTodos('TIMELINE', 'PATIENT_ID', p).some(function (h) { return String(h.TIPO) === 'egreso'; });
+}
+
+/**
+ * ¿Este PATIENT_ID ya lo tiene OTRA cama ocupada? (H14, revisión de la tanda 2.) Un mismo paciente en dos camas es un censo roto. Una
+ * cama LIBRE que conserva el pid escrito no cuenta: una cama libre no tiene dueño. Lee la columna de PATIENT_ID de CAMAS_ESTADO y,
+ * solo si el pid aparece, esas filas.
+ */
+function _pidEnOtraCamaOcupada(pid, idCama) {
+  const p = String(pid === undefined || pid === null ? '' : pid).trim();
+  if (!p) return false;
+  return repoLeerTodos('CAMAS_ESTADO', 'PATIENT_ID', p).some(function (c) {
+    return String(c.ID_CAMA) !== String(idCama) && esVerdadero(c.OCUPADA);
+  });
 }
 
 // ── Público con lock ───────────────────────────────────────
-function agregarHito(hito) {
+/**
+ * Agrega un hito a la línea de tiempo de una cama.
+ *
+ * 🔐 G14 (tanda 2 del guardado seguro, paso 6, 4-oct-2026). Sin `hito.patientId` el hito se atribuye a quien esté en la cama
+ * AHORA (`_agregarHitoInternoSinSync`), y la tarjeta de esa cama re-sincroniza su caché con él: un formulario que quedó abierto
+ * para P, con la cama ya de Q, le colgaba el hito a Q. Con `ep` (el reclamo de episodio de la petición, api.gs `_epDeDatos`),
+ * lo que la pantalla abrió (`ep.a`, EPISODIO_ABIERTO) tiene que ser el episodio AL QUE SE ATRIBUYE el hito: el que el propio
+ * hito nombra o, si no nombra ninguno, el de quien ocupa la cama (una cama libre no tiene dueño). Se compara DENTRO del lock y
+ * ANTES de escribir. Un hito que nombra a su episodio es de ese episodio, esté o no en la cama: no se le inventa un conflicto.
+ * Sin `ep` (los bancos antiguos y las llamadas internas) no se compara nada, y solo se invoca con reclamo o con el modo estricto:
+ * esos bancos no cargan dominio_validacion.gs, y si alguien lo pide sin cargarlo REVIENTA (INTERNO) en vez de saltarse el candado.
+ */
+function agregarHito(hito, ep) {
   return conLock(() => {
-    try { const r = _agregarHitoInterno(hito); SpreadsheetApp.flush(); return ok(r); }
-    catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
+    try {
+      const _ep = ep || {};
+      if (_ep.estricto === true || (_ep.a !== undefined && _ep.a !== null)) {
+        const idCama = String((hito && hito.idCama) || '');
+        const cama = idCama ? repoBuscarPorId('CAMAS_ESTADO', 'ID_CAMA', idCama) : null;
+        const _atribuido = String((hito && hito.patientId) || '').trim() ||
+          ((cama && esVerdadero(cama.OCUPADA)) ? String(cama.PATIENT_ID || '').trim() : '');
+        const _msgEp = validarEpisodioPuerta(_ep.a, _atribuido, idCama, _ep.estricto === true);
+        if (_msgEp) return err(_msgEp, ERR.VALIDACION);
+      }
+      /* 🔐 G16 (paso 11). Con OP_ID el id del hito se deriva de la operación y del contenido y se escribe SOLO SI NO ESTÁ: el reintento de
+         su propio éxito (la respuesta se perdió, el sello no llegó a escribirse) no repite el hito en la línea de tiempo. Sin OP_ID,
+         como siempre. La respuesta es la de siempre. */
+      _hitoDeOperacion(hito, true);
+      SpreadsheetApp.flush();
+      return ok({ accion: 'hito_agregado' });
+    } catch (e) { return err('agregarHito: ' + e.message, ERR.INTERNO, e); }
   });
 }
 
@@ -140,6 +283,19 @@ const PROC_TO_HITO = {
 // REEMPLACE al re-guardar la evolución: si el colega corrige la nota, el
 // historial muestra la corregida y no las dos.
 const _TIPOS_HITO_AUTO = ['via_aerea', 'procedimiento', 'kine', 'general', 'nota'];
+
+/**
+ * El hito de la vía aérea que cambió SIN un evento declarado y con su razón escrita (`TRANS_MOTIVO`). Un solo lugar para su
+ * texto y su detalle: lo arma `guardarEvolucion` la primera vez y lo rehace `_timelineDelGuardado` cuando el colega corrige la
+ * razón (con el «venía con» que el hito ya guardó: la cama a esas alturas dice la vía NUEVA).
+ */
+function _hitoTransicionSinEvento(de, a, motivo, firma, autor, autorEmail) {
+  const m = String(motivo || '').trim();
+  return { tipo: 'via_aerea',
+    texto: '⚠️ Vía aérea ' + de + ' → ' + a + ' sin evento declarado: «' + (m.length > 160 ? m.slice(0, 159) + '…' : m) + '»',
+    autor: autor, autorEmail: autorEmail,
+    datos: { evento: 'transicion_sin_evento', de: String(de), a: String(a), motivo: m, firma: String(firma || '') } };
+}
 
 /**
  * Prefijo del texto con que se escribe el hito de un procedimiento ANEXADO
@@ -211,7 +367,12 @@ function _procLabelGenerico(proc) {
 // `datosPorProc` (rama episodio/turno): detalle estructurado por procedimiento
 // de vía aérea —hora, tipo, «queda con»— que viaja a DATOS_JSON del hito que
 // ese procedimiento genera. Opcional: sin él, los hitos nacen como siempre.
-function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, patientId, hitosExtra, datosPorProc) {
+// `conservar` (G16, paso 10): { a: la vía aérea con que QUEDA el turno, motivo: la razón que trae el payload, o '' si no trae }.
+// Es el hito «vía aérea cambió sin evento» (`transicion_sin_evento`) que el turno YA dejó: el barrido de abajo lo borraba porque
+// es de tipo `via_aerea` (automático) y `guardarEvolucion` no puede regenerarlo —se calcula contra la vía de la CAMA, que tras el
+// primer guardado ya dice la nueva—, así que un reintento o cualquier re-guardado del turno le quitaba al colega la razón que
+// había escrito. Sale de la MISMA lectura de arriba, sin un viaje más. Opcional: sin él, todo corre como siempre.
+function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, patientId, hitosExtra, datosPorProc, conservar) {
   const id = String(idCama);
   // UNA lectura: sirve para decidir qué borrar Y para armar el cache después.
   const todos = repoLeerTodosConFila('TIMELINE');
@@ -222,12 +383,34 @@ function _timelineDelGuardado(idCama, fecha, turno, procs, autor, autorEmail, pa
   // hito sin paciente se sigue tratando como propio, para no dejar basura
   // inmortal de las camas reparadas a mano.
   const _pidEp = String(patientId || '');
-  const esDelTurnoAuto = function (h) {
+  const _esAutoDelTurno = function (h) {
     if (!(String(h.ID_CAMA) === id && String(h.FECHA) === String(fecha) &&
           h.TURNO === turno && _TIPOS_HITO_AUTO.indexOf(h.TIPO) !== -1)) return false;
     const hp = String(h.PATIENT_ID || '');
     return !_pidEp || !hp || hp === _pidEp;
   };
+  // El hito de transición que el turno ya dejó, si sigue siendo el de la vía con que queda (misma `a`). Con la misma razón (o
+  // sin razón en el payload: la pantalla no la trae al reabrir un turno) se QUEDA tal cual; con una razón corregida se rehace
+  // con el «venía con» que ya tenía. Si la vía final cambió, es otra transición: se barre y se calcula como siempre.
+  let _transConservada = null, _transRehacer = null;
+  if (conservar && conservar.a) {
+    for (let i = 0; i < todos.length && !_transConservada && !_transRehacer; i++) {
+      const h = todos[i].obj;
+      if (h.TIPO !== 'via_aerea' || !_esAutoDelTurno(h) || String(h.DATOS_JSON || '').indexOf('transicion_sin_evento') === -1) continue;
+      let d = null; try { d = JSON.parse(String(h.DATOS_JSON)); } catch (e) { d = null; }
+      if (!d || d.evento !== 'transicion_sin_evento' || String(d.a) !== String(conservar.a)) continue;
+      const m = String(conservar.motivo || '').trim();
+      if (!m || m === String(d.motivo || '')) _transConservada = h; else _transRehacer = d;
+    }
+  }
+  const esDelTurnoAuto = function (h) { return h !== _transConservada && _esAutoDelTurno(h); };
+  if (_transConservada || _transRehacer) {
+    // El hito del turno ya existe (y manda): el que `guardarEvolucion` recalculó contra la cama no se escribe una segunda vez.
+    hitosExtra = (hitosExtra || []).filter(function (x) { return !(x && x.datos && x.datos.evento === 'transicion_sin_evento'); });
+    if (_transRehacer) {
+      hitosExtra.push(_hitoTransicionSinEvento(_transRehacer.de, _transRehacer.a, conservar.motivo, _transRehacer.firma, autor, autorEmail));
+    }
+  }
   repoEliminarFilas('TIMELINE', todos.filter(function (t) { return esDelTurnoAuto(t.obj); })
     .map(function (t) { return t.fila; }));
 

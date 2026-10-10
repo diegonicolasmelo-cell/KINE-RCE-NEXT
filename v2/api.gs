@@ -88,18 +88,18 @@ function api(accion, datos, token) {
       case 'PLANTILLA_RETIRAR':  return _auditar(ctx, accion, () => plantillaDesactivar(datos), datos);
       case 'GSA_IMPORTAR':       return _auditar(ctx, accion, () => gsaImportarPendientes(ctx), datos);
       case 'GET_GSA_PENDIENTES': return gsaPendientes();
-      case 'GSA_ASIGNAR':        return _auditar(ctx, accion, () => gsaAsignar(datos, ctx), datos);
+      case 'GSA_ASIGNAR':        return _auditar(ctx, accion, () => gsaAsignar(datos, ctx, _epDeDatos(datos)), datos);
       case 'GSA_DESCARTAR':      return _auditar(ctx, accion, () => gsaDescartar(datos, ctx), datos);
       case 'WHOAMI':           return ok({ email: ctx.email, firma: ctx.firma, dev: !!auth.dev });
       // 🗂️ Rama episodio/turno (11-sep-2026)
       case 'GET_EVALUACIONES': return obtenerEvaluaciones(datos);
-      case 'EVAL_REGISTRAR':   return _auditar(ctx, accion, () => evalRegistrar(datos, ctx), datos);
-      case 'EPISODIO_ESCALA':  return _auditar(ctx, accion, () => episodioEscala(datos, ctx), datos);
+      case 'EVAL_REGISTRAR':   return _auditar(ctx, accion, () => evalRegistrar(datos, ctx, _epDeDatos(datos)), datos);
+      case 'EPISODIO_ESCALA':  return _auditar(ctx, accion, () => episodioEscala(datos, ctx, _epDeDatos(datos)), datos);
       // 📌 Pendientes del episodio (16-sep-2026). No hay PEND_LISTAR: viajan
       // dentro de la cama, que el arranque ya trae — una acción de listar
       // sería un viaje más por nada.
-      case 'PEND_ABRIR':       return _auditar(ctx, accion, () => pendAbrir(datos, ctx), datos);
-      case 'PEND_CERRAR':      return _auditar(ctx, accion, () => pendCerrar(datos, ctx), datos);
+      case 'PEND_ABRIR':       return _auditar(ctx, accion, () => pendAbrir(datos, ctx, _epDeDatos(datos)), datos);
+      case 'PEND_CERRAR':      return _auditar(ctx, accion, () => pendCerrar(datos, ctx, _epDeDatos(datos)), datos);
 
       // ── Escrituras (auditadas) ──
       case 'GUARDAR_SUGERENCIA':
@@ -107,19 +107,19 @@ function api(accion, datos, token) {
       case 'SET_SUGERENCIA_ESTADO':
         return _auditar(ctx, accion, () => setSugerenciaEstado(datos), datos);
       case 'INGRESAR_PACIENTE':
-        return _auditar(ctx, accion, () => ingresarPaciente(datos, ctx), datos);
+        return _auditar(ctx, accion, () => ingresarPaciente(datos, ctx, _epDeDatos(datos)), datos);
       case 'DAR_ALTA':
-        return _auditar(ctx, accion, () => darAltaPaciente(datos, ctx), datos);
+        return _auditar(ctx, accion, () => darAltaPaciente(datos, ctx, _epDeDatos(datos)), datos);
       case 'INTERCAMBIAR_CAMAS':
-        return _auditar(ctx, accion, () => intercambiarCamas(datos.idCamaA || datos.idA, datos.idCamaB || datos.idB, ctx), datos);
+        return _auditar(ctx, accion, () => intercambiarCamas(datos.idCamaA || datos.idA, datos.idCamaB || datos.idB, ctx, _epDeDatos(datos)), datos);
       case 'MOVER_A_CAMA_VACIA':
-        return _auditar(ctx, accion, () => moverACamaVacia(datos.idOrigen, datos.idDestino, ctx), datos);
+        return _auditar(ctx, accion, () => moverACamaVacia(datos.idOrigen, datos.idDestino, ctx, _epDeDatos(datos)), datos);
       case 'LIMPIAR_CAMA':
-        return _auditar(ctx, accion, () => limpiarCama(datos.idCama), datos);
+        return _auditar(ctx, accion, () => limpiarCama(datos.idCama, _epDeDatos(datos)), datos);
       case 'GUARDAR_EVOLUCION':
-        return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx), datos);
+        return _auditar(ctx, accion, () => guardarEvolucion(datos, ctx, _epDeDatos(datos)), datos);
       case 'AGREGAR_HITO':
-        return _auditar(ctx, accion, () => agregarHito(Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos)), datos);
+        return _auditar(ctx, accion, () => agregarHito(_hitoDeLaPuerta(datos, ctx), _epDeDatos(datos)), datos);
       case 'SET_ASIGNACION_TURNO':
         return _auditar(ctx, accion, () => guardarAsignacionTurno(datos), datos);
       case 'AGREGAR_FASE':
@@ -132,13 +132,13 @@ function api(accion, datos, token) {
           return ok({ entidad: 'CONFIG', accion: 'portada ' + tab, valor: String(datos.valor || '') });
         }, datos);
       case 'ANULAR_EVENTO':
-        return _auditar(ctx, accion, () => anularEvento(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anularEvento(datos, ctx, _epDeDatos(datos)), datos);
       case 'ANEXAR_EVENTO':
-        return _auditar(ctx, accion, () => anexarEventoRapido(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anexarEventoRapido(datos, ctx, _epDeDatos(datos)), datos);
       case 'ANULAR_ANEXO':
-        return _auditar(ctx, accion, () => anularAnexo(datos, ctx), datos);
+        return _auditar(ctx, accion, () => anularAnexo(datos, ctx, _epDeDatos(datos)), datos);
       case 'CONFIRMAR_DISPOSITIVOS':
-        return _auditar(ctx, accion, () => confirmarDispositivos(datos, ctx), datos);
+        return _auditar(ctx, accion, () => confirmarDispositivos(datos, ctx, _epDeDatos(datos)), datos);
       case 'GUARDAR_ENTREGA_TURNO':
         return _auditar(ctx, accion, () => guardarEntregaTurno(datos, ctx), datos);
       case 'GENERAR_REM':
@@ -180,6 +180,8 @@ function api(accion, datos, token) {
       case 'COORD_FICHA':        return coordFicha(datos);
       // 📣 Aviso al buzón del equipo — exige sesión DENTRO del servicio.
       case 'COORD_AVISO':        return coordAviso(datos);
+      // El reclamo de episodio de esta puerta es `patientId` (lo que la ficha mostró), no EPISODIO_ABIERTO, y lo compara el propio
+      // servicio (G14, paso 7): no recibe `ep`.
       case 'COORD_CORREGIR':     return coordCorregirFicha(datos);
 
       default:
@@ -305,15 +307,141 @@ function obtenerBoot(datos, ctx, auth) {
   } catch (e) { return err('obtenerBoot: ' + e.message, ERR.INTERNO, e); }
 }
 
+/**
+ * 🔐 EL CANDADO DE EPISODIO EN CADA PUERTA (G14, tanda 2 del guardado seguro, 4-oct-2026).
+ *
+ * `_ACC_EPISODIO` son las escrituras que actúan sobre «quien esté en la cama» y por eso la pantalla tiene que mandar
+ * `EPISODIO_ABIERTO` (el PATIENT_ID de la tarjeta TAL COMO ESTABA AL ABRIR el diálogo): sin él, lo que se hace se
+ * atribuye al ocupante de AHORA, que puede ser otro. Es la lista de las filas 'episodio' del censo de
+ * build/checks/guardado_seguro_cobertura.js, y la guardia exige que sean exactamente las mismas: dos listas escritas
+ * a mano que no se pueden separar. COORD_CORREGIR no está aquí: no pasa por `_auditar` y su reclamo es `patientId`.
+ * `var` y no `const`: las const no cuelgan de globalThis en el eval del simulador.
+ */
+var _ACC_EPISODIO = [
+  'GUARDAR_EVOLUCION', 'DAR_ALTA', 'LIMPIAR_CAMA', 'INTERCAMBIAR_CAMAS', 'MOVER_A_CAMA_VACIA',
+  'ANULAR_EVENTO', 'ANEXAR_EVENTO', 'ANULAR_ANEXO', 'CONFIRMAR_DISPOSITIVOS', 'AGREGAR_HITO',
+  'EVAL_REGISTRAR', 'EPISODIO_ESCALA', 'PEND_ABRIR', 'PEND_CERRAR', 'GSA_ASIGNAR',
+];
+
+/**
+ * ¿La pantalla omitió EPISODIO_ABIERTO? AUSENTE (undefined/null) no es lo mismo que VACÍO (`''`): el vacío es una
+ * declaración («la tarjeta no tenía episodio al abrir»), la ausencia es una pantalla que no sabe decirlo. PURA, sin
+ * leer configuración: la usa `_auditar`, que corre DESPUÉS de que la escritura ya aterrizó, y que un detalle de la
+ * bitácora no puede convertir en error.
+ */
+function _epAusente(datos) {
+  const d = datos || {};
+  return d.EPISODIO_ABIERTO === undefined || d.EPISODIO_ABIERTO === null;
+}
+
+/**
+ * `ep` — el reclamo de episodio de una petición, armado UNA vez y pasado como ÚLTIMO parámetro de la función de
+ * servicio de cada puerta de episodio (limpiarCama(id, ep), darAltaPaciente(datos, ctx, ep)…). Cada servicio, dentro
+ * de su lock y antes de su primera escritura, lo compara con la cama que leyó (dominio_validacion.gs).
+ *
+ *   a        EPISODIO_ABIERTO tal como llegó (sin tocar: la regla distingue undefined, null y '')
+ *   b        EPISODIO_ABIERTO_B, de las dos puertas que tocan dos camas (intercambio y traslado)
+ *   estricto CONFIG.CONTRATO_ESTRICTO = TRUE. Nace APAGADO para no tumbar las pantallas viejas, y se lee con su valor
+ *            por defecto (no hace falta tocar la planilla ni correr crearORepararEstructura): en estricto, la
+ *            pantalla que no manda el reclamo se rechaza. Se lee sin distinguir mayúsculas: un interruptor de
+ *            SEGURIDAD que se queda apagado porque alguien escribió «true» y no «TRUE» es un candado que parece
+ *            puesto y no lo está, y ese olvido no se ve en ninguna pantalla
+ *   ausente  no vino `a` (ver `_epAusente`); una `b` suelta no la llena
+ */
+function _epDeDatos(datos) {
+  const d = datos || {};
+  return {
+    a: d.EPISODIO_ABIERTO,
+    b: d.EPISODIO_ABIERTO_B,
+    estricto: String(leerConfig('CONTRATO_ESTRICTO', 'FALSE')).trim().toUpperCase() === 'TRUE',
+    ausente: _epAusente(d),
+  };
+}
+
+/**
+ * « [sin episodio]» — la marca que `_auditar` agrega al resumen de la fila de AUDIT_LOG cuando una puerta de episodio
+ * llega SIN EPISODIO_ABIERTO. Es el único hueco que el modo tolerante deja abierto (una pantalla vieja: el service
+ * worker cachea el armazón por sello de versión), y esta marca es cómo se mide cuántas llamadas siguen sin candado
+ * antes de decidir cuándo encender el modo estricto. Vale también para el rechazo: una llamada sin candado que
+ * igual fue rechazada sigue siendo una llamada sin candado.
+ *
+ * 🪤 GUARDAR_EVOLUCION es la ÚNICA puerta de episodio que NO se anota, y es una excepción a propósito, no un olvido.
+ * Su fila de AUDIT_LOG es la que build/checks/guardado_viajes.js compara byte a byte contra el árbol de antes de la
+ * Ola 4, con payloads sin navegador (sin EPISODIO_ABIERTO): anotarla ponía roja esa A/B por una diferencia que no
+ * tiene nada que ver con los viajes, y una guardia existente no se afloja para acomodar un detalle de la bitácora.
+ * Es además la puerta que YA compara el episodio hoy (G14 original: ausente no rechaza, pero la pantalla lo manda
+ * siempre), así que es donde menos hace falta medir el hueco. Si algún día los payloads de esa A/B mandan
+ * EPISODIO_ABIERTO, la excepción sobra y se quita.
+ */
+function _marcaSinEpisodio(accion, datos) {
+  if (accion === 'GUARDAR_EVOLUCION') return '';
+  return (_ACC_EPISODIO.indexOf(accion) !== -1 && _epAusente(datos)) ? ' [sin episodio]' : '';
+}
+
+/**
+ * Forma de un OP_ID: lo que `crypto.randomUUID()` de la pantalla acuña con su prefijo («op_…»), de 8 a 64 caracteres de
+ * `[A-Za-z0-9_-]`. Es parte del contrato porque el OP_ID entra a la CLAVE del sello en el caché ('op|ACCION|OP_ID'): sin
+ * «|» ni espacios no se puede colar en la de otra operación, y el largo deja la clave muy por debajo de los 250
+ * caracteres que admite el caché. `var` y no `const`: ver infra_lock.gs.
+ */
+var _OP_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * 🔐 La operación de esta petición para el sello de operación (G16; infra_lock.gs hace el resto), o null si el payload no
+ * trae un OP_ID con la forma válida. Un OP_ID mal formado se trata como AUSENTE y no se rechaza: el sello es una ayuda
+ * para no repetir lo ya hecho, no una puerta, y con él ausente la operación corre exactamente como hoy.
+ *
+ * 🪤 Se arma ANTES de llamar al servicio, no después: `guardarEvolucion` MUTA `datos` (reescribe TEXTO_GENERADO, fija la
+ * FECHA, fusiona la fila previa), así que la huella y el texto tienen que tomarse de lo que la pantalla mandó, no de lo
+ * que quedó. El OP_ID no entra a la huella (se excluye): lo que se compara es el CONTENIDO.
+ */
+function _opDe(accion, datos) {
+  const d = datos || {};
+  const id = d.OP_ID;
+  if (typeof id !== 'string' || !_OP_ID_RE.test(id)) return null;
+  return { id: id, accion: accion, h: _huellaPayload(d), texto: String(d.TEXTO_GENERADO || '').trim(), tomado: false, repetida: false };
+}
+
+/**
+ * El hito que la puerta AGREGAR_HITO le entrega a `agregarHito`: lo que mandó la pantalla, con la IDENTIDAD DE LA SESIÓN puesta encima y sin
+ * id propio (revisión de la tanda 2, H8).
+ *
+ * 🔴 EL DEFECTO. Se armaba `Object.assign({ autor: ctx.firma, autorEmail: ctx.email }, datos)`: lo que traía el paquete iba DESPUÉS y
+ * pisaba la firma, así que un hito podía quedar «de» otra persona. Y desde el paso 9 `hito.id` es el ID_HITO de la fila (para que el reintento
+ * de una operación reconozca el suyo): si lo elegía quien llama, dos hitos con el mismo id dejaban la línea de tiempo con una clave repetida,
+ * y el sello y el «insertar si falta» dan por hecho que es única. La firma se toma de `ctx` (lo que `autorizar` verificó) y los ids los
+ * deriva el servidor (`uid('HITO', clave)`) o los pone un llamador interno; esta puerta no acepta `id` ni `ID_HITO`.
+ * `patientId` sí se respeta: es el episodio al que el hito dice pertenecer, y el candado de episodio lo compara.
+ */
+function _hitoDeLaPuerta(datos, ctx) {
+  const h = Object.assign({}, datos, { autor: ctx.firma, autorEmail: ctx.email });
+  delete h.id;
+  delete h.ID_HITO;
+  return h;
+}
+
 /** Ejecuta fn y, si resultó ok, deja registro en AUDIT_LOG. */
 function _auditar(ctx, accion, fn, datos) {
-  const r = fn();
+  // 🔐 OP_ACTUAL se arma ANTES del servicio y se DEVUELVE a lo que era al terminar, salga como salga (excepción
+  // incluida): en Apps Script cada petición es un proceso y vuelve a null; el simulador, que corre «la otra petición» dentro
+  // de la espera del candado de ésta, necesita que la de adentro no se lleve la de afuera.
+  const previa = (typeof OP_ACTUAL !== 'undefined') ? OP_ACTUAL : null;
+  const op = _opDe(accion, datos);
+  OP_ACTUAL = op;
+  let r;
+  try { r = fn(); } finally { OP_ACTUAL = previa; }
+  // Una repetición (el sello la reconoció) NO vuelve a anotar la acción: ya quedó en la bitácora la primera vez, y una
+  // segunda fila diría que el guardado ocurrió dos veces.
+  // 🔴 DECISIÓN DE DIEGO PENDIENTE (la 10 del diseño): ¿dejar además una fila corta <ACCION>_REPETIDA para medir cuánto
+  // ayuda el sello? Hasta que responda no se escribe nada: es un cambio de estas pocas líneas, no de diseño.
+  if (op && op.repetida) return r;
+  const marca = _marcaSinEpisodio(accion, datos);
   if (r && r.ok) {
     const d = r.data || {};
     auditar({
       email: ctx.email, firma: ctx.firma, accion: accion,
       entidad: d.entidad || '', idEntidad: d.idCama || d.idEvolucion || d.id || '',
-      patientId: d.patientId || '', resumen: d.accion || accion,
+      patientId: d.patientId || '', resumen: (d.accion || accion) + marca,
     });
     return r;
   }
@@ -325,18 +453,26 @@ function _auditar(ctx, accion, fn, datos) {
      corregir un turno, no pudo, y abandonó — que es el riesgo que el propio
      diseño del candado reconoce y no podía detectar.
 
-     Solo `VALIDACION`: un `INTERNO` es una excepción y ya se registra en el log
-     de ejecuciones; duplicarlo aquí llenaría AUDIT_LOG de ruido.
+     Solo `VALIDACION` y `CONFLICTO` (G14, tanda 2): un `INTERNO` es una
+     excepción y ya se registra en el log de ejecuciones; duplicarlo aquí
+     llenaría AUDIT_LOG de ruido. El `CONFLICTO` —«otra persona se adelantó»:
+     la cama la ocupó otro, la limpió otro— es justo el rechazo del que más
+     interesa dejar rastro: es el que dice que dos personas pisaron la misma cama.
 
      El `idEntidad` sale del payload de ENTRADA, porque una respuesta de rechazo
      no trae `data`. Y el resumen se acota: lleva el motivo tal como se le mostró
-     a la persona, que por construcción nombra la cama pero no al otro paciente. */
-  if (r && r.ok === false && r.codigo === ERR.VALIDACION) {
+     a la persona, que por construcción nombra la cama pero no al otro paciente.
+
+     🪤 `ID_CAMA` también cuenta (G14, 4-oct-2026): el formulario de la pantalla
+     manda la cama así, en mayúsculas, y sin esto el rechazo de un guardado
+     —justo el que dice «la cama cambió de paciente»— quedaba en la bitácora con
+     la cama VACÍA. */
+  if (r && r.ok === false && (r.codigo === ERR.VALIDACION || r.codigo === ERR.CONFLICTO)) {
     const dd = datos || {};
     auditar({
       email: ctx.email, firma: ctx.firma, accion: accion + '_RECHAZADO',
-      entidad: '', idEntidad: dd.idCama || dd.idEvolucion || dd.id || '',
-      patientId: dd.patientId || '', resumen: String(r.error || '').slice(0, 300),
+      entidad: '', idEntidad: dd.idCama || dd.ID_CAMA || dd.idEvolucion || dd.id || '',
+      patientId: dd.patientId || '', resumen: String(r.error || '').slice(0, 300) + marca,
     });
   }
   return r;

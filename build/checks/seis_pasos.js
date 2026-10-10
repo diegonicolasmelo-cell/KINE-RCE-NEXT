@@ -19,6 +19,9 @@
 //     de Evaluaciones o de Terapia física no guarda nada. Después del guardado se llega al Relato.
 //   · «No medí nada este turno» (Evaluaciones) sigue de largo a la terapia física: ya no guarda.
 //   · En el CELULAR caben las seis: la pestaña activa muestra su nombre y las demás solo su número.
+//   · 🔴 «← Atrás» sigue a la barra: si la pestaña 1 (Prevención) está oculta porque el paciente no
+//     tiene dispositivos, volver desde el Turno NO cae en esa pantalla vacía (sección 8b). La
+//     numeración de las pestañas no cambia: lo que cambia es adónde lleva el botón.
 //
 // 🪤 «CADA COSA SE MIDE DONDE VIVE»: aquí se mide justamente dónde vive cada cosa.
 // 🪤 Reloj congelado: la fecha se INVENTA y el turno se fuerza en SHIFT.
@@ -51,10 +54,12 @@ const PUENTE = () => {
     await q.goto('file://' + path.join(v2, 'index.html')); await q.waitForTimeout(800); return q; };
   const p = await nueva(1200);
 
-  const abrir = (pg, turno, ingreso) => pg.evaluate(async x => {
+  // sinVia: un paciente sin vía aérea artificial ni ventilación (no hay nada que prevenir: la pestaña 1 se esconde).
+  const abrir = (pg, turno, ingreso, sinVia) => pg.evaluate(async x => {
     $('kf').reset(); $('gDate').value = '2026-08-12'; SHIFT = x.turno;
     window.Turnos.setRoster([{ f: 'K.P.', n: 'Kine' }]);
     DB = x.ingreso ? [{ ID_CAMA: '5', OCUPADA: false }]
+      : x.sinVia ? [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: '', SOPORTE: '', FECHA_INGRESO: '2026-08-05', TS_INGRESO: '2026-08-05 23:00:00' }]
       : [{ ID_CAMA: '3', OCUPADA: true, PATIENT_ID: 'p3', NOMBRE: 'P', VIA_AEREA: 'TOT', SOPORTE: 'VM', FECHA_INGRESO: '2026-08-05', TS_INGRESO: '2026-08-05 23:00:00',
           FECHA_INICIO_VA: '2026-08-08', TS_INICIO_VA: '2026-08-08 10:00:00', FECHA_INICIO_SOPORTE: '2026-08-08', TS_INICIO_SOPORTE: '2026-08-08 10:00:00' }];
     if (!window.__toastGancho) { window.__toastGancho = true; const t0 = window.toast; window.toast = function (m) { window.__ultimoToast = String(m); return t0.apply(this, arguments); }; }
@@ -62,7 +67,7 @@ const PUENTE = () => {
     window.recargarSilencioso = () => {}; renderGrid(); abrirPanel(x.ingreso ? '5' : '3', !!x.ingreso, false);
     await new Promise(r => setTimeout(r, 800));
     if (typeof aplicarGatesEval === 'function') aplicarGatesEval();
-  }, { turno, ingreso: !!ingreso });
+  }, { turno, ingreso: !!ingreso, sinVia: !!sinVia });
   const ver = (pg, sel) => pg.evaluate(s => { const e = document.querySelector(s); if (!e) return false;
     const cs = getComputedStyle(e), r = e.getBoundingClientRect();
     return cs.display !== 'none' && cs.visibility !== 'hidden' && (r.width > 0 || r.height > 0); }, sel);
@@ -190,6 +195,60 @@ const PUENTE = () => {
   si('★ y aparece la pestaña del ingreso', await ver(p, '#pasoTab0'));
   // (la Prevención no aplica a un paciente que acaba de llegar: su pestaña no sale en el ingreso)
   eq('★★ con el ingreso, las pestañas son 0, 2, 3, 4, 5 y 6', await p.evaluate(() => Array.from(document.querySelectorAll('#spPasos .paso-t')).filter(t => !t.classList.contains('hidden') && !t.classList.contains('paso-oculto')).map(t => t.dataset.p).join(',')), '0,2,3,4,5,6');
+
+  console.log('\n8b · 🔴 «← Atrás» no cae en la Prevención cuando su pestaña está oculta (igual que «Siguiente» la salta)');
+  // Defecto (auditoría de la tanda 4, hallazgo F): con un paciente SIN vía aérea artificial ni ventilación la pestaña 1 se
+  // esconde (prevGateTab) y el camino arranca en el 2. «Siguiente» ya respeta eso, pero pasoRetroceder hacía pasoIr(PASO_ACTUAL-1)
+  // a ciegas: desde el Turno llevaba a una pantalla con el cartel «Sin dispositivos de vía aérea en este paciente.» que la barra
+  // ni siquiera ofrece. La ida y la vuelta tienen que ser el mismo camino. La numeración NO cambia (1..6 fija): cambia adónde
+  // lleva el botón. Lo que manda es la BARRA: si la pestaña 1 no se ve, Atrás no cae ahí.
+  const atras = () => p.evaluate(() => { pasoRetroceder(); return PASO_ACTUAL; });
+  const tab1Visible = () => p.evaluate(() => { const t = document.querySelector('#spPasos [data-p="1"]');
+    return !!t && !t.classList.contains('paso-oculto') && !t.classList.contains('hidden'); });
+  const cartelVacio = () => ver(p, '.pv-vacio');
+
+  console.log('   · paciente SIN dispositivos (pestaña 1 oculta)');
+  await abrir(p, 'Dia', false, true);
+  no('(control) la pestaña 1 está oculta', await tab1Visible());
+  eq('(control) el camino arranca en el 2', await p.evaluate(() => PASO_ACTUAL), '2');
+  no('★★ en el 2 NO se ofrece «← Atrás»: no hay un paso anterior a donde volver', await ver(p, '#pasoAtras'));
+  eq('★★ pasoRetroceder desde el 2 NO cae en la Prevención (se queda en el 2)', await atras(), '2');
+  no('★★ …y no aparece el cartel «Sin dispositivos de vía aérea en este paciente.»', await cartelVacio());
+  no('★★ …ni la tarjeta de prevención', await ver(p, '#fcPrevNavm'));
+  si('★ …y el Turno sigue a la vista', await ver(p, '#fcRespCard'));
+  // La vuelta repite la ida: 2 → 3 → 4 → 5 y de regreso 4 → 3 → 2, y desde el 2 no se baja más.
+  const ida = [], vuelta = [];
+  await p.evaluate(() => pasoIr(2));
+  for (let i = 0; i < 3; i++) { await p.evaluate(() => pasoAvanzar()); ida.push(await p.evaluate(() => PASO_ACTUAL)); }
+  for (let i = 0; i < 4; i++) vuelta.push(await atras());
+  eq('★★ la ida pasa por 3, 4, 5', ida.join(','), '3,4,5');
+  eq('★★ la vuelta pasa por 4, 3, 2 y ahí se queda (nunca el 1)', vuelta.join(','), '4,3,2,2');
+  si('(control) en el 3 «← Atrás» sí se ofrece', await p.evaluate(() => { pasoIr(3); return $('pasoAtras').style.display !== 'none'; }));
+  // La barra es la que manda: si el formulario cambia DESPUÉS de abrir (la vía aérea se elige en el turno), la pestaña 1 sigue oculta
+  // hasta reabrir la cama (prevGateTab solo corre al abrir) y «Atrás» no puede caer en un paso que la barra no muestra.
+  await abrir(p, 'Dia', false, true);
+  await p.evaluate(() => { $('fVA').value = 'TOT'; $('fSop').value = 'VM'; });
+  si('(control) el formulario ya dice TOT + VM, así que prevAplicaAlgo() es verdadero…', await p.evaluate(() => prevAplicaAlgo()));
+  no('(control) …pero la pestaña 1 sigue oculta (se evalúa al abrir)', await tab1Visible());
+  eq('★ Atrás desde el 2 sigue a la BARRA (se queda en el 2), no al formulario', await atras(), '2');
+
+  console.log('   · paciente CON prevención (pestaña 1 visible): todo igual que antes');
+  await abrir(p, 'Dia');
+  si('(control) la pestaña 1 está a la vista', await tab1Visible());
+  eq('(control) el camino arranca en el 1', await p.evaluate(() => PASO_ACTUAL), '1');
+  no('(control) en el 1 «← Atrás» no se ofrece', await ver(p, '#pasoAtras'));
+  await p.evaluate(() => pasoIr(2));
+  si('★★ en el 2 «← Atrás» SÍ se ofrece', await ver(p, '#pasoAtras'));
+  eq('★★ y desde el 2 SÍ vuelve al 1', await atras(), '1');
+
+  console.log('   · INGRESO (pestaña 1 oculta): desde el 2 se vuelve al 0');
+  await abrir(p, 'Dia', true);
+  no('(control) la pestaña 1 está oculta', await tab1Visible());
+  no('(control) en el 0 «← Atrás» no se ofrece', await ver(p, '#pasoAtras'));
+  await p.evaluate(() => pasoIr(2));
+  si('★★ en el 2 «← Atrás» SÍ se ofrece (hay un 0 al que volver)', await ver(p, '#pasoAtras'));
+  eq('★★ y desde el 2 vuelve al 0 (el ingreso), NO al 1 oculto', await atras(), '0');
+  no('…sin el cartel de la prevención vacía', await cartelVacio());
 
   console.log('\n9 · 🔴 En el CELULAR caben las seis');
   const m = await nueva(390);

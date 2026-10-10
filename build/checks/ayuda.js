@@ -24,6 +24,11 @@ global.repoActualizar = (h, c, id, cambios) => { const r = (DB[h] || []).find(x 
 global.ahoraTS = () => '2026-08-02 12:00:00';
 global.ok = d => ({ ok: true, data: d }); global.err = m => ({ ok: false, error: m });
 global.ERR = { VALIDACION: 'V', INTERNO: 'I' };
+// guardarSugerencia ahora toma el candado y deriva su id con uid() (H17, revisión de la tanda 2): este banco evalúa el servicio SOLO, así que
+// le pone los dos ayudantes que antes no necesitaba. Es el arnés, no lo que se afirma: las aserciones de abajo no cambiaron. Que la real
+// tome el candado y no duplique con el mismo OP_ID lo prueba guardado_seguro_operacion_g16.js (sección 29).
+global.conLock = fn => fn();
+global.uid = p => (p || 'ID') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7).toUpperCase();
 const svc = fs.readFileSync(path.join(v2, 'svc_turnos.gs'), 'utf8');
 eval(svc.slice(svc.indexOf('/* ── Sugerencias del equipo')));
 

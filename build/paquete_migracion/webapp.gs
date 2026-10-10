@@ -63,6 +63,15 @@ function doGet(e) {
  * acordar de que hay dos listas. También por eso hereda el candado gratis: el
  * acceso del turno se verifica dentro de `api()`, no acá.
  *
+ * ── 🔐 EL OP_ID Y EL EPISODIO VIAJAN IGUAL ───────────────────────────────
+ * La pantalla manda dentro de `datos` el `OP_ID` de la intención (el sello de
+ * operación de infra_lock.gs: un reintento que ya aterrizó no se ejecuta dos
+ * veces) y `EPISODIO_ABIERTO` (el candado de episodio de cada puerta). Por este
+ * camino llegan tal cual, porque esta puerta no mira `datos`: se los pasa a
+ * `api()`, que es quien los arma y los lee. Acá no hay nada que cambiar cuando
+ * aparece otro campo transitorio: si hubiera que tocar este archivo, algo se
+ * estaría decidiendo en el lugar equivocado.
+ *
  * ── 🔒 LO QUE NO VUELVE ───────────────────────────────────────────────────
  * Un error NUNCA devuelve el cuerpo que se mandó. Por ahí viajan las claves
  * del turno, y un mensaje de error que las eche de vuelta las deja en el
