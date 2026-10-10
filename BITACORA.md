@@ -4057,3 +4057,76 @@ en el selector de vía aérea del ingreso lo trata como estado de llegada, no co
 que `regresion_ui` llama «anotable» (solo mira que el cascarón no tenga la clase `hidden`). Va a las decisiones de Diego.
 
 **Sin migración de esquema.** `entrega/`, `pwa/` y la `VERSION` quedan para el cierre de la tanda.
+
+## 10-oct-2026 · Tanda 3 · paso 3.2 · Una sola lista de obligatorios, y el aviso «Falta:» nombra la hemodinamia y la razón de no extubar (cambios 2 y 3)
+
+**El defecto.** Lo que falta para poder guardar existía en TRES listas: dos paralelas dentro de `rielRender` (una de textos para la línea
+«Falta:» de `#gFalta` y otra de elementos para el «!» de los encabezados del celular) y una tercera, con sus toasts, en `guardar()`.
+Bastaba agregar un obligatorio a una y olvidar la otra para que el aviso y el bloqueo se contradijeran, y se contradijeron: `guardar()` frena
+si falta la **hemodinamia** (estado y DVA; Diego, 20-sep-2026: «HDN pedir antes de avanzar… como la firma») y si la PVE se superó **sin
+extubar** y falta su razón o el detalle de «Otra» (tanda 2a), pero el aviso no nombraba ninguna de las dos. Medido en Chromium: una
+evolución nueva con la firma y la vía aérea puestas decía «Falta:» en blanco, y al apretar Guardar salía «Registra la hemodinamia». El aviso
+mentía por omisión: la persona descubría la falta recién al guardar, justo lo que el aviso existe para evitar. (Confirmado que la hipótesis de
+la auditoría era cierta: el aviso quedaba vacío en los cinco escenarios medidos, a 1200 y a 390 px.)
+
+**El cambio (solo `v2/index.html`, sin tocar `guardar()`, ni su lista, ni su bloqueo, ni el payload).**
+- **Cambio 2.** Función nueva `_obligatoriosPendientes()`, justo encima de `rielRender`: devuelve `[{ el, texto }]` en el orden en que se
+  anuncian. `rielRender` ya no arma nada: la consume para las dos cosas (la línea de `#gFalta` con los `texto` unidos con « y » y
+  `_mPintarSecciones` con los `el`). Se conserva el nombre `rielRender` (lo llaman sitios que ya no importa contar). Cada entrada lleva su
+  texto y su elemento JUNTOS: no se pueden separar. Los once obligatorios de siempre conservan **palabra por palabra** su texto, su elemento y
+  su orden (lo mide el oráculo escrito a mano de la guardia 1, que da verde contra el código de antes y de después).
+- **Cambio 3.** Entran dos obligatorios, en el **mismo orden relativo que `guardar()`**: firma · **hemodinamia** · vía aérea · PVE · … ·
+  tipo de la extubación sin PVE · **razón de la PVE superada sin extubar** · **motivo de la «Otra» razón de no extubar** · KTM · reintubación.
+  Mismas condiciones que `guardar()` (hemodinamia: `!v('fHEst') || !v('fDVA')`, y el campo al que lleva es el primero vacío, como allá;
+  PVE superada sin extubar: `_pveSupSinExt()` con razón vacía, o con «Otra» sin detalle).
+- De paso, en el celular el encabezado de la tarjeta decía el genérico «falta un dato obligatorio» para lo que `_mFaltaTxt` no conocía. Se le
+  enseñaron tres nombres: «falta la hemodinamia», «falta la razón de no extubar» y «falta el motivo de la «Otra» razón de no extubar».
+
+**Lo que ve distinto la kinesióloga (texto visible).**
+- La primera línea de una evolución en blanco pasa de «Falta: firma y vía aérea» a **«Falta: firma y hemodinamia y vía aérea»**. Con tubo, de
+  «Falta: firma y PVE sí / no / no corresponde» a «Falta: firma y hemodinamia y PVE sí / no / no corresponde». Cuando la hemodinamia está puesta
+  (la mayoría de los turnos, porque se copia del turno anterior) no cambia nada.
+- Si marca «PVE superada» y «no se extubó» sin decir por qué, el aviso ahora lo pide ANTES de apretar Guardar: «Falta: razón de la PVE superada
+  sin extubar» (y «motivo de la «Otra» razón de no extubar» si eligió «Otra» sin detalle).
+- En el celular, la tarjeta Hemodinamia sin registrar pasa de «— sin registrar» a **«! falta la hemodinamia»**, y Respiratorio avisa lo de la
+  razón de no extubar. Es lo que se quería: el bloque que debe algo ya no se ve igual que el que está vacío sin deber nada.
+- 🪤 Con tres o más pendientes la frase lee «firma y hemodinamia y vía aérea» (el unir con « y » ya era así: «firma y vía aérea y PVE sí / no…»).
+  No se cambió el modo de unir para no tocar el resto de frases; si Diego prefiere comas, es una línea.
+
+**Las guardias.**
+- `build/checks/obligatorios_una_sola_lista.js` (nueva, a 1200 y 390 px, reloj inventado lunes 10-ago-2026 11:00): estructura (existe la función,
+  `rielRender` ya no lleva `faltas.push` ni `faltaEls` y la llama) y equivalencia en 14 escenarios (firma y vía aérea en blanco, vía natural en
+  regla, PVE sin responder, «No» sin razón, «No corresponde» sin razón, «Otra» sin motivo en las dos ramas, extubación sin tipo, KTM no realizada,
+  contraindicada, suspendida sin criterio, «Otro» sin fundamento, reintubación sin hora y tres a la vez para el ORDEN) contra una tabla escrita a
+  mano: el texto de `#gFalta`, la lista `[texto, id]` y, en el celular, las tarjetas marcadas con «!». **Roja antes:** 36 fallos (todos de
+  estructura y de la lista; las aserciones de texto y de tarjetas daban verde contra el código de antes, que es lo que demuestra que el
+  oráculo es fiel al comportamiento de hoy). **Verde después.**
+- `build/checks/aviso_igual_que_guardar.js` (nueva, a 1200 y 390 px): espía `_irAlCampo` para saber a dónde lleva `guardar()` sin editarlo. Matriz
+  nueva (hemodinamia vacía, solo con el estado, solo con la DVA, PVE superada sin extubar sin razón y con «Otra» sin detalle, y hemodinamia + PVE
+  sin responder para el orden): `guardar()` no guarda, lleva al campo esperado, `#gFalta` no queda vacío y dice exactamente la frase, la lista
+  incluye ese campo y, en el celular, su tarjeta queda con «!» y el encabezado la nombra. Y la misma invariante («si `guardar()` bloquea, el aviso lo
+  nombra y la lista incluye el lugar al que lleva») en los diez obligatorios de siempre, para que la próxima deriva no necesite un bug nuevo. Más
+  el orden de la evolución en blanco y un control positivo (con todo en regla el aviso queda vacío y `guardar()` guarda, también con la razón de no
+  extubar y con «Otra» + detalle). **Roja antes:** 68 fallos (el aviso vacío en los cinco escenarios nuevos; la lista de elementos no existía).
+  **Verde después.**
+- **Mutantes (mueren donde les toca):** sin la hemodinamia en la lista → 33 fallos en `aviso_igual_que_guardar`; la hemodinamia después de la vía
+  aérea → 3; sin la razón de no extubar → 9; sin el detalle de «Otra» → 4; sin el nombre de la hemodinamia en el celular → 5; `rielRender` con una
+  lista propia de nuevo → 3 fallos en `obligatorios_una_sola_lista`.
+- **`panel_ux.js` reconciliada con su razón escrita** (en la guardia y acá): sus dos aserciones de texto exacto fijaban «Falta: firma y vía aérea» y
+  «Falta: firma y PVE sí / no / no corresponde». La convención que cambia de verdad es QUÉ nombra el aviso (ahora todo lo que bloquea el guardado);
+  las aserciones se actualizaron a «Falta: firma y hemodinamia y vía aérea» y «Falta: firma y hemodinamia y PVE sí / no / no corresponde» (la firma
+  sigue primero y la vía aérea sigue nombrada; ninguna aserción se borró). Las demás guardias que miran `#gFalta` (reporte_colega,
+  pve_no_corresponde_razon, pve_otra_pantalla, ktm_otro_pantalla, evaluaciones_celular, validacion_entre_pasos) usan fragmentos y siguen verdes sin
+  tocarlas; `movil_panel` y `movil` también.
+- Batería completa con `-j 2` (en dos mitades, 228 guardias): 226 verdes y solo `paridad_entrega` y `pwa_paquete` en rojo, que son la regeneración pendiente del cierre.
+  `guardado_viajes` y `episodio_turno` (A/B del payload) verdes: lo que `guardar()` manda no cambió.
+
+**Lo que NO se hizo y queda dicho.**
+- `guardar()` sigue con su lista propia (con sus toasts y sus frases): la auditoría pidió no tocarlo. Un obligatorio nuevo va en los DOS sitios;
+  `aviso_igual_que_guardar.js` es la red que avisa si se olvida uno (mide `guardar()` desde afuera). Unificarlas del todo sería un paso aparte, en zona
+  cerrada.
+- Esto implementa la opción recomendada de la decisión 1 de la auditoría («que `Falta:` nombre la hemodinamia desde el primer momento»). Si Diego
+  dice que no, se revierte la línea de la hemodinamia en `_obligatoriosPendientes()` y las dos aserciones de `panel_ux`, pero entonces el desplegable
+  de Hemodinamia no podrá decir «Requiere revisión» de forma honesta (cambio 4).
+- No se cambió el modo de unir las frases (« y »), ni `_vis`, ni la PVE, ni ningún id; sin migración de esquema. `entrega/`, `pwa/` y la `VERSION`
+  quedan para el cierre (`build/paquete_migracion/index.html` lo regeneró la guardia `paquete.js`).

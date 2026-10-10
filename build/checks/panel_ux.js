@@ -1,7 +1,7 @@
 // panel_ux.js — Guardia del panel v5.25 (versión de PRUEBA de Diego):
 //   1. Riel de secciones: se arma desde las .fcard visibles, marca ✓ las que
 //      tienen datos, salta a la sección al tocar y NO agrega obligaciones.
-//   2. #gFalta anuncia firma/vía aérea ANTES de apretar Guardar.
+//   2. #gFalta anuncia firma/hemodinamia/vía aérea ANTES de apretar Guardar.
 //   3. Reintento automático del guardado: si el primer intento falla, se
 //      reintenta UNA vez a los ~3 s; si el segundo funciona, la evolución
 //      queda guardada sin intervención del usuario.
@@ -73,11 +73,16 @@ const { chromium } = require('playwright-core');
   });
   console.log('── Riel de secciones ──');
   eq('el riel lista las secciones del formulario', R1.hayRiel, true);
-  eq('al abrir en blanco anuncia lo obligatorio', R1.faltaInicial, 'Falta: firma y vía aérea');
+  /* 🔴 10-oct-2026 · EL AVISO TAMBIÉN NOMBRA LA HEMODINAMIA (tanda 3 · cambio 3). Esta frase decía «Falta: firma y vía aérea», pero
+     guardar() frena si falta la hemodinamia (estado y DVA; Diego, 20-sep-2026: «HDN pedir antes de avanzar… como la firma») y el
+     aviso no la nombraba: la evolución en blanco prometía «firma y vía aérea» y al apretar Guardar pedía otra cosa más. La
+     convención que cambia de verdad es QUÉ nombra el aviso (ahora todo lo que bloquea el guardado, en el orden de guardar());
+     la firma sigue primero y la vía aérea sigue nombrada. Lo mide aviso_igual_que_guardar.js contra guardar() mismo. */
+  eq('al abrir en blanco anuncia lo obligatorio', R1.faltaInicial, 'Falta: firma y hemodinamia y vía aérea');
   eq('sin datos no está todo verde', R1.ningunaVerde, true);
   eq('una sección con datos se marca ✓', R1.verdesConDatos, true);
   // Con el paciente en TOT la PVE es obligatoria de declarar (ago-2026)
-  eq('con vía aérea quedan la firma y la PVE', R1.faltaSoloFirma, 'Falta: firma y PVE sí / no / no corresponde');
+  eq('con vía aérea quedan la firma, la hemodinamia y la PVE', R1.faltaSoloFirma, 'Falta: firma y hemodinamia y PVE sí / no / no corresponde');
   eq('con firma y PVE declarada el aviso desaparece', R1.faltaVacio, '');
   // 🗂️ 17-sep-2026 · Salió con el índice lateral: `rielIr(i)` era el salto a
   // una sección desde el riel, y el riel ya no existe. No quedó nada que

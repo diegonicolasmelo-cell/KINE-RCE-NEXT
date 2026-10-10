@@ -6983,10 +6983,50 @@ function _resetHiddenYEventos(){
 // ── Riel de secciones del panel (v5.25, versión de PRUEBA de Diego) ──
 // Índice del formulario armado desde las tarjetas visibles (.fcard):
 // ✓ verde = la sección tiene datos · ○ = vacía. Es INFORMATIVO — no agrega
-// obligaciones nuevas (las obligatorias siguen siendo firma y vía aérea,
-// que además se anuncian en #gFalta antes de apretar Guardar).
+// obligaciones nuevas (las obligatorias son las de `guardar()` y viven en
+// `_obligatoriosPendientes()`: firma, hemodinamia, vía aérea… — se anuncian
+// en #gFalta antes de apretar Guardar).
 let _rielT=null;
 function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
+/**
+ * LA LISTA ÚNICA de lo que falta para poder guardar, en el orden en que se anuncia: `[{ el, texto }]`, con `el` el campo
+ * al que hay que llevar a la persona y `texto` lo que dice la línea «Falta:» de #gFalta.
+ *
+ * 🔴 10-oct-2026 · ANTES eran dos listas paralelas dentro de `rielRender` (textos y elementos) y una tercera en `guardar()`.
+ * Bastaba agregar un obligatorio a una y olvidar la otra para que el aviso y el bloqueo se contradijeran, y se
+ * contradijeron: `guardar()` frena si falta la HEMODINAMIA (Diego, 20-sep-2026: «HDN pedir antes de avanzar… como la
+ * firma») y si la PVE se superó SIN extubar y falta su razón (tanda 2a), pero el aviso no las nombraba. Una evolución nueva
+ * con la firma y la vía aérea puestas decía «Falta:» en blanco y al apretar Guardar salía «Registra la hemodinamia»: el
+ * aviso mentía por omisión. Un obligatorio que bloquea tiene que anunciarse ANTES de apretar. Ahora el texto de la línea y
+ * el elemento que marca el celular salen de la MISMA entrada: no se pueden separar.
+ * 🪤 El ORDEN es el de `guardar()` (firma · hemodinamia · vía aérea · PVE · razón de no extubar · KTM · reintubación), y el
+ * primero de la lista es el campo al que `guardar()` lleva. `guardar()` sigue con su propia secuencia (cada obligatorio con
+ * su toast y su frase), así que un obligatorio nuevo va en los DOS sitios: lo cuida aviso_igual_que_guardar.js, y
+ * obligatorios_una_sola_lista.js cuida que el aviso siga siendo palabra por palabra el de siempre.
+ */
+function _obligatoriosPendientes(){
+  const o=[];
+  const falta=(el,texto)=>{ o.push({el:el, texto:texto}); };
+  if(!v('fFirma')) falta($('fFirma'),'firma');
+  // Estado Y DVA (las dos). Como en guardar(), se lleva al primero que está vacío.
+  if(!v('fHEst') || !v('fDVA')) falta(!v('fHEst')?$('fHEst'):$('fDVA'),'hemodinamia');
+  if(!v('fVA')) falta($('fVA'),'vía aérea');
+  // Obligatorias nuevas (ago-2026, Diego): declarar la PVE con TOT y la
+  // razón cuando la KTM no se realiza o está contraindicada.
+  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) falta($('fPVEval'),'PVE sí / no / no corresponde');
+  { const _pr=_pveRazonFalta(); if(_pr) falta(_pr, v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada'); }
+  { const _po=_pveOtraSinMotivo(); if(_po) falta(_po,'motivo de la «Otra» razón de PVE'); }
+  { const _pt=_pveExtSinTipo(); if(_pt) falta(_pt,'tipo de la extubación sin PVE'); }
+  // PVE superada y NO se extubó: la razón es obligatoria y «Otra» exige el detalle (tanda 2a). Mismas condiciones que guardar().
+  if(_pveSupSinExt() && !_pveSupRazon()) falta($('fPveSupRaz'),'razón de la PVE superada sin extubar');
+  if(_pveSupSinExt() && String(v('fPveSupRaz')||'').trim()==='Otra' && !String(v('fPveSupDet')||'').trim()) falta($('fPveSupDet'),'motivo de la «Otra» razón de no extubar');
+  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) falta($('fKTMnoRaz'),'razón de KTM no realizada');
+  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) falta($('fKTMraz'),'contraindicación de KTM');
+  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) falta($('fKTMalertRaz'),'criterio de la suspensión de KTM en sesión');
+  { const _kof=_ktmOtroSinFundamento(); if(_kof) falta(_kof,'fundamento de la razón de KTM'); }
+  if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) falta(_rh,'hora de la reintubación'); }
+  return o;
+}
 /**
  * Lo que falta para poder guardar, en los dos sitios donde se anuncia: la línea
  * de #gFalta (escritorio) y el encabezado de la sección que lo contiene
@@ -7002,39 +7042,16 @@ function _rielDeb(){ clearTimeout(_rielT); _rielT=setTimeout(rielRender,250); }
  * consola.
  */
 function rielRender(){
-  const faltas=[];
-  if(!v('fFirma')) faltas.push('firma');
-  if(!v('fVA')) faltas.push('vía aérea');
-  // Obligatorias nuevas (ago-2026, Diego): declarar la PVE con TOT y la
-  // razón cuando la KTM no se realiza o está contraindicada.
-  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) faltas.push('PVE sí / no / no corresponde');
-  if(_pveRazonFalta()) faltas.push(v('fPVEval')==='nc' ? 'razón de «PVE no corresponde»' : 'razón de la PVE no realizada');
-  if(_pveOtraSinMotivo()) faltas.push('motivo de la «Otra» razón de PVE');
-  if(_pveExtSinTipo()) faltas.push('tipo de la extubación sin PVE');
-  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) faltas.push('razón de KTM no realizada');
-  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltas.push('contraindicación de KTM');
-  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) faltas.push('criterio de la suspensión de KTM en sesión');
-  if(_ktmOtroSinFundamento()) faltas.push('fundamento de la razón de KTM');
-  if(typeof _reintubHoraFalta==='function' && _reintubHoraFalta()) faltas.push('hora de la reintubación');
+  /* 🔴 10-oct-2026 · UNA sola lista. Antes esta función armaba lo que falta dos veces (una lista de textos y, más abajo, una
+     paralela de elementos); ahora las dos salen de `_obligatoriosPendientes()`, que es donde vive cada obligatorio. */
+  const pend=_obligatoriosPendientes();
   const fEl=$('gFalta');
-  if(fEl) fEl.textContent=faltas.length?('Falta: '+faltas.join(' y ')):'';
+  if(fEl) fEl.textContent=pend.length?('Falta: '+pend.map(o=>o.texto).join(' y ')):'';
   // Los MISMOS obligatorios, pero como elementos: en el celular el aviso va en
   // el encabezado de la sección que lo contiene, no en una línea al final que
   // en un teléfono queda fuera de la pantalla. Se deduce por `contains`, no por
   // el título de la tarjeta — un título se cambia y nadie se acuerda del riel.
-  const faltaEls=[];
-  if(!v('fFirma')) faltaEls.push($('fFirma'));
-  if(!v('fVA')) faltaEls.push($('fVA'));
-  if($('dExtSec') && _vis($('dExtSec')) && !v('fPVEval')) faltaEls.push($('fPVEval'));
-  { const _pr=_pveRazonFalta(); if(_pr) faltaEls.push(_pr); }
-  { const _po=_pveOtraSinMotivo(); if(_po) faltaEls.push(_po); }
-  { const _pt=_pveExtSinTipo(); if(_pt) faltaEls.push(_pt); }
-  if($('bKTMn')?.classList.contains('on') && _vis($('bKTMn')) && !v('fKTMnoRaz')) faltaEls.push($('fKTMnoRaz'));
-  if($('bKTMs')?.classList.contains('on') && _vis($('bKTMs')) && !v('fKTMraz') && !String(v('fKTMman')||'').trim()) faltaEls.push($('fKTMraz'));
-  if($('cKTMalert')?.checked && _vis($('cKTMalert')) && !v('fKTMalertRaz')) faltaEls.push($('fKTMalertRaz'));
-  { const _kof=_ktmOtroSinFundamento(); if(_kof) faltaEls.push(_kof); }
-  if(typeof _reintubHoraFalta==='function'){ const _rh=_reintubHoraFalta(); if(_rh) faltaEls.push(_rh); }
-  _mPintarSecciones(faltaEls);
+  _mPintarSecciones(pend.map(o=>o.el));
   _mPacBar();
 }
 /* 🗂️ 17-sep-2026 · Acá vivía `rielIr(i)`, el salto a una sección desde el
@@ -16277,6 +16294,9 @@ function _mPintarSecciones(faltaEls){
 function _mFaltaTxt(el){
   const id=el&&el.id;
   return id==='fFirma'?'la firma':id==='fVA'?'la vía aérea':
+         (id==='fHEst'||id==='fDVA')?'la hemodinamia':
+         id==='fPveSupRaz'?'la razón de no extubar':
+         id==='fPveSupDet'?'el motivo de la «Otra» razón de no extubar':
          id==='fPVEval'?'declarar la PVE':id==='fKTMnoRaz'?'la razón de KTM':
          id==='fKTMnoCom'?'el fundamento de la razón':
          id==='fKTMraz'?'la contraindicación':
