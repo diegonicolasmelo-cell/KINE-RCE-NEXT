@@ -3352,3 +3352,25 @@ Diego eligió el estilo (acuerdo 8.8) y pidió programarlo. Se hizo como **capa 
   nueva lo cazó al medir el color real, no el escrito.
 - Batería: 213 verdes. Sello `NEXT-6.0-sereno`.
 
+
+### Tanda H · Diego revisó los seis pasos en la app pegada · 11-oct-2026
+
+Primera revisión con la app **corriendo** (sello 6.0). Antes de eso, un tropiezo de pegado: el proyecto tiraba
+`ReferenceError: e is not defined (línea 17, archivo "spike")`. No venía del index (no contiene la palabra «spike»):
+su proyecto tenía los `.gs` desfasados y el `doGet` quedó en el archivo equivocado. Se resolvió pegando `spike.gs` y
+`webapp.gs`.
+🪤 **Mandar solo el index deja los `.gs` desfasados sin que nadie lo note.** `que_pegar.js` compara contra el último
+commit, no contra lo que de verdad está pegado en SU proyecto. Al entregar, preguntar qué archivos tiene.
+
+De la revisión salió una lista larga, ordenada en `docs/PLAN_TANDA_H.md` (tandas H1 a H11, 7 preguntas abiertas).
+Lo que vale la pena recordar del dictado:
+
+- 🔑 **La idea que ordena medio plan:** «la interpretación viene por añadidura». El clínico anota el dato crudo
+  (la dosis, la frecuencia, la actividad, el diagnóstico) y el sistema deriva la lectura (dosis alta, taquicárdico,
+  nivel de KTM, grupo REM). Choca con la cicatriz del Glasgow 15 de fábrica, así que lo derivado se muestra como
+  LECTURA, no como campo ya elegido, y se guarda el dato crudo, no la interpretación.
+- **Dos bugs de verdad**, no de gusto: el IMT y el EMS despliegan sus variables bajo la tarjeta equivocada, y la vía
+  aérea se elige en dos sitios.
+- **«Todo se permite»** en evaluaciones: es exactamente el caso de la regla del 9-oct (guardia heredada que no se
+  defiende). Pero antes de borrarlas hay que separar las condicionantes de evaluación de las reglas clínicas que él
+  mismo cerró (plateau con asincronía, BNM sin sedación). Preguntado.
