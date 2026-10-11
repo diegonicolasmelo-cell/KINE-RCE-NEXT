@@ -265,19 +265,102 @@ está muerto en el flujo por pasos (`docs/PENDIENTES.md` §4b). Conviene resolve
 
 ---
 
+## 12 bis · Lo que Diego respondió el 11-oct-2026
+
+### B · Escalones por sedante
+*«Solo ponemos el escalón, luego te paso el detalle.»* → La pantalla deja elegir **fármaco + escalón 1 a 6**,
+sin validar la dosis. La tabla dosis→escalón llega después. **H7 ya no está bloqueada.**
+
+### C · Cortes de dosis de las DVA
+
+| Fármaco | Baja | Media | Alta | De dónde |
+|---|---|---|---|---|
+| **Noradrenalina** | 0,01 – 0,1 | > 0,1 – 0,3 | > 0,3 | Diego |
+| **Vasopresina** | 0,01 | 0,02 | 0,03 | Diego |
+| **Adrenalina** | 0,01 – 0,1 | > 0,1 – 0,3 | > 0,3 | 🔎 propuesta: es **equipotente 1:1 con la noradrenalina** en los equivalentes de noradrenalina (Goradia 2021), así que se le aplican los mismos cortes |
+| **Dopamina** | < 5 | 5 – 10 | > 10 | 🔎 propuesta: los tramos farmacológicos clásicos (renal · inotrópico · vasopresor). Coinciden con la equivalencia dopamina ÷ 100 ≈ noradrenalina |
+
+🪤 **Las unidades no son todas iguales**: noradrenalina, adrenalina y dopamina van en mcg/kg/min (γ);
+la vasopresina va en **U/min y no por kilo**. La pantalla tiene que mostrar la unidad de cada una, y el
+cálculo no puede usar una sola fórmula.
+⏳ **Falta que Diego confirme** los dos renglones marcados 🔎, y que la unidad de la noradrenalina sea γ/kg/min.
+
+### D · Rangos de frecuencia cardíaca
+Bradicárdico **< 60** · eucárdico **60 a 100** · taquicárdico **> 100**.
+
+### E · GSA
+*«Sacar la GSA solo de la vista de turno.»* → **Sale de la pantalla del turno. El módulo que la importa desde
+el PDF del laboratorio se queda entero**, con su guardia `gsa_importada.js`.
+
+### F · «Todo se permite»
+*«Solo para evaluaciones.»* → Las condicionantes se sacan **solo del paso 3**. Las reglas clínicas de los otros
+apartados (plateau con asincronía, BNM que se desmarca sin sedación, PVE con más de 24 h de VM) **se quedan
+como están**: son decisiones suyas ya cerradas, no candados heredados.
+
+### G · Actividades de cada nivel de KTM — 🟢 ya están en el repositorio
+No hace falta buscar la hoja antigua: la lista vive en `v2/index.html` (`KTM_INTERV_BY_LVL`) y hoy ya se usa
+como chips que aparecen **después** de elegir el nivel.
+
+| Nivel | Qué dice hoy | Actividades |
+|---|---|---|
+| **1** | Protección muscular — paciente no cooperador (S5Q ≤ 3) | Posicionamiento · elongaciones · movilización pasiva · NEMS · entrenamiento muscular respiratorio |
+| **2** | Movilización en cama — giros y ejercicio analítico | Elongaciones · movilización activo-asistida · giros en cama · ejercicio analítico · NEMS · pedalera · entrenamiento muscular respiratorio |
+| **3** | Sedente al borde de cama (SBC) | Elongaciones · movilización activa · equilibrio sedente · control de tronco · coordinación y balance · transición supino a SBC · tolerancia al ejercicio |
+| **4** | Bipedestación y transición sedente-bípedo | Equilibrio sedente y bípedo · bipedestación · marcha estática · transición sedente a bípedo · sedente en sillón · tolerancia al ejercicio |
+| **5** | Marcha y reeducación de la marcha | Coordinación dinámica en bípedo · reeducación de la marcha · marcha por habitación · tolerancia al ejercicio |
+
+**Lo que pide Diego es darlo vuelta:** se muestran **todas** las actividades, se marcan las que se hicieron
+(pueden ser de varios niveles) y **el nivel se deriva de la más alta**, para la estadística.
+⏳ **Falta que Diego confirme** que esta lista es la misma del reverso de la hoja, o la corrija.
+
+### A · Borrador de diagnóstico → grupo REM
+28 diagnósticos contra 17 grupos. **Esto es un borrador mío**, para que lo corrija:
+
+| Diagnóstico | Grupo REM |
+|---|---|
+| Neumonía grave · Insuficiencia respiratoria aguda · SDRA | Enfermedades respiratorias |
+| ACV isquémico · ACV hemorrágico | ACV |
+| TEC grave | TEC |
+| Guillain-Barré | ENM agudas |
+| Miastenia gravis | ENM crónicas |
+| Status epiléptico | Otras neurológicas |
+| Falla cardíaca descompensada · Shock cardiogénico · Infarto agudo al miocardio | Enfermedades cardíacas |
+| Politraumatismo · Trauma torácico · Trauma abdominal · Fractura de cadera | Traumatológicos |
+| Post operatorio cirugía cardíaca · Post operatorio cirugía abdominal · Post operatorio neurocirugía | Otros pre y post quirúrgicos |
+| Insuficiencia renal aguda | Genitourinarias |
+| Quemados | Quemados |
+| Shock séptico · Sepsis · Pancreatitis aguda grave · Falla hepática aguda · Cetoacidosis diabética · Intoxicación aguda | Otros |
+
+**Las cuatro que no tengo claras, y por qué:**
+1. **Hemorragia subaracnoidea** → ¿ACV, u «Otras neurológicas»? La dejé sin asignar.
+2. **Post operatorio cirugía cardíaca** → ¿«Otros pre y post quirúrgicos» o «Enfermedades cardíacas»?
+3. **Post operatorio neurocirugía** → ¿«Otros pre y post quirúrgicos» u «Otras neurológicas»?
+4. **Insuficiencia renal aguda** → la puse en «Genitourinarias»; ¿o va en «Otros»?
+
+🪤 **Y una decisión de fondo:** el diagnóstico es **texto libre con sugerencias**, no una lista cerrada. Si el
+colega escribe uno que no está en la tabla, **el grupo REM queda en blanco y se elige a mano**. Nunca se
+inventa un grupo: una cifra del REM mal atribuida es peor que una vacía.
+
+**Quedan sin usar** cuatro grupos (LM, Sd. Post-UCI, COVID-19, Otras reumatológicas, Oncológicos): ningún
+diagnóstico de la lista cae ahí. Se siguen pudiendo elegir a mano.
+
+---
+
 ## 13 · Lo que falta decidir antes de programar
 
 Nada de esto lo puedo inventar: son decisiones clínicas.
 
 | | Pregunta | Para qué |
 |---|---|---|
-| **A** | **La tabla diagnóstico → grupo REM.** Hay 28 diagnósticos en la lista y 17 grupos REM. ¿Me la dictas, o parto con un borrador mío y lo corriges? | §1.5 |
-| **B** | **Los escalones por sedante.** ¿Qué dosis de fentanilo es E3? ¿Y de propofol, midazolam, precedex, ketamina? | §3.1 |
-| **C** | **Los cortes de dosis de cada DVA** (baja/media/alta) y **la unidad** de cada una (γ/kg/min, mcg/kg/min, U/min…). | §4.4 |
-| **D** | **Los rangos de FC**: ¿bradicárdico bajo 60 y taquicárdico sobre 100, o usas otros cortes en UCI? | §4.5 |
-| **E** | **«Sacar la GSA»**: ¿la saco solo de la vista del turno y sigue llegando del PDF del laboratorio, o la jubilo entera? Hoy hay un módulo completo que importa los gases desde el PDF. | §6.5 |
-| **F** | **«Todo se permite»**: ¿vale solo para las **evaluaciones**, o también para las reglas clínicas de otros apartados (plateau con asincronía, BNM sin sedación…)? Esas últimas no son candados de evaluación: son decisiones clínicas tuyas ya cerradas. | §9.3 |
-| **G** | **Las actividades de cada nivel de KTM** (1 a 5). ¿Me las dictas? | §10.2 |
+🟢 **Las siete de la primera ronda están respondidas** (§12 bis). Quedan solo estos flecos, y **ninguno
+bloquea H1 a H8**:
+
+| | Pregunta | Para qué |
+|---|---|---|
+| **A1** | Las **cuatro casillas dudosas** del borrador diagnóstico → REM (HSA, post-op cardíaca, post-op neurocirugía, falla renal). | §12 bis A |
+| **C1** | Confirmar los cortes **propuestos** de adrenalina y dopamina, y que la noradrenalina se mide en γ/kg/min. | §12 bis C |
+| **G1** | Confirmar que las actividades que ya están en el código son las mismas del reverso de la hoja. | §12 bis G |
+| **B1** | La tabla **dosis → escalón** por sedante. Diego la pasa después; **no bloquea**, porque el escalón se elige a mano. | §3.1 |
 
 ---
 
@@ -292,12 +375,12 @@ roja primero y la batería en verde.
 | **H2** | Terapia física: IMT y EMS cada uno con lo suyo (bug), sesiones y descanso en IMT | — | bajo |
 | **H3** | Secreciones (agregar/sacar), cultivos con Minilab y texto libre, permeabilización condicionada | — | medio |
 | **H4** | PVE más clara, cerrar el turno más limpio, procedimientos del día, pendientes como lista | — | medio |
-| **H5** | Evaluaciones: iconos arriba, filas desplegables, sacar condicionantes | **F** | medio-alto |
-| **H6** | Hemodinamia: DVA con dosis, FC en número, meta PAM siempre | **C, D** | medio |
-| **H7** | Sedación: escalón por fármaco, meta que no coincide, GCS tras el SAS, BNM al final | **B** | **alto** |
-| **H8** | Respiratorio: días en la segunda línea, resumen en frase, procedimientos de vía aérea, GSA | **E** | **alto** |
-| **H9** | Grupo REM automático desde el diagnóstico | **A** | medio |
-| **H10** | Terapia física: actividades en vez de nivel, nivel derivado | **G** | medio |
+| **H5** | Evaluaciones: iconos arriba, filas desplegables, sacar condicionantes (**solo del paso 3**) | — | medio-alto |
+| **H6** | Hemodinamia: DVA con dosis, FC en número, meta PAM siempre | C1 | medio |
+| **H7** | Sedación: escalón por fármaco, meta que no coincide, GCS tras el SAS, BNM al final | — | **alto** |
+| **H8** | Respiratorio: días en la segunda línea, resumen en frase, procedimientos de vía aérea, GSA fuera de la vista | — | **alto** |
+| **H9** | Grupo REM automático desde el diagnóstico | A1 | medio |
+| **H10** | Terapia física: actividades en vez de nivel, nivel derivado | G1 | medio |
 | **H11** | Herencia: la tabla del §12, y revivir el aviso de heredados | — | medio |
 
-**H1 a H4 se pueden empezar hoy**, sin esperar ninguna respuesta tuya.
+**H1 a H8 se pueden programar ya.** Solo H9 y H10 esperan un fleco, y los dos se pueden dejar para el final.
