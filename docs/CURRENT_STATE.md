@@ -1,6 +1,26 @@
 # Estado actual de RCE-KINE NEXT
 
-Actualizado: 15/09/2026.
+Actualizado: 18/10/2026.
+
+## Línea paralela: hoja diaria digital
+
+Diego aportó la hoja física de registro kinésico UCI y solicitó un diseño para
+reemplazar la sección Turno: captura numérica, columnas sucesivas por valoración
+y texto revisable para copiar manualmente en ALMA. Se revisaron las dos páginas.
+Implementación en rama paralela `codex/hoja-diaria-turno`, descrita en
+[DAILY_RECORD_DESIGN.md](DAILY_RECORD_DESIGN.md). SAS se captura dentro del turno conservando observaciones por
+hora; evaluaciones funcionales en panel lateral. DVA propone agentes, dosis y
+unidades con cantidad derivada, sin interpretación automática por cantidad.
+Decisión confirmada: descripción «HDN autosostenida» o «HDN con DVA»; en este último
+caso, cantidad y detalle de NAD/AD/VS con dosis y unidades. No usar dosis altas,
+moderadas o bajas. Un estado no registrado no equivale a HDN autosostenida.
+Hoja del día reemplaza Turno: tabla de valoraciones, auscultación, secreciones,
+observaciones, GSA con hora de muestra y parámetros descriptivos para KTM. Datos
+iniciales de tubo/talla quedan fuera de la captura diaria. Firma y texto para ALMA
+en la misma vista. 43 pruebas automáticas y smoke aprobados.
+Paquete generado; [archivos e instalación](DAILY_RECORD_INSTALL.md).
+Publicación Google de esta rama pendiente de verificar; versión 4 es la última
+publicación previamente confirmada. No se modificó producción.
 
 ## Bloque cerrado
 

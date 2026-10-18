@@ -1,10 +1,25 @@
-import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS, NUMERIC_MEASUREMENTS, GAS_FIELDS, SESSION_FIELDS } from '../model/clinical-record.js';
+import { EVENT_LABELS, MEASUREMENTS, MEASUREMENT_RANGES, ACTIVITIES, SCALE_COMPONENTS, NUMERIC_MEASUREMENTS, GAS_FIELDS, SESSION_FIELDS, DAILY_FIELDS, DVA_UNITS, KTM_ASSESSMENT_FIELDS, describeHdn } from '../model/clinical-record.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const options = values => values.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('');
 const field = (label, name, body = '') => `<label>${label}${body || `<input name="${name}" required>`}</label>`;
 const select = (label, name, values) => field(label, name, `<select name="${name}">${options(values)}</select>`);
 const form = (type, title, contents, submit = 'Registrar') => `<form data-command="${type}"><h3>${title}</h3>${contents}<button class="primary" type="submit">${submit}</button></form>`;
 const stamp = value => new Date(value).toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+const dailyInput = (spec, prefix) => spec.text ? `<textarea aria-label="${esc(spec.label)}" name="${prefix}${spec.key}" rows="2"></textarea>` : `<input aria-label="${esc(spec.label)}" name="${prefix}${spec.key}" inputmode="decimal" placeholder="Sin registrar">`;
+export function dailySheet(e, open) {
+  const records = [...(e.dailyRecords || [])].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const cell = value => `<td>${esc(value == null || value === '' ? '—' : value)}</td>`;
+  const headers = records.map(record => `<th scope="col">${stamp(record.at)}<small>${e.turns.find(t => t.id === record.turnId)?.signedAt ? 'Firmado' : 'Turno abierto'}</small></th>`).join('');
+  const rows = DAILY_FIELDS.map(spec => `<tr><th scope="row">${esc(spec.label)}${spec.unit ? `<small>${esc(spec.unit)}</small>` : ''}</th>${records.map(record => cell(record.values[spec.key])).join('')}${open ? `<td class="daily-new">${dailyInput(spec, 'daily_')}</td>` : ''}</tr>`).join('');
+  const dvaInputs = select('Estado HDN', 'hdn', ['', 'autosostenida', 'dva']).replace('>autosostenida<', '>HDN autosostenida<').replace('>dva<', '>HDN con DVA<') + Object.entries(DVA_UNITS).map(([drug, units]) => `<div class="dva-entry"><label>${drug}<input aria-label="Dosis ${drug}" name="dose_${drug}" inputmode="decimal" placeholder="Dosis"></label><label>Unidad ${drug}<select name="unit_${drug}">${options(['', ...units])}</select></label></div>`).join('');
+  const hdnRow = `<tr><th scope="row">Hemodinamia / DVA</th>${records.map(record => cell(describeHdn(record))).join('')}${open ? `<td class="daily-new">${dvaInputs}</td>` : ''}</tr>`;
+  const gasRows = GAS_FIELDS.map(spec => `<tr><th scope="row">${esc(spec.label)} <small>${esc(spec.unit)}</small></th>${records.map(record => cell(e.measurements.find(item => item.id === record.gasId)?.components?.[spec.key])).join('')}${open ? `<td class="daily-new">${dailyInput(spec, 'daily_gas_')}</td>` : ''}</tr>`).join('');
+  const gasTime = `<tr><th scope="row">Hora de muestra GSA</th>${records.map(record => cell(record.gasId ? stamp(e.measurements.find(item => item.id === record.gasId).at) : null)).join('')}${open ? '<td class="daily-new"><input aria-label="Hora de muestra GSA" type="datetime-local" name="gasAt"></td>' : ''}</tr>`;
+  const ktmRows = KTM_ASSESSMENT_FIELDS.map(spec => `<tr><th scope="row">${esc(spec.label)}</th>${records.map(record => cell(record.ktm[spec.key])).join('')}${open ? `<td class="daily-new">${dailyInput(spec, 'ktm_')}</td>` : ''}</tr>`).join('');
+  const cols = 1 + records.length + (open ? 1 : 0);
+  const section = title => `<tr class="daily-section"><th colspan="${cols}">${title}</th></tr>`;
+  return `<section class="daily-sheet"><h3>Hoja del día · cambios clínicos</h3><p>Una columna por valoración. Auscultación y secreciones corresponden a esa hora. Talla y características iniciales del tubo pertenecen al ingreso.</p>${open ? '<form data-command="DAILY_ASSESSMENT">' : ''}<div class="daily-scroll"><table><caption>Historia de valoraciones · horas guardadas mostradas en Santiago</caption><thead><tr><th scope="col">Variable</th>${headers}${open ? `<th scope="col" class="daily-new">Nueva valoración<label>Hora opcional (vacío: al guardar)<input type="datetime-local" name="assessmentAt" step="1"></label><small>Entrada en zona del navegador: ${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)}</small></th>` : ''}</tr></thead><tbody>${section('Monitorización y observaciones')}${rows}${hdnRow}${section('GSA · resultado de una muestra, sin interpretación automática')}${gasTime}${gasRows}${section('Parámetros para KTM · no registra una sesión realizada')}${ktmRows}</tbody></table></div>${open ? '<p>Vacío = sin registrar en esta valoración. No modifica las columnas previas. Para DVA, selecciona la unidad de cada dosis.</p><button class="primary" type="submit">Guardar valoración</button></form>' : '<p>Abre un turno para agregar una valoración.</p>'}</section>`;
+}
 function measurementFields(kind) {
   if (kind === 'GSA') return '<p>Deja vacío lo no medido. Cada registro agrega una muestra a la serie.</p>' + GAS_FIELDS.map(({ key, label, unit }) => field(`${label}${unit ? ' (' + unit + ')' : ''}`, `gas_${key}`, `<input name="gas_${key}" inputmode="decimal">`)).join('');
   if (NUMERIC_MEASUREMENTS[kind]) return field(`Resultado (${NUMERIC_MEASUREMENTS[kind].unit})`, 'value', '<input name="value" inputmode="decimal" required>');
@@ -42,7 +57,14 @@ export class ClinicalView {
       if (button.dataset.episode) { this.tab = 'turno'; actions.open(button.dataset.episode); }
       if (button.dataset.admit) actions.admit(Number(button.dataset.admit));
     });
-    this.document.querySelector('#dialog-body').addEventListener('click', event => {
+    this.document.querySelector('#dialog-body').addEventListener('click', async event => {
+      if (event.target.closest('[data-copy-alma]')) {
+        if (!this.canLeave()) return;
+        const text = this.document.querySelector('[aria-label="Texto para ALMA"]');
+        try { await this.document.defaultView.navigator.clipboard.writeText(text.value); this.message('Texto copiado. Pégalo y revísalo en ALMA.'); }
+        catch { text.focus(); text.select(); this.message('Texto seleccionado: usa Ctrl+C para copiar.'); }
+        return;
+      }
       if (event.target.closest('[data-discard]')) { this.dirty = false; this.record(this.current); return; }
       const button = event.target.closest('[data-tab]'); if (!button || !this.canLeave()) return;
       this.tab = button.dataset.tab; this.record(this.current);
@@ -52,6 +74,23 @@ export class ClinicalView {
       if ([...this.dirtyForms].some(type => type !== form.dataset.command)) { this.message('Guarda o descarta primero los cambios del otro formulario.', true); return; }
       const data = Object.fromEntries(new FormData(form));
       const command = { ...data, type: form.dataset.command, turnId: data.turnId || this.current.episode.turns.find(t => !t.signedAt)?.id };
+      if (command.type === 'DAILY_ASSESSMENT') {
+        if (data.assessmentAt) {
+          const at = new Date(data.assessmentAt);
+          if (!Number.isFinite(at.getTime())) { this.message('Indica fecha y hora válida.', true); return; }
+          command.at = at.toISOString();
+        }
+        command.format = 'daily-v1';
+        command.values = Object.fromEntries(DAILY_FIELDS.map(({ key }) => [key, data[`daily_${key}`]]));
+        command.ktm = Object.fromEntries(KTM_ASSESSMENT_FIELDS.map(({ key }) => [key, data[`ktm_${key}`]]));
+        command.dva = Object.keys(DVA_UNITS).filter(drug => data[`dose_${drug}`]?.trim() || data[`unit_${drug}`]).map(drug => ({ drug, dose: data[`dose_${drug}`], unit: data[`unit_${drug}`] }));
+        const components = Object.fromEntries(GAS_FIELDS.map(({ key }) => [key, data[`daily_gas_${key}`]]));
+        if (Object.values(components).some(value => value?.trim()) || data.gasAt) {
+          const gasAt = new Date(data.gasAt);
+          if (!Number.isFinite(gasAt.getTime())) { this.message('Indica la fecha y hora de la muestra GSA.', true); return; }
+          command.gas = { at: gasAt.toISOString(), components };
+        }
+      }
       if (data.bed) command.bed = Number(data.bed);
       if (command.type === 'MEASUREMENT' && data.kind === 'GCS') command.components = { ocular: data.ocular, verbal: data.verbal, motor: data.motor };
       if (command.type === 'MEASUREMENT' && SCALE_COMPONENTS[data.kind]) command.components = Object.fromEntries(SCALE_COMPONENTS[data.kind].map(({ key }) => [key, data[`component_${key}`]]));
@@ -95,13 +134,15 @@ export class ClinicalView {
     this.dirty = false; this.dirtyForms = new Set(); this.current = model; const { episode: e, state, clocks, handover, narratives } = model; this.revision = e.revision;
     this.document.querySelector('#dialog-title').textContent = `${e.bed ? `Cama ${e.bed}` : 'Egresado'} · ${e.alias}`;
     const open = e.turns.find(t => !t.signedAt);
-    const tabs = { turno: 'Turno', eventos: 'Eventos', series: 'Mediciones', actividades: 'Atenciones', continuidad: 'Continuidad', historia: 'Historia y entrega' };
+    const tabs = { turno: 'Hoja del día', eventos: 'Eventos', series: 'Evaluaciones y mediciones', actividades: 'Atenciones', continuidad: 'Continuidad', historia: 'Historia y entrega' };
     let body = '';
     if (this.tab === 'turno') {
-      body = open ? form('DRAFT', 'Borrador del turno', field('Nota de este turno', 'note', `<textarea name="note">${esc(open.note)}</textarea>`) + field('Plan para la entrega', 'plan', `<textarea name="plan">${esc(open.plan)}</textarea>`), 'Guardar borrador') + form('SIGN', 'Cerrar turno', '<p>Firma la versión guardada. Las correcciones posteriores serán adendas.</p>', 'Firmar turno') : (!e.dischargedAt ? form('OPEN_TURN', 'Comenzar turno', '<p>Los registros del turno anterior permanecen en la historia.</p>', 'Abrir turno') : '<p>Episodio cerrado.</p>');
+      body = (!open && !e.dischargedAt ? form('OPEN_TURN', 'Comenzar turno', '<p>Apertura manual. Se conserva la historia anterior.</p>', 'Abrir turno') : '') + dailySheet(e, open);
+      if (open) body += '<details class="daily-note"><summary>Nota complementaria y plan del turno</summary>' + form('DRAFT', 'Nota y plan', field('Nota complementaria', 'note', `<textarea name="note">${esc(open.note)}</textarea>`) + field('Plan para la entrega', 'plan', `<textarea name="plan">${esc(open.plan)}</textarea>`), 'Guardar nota y plan') + '</details>' + form('SIGN', 'Cerrar turno', '<p>Firma las valoraciones guardadas. Las correcciones posteriores serán adendas.</p>', 'Firmar turno');
       const signed = e.turns.filter(t => t.signedAt);
       if (signed.length) body += form('ADDENDUM', 'Agregar adenda', field('Turno firmado', 'turnId', `<select name="turnId">${signed.map(t => `<option value="${esc(t.id)}">${stamp(t.openedAt)}</option>`).join('')}</select>`) + field('Motivo de la corrección', 'reason') + field('Texto de la adenda', 'text'));
-      if (!e.dischargedAt) body += form('MOVE', 'Trasladar episodio', field('Cama destino (1–18)', 'bed', '<input name="bed" type="number" min="1" max="18" required>'), 'Trasladar') + (!open ? form('DISCHARGE', 'Egreso de prueba', '<p>La historia se conservará en episodios egresados.</p>', 'Registrar egreso') : '');
+      const currentTurn = open || e.turns.at(-1);
+      if (currentTurn) body += `<section class="daily-text"><h3>Texto para ALMA · ${currentTurn.signedAt ? 'turno firmado' : 'borrador sin firmar'}</h3><p>Revisa el texto antes de copiar. La copia no confirma guardado en ALMA.</p><textarea readonly aria-label="Texto para ALMA">${esc(narratives.find(n => n.id === currentTurn.id)?.text || '')}</textarea><button type="button" data-copy-alma>Copiar texto</button></section>`;
     }
     if (this.tab === 'eventos') {
       body = open ? form('EVENT', 'Registrar evento ahora', field('Evento', 'eventType', `<select name="eventType">${Object.entries(EVENT_LABELS).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select>`) + field('Motivo', 'reason') + '<details><summary>Datos según el evento</summary>' + select('Soporte posterior (si corresponde)', 'support', ['Ambiente', 'Oxigenoterapia', 'CNAF', 'VNI', 'VM']) + select('Resultado PVE', 'result', ['Superada', 'Fracasada', 'No evaluable']) + field('Estado persistente', 'active', '<select name="active"><option value="true">Iniciar / cambiar</option><option value="false">Suspender</option></select>') + field('Detalle de AET / UPOT / aislamiento / programa', 'detail', '<input name="detail">') + '</details>') : '<p>Abre un turno para registrar eventos.</p>';
@@ -117,6 +158,7 @@ export class ClinicalView {
       body += this.list(e.activities, item => `${stamp(item.at)} · ${item.kind} · ${item.status}: ${item.detail}${item.techniques?.length ? ' · Técnicas: ' + item.techniques.join('; ') : ''}${item.parameters ? ' · ' + (SESSION_FIELDS[item.kind] || []).filter(spec => item.parameters[spec.key] != null).map(spec => `${spec.label}: ${item.parameters[spec.key]} ${spec.unit || ''}`).join('; ') : ''}`);
     }
     if (this.tab === 'continuidad') {
+      if (!e.dischargedAt) body += form('MOVE', 'Trasladar episodio', field('Cama destino (1–18)', 'bed', '<input name="bed" type="number" min="1" max="18" required>'), 'Trasladar') + (!open ? form('DISCHARGE', 'Egreso de prueba', '<p>La historia se conserva.</p>', 'Registrar egreso') : '');
       if (open) {
         body += form('PENDING', 'Nuevo pendiente', field('Tarea para continuidad', 'text'));
         const pending = e.pending.filter(p => p.status === 'Abierto');
@@ -124,7 +166,7 @@ export class ClinicalView {
         body += form('CULTURE', 'Toma de cultivo', field('Muestra y contexto', 'sample'));
         const cultures = e.cultures.filter(c => !c.result);
         if (cultures.length) body += form('CULTURE_RESULT', 'Informar resultado', field('Muestra', 'cultureId', `<select name="cultureId">${cultures.map(c => `<option value="${esc(c.id)}">${esc(c.sample)}</option>`).join('')}</select>`) + field('Resultado', 'text'));
-      } else body = '<p>Abre un turno para modificar continuidad.</p>';
+      } else body += '<p>Abre un turno para modificar continuidad.</p>';
       body += '<h3>Pendientes</h3>' + this.list(e.pending, p => `${p.status} · ${p.text}`) + '<h3>Cultivos</h3>' + this.list(e.cultures, c => `${c.sample} · ${c.result?.text || 'Resultado pendiente'}`);
     }
     if (this.tab === 'historia') {

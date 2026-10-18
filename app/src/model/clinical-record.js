@@ -27,6 +27,50 @@ export const GAS_FIELDS = Object.freeze([
   { key: 'eb', label: 'EB', unit: '' }, { key: 'lactate', label: 'Lactato', unit: 'mmol/L' },
   { key: 'sao2', label: 'SaO₂', unit: '%', min: 0, max: 100 }, { key: 'fio2', label: 'FiO₂ al momento', unit: '%', min: 0, max: 100 }
 ]);
+export const DAILY_FIELDS = Object.freeze([
+  { key: 'fc', label: 'FC', unit: 'lpm', min: 0 },
+  { key: 'fr', label: 'FR observada', unit: 'rpm', min: 0 },
+  { key: 'pas', label: 'PA sistólica', unit: 'mmHg', min: 0 },
+  { key: 'pad', label: 'PA diastólica', unit: 'mmHg', min: 0 },
+  { key: 'pam', label: 'PAM medida', unit: 'mmHg', min: 0 },
+  { key: 'spo2', label: 'SpO₂', unit: '%', min: 0, max: 100 },
+  { key: 'fio2', label: 'FiO₂', unit: '%', min: 0, max: 100 },
+  { key: 'sas', label: 'SAS', min: 1, max: 7, integer: true },
+  { key: 'pic', label: 'PIC', unit: 'mmHg', min: 0 },
+  { key: 'ppc', label: 'PPC', unit: 'mmHg', min: 0 },
+  { key: 'auscultation', label: 'Auscultación', text: true },
+  { key: 'secretions', label: 'Secreciones', text: true },
+  { key: 'observations', label: 'Observaciones / cambios clínicos', text: true }
+]);
+export const DVA_UNITS = Object.freeze({ NAD: ['µg/kg/min', 'µg/min'], AD: ['µg/kg/min', 'µg/min'], VS: ['U/min', 'U/h'] });
+export const KTM_ASSESSMENT_FIELDS = Object.freeze([
+  { key: 'objective', label: 'Objetivo / actividad prevista', text: true },
+  { key: 'assistance', label: 'Asistencia prevista', text: true },
+  { key: 'limitations', label: 'Limitaciones / contraindicaciones observadas', text: true },
+  { key: 'response', label: 'Tolerancia / respuesta observada', text: true }
+]);
+export function describeHdn(record) {
+  if (record.hdn === 'autosostenida') return 'HDN autosostenida';
+  if (record.hdn === 'dva') return `HDN con ${record.dva.length} DVA: ` + record.dva.map(item => `${item.drug} ${item.dose} ${item.unit}`).join('; ');
+  return '';
+}
+function dailyValues(command) {
+  const values = structuredValues(command.values || {}, DAILY_FIELDS);
+  const ktm = structuredValues(command.ktm || {}, KTM_ASSESSMENT_FIELDS);
+  const hdn = command.hdn || '';
+  requireValue(['', 'autosostenida', 'dva'].includes(hdn), 'Estado HDN inválido');
+  requireValue(Array.isArray(command.dva || []), 'Lista DVA inválida');
+  const dva = (command.dva || []).map(item => {
+    requireValue(DVA_UNITS[item.drug]?.includes(item.unit), 'Fármaco o unidad DVA inválidos');
+    const dose = decimal(item.dose, item.drug);
+    requireValue(dose > 0, 'La dosis de una DVA activa debe ser mayor que cero');
+    return { drug: item.drug, dose, unit: item.unit };
+  });
+  requireValue(new Set(dva.map(item => item.drug)).size === dva.length, 'DVA duplicada');
+  requireValue(hdn === 'dva' ? dva.length > 0 : dva.length === 0, 'El estado HDN debe coincidir con las DVA registradas');
+  requireValue(hdn || Object.values(values).some(value => value !== null) || Object.values(ktm).some(value => value !== null) || command.gas, 'Registra al menos un dato de la valoración');
+  return { format: 'daily-v1', values, hdn, dva, ktm };
+}
 function decimal(value, label) {
   const text = String(value ?? '').trim().replace(',', '.');
   requireValue(/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text) && Number.isFinite(Number(text)), `Ingresa un valor numérico válido: ${label}`);
@@ -226,6 +270,20 @@ export function applyCommand(original, command, context) {
     case 'MEASUREMENT':
       editable(); requireValue(MEASUREMENTS.includes(command.kind), 'Medición no permitida');
       episode.measurements.push({ ...entry, turnId: command.turnId, kind: command.kind, ...measurementValue(command) }); break;
+    case 'DAILY_ASSESSMENT': {
+      editable();
+      requireValue(command.format === 'daily-v1', 'Formato de hoja diaria inválido');
+      const record = { ...entry, turnId: command.turnId, ...dailyValues(command) };
+      if (command.gas) {
+        const gasAt = command.gas.at;
+        requireValue(instant(gasAt) >= instant(episode.admittedAt) && instant(gasAt) <= instant(at), 'La muestra debe tener una hora válida anterior o igual a la valoración');
+        const gas = measurementValue({ kind: 'GSA', format: 'gsa-v1', components: command.gas.components });
+        record.gasId = `${id}:gas`;
+        episode.measurements.push({ ...entry, id: record.gasId, at: gasAt, turnId: command.turnId, kind: 'GSA', ...gas });
+      }
+      (episode.dailyRecords ||= []).push(record);
+      break;
+    }
     case 'ACTIVITY':
       editable(); requireValue(ACTIVITIES.includes(command.kind), 'Actividad no permitida');
       requireValue(nonempty(command.detail), 'Describe la atención o sesión');
@@ -273,6 +331,12 @@ export function narrative(episode, turnId) {
     lines.push(`${item.at}: ${item.kind}: ${item.value} ${item.unit}.`);
     if (item.components && SCALE_COMPONENTS[item.kind]) lines.push(SCALE_COMPONENTS[item.kind].map(({ key, label }) => `${label}: ${item.components[key]}`).join('; ') + '.');
     if (item.calculation?.notEvaluable) lines.push(`Ítems NE: ${item.calculation.notEvaluable}. ${item.calculation.method === 'no-calculable' ? 'Total no calculable.' : 'Total con imputación por promedio y redondeo según legacy 7.04.'}`);
+  }
+  for (const item of (episode.dailyRecords || []).filter(e => e.turnId === turnId)) {
+    lines.push(`${item.at}: Valoración del día. ${describeValues(item.values, DAILY_FIELDS)}.`);
+    const hdn = describeHdn(item); if (hdn) lines.push(hdn + '.');
+    const ktm = describeValues(item.ktm, KTM_ASSESSMENT_FIELDS);
+    if (ktm) lines.push(`Parámetros / valoración para KTM (no acredita sesión realizada): ${ktm}.`);
   }
   for (const item of episode.activities.filter(e => e.turnId === turnId)) {
     lines.push(`${item.at}: ${item.kind} — ${item.status}: ${item.detail}.`);

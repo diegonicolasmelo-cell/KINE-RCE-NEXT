@@ -15,7 +15,17 @@ const escaped = combined.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replac
 await writeFile(new URL('review.html', dest), '<!doctype html><html lang="es"><meta charset="utf-8"><title>Backend NEXT TEST · archivo preparado</title><style>body{font-family:system-ui;background:#fff;color:#123;padding:24px}textarea{width:100%;height:75vh;font:12px monospace}</style><h1>Backend NEXT TEST</h1><p>Archivo generado para el proyecto TEST vacío. No contiene credenciales.</p><label>Código completo preparado<textarea readonly aria-label="Código completo preparado">' + escaped + '</textarea></label></html>');
 await copyFile(new URL('api/apps-script/appsscript.json', root), new URL('appsscript.json', dest));
 await writeFile(new URL('LEEME.txt', dest), [
-  'KINE-RCE-NEXT TEST — Instalación en proyecto NUEVO y vacío',
+  'KINE-RCE-NEXT TEST — Hoja diaria — rama codex/hoja-diaria-turno',
+  '',
+  'ACTUALIZAR EL TEST EXISTENTE:',
+  'Reemplazar todo el contenido de Código.gs con NEXT_TEST.gs. No agregarlo como segundo script.',
+  'Conservar appsscript.json y las propiedades del proyecto existentes.',
+  'NO ejecutar initializeNextTest otra vez.',
+  'Guardar y actualizar la implementación web existente con una nueva versión. Acceso: Solo yo.',
+  'Una vez guardadas valoraciones nuevas, no volver a código anterior que desconozca DAILY_ASSESSMENT:',
+  'el diario requiere un lector compatible. Para revertir la vista, conservar el dominio nuevo.',
+  '',
+  'SOLO PARA UN PROYECTO NUEVO Y VACÍO:',
   '',
   '1. Copiar NEXT_TEST.gs en un archivo de script del proyecto TEST vacío.',
   '2. Usar appsscript.json como manifiesto del proyecto.',
