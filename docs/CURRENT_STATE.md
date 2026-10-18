@@ -19,8 +19,18 @@ observaciones, GSA con hora de muestra y parámetros descriptivos para KTM. Dato
 iniciales de tubo/talla quedan fuera de la captura diaria. Firma y texto para ALMA
 en la misma vista. 43 pruebas automáticas y smoke aprobados.
 Paquete generado; [archivos e instalación](DAILY_RECORD_INSTALL.md).
-Publicación Google de esta rama pendiente de verificar; versión 4 es la última
-publicación previamente confirmada. No se modificó producción.
+El código de esta rama fue cargado en Código.gs del proyecto NEXT TEST; se verificó
+coincidencia exacta con el paquete. Se corrigió incompatibilidad de Apps Script con
+asignación lógica ||= usando asignación convencional; las cinco pruebas afectadas
+volvieron a pasar. Prueba local de interfaz: FC 82, SAS 1 y NAD 0,35 µg/kg/min
+guardados y presentes en el texto descriptivo; revisión visual realizada.
+Publicación web pendiente de confirmar: la revisión automática de permisos agotó
+el tiempo al publicar y bloqueó la consulta posterior por fallo de conexión.
+Versión 4 sigue siendo la última publicación confirmada. No asumir una versión 5
+ni persistencia real de la hoja diaria hasta verificar la implementación.
+Siguiente acción: revisar Gestionar implementaciones en el mismo proyecto, confirmar
+o completar nueva versión con acceso Solo yo y probar guardado/recarga de una
+valoración sintética. No ejecutar el inicializador. No se modificó producción.
 
 ## Bloque cerrado
 

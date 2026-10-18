@@ -281,7 +281,8 @@ export function applyCommand(original, command, context) {
         record.gasId = `${id}:gas`;
         episode.measurements.push({ ...entry, id: record.gasId, at: gasAt, turnId: command.turnId, kind: 'GSA', ...gas });
       }
-      (episode.dailyRecords ||= []).push(record);
+      episode.dailyRecords = episode.dailyRecords || [];
+      episode.dailyRecords.push(record);
       break;
     }
     case 'ACTIVITY':
