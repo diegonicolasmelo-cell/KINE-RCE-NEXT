@@ -35,11 +35,11 @@ con el archivo combinado. El adaptador y smoke no requieren cambios.
 Validación automática de esta entrega: 43 pruebas y smoke aprobados. La revisión
 Google se informa por separado en CURRENT_STATE.md.
 
-Estado al 18/10/2026: Código.gs cargado y comparado con el paquete; publicación
-web sin confirmar por fallo del servicio de revisión automática de permisos.
-Consultar la implementación antes de crear otra versión. El último despliegue
-confirmado es versión 4. La nueva hoja fue probada localmente; falta probar su
-persistencia real desde la implementación web.
+Estado al 18/10/2026: Código.gs cargado y comparado con el paquete; versión 5
+publicada a las 16:26 de Chile, misma URL y acceso Solo yo. Se verificó persistencia
+tras recarga de dos valoraciones sintéticas en cama 2: FC/SAS, NAD con dosis/unidad,
+auscultación, secreciones, observaciones, objetivo KTM y GSA con signo y cero.
+No es necesario que el usuario vuelva a reemplazar archivos para esta entrega.
 
 ## Compatibilidad y retorno
 

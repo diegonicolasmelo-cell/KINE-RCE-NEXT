@@ -24,13 +24,15 @@ coincidencia exacta con el paquete. Se corrigió incompatibilidad de Apps Script
 asignación lógica ||= usando asignación convencional; las cinco pruebas afectadas
 volvieron a pasar. Prueba local de interfaz: FC 82, SAS 1 y NAD 0,35 µg/kg/min
 guardados y presentes en el texto descriptivo; revisión visual realizada.
-Publicación web pendiente de confirmar: la revisión automática de permisos agotó
-el tiempo al publicar y bloqueó la consulta posterior por fallo de conexión.
-Versión 4 sigue siendo la última publicación confirmada. No asumir una versión 5
-ni persistencia real de la hoja diaria hasta verificar la implementación.
-Siguiente acción: revisar Gestionar implementaciones en el mismo proyecto, confirmar
-o completar nueva versión con acceso Solo yo y probar guardado/recarga de una
-valoración sintética. No ejecutar el inicializador. No se modificó producción.
+Versión 5 publicada y confirmada el 18/10/2026 a las 16:26 de Chile, misma URL,
+acceso Solo yo y ejecución como propietario. No se ejecutó el inicializador.
+Prueba real en cama 2, episodio sintético `fd19b949-4233-4e84-8733-8c64650f015b`:
+dos columnas a las 16:28:07 y 16:28:30 conservaron FC 82/96 y SAS 1/2. La primera
+incluye auscultación, secreciones, observaciones, NAD 0,35 µg/kg/min y objetivo KTM.
+La segunda enlaza GSA de las 16:28 con pH 7,38, EB -2 y lactato 0. Se recargó la
+aplicación y se reabrió el episodio: ambas columnas y texto persistieron en Sheets.
+El turno sintético permanece abierto para revisión. Firma de hoja validada por
+pruebas automáticas; no se firmó este turno en Google. No se modificó producción.
 
 ## Bloque cerrado
 

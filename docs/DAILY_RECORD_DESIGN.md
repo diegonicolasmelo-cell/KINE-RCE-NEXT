@@ -1,8 +1,9 @@
 # Propuesta paralela: hoja diaria digital del turno
 
 Fecha: 18/10/2026. Estado: primera implementación en rama `codex/hoja-diaria-turno`.
-Validación automática: 43 pruebas y smoke del shell aprobados. Publicación Google
-pendiente de verificación; consultar el estado actual antes de asumir despliegue.
+Validación automática: 43 pruebas y smoke del shell aprobados. Versión 5 publicada
+en Google TEST el 18/10/2026; dos columnas sintéticas recuperadas tras recarga.
+Consultar CURRENT_STATE.md para el detalle de evidencia y alcance.
 Fuente: las dos páginas de «Hoja registro Kinésico UCI 2025 (2).pdf», facilitadas
 por Diego. La hoja es una referencia de estructura; sus protocolos y umbrales no
 se incorporan automáticamente como reglas aprobadas del software.
